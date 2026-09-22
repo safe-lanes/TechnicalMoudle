@@ -10,6 +10,9 @@ import { tenantMiddleware } from "./middleware/tenantMiddleware";
 import { requestContextMiddleware } from "./middleware/requestContext";
 import { ensureMaintenanceHistoryImmutability, ensureCertApplicabilityIndex } from "./initDb";
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
+import { getDb } from "./db";
+import { jobs as jobsTable } from "@shared/schema";
+import { and, eq, isNull } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL: Ensure immutability trigger exists BEFORE registering routes
@@ -451,6 +454,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allJobs = await storage.getJobs();
       let updatedCalendar = 0;
       let updatedRH = 0;
+      let updatedRhEstimate = 0;
+      const {
+        estimateRhDueDate,
+        resolveAuthoritativeRhComponent,
+      } = await import("./services/rhDueDateService");
 
       for (const job of allJobs) {
         let updates: any = {};
@@ -489,14 +497,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Historical-utilization projection for existing RH and Dual jobs.
+        // Persist even an unavailable basis once so startup does not repeat
+        // the same audit scan until a real completion recalculates the cycle.
+        if (
+          (job.maintenanceBasis === 'Running Hours' || job.maintenanceBasis === 'Dual Frequency')
+          && !job.rhEstimatedDueDate
+          && !job.rhEstimateBasis
+          && job.lastDoneDate
+          && Number(job.intervalRunningHour) > 0
+        ) {
+          let component: any = job.componentId
+            ? await storage.getComponent(job.componentId)
+            : null;
+          if (!component && job.componentCode && job.vesselId) {
+            component = await storage.getComponentByCode(job.componentCode, job.vesselId);
+          }
+          component = await resolveAuthoritativeRhComponent(
+            component,
+            id => storage.getComponent(id),
+            (code, vesselId) => storage.getComponentByCode(code, vesselId),
+            job.vesselId,
+          );
+          if (component) {
+            const audits = await storage.getRunningHoursAudits(component.cuuid || component.id);
+            const estimate = estimateRhDueDate(
+              job.lastDoneDate,
+              job.intervalRunningHour,
+              audits,
+            );
+            // Compare-and-set prevents this detached startup backfill from
+            // replacing a cycle estimate written by a concurrent completion.
+            const db = await getDb();
+            const saved = await db.update(jobsTable)
+              .set({
+                rhEstimatedDueDate: estimate.dueDate,
+                rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
+                rhEstimateBasis: estimate.basis,
+                updatedAt: new Date(),
+              })
+              .where(and(
+                eq(jobsTable.juuid, job.juuid),
+                eq(jobsTable.lastDoneDate, job.lastDoneDate),
+                isNull(jobsTable.rhEstimatedDueDate),
+                isNull(jobsTable.rhEstimateBasis),
+              ))
+              .returning({ juuid: jobsTable.juuid });
+            if (saved.length > 0) updatedRhEstimate++;
+          }
+        }
+
         // Apply updates if needed
         if (needsUpdate) {
           await storage.updateJob(job.juuid, updates);
         }
       }
 
-      if (updatedCalendar > 0 || updatedRH > 0) {
-        console.log(`✅ Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH)`);
+      if (updatedCalendar > 0 || updatedRH > 0 || updatedRhEstimate > 0) {
+        console.log(`✅ Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH), ${updatedRhEstimate} RH historical estimates`);
       } else {
         console.log('✅ Job backfill check complete - all jobs already have due dates/RH calculated');
       }

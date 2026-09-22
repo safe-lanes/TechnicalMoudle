@@ -192,6 +192,7 @@ export async function receivePushData(
   //     construction (applyFullRowsIfAbsent) — cannot overwrite anything.
   // Completion-learning candidates (shore learns ship WO completions → job tracking).
   const completionWouuids = new Set<string>();
+  const rhAuditRowUuids = new Set<string>();
 
   let selfHealInserted = 0;
   if (payload.fullRows && payload.fullRows.length > 0) {
@@ -203,6 +204,12 @@ export async function receivePushData(
         continue;
       }
       collectCompletionWouuidsFromFullRows(t.tableName, t.rows).forEach(w => completionWouuids.add(w));
+      if (t.tableName === 'running_hours_audit') {
+        t.rows.forEach(row => {
+          const id = row.rhauuid ?? row.Rhauuid;
+          if (id) rhAuditRowUuids.add(String(id));
+        });
+      }
       const r = await applyFullRowsIfAbsent(t.tableName, t.rows);
       selfHealInserted += r.inserted;
       if (r.errors.length > 0) r.errors.slice(0, 3).forEach(e => syncDiag(`SELF-HEAL APPLY ERROR: ${e.substring(0, 150)}`));
@@ -287,6 +294,9 @@ export async function receivePushData(
           const appliedInsertLogs = acceptedLogs.filter(l =>
             (l.oldValue === null || l.oldValue === undefined) && !deferred.has(l as any) && !dropped.has(l.rowUuid));
           collectCompletionWouuidsFromLogs(appliedInsertLogs).forEach(w => completionWouuids.add(w));
+          appliedInsertLogs
+            .filter(log => log.tableName === 'running_hours_audit')
+            .forEach(log => rhAuditRowUuids.add(log.rowUuid));
         }
         fieldLogApplyErrors += insertResult.errors.length;
         (insertResult.failedRowUuids || []).forEach(r => droppedRowUuids.add(r));
@@ -573,6 +583,8 @@ export async function receivePushData(
               droppedRowUuids.add(log.rowUuid); // Fix 2/3: keep unsynced so the ship retries once its INSERT lands
               console.warn(`[Sync Push] UPDATE skipped — row missing on receiver: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} (change dropped; see FIELD-LOG-INSERT RECOVERY)`);
               syncDiag(`UPDATE-MISS: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — row not found, UPDATE had no effect`);
+            } else if (log.tableName === 'running_hours_audit') {
+              rhAuditRowUuids.add(log.rowUuid);
             }
 
             // ── Derived RH update — propagate running_hours_audit field changes to components current state ──
@@ -848,6 +860,12 @@ export async function receivePushData(
             await learnFromShipCompletions(client, Array.from(completionWouuids));
             completionWouuids.clear(); // consumed inside this transaction
           }
+          if (rhAuditRowUuids.size > 0) {
+            const { refreshRhEstimatesFromAuditRows } = await import('./shipCompletionLearner');
+            const refreshed = await refreshRhEstimatesFromAuditRows(client, Array.from(rhAuditRowUuids));
+            syncDiag(`RH-ESTIMATE REFRESH: audits=${rhAuditRowUuids.size} jobs=${refreshed}`);
+            rhAuditRowUuids.clear();
+          }
         }
 
         await client.query('COMMIT');
@@ -865,9 +883,12 @@ export async function receivePushData(
   // Completion learning for pushes that carried completed WOs ONLY as self-heal full
   // rows (no accepted field logs → the shared transaction above never ran). Same
   // learner, its own short transaction. No-op when the set was already consumed.
-  if (completionWouuids.size > 0) {
+  if (completionWouuids.size > 0 || rhAuditRowUuids.size > 0) {
     try {
-      const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+      const {
+        learnFromShipCompletions,
+        refreshRhEstimatesFromAuditRows,
+      } = await import('./shipCompletionLearner');
       const pool = await getPool();
       const client = await pool.connect();
       try {
@@ -880,6 +901,9 @@ export async function receivePushData(
         if (completionWouuids.size > 0) {
           await learnFromShipCompletions(client, Array.from(completionWouuids));
         }
+        if (rhAuditRowUuids.size > 0) {
+          await refreshRhEstimatesFromAuditRows(client, Array.from(rhAuditRowUuids));
+        }
         await client.query('COMMIT');
       } catch (learnErr: any) {
         try { await client.query('ROLLBACK'); } catch { /* non-fatal */ }
@@ -888,6 +912,7 @@ export async function receivePushData(
         client.release();
       }
       completionWouuids.clear();
+      rhAuditRowUuids.clear();
     } catch (learnOuterErr: any) {
       syncDiag(`COMPLETION-LEARN (fullRows-only) setup failed: ${String(learnOuterErr?.message || learnOuterErr).substring(0, 160)}`);
     }

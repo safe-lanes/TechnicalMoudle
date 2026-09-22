@@ -31,12 +31,167 @@ import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import { isCompletedStatus } from '../../utils/workOrderStatus';
 import { syncDiag } from './syncDiagLogger';
 import { getJobCompletionDate } from '../work-orders/utils/completedWorkOrderDate';
+import {
+  estimateRhDueDate,
+  resolveAuthoritativeRhComponent,
+} from '../../services/rhDueDateService';
 
 export interface LearnResult {
   candidates: number;
   jobsAdvanced: number;
   skipped: number;
   errors: number;
+}
+
+/**
+ * Recalculate planning estimates after RH audit rows arrive in a later sync
+ * batch than their completed WO. This never advances cycle tracking; it only
+ * refreshes the estimate for the job's current last-done cycle, guarded by a
+ * compare-and-set on last_done_date/last_done_rh.
+ */
+export async function refreshRhEstimatesFromAuditRows(
+  client: PoolClient,
+  auditRowUuids: string[],
+): Promise<number> {
+  if (auditRowUuids.length === 0) return 0;
+  const componentsRes = await client.query(
+    `SELECT DISTINCT
+            a.component_id,
+            c.cuuid AS component_cuuid,
+            c.id::text AS component_legacy_id,
+            c.component_code
+       FROM running_hours_audit a
+       LEFT JOIN components c
+         ON c.cuuid = a.component_id OR c.id::text = a.component_id
+      WHERE a.rhauuid = ANY($1::text[])`,
+    [auditRowUuids],
+  );
+  const componentIdentities = Array.from(new Set(
+    componentsRes.rows.flatMap(row => [
+      row.component_id,
+      row.component_cuuid,
+      row.component_legacy_id,
+    ].filter(Boolean).map(String)),
+  ));
+  const componentCodes = Array.from(new Set(
+    componentsRes.rows.map(row => row.component_code).filter(Boolean).map(String),
+  ));
+  if (componentIdentities.length === 0) return 0;
+
+  const jobsRes = await client.query(
+    `SELECT DISTINCT
+            j.juuid, j.vessel_id, j.component_id, j.component_code,
+            j.maintenance_basis, j.interval_running_hour,
+            j.last_done_date, j.last_done_rh,
+            c.cuuid AS component_cuuid, c.id AS component_legacy_id,
+            c.vessel_id AS component_vessel_id, c.rh_counter_type,
+            c.rh_master_component_id, c.rh_counter_source
+       FROM jobs j
+       JOIN components c
+         ON c.cuuid = j.component_id
+         OR c.id::text = j.component_id
+         OR (c.component_code = j.component_code AND c.vessel_id = j.vessel_id)
+      WHERE j.maintenance_basis IN ('Running Hours', 'Dual Frequency')
+        AND j.last_done_date IS NOT NULL
+        AND j.interval_running_hour > 0
+        AND (
+          c.cuuid = ANY($1::text[])
+          OR c.id::text = ANY($1::text[])
+          OR c.rh_master_component_id = ANY($1::text[])
+          OR c.rh_counter_source = ANY($2::text[])
+        )`,
+    [componentIdentities, componentCodes],
+  );
+
+  let refreshed = 0;
+  for (const job of jobsRes.rows) {
+    const toRhComponent = (row: any) => row ? ({
+      id: row.id,
+      cuuid: row.cuuid,
+      vesselId: row.vessel_id,
+      rhCounterType: row.rh_counter_type,
+      rhMasterComponentId: row.rh_master_component_id,
+      rhCounterSource: row.rh_counter_source,
+    }) : null;
+    const findById = async (id: string) => {
+      const result = await client.query(
+        `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE cuuid = $1 OR id::text = $1 LIMIT 1`,
+        [id],
+      );
+      return toRhComponent(result.rows[0]);
+    };
+    const findByCode = async (code: string, vesselId: string) => {
+      const result = await client.query(
+        `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE component_code = $1 AND vessel_id = $2 LIMIT 1`,
+        [code, vesselId],
+      );
+      return toRhComponent(result.rows[0]);
+    };
+    const source = await resolveAuthoritativeRhComponent(
+      {
+        id: job.component_legacy_id,
+        cuuid: job.component_cuuid,
+        vesselId: job.component_vessel_id,
+        rhCounterType: job.rh_counter_type,
+        rhMasterComponentId: job.rh_master_component_id,
+        rhCounterSource: job.rh_counter_source,
+      },
+      findById,
+      findByCode,
+      job.vessel_id,
+    );
+
+    let estimate = { dueDate: null as string | null, averagePerDay: null as number | null, basis: 'MISSING_RH_SOURCE' };
+    if (source?.cuuid) {
+      const audits = await client.query(
+        `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+           FROM running_hours_audit
+          WHERE component_id = $1
+            AND COALESCE(is_deleted, false) = false
+          ORDER BY entered_at_utc DESC`,
+        [source.cuuid],
+      );
+      estimate = estimateRhDueDate(
+        job.last_done_date,
+        job.interval_running_hour,
+        audits.rows.map(row => ({
+          cumulativeRH: row.cumulative_rh,
+          newRH: row.new_rh,
+          previousRH: row.previous_rh,
+          dateUpdatedLocal: row.date_updated_local,
+          meterReplaced: row.meter_replaced,
+          isRenewalReset: row.is_renewal_reset,
+          stampHolder: row.stamp_holder,
+          enteredAtUTC: row.entered_at_utc,
+          isDeleted: row.is_deleted,
+        })),
+      );
+    }
+
+    const update = await client.query(
+      `UPDATE jobs
+          SET rh_estimated_due_date = $2,
+              rh_average_per_day = $3,
+              rh_estimate_basis = $4,
+              updated_at = NOW()
+        WHERE juuid = $1
+          AND last_done_date IS NOT DISTINCT FROM $5
+          AND last_done_rh IS NOT DISTINCT FROM $6`,
+      [
+        job.juuid,
+        estimate.dueDate,
+        estimate.averagePerDay,
+        estimate.basis,
+        job.last_done_date,
+        job.last_done_rh,
+      ],
+    );
+    refreshed += update.rowCount ?? 0;
+  }
+  return refreshed;
 }
 
 /**
@@ -109,7 +264,18 @@ export function filterAdvanceOnly(
     const advance = incoming !== null && (local === null || incoming > local);
     if (!advance) {
       delete ju.lastDoneRH; delete ju.nextDueRH;
+      delete ju.rhEstimatedDueDate;
+      delete ju.rhAveragePerDay;
+      delete ju.rhEstimateBasis;
     }
+  } else if (
+    ju.rhEstimatedDueDate !== undefined
+    || ju.rhAveragePerDay !== undefined
+    || ju.rhEstimateBasis !== undefined
+  ) {
+    delete ju.rhEstimatedDueDate;
+    delete ju.rhAveragePerDay;
+    delete ju.rhEstimateBasis;
   }
   return Object.keys(ju).length > 0 ? ju : null;
 }
@@ -119,6 +285,9 @@ const COL_MAP: Record<string, string> = {
   nextDueDate: 'next_due_date',
   lastDoneRH: 'last_done_rh',
   nextDueRH: 'next_due_rh',
+  rhEstimatedDueDate: 'rh_estimated_due_date',
+  rhAveragePerDay: 'rh_average_per_day',
+  rhEstimateBasis: 'rh_estimate_basis',
 };
 
 function buildSet(updates: Record<string, any>, startIdx: number): { sql: string; values: any[] } {
@@ -128,7 +297,7 @@ function buildSet(updates: Record<string, any>, startIdx: number): { sql: string
   for (const [k, col] of Object.entries(COL_MAP)) {
     if (updates[k] !== undefined) {
       parts.push(`"${col}" = $${i++}`);
-      values.push(String(updates[k]));
+      values.push(updates[k] === null ? null : String(updates[k]));
     }
   }
   parts.push(`updated_at = NOW()`);
@@ -153,6 +322,7 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
       const woRes = await client.query(
         `SELECT wouuid, status, job_id, vessel_id, maintenance_basis,
                 date_completed, wo_completion_rh, completion_rh, current_reading,
+                component_id,
                 next_due_date, due_date, work_order_no
            FROM work_orders WHERE wouuid = $1 LIMIT 1`,
         [wouuid],
@@ -179,8 +349,8 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
 
       // Row-lock the job against concurrent shore edits within this transaction.
       const jobRes = await client.query(
-        `SELECT juuid, job_no, vessel_id, frequency_value, frequency_unit, interval_running_hour,
-                last_done_date, last_done_rh
+        `SELECT juuid, job_no, vessel_id, component_id, frequency_value, frequency_unit, interval_running_hour,
+                last_done_date, last_done_rh, rh_estimated_due_date
            FROM jobs WHERE juuid = $1 FOR UPDATE`,
         [wo.job_id],
       );
@@ -210,8 +380,91 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
           frequencyValue: job.frequency_value,
           frequencyUnit: job.frequency_unit,
           intervalRunningHour: job.interval_running_hour,
+          lastDoneDate: job.last_done_date,
+          lastDoneRH: job.last_done_rh,
         },
       });
+
+      if (
+        jobUpdates.lastDoneRH !== undefined
+        && completionRH != null
+        && (wo.maintenance_basis === 'Running Hours' || wo.maintenance_basis === 'Dual Frequency')
+      ) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = 'MISSING_RH_SOURCE';
+        const toRhComponent = (row: any) => row ? ({
+          id: row.id,
+          cuuid: row.cuuid,
+          vesselId: row.vessel_id,
+          rhCounterType: row.rh_counter_type,
+          rhMasterComponentId: row.rh_master_component_id,
+          rhCounterSource: row.rh_counter_source,
+        }) : null;
+        const findComponentById = async (id: string) => {
+          const result = await client.query(
+            `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE cuuid = $1 OR id::text = $1
+              LIMIT 1`,
+            [id],
+          );
+          return toRhComponent(result.rows[0]);
+        };
+        const findComponentByCode = async (code: string, vesselId: string) => {
+          const result = await client.query(
+            `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE component_code = $1 AND vessel_id = $2
+              LIMIT 1`,
+            [code, vesselId],
+          );
+          return toRhComponent(result.rows[0]);
+        };
+        const componentRes = await client.query(
+          `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+             FROM components
+            WHERE cuuid = $1 OR id::text = $1
+            LIMIT 1`,
+          [wo.component_id || job.component_id],
+        );
+        const sourceComponent = await resolveAuthoritativeRhComponent(
+          toRhComponent(componentRes.rows[0]),
+          findComponentById,
+          findComponentByCode,
+          wo.vessel_id || job.vessel_id,
+        );
+        const sourceId = sourceComponent?.cuuid;
+        if (sourceId) {
+          const auditsRes = await client.query(
+            `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                    meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+               FROM running_hours_audit
+               WHERE component_id = $1
+                 AND COALESCE(is_deleted, false) = false
+              ORDER BY entered_at_utc DESC`,
+            [sourceId],
+          );
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.interval_running_hour,
+            auditsRes.rows.map(row => ({
+              cumulativeRH: row.cumulative_rh,
+              newRH: row.new_rh,
+              previousRH: row.previous_rh,
+              dateUpdatedLocal: row.date_updated_local,
+              meterReplaced: row.meter_replaced,
+              isRenewalReset: row.is_renewal_reset,
+              stampHolder: row.stamp_holder,
+              enteredAtUTC: row.entered_at_utc,
+              isDeleted: row.is_deleted,
+            })),
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
+        }
+      }
 
       const filtered = filterAdvanceOnly(job, jobUpdates);
       if (!filtered) {

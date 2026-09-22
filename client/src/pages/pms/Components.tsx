@@ -55,7 +55,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkOrderViewerSheet } from "@/components/WorkOrderViewerSheet";
-import { addDays } from "date-fns";
 
 interface ComponentNode {
   id: string;
@@ -892,21 +891,6 @@ const formatRunningHours = (value: unknown): string => {
   return `${Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(2)} RH`;
 };
 
-const getExpectedRunningHoursDueDate = (
-  lastDoneDate: string | null | undefined,
-  intervalRunningHour: unknown,
-): string => {
-  const interval = Number(intervalRunningHour);
-  const parsedLastDoneDate = parseDate(lastDoneDate);
-
-  if (!Number.isFinite(interval) || interval <= 0 || !parsedLastDoneDate) {
-    return '—';
-  }
-
-  const expectedDays = Math.ceil(interval / 24);
-  return formatProfessionalDate(addDays(parsedLastDoneDate, expectedDays));
-};
-
 const getJobFrequencyDisplay = (job: any): string =>
   job.maintenanceBasis === 'Running Hours'
     ? `${job.intervalRunningHour || 0} RH`
@@ -915,13 +899,40 @@ const getJobFrequencyDisplay = (job: any): string =>
       : `${job.frequencyValue} ${job.frequencyUnit}`;
 
 const getJobNextDueDateDisplay = (job: any): string => {
-  const isRunningHoursBased =
-    job.maintenanceBasis === 'Running Hours' ||
-    job.maintenanceBasis === 'Dual Frequency';
+  if (job.maintenanceBasis === 'Running Hours') {
+    return job.rhEstimatedDueDate ? formatProfessionalDate(job.rhEstimatedDueDate) : 'Not available';
+  }
+  if (job.maintenanceBasis === 'Dual Frequency') {
+    const calendar = parseDate(job.nextDueDate);
+    const rh = parseDate(job.rhEstimatedDueDate);
+    if (!calendar && !rh) return 'Not available';
+    if (!calendar) return formatProfessionalDate(job.rhEstimatedDueDate);
+    if (!rh) return formatProfessionalDate(job.nextDueDate);
+    return formatProfessionalDate(calendar <= rh ? job.nextDueDate : job.rhEstimatedDueDate);
+  }
+  return formatProfessionalDate(job.nextDueDate);
+};
 
-  return isRunningHoursBased
-    ? getExpectedRunningHoursDueDate(job.lastDoneDate, job.intervalRunningHour)
-    : formatProfessionalDate(job.nextDueDate);
+const getJobNextDueDateTooltip = (job: any, displayedValue: string): string => {
+  if (job.maintenanceBasis === 'Running Hours') {
+    if (!job.rhEstimatedDueDate) return 'Not available — insufficient valid RH history';
+    return `${displayedValue} (estimated from ${Number(job.rhAveragePerDay).toFixed(2)} RH/day)`;
+  }
+  if (job.maintenanceBasis !== 'Dual Frequency') return displayedValue;
+
+  const calendar = parseDate(job.nextDueDate);
+  const rh = parseDate(job.rhEstimatedDueDate);
+  if (!calendar && !rh) return 'Not available — insufficient calendar and RH history';
+  const calendarText = calendar ? formatProfessionalDate(job.nextDueDate) : 'Not available';
+  const rhText = rh ? formatProfessionalDate(job.rhEstimatedDueDate) : 'Not available';
+  const basis = calendar && rh && calendar.getTime() === rh.getTime()
+    ? 'Calendar + RH'
+    : !calendar
+      ? 'Running Hours'
+      : !rh || calendar < rh
+        ? 'Calendar'
+        : 'Running Hours';
+  return `${displayedValue} (${basis} first) • Calendar: ${calendarText} • Estimated RH: ${rhText}`;
 };
 
 const getJobNextDueHourDisplay = (job: any): string => {
@@ -1210,9 +1221,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
         headerComponent: header('Next Due Date', 'B7.C.8', 'B7.C.8'),
         valueGetter: ({ data }) => data ? getJobNextDueDateDisplay(data) : '—',
         tooltipValueGetter: ({ data, value }) =>
-          data?.maintenanceBasis === 'Running Hours' || data?.maintenanceBasis === 'Dual Frequency'
-            ? `${value} (RH-based estimate)`
-            : value,
+          data ? getJobNextDueDateTooltip(data, value) : value,
       },
       {
         headerName: 'Next Due Hour',

@@ -4,6 +4,7 @@ import {
   collectCompletionWouuidsFromFullRows,
   filterAdvanceOnly,
   learnFromShipCompletions,
+  refreshRhEstimatesFromAuditRows,
 } from '../shipCompletionLearner';
 
 describe('collectCompletionWouuidsFromLogs', () => {
@@ -52,6 +53,30 @@ describe('filterAdvanceOnly (advance-only per leg)', () => {
     expect(filterAdvanceOnly({ last_done_rh: '11000' }, { ...rhUpdates })).toBeTruthy();
     expect(filterAdvanceOnly({ last_done_rh: '12000' }, { ...rhUpdates })).toBeNull();
     expect(filterAdvanceOnly({ last_done_rh: '13000' }, { ...rhUpdates })).toBeNull();
+  });
+
+  it('does not let an older RH completion overwrite its historical estimate', () => {
+    const res = filterAdvanceOnly(
+      { last_done_rh: '13000' },
+      {
+        ...rhUpdates,
+        rhEstimatedDueDate: '15-Nov-2026',
+        rhAveragePerDay: 3.69,
+        rhEstimateBasis: 'HISTORICAL',
+      },
+    );
+    expect(res).toBeNull();
+  });
+
+  it('rejects estimate-only updates without an advancing RH leg', () => {
+    expect(filterAdvanceOnly(
+      { last_done_rh: '13000' },
+      {
+        rhEstimatedDueDate: '15-Nov-2026',
+        rhAveragePerDay: 3.69,
+        rhEstimateBasis: 'HISTORICAL',
+      },
+    )).toBeNull();
   });
 
   it('filters calendar and RH legs independently', () => {
@@ -139,6 +164,7 @@ describe('learnFromShipCompletions', () => {
         frequency_value: '3',
         frequency_unit: 'Months',
         interval_running_hour: 500,
+        component_id: 'component-1',
         last_done_date: '01-Jul-2026',
         last_done_rh: '11000',
       },
@@ -159,6 +185,7 @@ describe('learnFromShipCompletions', () => {
         frequency_value: null,
         frequency_unit: null,
         interval_running_hour: 500,
+        component_id: 'component-1',
         last_done_date: '01-Jul-2026',
         last_done_rh: '13500',
       },
@@ -175,6 +202,38 @@ describe('learnFromShipCompletions', () => {
           const row = jobs[String(values?.[0])];
           return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
         }
+        if (text.includes('FROM components')) {
+          return {
+            rows: [{
+              cuuid: 'component-1',
+              id: '1',
+              vessel_id: 'vessel-1',
+              rh_counter_type: 'MASTER',
+              rh_master_component_id: null,
+              rh_counter_source: null,
+            }],
+            rowCount: 1,
+          };
+        }
+        if (text.includes('FROM running_hours_audit')) {
+          return {
+            rows: [
+              {
+                cumulative_rh: '1000',
+                date_updated_local: '01-Aug-2026',
+                entered_at_utc: '2026-08-01T00:00:00Z',
+                is_deleted: false,
+              },
+              {
+                cumulative_rh: '100',
+                date_updated_local: '01-May-2026',
+                entered_at_utc: '2026-05-01T00:00:00Z',
+                is_deleted: false,
+              },
+            ],
+            rowCount: 2,
+          };
+        }
         if (text.startsWith('UPDATE jobs')) {
           if (values?.[0] === options?.failJobId) throw new Error('simulated Job write failure');
           return { rows: [], rowCount: 1 };
@@ -186,7 +245,7 @@ describe('learnFromShipCompletions', () => {
     return { client: client as any, queries };
   }
 
-  it('keeps trigger bypass active and writes only the four Job tracking columns plus updated_at', async () => {
+  it('keeps trigger bypass active and writes cycle tracking plus the persisted RH estimate', async () => {
     const { client, queries } = makeClient();
     const result = await learnFromShipCompletions(client, ['wo-1']);
 
@@ -199,6 +258,9 @@ describe('learnFromShipCompletions', () => {
     expect(update!.text).toContain('"next_due_date"');
     expect(update!.text).toContain('"last_done_rh"');
     expect(update!.text).toContain('"next_due_rh"');
+    expect(update!.text).toContain('"rh_estimated_due_date"');
+    expect(update!.text).toContain('"rh_average_per_day"');
+    expect(update!.text).toContain('"rh_estimate_basis"');
     expect(update!.text).toContain('updated_at = NOW()');
     expect(update!.text).not.toContain('tracking_rebaselined_at');
     expect(update!.text).not.toContain('job_component_links');
@@ -248,5 +310,72 @@ describe('learnFromShipCompletions', () => {
 
     expect(result).toEqual({ candidates: 1, jobsAdvanced: 0, skipped: 1, errors: 0 });
     expect(queries.some((q) => q.text.startsWith('UPDATE jobs'))).toBe(false);
+  });
+});
+
+describe('refreshRhEstimatesFromAuditRows', () => {
+  it('converges an insufficient estimate when RH history arrives in a later push', async () => {
+    const queries: Array<{ text: string; values?: any[] }> = [];
+    const client = {
+      async query(text: string, values?: any[]) {
+        queries.push({ text, values });
+        if (text.includes('FROM running_hours_audit a')) {
+          return {
+            rows: [{
+              component_id: 'master-1',
+              component_cuuid: 'master-1',
+              component_legacy_id: '1',
+              component_code: '601.01',
+            }],
+            rowCount: 1,
+          };
+        }
+        if (text.includes('SELECT DISTINCT') && text.includes('FROM jobs j')) {
+          return {
+            rows: [{
+              juuid: 'job-rh',
+              vessel_id: 'vessel-1',
+              component_id: 'master-1',
+              maintenance_basis: 'Running Hours',
+              interval_running_hour: 200,
+              last_done_date: '22-Sep-2026',
+              last_done_rh: '1000',
+              component_cuuid: 'master-1',
+              component_legacy_id: '1',
+              component_vessel_id: 'vessel-1',
+              rh_counter_type: 'MASTER',
+              rh_master_component_id: null,
+              rh_counter_source: null,
+            }],
+            rowCount: 1,
+          };
+        }
+        if (text.includes('FROM running_hours_audit')) {
+          return {
+            rows: [
+              { cumulative_rh: '1000', date_updated_local: '22-Sep-2026', entered_at_utc: '2026-09-22T00:00:00Z', is_deleted: false },
+              { cumulative_rh: '100', date_updated_local: '21-Jan-2026', entered_at_utc: '2026-01-21T00:00:00Z', is_deleted: false },
+            ],
+            rowCount: 2,
+          };
+        }
+        if (text.startsWith('UPDATE jobs')) return { rows: [], rowCount: 1 };
+        return { rows: [], rowCount: 0 };
+      },
+    };
+
+    expect(await refreshRhEstimatesFromAuditRows(client as any, ['audit-1', 'audit-2'])).toBe(1);
+    const update = queries.find(query => query.text.startsWith('UPDATE jobs'));
+    const candidateQuery = queries.find(query => query.text.includes('FROM jobs j'));
+    expect(candidateQuery?.text).toContain('c.id::text = j.component_id');
+    expect(candidateQuery?.text).toContain('c.rh_master_component_id = ANY($1::text[])');
+    expect(update?.values).toEqual([
+      'job-rh',
+      '2026-11-15',
+      expect.closeTo(900 / 244, 8),
+      'HISTORICAL',
+      '22-Sep-2026',
+      '1000',
+    ]);
   });
 });

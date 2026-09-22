@@ -15,6 +15,10 @@ import {
   ensureCompletedWorkOrderDate,
   getJobCompletionDate,
 } from '../utils/completedWorkOrderDate';
+import {
+  estimateRhDueDate,
+  resolveAuthoritativeRhComponent,
+} from '../../../services/rhDueDateService';
 
 // ── Complete Work Order ──
 
@@ -806,6 +810,35 @@ export async function completeWorkOrder(
         job,
       });
 
+      // Planning estimate only: this never replaces nextDueDate or changes
+      // the scanner's actual RH threshold.
+      if (
+        jobUpdates.lastDoneRH !== undefined
+        && cycleRH
+        && (workOrder.maintenanceBasis === 'Running Hours' || workOrder.maintenanceBasis === 'Dual Frequency')
+      ) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = 'MISSING_RH_SOURCE';
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          repo.findComponent,
+          repo.findComponentByCode,
+          workOrder.vesselId,
+        );
+        if (rhComponent) {
+          const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits,
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
+        }
+      }
+
       if (workOrder.maintenanceBasis === 'Dual Frequency' && jobCompletionDate && !cycleRH) {
         console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
       }
@@ -1034,43 +1067,47 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
 
     if (job && jobCompletionDate) {
       const basis = workOrder.maintenanceBasis;
-
-      if (basis === 'Calendar' || basis === 'Dual Frequency') {
-        const { calculateNextDueDate } = await import('@shared/dateUtils');
-        const updates: any = { lastDoneDate: jobCompletionDate };
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(jobCompletionDate, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) updates.nextDueDate = nextDue;
-        }
-        await repo.updateJob(job.juuid, updates);
-        console.log(`✅ [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${jobCompletionDate}`);
-      }
-
       // R1 (migration 139): next cycle derives from the stored WO Completion RH
       // (fallback: the stored reading = pre-feature behaviour for old rows).
       const finalizeCycleRH = (workOrder as any).woCompletionRh ?? workOrder.runningHours;
-      if (basis === 'Running Hours') {
-        await repo.updateJob(job.juuid, { lastDoneDate: jobCompletionDate });
-        console.log(`✅ [Finalize] Updated RH job ${job.jobNo} lastDoneDate: ${jobCompletionDate}`);
-      }
-      if ((basis === 'Running Hours' || basis === 'Dual Frequency') && finalizeCycleRH) {
-        const currentRH = parseInt(String(finalizeCycleRH));
-        if (!isNaN(currentRH)) {
-          const rhUpdates: any = { lastDoneRH: currentRH };
-          if (jobCompletionDate) {
-            rhUpdates.lastDoneDate = jobCompletionDate;
-          }
-          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-          if (rhInterval && !isNaN(rhInterval)) {
-            rhUpdates.nextDueRH = currentRH + rhInterval;
-          }
-          const { preserveNewerJobRhState } = await import('@shared/workOrders/jobCycleCalc');
-          const guardedRhUpdates = preserveNewerJobRhState(job, rhUpdates);
-          if (Object.keys(guardedRhUpdates).length > 0) {
-            await repo.updateJob(job.juuid, guardedRhUpdates);
-            console.log(`✅ [Finalize] Updated RH job ${job.jobNo} cycle fields without reducing newer RH state`);
-          }
+      const { computeJobCycleUpdates } = await import('@shared/workOrders/jobCycleCalc');
+      const { jobUpdates } = computeJobCycleUpdates({
+        maintenanceBasis: basis,
+        dateOfCompletion: jobCompletionDate,
+        completionRH: finalizeCycleRH != null ? String(finalizeCycleRH) : null,
+        originalDueDate,
+        job,
+      });
+
+      if (
+        jobUpdates.lastDoneRH !== undefined
+        && (basis === 'Running Hours' || basis === 'Dual Frequency')
+      ) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = 'MISSING_RH_SOURCE';
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          repo.findComponent,
+          repo.findComponentByCode,
+          workOrder.vesselId,
+        );
+        if (rhComponent) {
+          const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits,
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
         }
+      }
+
+      if (Object.keys(jobUpdates).length > 0) {
+        await repo.updateJob(job.juuid, jobUpdates);
+        console.log(`✅ [Finalize] Updated ${basis} job ${job.jobNo} cycle fields without reducing newer RH state`);
       }
     }
   } catch (err) {

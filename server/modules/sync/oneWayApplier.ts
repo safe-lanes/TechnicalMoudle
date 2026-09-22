@@ -241,7 +241,15 @@ export async function applyRotationToComponent(conn: any, rowData: Record<string
  * @returns Counts of inserts, updates, soft-deletes, and any per-row errors
  */
 /** Ship-owned tracking columns on jobs (snake_case, DB names). */
-export const JOB_TRACKING_COLUMNS = ['last_done_date', 'next_due_date', 'last_done_rh', 'next_due_rh'] as const;
+export const JOB_TRACKING_COLUMNS = [
+  'last_done_date',
+  'next_due_date',
+  'last_done_rh',
+  'next_due_rh',
+  'rh_estimated_due_date',
+  'rh_average_per_day',
+  'rh_estimate_basis',
+] as const;
 
 function toTimeOrNull(v: any): number | null {
   if (v === null || v === undefined || v === '') return null;
@@ -269,6 +277,19 @@ export function evaluateJobTrackingGuard(localRow: Record<string, any>, incoming
     const localVal = localRow[col];
     if (localVal !== null && localVal !== undefined && localVal !== '') {
       strip.push(col);
+    }
+  }
+  const estimateColumns = ['rh_estimated_due_date', 'rh_average_per_day', 'rh_estimate_basis'] as const;
+  const localRhCycleInitialized = [
+    'last_done_rh',
+    ...estimateColumns,
+  ].some(col => {
+    const value = localRow[col];
+    return value !== null && value !== undefined && value !== '';
+  });
+  if (localRhCycleInitialized) {
+    for (const col of estimateColumns) {
+      if (!strip.includes(col)) strip.push(col);
     }
   }
   // Without a newer authorized stamp, never let an incoming stamp overwrite the local one.

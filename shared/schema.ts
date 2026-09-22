@@ -1193,6 +1193,9 @@ export const jobs = pgTable("jobs", {
   nextDueDate: text("next_due_date"), // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar-based jobs)
   lastDoneRH: text("last_done_rh"), // Last completion running hours (for RH-based jobs)
   nextDueRH: text("next_due_rh"), // Calculated: lastDoneRH + frequencyValue (for RH-based jobs)
+  rhEstimatedDueDate: text("rh_estimated_due_date"), // Historical-utilization projection; never an RH trigger
+  rhAveragePerDay: decimal("rh_average_per_day", { precision: 12, scale: 6 }), // Full-precision RH/day used for the projection
+  rhEstimateBasis: text("rh_estimate_basis"), // 'HISTORICAL' or an explicit unavailable reason
   // Authorized-rebaseline stamp (migration 161): shore tracking values only pass the
   // one-way applier's job-tracking guard when this incoming stamp is newer than local.
   trackingRebaselinedAt: timestamp("tracking_rebaselined_at"),

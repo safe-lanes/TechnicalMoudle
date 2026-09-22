@@ -102,4 +102,11 @@ describe('preserveNewerJobRhState', () => {
       { lastDoneRH: 6000, nextDueRH: 6500 },
     )).toEqual({ lastDoneRH: 6000, nextDueRH: 6500 });
   });
+
+  it('does not move completion-date metadata backward while RH advances', () => {
+    expect(preserveNewerJobRhState(
+      { lastDoneDate: '15-Aug-2026', lastDoneRH: 5000, nextDueRH: 5500 },
+      { lastDoneDate: '01-Aug-2026', lastDoneRH: 6000, nextDueRH: 6500 },
+    )).toEqual({ lastDoneRH: 6000, nextDueRH: 6500 });
+  });
 });

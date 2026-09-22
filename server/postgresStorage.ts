@@ -2406,7 +2406,10 @@ export class PostgresStorage {
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
     let query = db.select().from(runningHoursAudit)
-      .where(or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId)))
+      .where(and(
+        or(eq(runningHoursAudit.componentId, resolvedId), eq(runningHoursAudit.componentId, componentId)),
+        or(eq(runningHoursAudit.isDeleted, false), isNull(runningHoursAudit.isDeleted))
+      ))
       .orderBy(desc(runningHoursAudit.enteredAtUTC));
 
     if (limit) {

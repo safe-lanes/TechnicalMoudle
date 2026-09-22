@@ -18,13 +18,18 @@
  *    existing write contract.
  */
 import { calculateNextDueDate } from '../dateUtils';
+import { parseWorkOrderDate } from './dateParse';
 
 export interface JobCycleJobFields {
   frequencyValue?: string | number | null;
   frequencyUnit?: string | null;
   intervalRunningHour?: number | null;
+  lastDoneDate?: string | null;
   lastDoneRH?: string | number | null;
   nextDueRH?: string | number | null;
+  rhEstimatedDueDate?: string | null;
+  rhAveragePerDay?: string | number | null;
+  rhEstimateBasis?: string | null;
 }
 
 export interface JobCycleInput {
@@ -55,20 +60,33 @@ function finiteRh(value: string | number | null | undefined): number | null {
  * alone; this guard owns only the Job-level RH fields.
  */
 export function preserveNewerJobRhState(
-  job: Pick<JobCycleJobFields, 'lastDoneRH' | 'nextDueRH'>,
+  job: Pick<JobCycleJobFields, 'lastDoneDate' | 'lastDoneRH' | 'nextDueRH'>,
   updates: Record<string, any>,
 ): Record<string, any> {
   const guarded = { ...updates };
+  const currentDate = parseWorkOrderDate(job.lastDoneDate);
+  const incomingDate = parseWorkOrderDate(guarded.lastDoneDate);
+  if (
+    currentDate
+    && incomingDate
+    && incomingDate.getTime() <= currentDate.getTime()
+  ) {
+    delete guarded.lastDoneDate;
+    delete guarded.nextDueDate;
+  }
   const currentLastDone = finiteRh(job.lastDoneRH);
   const incomingLastDone = finiteRh(guarded.lastDoneRH);
 
   if (
     currentLastDone !== null
     && incomingLastDone !== null
-    && incomingLastDone < currentLastDone
+    && incomingLastDone <= currentLastDone
   ) {
     delete guarded.lastDoneRH;
     delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
     return guarded;
   }
 
@@ -80,6 +98,9 @@ export function preserveNewerJobRhState(
     && incomingNextDue < currentNextDue
   ) {
     delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
   }
 
   return guarded;

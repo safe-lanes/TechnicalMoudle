@@ -6,6 +6,9 @@ const localWithTracking = {
   next_due_date: '01-Oct-2026',
   last_done_rh: '12000',
   next_due_rh: '12500',
+  rh_estimated_due_date: '15-Nov-2026',
+  rh_average_per_day: '3.690000',
+  rh_estimate_basis: 'HISTORICAL',
   tracking_rebaselined_at: null,
 };
 
@@ -20,7 +23,16 @@ describe('evaluateJobTrackingGuard (one-way applier, migration 161)', () => {
 
   it('lets values through on fresh provisioning (local tracking all NULL)', () => {
     const strip = evaluateJobTrackingGuard(
-      { last_done_date: null, next_due_date: null, last_done_rh: null, next_due_rh: null, tracking_rebaselined_at: null },
+      {
+        last_done_date: null,
+        next_due_date: null,
+        last_done_rh: null,
+        next_due_rh: null,
+        rh_estimated_due_date: null,
+        rh_average_per_day: null,
+        rh_estimate_basis: null,
+        tracking_rebaselined_at: null,
+      },
       { last_done_date: '01-Jan-2026' },
     );
     expect(strip).toHaveLength(0);
@@ -35,6 +47,28 @@ describe('evaluateJobTrackingGuard (one-way applier, migration 161)', () => {
     expect(strip).toContain('next_due_date');
     expect(strip).not.toContain('last_done_rh');
     expect(strip).not.toContain('next_due_rh');
+  });
+
+  it('protects the RH estimate as one atomic tuple', () => {
+    const strip = evaluateJobTrackingGuard(
+      {
+        last_done_rh: '12000',
+        rh_estimated_due_date: null,
+        rh_average_per_day: null,
+        rh_estimate_basis: 'INSUFFICIENT_HISTORY',
+        tracking_rebaselined_at: null,
+      },
+      {
+        rh_estimated_due_date: '15-Nov-2026',
+        rh_average_per_day: '3.69',
+        rh_estimate_basis: 'HISTORICAL',
+      },
+    );
+    expect(strip).toEqual(expect.arrayContaining([
+      'rh_estimated_due_date',
+      'rh_average_per_day',
+      'rh_estimate_basis',
+    ]));
   });
 
   it('authorized rebaseline: newer incoming stamp lets shore values through', () => {
