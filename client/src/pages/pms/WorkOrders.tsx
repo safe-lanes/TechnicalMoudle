@@ -522,15 +522,6 @@ const WorkOrders: React.FC = () => {
       },
     ];
 
-    if (activeTab === "Pending Approval") {
-      cols.push({
-        headerName: 'WO Template Code',
-        field: 'templateCode',
-        minWidth: 150,
-        flex: 1,
-      });
-    }
-
     cols.push(
       {
         headerName: 'Job Title',
