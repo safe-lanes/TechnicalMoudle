@@ -30,6 +30,10 @@ import {
   ensureCompletedWorkOrderDate,
   getJobCompletionDate,
 } from '../utils/completedWorkOrderDate';
+import {
+  buildHydrationJobIndexes,
+  resolveWorkOrderHydrationJob,
+} from '../utils/workOrderListHydration';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -284,6 +288,7 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
     allJobs = await repo.findJobs(vesselId);
   }
   const jobsMap = new Map(allJobs.map((job: any) => [job.juuid, job]));
+  const hydrationJobIndexes = buildHydrationJobIndexes(allJobs);
 
   // Fetch components per-vessel
   const componentsByCodeMap = new Map<string, any>();
@@ -362,12 +367,11 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
       rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
     } : undefined;
 
-    // Try to match by jobId first, then fall back to templateCode === jobNo
-    const job = wo.jobId
-      ? jobsMap.get(wo.jobId)
-      : wo.templateCode
-        ? allJobs.find((j: any) => j.jobNo === wo.templateCode)
-        : null;
+    // Legacy rows without jobId may fall back to job number, but only within
+    // the same vessel because job numbers are not globally unique.
+    const job = resolveWorkOrderHydrationJob(wo, jobsMap, hydrationJobIndexes);
+    const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || null;
+    const isRhBased = maintenanceBasis === 'Running Hours' || maintenanceBasis === 'Dual Frequency';
 
     // Get component to fetch currentCumulativeRH
     const component = wo.componentCode
@@ -378,7 +382,7 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
     // Resolve dueRH from the Job row, then the Work Order snapshot, then Job cycle inputs.
     // When wo.nextDueReading equals interval (likely stale from initial WO creation), prefer computed
     let dueRH: number | undefined;
-    if (wo.maintenanceBasis === 'Running Hours') {
+    if (maintenanceBasis === 'Running Hours') {
       dueRH = parseRH(job?.nextDueRH);
       if (dueRH == null) {
         const woNextDue = parseRH(wo.nextDueReading);
@@ -392,7 +396,13 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
         }
       }
     }
-    const currentRH = wo.maintenanceBasis === 'Running Hours'
+    const nextDueHour = maintenanceBasis === 'Running Hours'
+      ? (dueRH ?? null)
+      : maintenanceBasis === 'Dual Frequency'
+        ? (parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading) ?? null)
+        : null;
+    const rhEstimatedDueDate = isRhBased ? (job?.rhEstimatedDueDate ?? null) : null;
+    const currentRH = isRhBased
       ? (parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading))
       : undefined;
 
@@ -464,6 +474,7 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
 
     return {
       ...wo,
+      maintenanceBasis,
       assignedTo: resolvedAssignedTo,
       assignedToRankId: resolvedAssignedToRankId,
       criticality: wo.criticality || job?.criticality || null,
@@ -473,6 +484,8 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
       leadTimeUnit: job?.leadTimeUnit ?? null,
       componentCritical: component?.critical === true,
       dueRH: dueRH ?? null,
+      nextDueHour,
+      rhEstimatedDueDate,
       currentRH: currentRH ?? null,
       plannedDate
     };

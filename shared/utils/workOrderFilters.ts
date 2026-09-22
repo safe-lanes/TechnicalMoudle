@@ -44,6 +44,8 @@ export interface FilterableWorkOrder {
   currentRH?: number | null;
   currentReading?: string | number | null;
   dueDate?: string | null;
+  rhEstimatedDueDate?: string | null;
+  nextDueHour?: number | null;
   assignedTo?: string | null;
   criticality?: string | null;
   componentCritical?: boolean | null;
@@ -58,6 +60,28 @@ export interface FilterableWorkOrder {
   postponementEndDate?: string | null;
   daysLate?: number | null;
   approvalTier?: string | null;
+}
+
+export function getDisplayedWorkOrderDueDate(wo: FilterableWorkOrder): string | null {
+  const basis = String(wo.maintenanceBasis || '').trim().toLowerCase();
+  const calendarDueDate = wo.dueDate || null;
+  const expectedRhDueDate = wo.rhEstimatedDueDate || null;
+
+  if (basis === 'running hours') return expectedRhDueDate;
+  if (basis !== 'dual frequency') return calendarDueDate;
+
+  if (!calendarDueDate) return expectedRhDueDate;
+  if (!expectedRhDueDate) return calendarDueDate;
+
+  const calendar = parseWorkOrderDate(calendarDueDate);
+  const expectedRh = parseWorkOrderDate(expectedRhDueDate);
+  if (!calendar) return expectedRhDueDate;
+  if (!expectedRh) return calendarDueDate;
+  return expectedRh.getTime() < calendar.getTime() ? expectedRhDueDate : calendarDueDate;
+}
+
+export function shouldShowNextDueHourColumn(activeTab: string): boolean {
+  return ['Planned', 'Due', 'Overdue', 'Postponed'].includes(activeTab);
 }
 
 export const WORK_ORDER_TABS = [
@@ -307,9 +331,12 @@ export function compareWorkOrders(
     case "assignedTo": cmp = (a.assignedTo || "").localeCompare(b.assignedTo || ""); break;
     case "dueDate": {
       const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
-      const aVal = useSubmitted ? (a.submittedDate || "") : (a.dueDate || "");
-      const bVal = useSubmitted ? (b.submittedDate || "") : (b.dueDate || "");
-      cmp = aVal.localeCompare(bVal);
+      const aVal = useSubmitted ? (a.submittedDate || "") : (getDisplayedWorkOrderDueDate(a) || "");
+      const bVal = useSubmitted ? (b.submittedDate || "") : (getDisplayedWorkOrderDueDate(b) || "");
+      const aDate = parseWorkOrderDate(aVal);
+      const bDate = parseWorkOrderDate(bVal);
+      if (aDate && bDate) cmp = aDate.getTime() - bDate.getTime();
+      else cmp = aVal.localeCompare(bVal);
       break;
     }
     case "status": {
