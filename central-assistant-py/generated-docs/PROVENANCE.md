@@ -74,3 +74,13 @@ Repository revision read: `27a40b2ce` (branch feature/chatbot-enterprise). R2 = 
 | Sync | RH across sync: latest date wins, tie → ship, never backwards, reset exceptions | KEPT | rhEventComparator.ts:4-17,77-121,200-210,258; oneWayApplier.ts:1077-1086 |
 | Sync | 'Sync All' on Admin → Data Masters (shore only); vessel code is the WO prefix | CORRECTED (label) / KEPT (WO prefix, hand-verified) | DataMasters.tsx:558-580; server/modules/misc/routes.ts:32; workOrderNumbering.ts:7-11,60-86 |
 | Sync | Vessel master at provisioning only; re-provision from Admin → Ship Provisioning | CORRECTED | shared/syncConfig.ts:1191-1202; SideMenuBar.tsx:98; provisioningService.ts:55,373,851 |
+
+## R6 (22-Sep-2026) — one correction to R5, owner-authorised
+
+Built by `build_r6.py` = `build_r5.py` with one bullet replaced in §1.1.14.6.2 (nothing else changed; `git diff --no-index build_r5.py build_r6.py`).
+R6 docx sha256 `771dc12473e827345792d0b9e3d93ccfd7fe20e44270165c3f344b392b177d64` (R5 was `7a06bad589b3…`).
+
+| document | claim | disposition | evidence |
+|---|---|---|---|
+| Recent Updates §1.1.14.6.2 | R5: "Both refusals belong to 'Generate Now' only. The per-job 'Generate WO' route and the unplanned route … have different conditions." | **CORRECTED (R6)** → only the ROLE refusal is exclusive to Generate Now; on the office instance both Generate Now and per-job Generate WO require the vessel's office work-order generation switch (same refusal message); the Sail Admin role requirement belongs to Generate Now only; unplanned creation requires neither. The enforcement caveat bullets (ENFORCE_GN / ENFORCE_NOROLE) are unchanged. | `server/modules/jobs/services/jobService.ts` generateWorkOrder → `isOfficeWoGenerationEnabled` (the same check `workOrderGenerationGate.evaluateDirectGeneration` uses); `workOrderController.ts` is the only caller of the Sail Admin gate — recorded 19-Sep in `docs/assistant-experiments/2026-09-15-kb-pilot/for-astra-2026-09-19c/DOC-ERROR-both-refusals.md` (open issue A5), applied 22-Sep |
+| KB `how-work-orders-are-created.md` (kb-r6) | "The Sail Admin requirement belongs to 'Generate Now' only; it does not apply to per-job 'Generate WO' or to unplanned work orders." | **EXTENDED (kb-r6)** → the same sentence, plus: the office work-order generation switch applies to BOTH office routes and only the unplanned route is exempt. File sha256 `c303336a9dd2a9bf…` (kb-r5 was `115db8545d83…`); the other four KB files are byte-identical to kb-r5. | as above |

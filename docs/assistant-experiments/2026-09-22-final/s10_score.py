@@ -86,9 +86,16 @@ def table(title: str, pc: dict[str, dict[str, bool]], rule: str, read: bool = Fa
 
 
 def main() -> None:
+    global HERE
     ap = argparse.ArgumentParser()
     ap.add_argument("--read", action="store_true")
+    ap.add_argument("--dir", default=None, help="folder holding the *-dump.jsonl files (default: this folder)")
+    ap.add_argument("--xref-cand", default=str(XREF_DIR / "xref-answers-c3-captured.json"), help="cross-reference answers file for the CAND arm")
+    ap.add_argument("--xref-arm", default="repaired_c", help="arm name inside --xref-cand")
+    ap.add_argument("--xref-live", default=None, help="cross-reference answers file for the LIVE arm (default: <dir>/xref-answers-live.json)")
     a = ap.parse_args()
+    if a.dir:
+        HERE = Path(a.dir).resolve()
     totals = {}
     tok = {}
 
@@ -124,8 +131,8 @@ def main() -> None:
     # LIVE = the same seven cases against the isolated live copy, run today.
     import judge_xref  # noqa: E402  (its self-test runs on import? no — main() only; call self_test explicitly)
     judge_xref.self_test()
-    xr = {"CAND": [x for x in json.loads((XREF_DIR / "xref-answers-c3-captured.json").read_text(encoding="utf-8"))["results"] if x["arm"] == "repaired_c"]}
-    lp = HERE / "xref-answers-live.json"
+    xr = {"CAND": [x for x in json.loads(Path(a.xref_cand).read_text(encoding="utf-8"))["results"] if x["arm"] == a.xref_arm]}
+    lp = Path(a.xref_live) if a.xref_live else HERE / "xref-answers-live.json"
     if lp.exists():
         xr["LIVE"] = json.loads(lp.read_text(encoding="utf-8"))["results"]
     print("\n## CROSS-REFERENCE cases (7 x 3 runs)  —  rule: judge_xref buckets per run; appraisals capped at limited")

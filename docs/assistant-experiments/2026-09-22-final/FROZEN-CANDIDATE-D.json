@@ -1,0 +1,30 @@
+{
+  "_purpose": "Identities of the CORRECTED candidate (second final run, 22-Sep-2026), recorded before its regression run. Same image, prompt, model and serving flags as the frozen candidate in ../2026-09-15-kb-pilot/routing-experiment/FROZEN-CANDIDATE.json; only the index set differs.",
+  "candidate": {
+    "container": "sail-assistant-py-g5",
+    "bind": "127.0.0.1:8042 -> 8000",
+    "image": "sail-assistant-py:v6-r9",
+    "image_sha256": "722127cab5373572d36378d282ccb05d741124f792cde0a5eaa22131cb4f1da2",
+    "env_diff_vs_g4": "ASSISTANT_INDEX_SET=kb-xref-c -> kb-xref-d; nothing else (masked diff)",
+    "index_set": "kb-xref-d",
+    "index_documents": 30,
+    "index_chunks": 960,
+    "index_build_key": "7752dbf284ae08be|clean=off|xrefs=2026-09-22.3|repairs=2026-09-14.1|chunker=2026-03-17.original|1200/150|embed=llamaindex-meta9|model=text-embedding-3-large:3072 (identical to kb-xref-c; one key for all 25 parsed documents)",
+    "sources": "manifest.json (30 entries, full sha256): 20 PDF manuals (unchanged), 4 R3 operational docx (Bulk bffa8828d5, Roles e845a51f00, Ship-Side 0bb3e4225e, Sync 25f4a49ef9), Recent Updates R6 771dc12473 (= R5 + A5 correction), 5 KB files from kb-r6 (how-work-orders-are-created.md c303336a9d extended; other four byte-identical to kb-r5 / kb-pilot-e)",
+    "intended_differences_vs_reviewed_candidate_kb_pilot_e": ["Recent Updates 7a06bad589 (R5) -> 771dc12473 (R6): §1.1.14.6.2 second bullet replaced", "KB how-work-orders-are-created.md 115db8545d -> c303336a9d: one sentence added on the switch scope", "resolver 2026-09-14.4 -> 2026-09-22.3 with XREF_LAYOUT=quote-excluded (the cross-reference repair under test)"],
+    "build": "build-kb-xref-d.sh: step A = R6 docx only, ONE LlamaParse job (owner-authorised exception, job pjb-hzepqb29pyg4432pbjawvijdrup6); step B = --cache-only, 24 documents from the parse store (parser not called), 5 KB files as-is with --kb-provenance-line; vectors: all reused except 1 new (the changed KB file) + the R6 document's chunks",
+    "validation": "manifest_check.py sources PASS (pre-build) and index PASS (post-build); negative controls: kb-xref-c FAILS (16 violations), kb-pilot-e FAILS (4: superseded R5 + kb-r5 file); PDF chunk sets identical to kb-xref-c (0/0), R3 docx chunk sets identical to kb-pilot-e (0/0), 4 of 5 KB chunks byte-identical to kb-pilot-e, 41/41 resolved cross-references with source_quote metadata; postbuild-checks.sql §7 known facts all as intended, 'Both refusals' absent",
+    "prompt": {"version": "v5-plain-coverage-2026-09-15", "docsPromptSha": "ff9ee87141ac1362", "toolLoopPromptSha": "7a028346c1c2fdf0", "combined": "aea94e2f5edb6948"},
+    "chat_model": "gpt-5.6-luna", "chat_temperature": "default",
+    "flags": {"ASSISTANT_DOCS_PROMPT": "v5", "ASSISTANT_ROUTE_INTENT": "on", "ASSISTANT_HYBRID": "rescue", "ASSISTANT_CROSS_MODULE_GAP": "0.25", "ASSISTANT_CROSS_MODULE_SLOTS": "2", "ROUTE_MARGIN": "0.07", "ASSISTANT_CAPTURE_OUTBOUND": "instrumentation only"}
+  },
+  "live_copy": {
+    "container": "sail-assistant-py-livecopy (recreated 13:4x UTC with the identical recipe as the morning run; capture dir emptied)",
+    "bind": "127.0.0.1:8040 -> 8000",
+    "image": "sail-assistant-py:prompt-v2", "image_sha256": "8db669090d3690111867ece75b868001bb6ee311e866456949a9f41618c133b9",
+    "index_set": "repaired", "index_chunks": 911, "chat_model": "gpt-4o-mini",
+    "prompt": {"version": "v2-xref-hardrule-2026-09-14", "combined": "ebfd83a623e41173"},
+    "prompt_matches_live_health": true
+  },
+  "harness": "run-s11-final.sh (= run-s10-final.sh with g5 / s11 paths), same runner image v6-r7, same judges (.9 / .13 / .4), xref 7x3 run fresh on g5 (XREF_ARMS=cand_d); live-arm xref answers reused from the morning run (xref-answers-live.json — identical live configuration)"
+}

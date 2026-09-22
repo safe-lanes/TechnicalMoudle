@@ -1,0 +1,32 @@
+b5252752ffc1c61e9a54a0c63409838f07fd6a2810f42f3ff956414d1e783a9e  Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf
+c2494d2156bc6766227eef73a212c722baf02652f9d32308452fc344f9258c9d  Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf
+efe75238c622efbbe344a689bff40b72ad7c351a8a4c1a333074ff86e537a120  Audit - History Manual_R1_30.06.2026.pdf
+35a2d511a21a42638d47bc232cd3f53d62874fb1853100a92635e1e15abf6e88  Audit - Preparation Manual_Office_R1_30.06.2026.pdf
+e6149f9b2aab29ce97a393ab14d7f89be0880f085de485f8d0989223d2a487da  Crewing - Crewing User Manual R2_10.06.2026.pdf
+3201171579f45af8df721cabba6603c80bedff8a3205bd4fd160172054fa1174  Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf
+ceb3e31b6e6ed8a71f909b878a86e9274ffa6193ede490072f17eb2cbc5f39f5  Incident - Incident User Manual R0_20.05.2026.pdf
+525ce802dbcca23b6463614bc39c1d5c32ce598760ac51498251a3ef860d7a35  Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf
+5cd0d392035a320626d9bc07003f25fead00d2880bf87523e6497a1f697b5582  Incident - Near Miss User Manual R1_30.05.2026.pdf
+ab160ffe1a14e733c2d72df6f7bd8737eb8aaae0856c5e795196851b7e1ba104  Safety - MOC User Manual_Office_R0_31.03.2026.pdf
+a10cd79a2fa57c7eab29ba82ff4a5647d4a84976ce6d32b47af19d4169559191  Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf
+16a8d99022a9e81bda2573bd51c69854460bb989257f46dc7e89a4ca064446b3  Safety - Master Review Manual R1_10.06.2026.pdf
+70475a998cebbc6fbbb4138c034b4110e541becb7d1deafc8e6bec13662702b6  Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf
+a3e1ab92590df9f77324924f6e02783852e40ffb9c00d631d46a7b064f83fc59  Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf
+182b93c99791a6c112995a17a5a1ff0ad1c7dc0162dbe0913a9776699687a4ea  Safety - SMS User Manual_Office_R0_31.01.2026.pdf
+2fbae044792f579625d703b557ac087bd68105e8720766e6696bcb1a53e4cf8c  Safety - Safety Meeting User Manual_R1_31.05.2026.pdf
+bffa8828d516ab84f0ca88eaf9e171e3b8342df78fd38d17e4e88c72fe3bd430  Technical - Bulk Data Import (Operational) User Manual.docx
+c4c026beb21bcc993a31a0033e6929db84e7da838fe1da5aa612ba0b5206bf72  Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf
+996227bf0fffbb433e9006278e2063a5679362b7f0154efd1e75f06c042271e8  Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf
+ef0e35d1df7f09c57c8c21108aaaaab26689b8c343a40aaf4d64fa2dc4af8cff  Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf
+c9359810897950e7adf6e1112ba7edd0d8e61081f4dd7901e1c6fbb678ce5811  Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf
+771dc12473e827345792d0b9e3d93ccfd7fe20e44270165c3f344b392b177d64  Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx
+e845a51f00a291ce2999605e184471c7f8dec9cb9fef879d510a395a3f1f4a5e  Technical - Roles & Permissions (Operational) User Manual.docx
+0bb3e4225ed74fda9e29728428cb4dcc418afca4b0f1da1ac0836f072715cb40  Technical - Ship-Side (Vessel Crew) Operational Notes.docx
+25f4a49ef951ccee89330ed5f5a8d16c91354f193172eb9942f6aa8cbe7c1024  Technical - Sync (Operational) User Manual.docx
+a71d3caf4dfa3efe80b47da042e86d39893a682be6c1bd607d94a83b054c7ef3  CONFLICTS.md
+b8d0d3ae3079d39e8240a4439b24e01122a6d1b2cf465385919361ba41a7847e  REVIEW.md
+c303336a9dd2a9bf0257f3dfc28ccf3e5972a5cd600d974b44e44640b8e40fe8  how-work-orders-are-created.md
+4bda820e872bcdb7dd6ca473e5bceed444c5ff4ea490371b07df4f73b570b8cd  office-generate-now.md
+e872095984faedd238d76a75146483bd2bd93ed9da8734937efd971587f1044d  office-generate-wo-per-job.md
+1b5fb1ed055941f0a475e435b5bc010cdcc0b7e95c5d69c6461156cbd3cf02fb  planned-wo-ship-daily-scan.md
+939dec7535dea707e085c1c4a886d848b9c014859c9a47497c16dc2a70d9b941  unplanned-wo.md
