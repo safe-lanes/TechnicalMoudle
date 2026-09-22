@@ -1,6 +1,7 @@
 """Pre-chunk cleanup + cross-reference resolution — behaviour on synthetic manual pages
 shaped like the real parses (agentic captions, cost_effective OCR tables, callouts)."""
 from indexer.clean_markdown import clean_pages
+from indexer import xrefs
 from indexer.xrefs import is_pointer, resolve_xrefs
 
 COVER = "Blue water texture\n\n# TECHNICAL USER MANUAL\n\nsail logo\n\nBlue water texture"
@@ -128,7 +129,16 @@ def test_resolves_appends_target_steps_and_reports_edges():
     assert resolved["1.1.8.2 HOW TO APPLY FILTER"] == "1.1.7.2 HOW TO APPLY FILTER"
     assert resolved["1.1.8.6 HOW TO EXPORT STORE ITEMS"] == "1.1.7.6 HOW TO EXPORT SPARES"
     assert "Choose the criteria and click 'Apply'." in out[9]
-    assert "(Cross-reference resolved: the steps for Stores › How To Apply Filter are the same as section 1.1.7.2 'How To Apply Filter' under Spares, page 5. They are:)" in out[9]  # honest attribution, both sides named
+    # The resolved block is now THREE separated parts (22-Sep-2026): guidance adapted for the
+    # destination, anything not established, then the source quoted verbatim. Adapted guidance must
+    # never look like a quote, and the quote must never be edited.
+    assert "guidance adapted for Stores, then the source text quoted verbatim" in out[9]
+    assert "**Applies to: Stores › How To Apply Filter.**" in out[9]
+    assert "section 1.1.7.2 'How To Apply Filter' under Spares, page 5" in out[9]  # citation kept, both sides named
+    assert "Quoted verbatim from" in out[9] and "refer to Spares:" in out[9]
+    # the adapted part comes first, the quote after it — a reader must not meet the source's
+    # screen names before being told which screen they are on
+    assert out[9].index("**Applies to: Stores") < out[9].index("Quoted verbatim from") < out[9].index("Choose the criteria")
     # the pointer's own sentence is kept, and the appended text lands inside the pointer section (before the next heading)
     assert out[9].index("Refer to the 'Spares'") < out[9].index("Choose the criteria") < out[9].index("### 1.1.8.6")
     # dead end: no 'Warehouse' section
@@ -157,3 +167,36 @@ def test_cycle_is_unresolved_not_infinite():
     out, rep = resolve_xrefs(pages)
     assert len(rep.resolved) == 0 and len(rep.unresolved) == 2 and all("cycle" in r for _, r in rep.unresolved)
     assert out == pages
+
+
+def test_quoted_body_is_never_edited_and_captions_are_labelled():
+    """The repair must not rewrite the source's nouns: the quote has to stay what the manual says, or
+    a citation to it is false. Captions are marked as illustrations of the SOURCE screen, and their
+    text is preserved because a caption sometimes carries the only statement of a step."""
+    body = ("* Click on the 'Spares' sub-sub module.\n"
+            "screenshot: Spares Inventory dashboard showing the Export button.\n"
+            "* Click 'Export' to download.")
+    block = xrefs.render_resolved(dest_parent="Stores", dest_title="How To Export Store Items",
+                                  src_citation="section 1.1.7.7 'How To Export Spares Records' under Spares, page 41",
+                                  src_parent="Spares", body=body)
+    quote = block.split("refer to Spares:**", 1)[1]
+    # every original line survives, unedited apart from the caption marker
+    assert "* Click on the 'Spares' sub-sub module." in quote
+    assert "* Click 'Export' to download." in quote
+    assert "[illustration of the Spares screen] Spares Inventory dashboard showing the Export button." in quote
+    # the destination facts appear ABOVE the quote, labelled, never inside it
+    head = block.split("refer to Spares:**", 1)[0]
+    assert "Carry it out on the **Stores** screen" in head
+    assert "stores_<tab>_inventory" in head
+    assert "Stores" not in quote.replace("stores_", "")  # no rewriting of the source's nouns
+
+
+def test_destination_without_verified_facts_says_so_instead_of_inventing():
+    """Crewing screens are not in any repository available to us. The renderer must state that the
+    quoted wording is unverified for the destination rather than assert a field list."""
+    block = xrefs.render_resolved(dest_parent="Waitlist", dest_title="How To Export Crew Details",
+                                  src_citation="section 1.2.1.5 'How To Export Crew Details' under In Progress, page 19",
+                                  src_parent="In Progress", body="* Click on the 'In-Progress' sub-sub module.")
+    assert "**Not established:**" in block
+    assert "have NOT been confirmed for Waitlist" in block
+    assert "Carry it out on the" not in block  # no screen claim without evidence

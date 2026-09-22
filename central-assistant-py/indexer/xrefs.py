@@ -23,7 +23,9 @@ pages; the appended text is inserted on the page that holds S.
 from __future__ import annotations
 
 import difflib
+import json
 import re
+from pathlib import Path
 from dataclasses import dataclass, field
 
 # Resolver version — part of the build key and of every reproducibility record. Bump on ANY
@@ -178,6 +180,88 @@ def find_target(sections: list[Section], container: Section, pointer: Section) -
     return None
 
 
+_FACTS: dict | None = None
+
+
+def facts_for(dest_parent: str) -> dict:
+    """Verified, code-backed facts about the DESTINATION screen, or {} when none exist.
+
+    A destination with no entry gets no generated field list and no screen claim — see xref_facts.json.
+    The Crewing screens are not in any repository available to us, so they are deliberately absent and
+    their field lists are left unresolved rather than invented."""
+    global _FACTS
+    if _FACTS is None:
+        p = Path(__file__).with_name("xref_facts.json")
+        _FACTS = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    return _FACTS.get(norm(dest_parent), {}) if dest_parent else {}
+
+
+def label_captions(body: str, src_parent: str) -> str:
+    """A pasted figure caption describes the SOURCE screen, not the destination. Mark it as such and
+    leave the caption text itself intact — captions sometimes carry the only statement of a step."""
+    def mark(m: re.Match) -> str:
+        return f"{m.group(1)}[illustration of the {src_parent} screen] {m.group(2)}"
+    return re.sub(r"(?mi)^(\s*(?:screenshot(?:_from_computer)?|screen shot)\s*:\s*)(.*)$", mark, body)
+
+
+def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_parent: str,
+                    body: str) -> str:
+    """Three clearly separated parts, so adapted guidance never masquerades as a verbatim quote:
+
+      1. WHAT APPLIES HERE — destination screen and record, from this manual's own section heading,
+         plus any fact VERIFIED against the product code (xref_facts.json). Labelled as adapted.
+      2. NOT ESTABLISHED — named explicitly rather than papered over.
+      3. QUOTED VERBATIM — the source section's text, unedited, with its citation, and with figure
+         captions marked as illustrations of the source screen.
+
+    Rewriting the source's nouns was rejected: the quote would no longer be what the manual says and a
+    citation to it would be false. Equally, a bare "apply these steps here" was rejected — it leaves a
+    wrong field list in front of the reader and asks them to reinterpret it."""
+    f = facts_for(dest_parent)
+    where = dest_parent or "this sub-module"
+    out = [f"\n\n(Cross-reference resolved. Two separate parts follow: guidance adapted for {where}, "
+           f"then the source text quoted verbatim.)\n",
+           f"**Applies to: {where} › {dest_title}.** The procedure is the same as {src_citation}."]
+
+    if f.get("screen"):
+        out.append(f"Carry it out on the **{f['screen']}** screen — {where} is its own screen "
+                   f"({f.get('own_screen_evidence', 'verified in the product code')}).")
+    # Only state the fact that belongs to the action this section documents. An export section does
+    # not need the filter list, and saying it anyway buries the part that matters.
+    act = norm(dest_title)
+    relevant = {"filters": "filter" in act, "edit": "edit" in act or "update" in act,
+                "export": "export" in act or "download" in act,
+                "creation": "create" in act or "new" in act}
+    if f.get("filters") and relevant["filters"]:
+        out.append(f"Verified filters on this screen: **{', '.join(f['filters'])}**."
+                   + (f" The quoted steps also name {', '.join(f['not_present'])}, which "
+                      f"**do not exist here**." if f.get("not_present") else ""))
+    for key in ("edit", "export", "creation"):
+        if f.get(key) and relevant[key]:
+            out.append(f"{f[key]}.")
+
+    # An unresolved note may be scoped to one action: {"when": "filter", "text": "..."}. A plain
+    # string always shows. Without this, the Certificates filter caveat appeared on an EDIT section.
+    unresolved = []
+    for u in f.get("unresolved", []):
+        if isinstance(u, dict):
+            if relevant.get(u.get("when", ""), True):
+                unresolved.append(u["text"])
+        else:
+            unresolved.append(u)
+    if not f:
+        unresolved.append(
+            f"No verified description of the {where} screen is available, so the screen names, record "
+            f"types, field lists and figures in the quoted steps below describe {src_parent} and have "
+            f"NOT been confirmed for {where}. Treat the sequence of actions as the transferable part.")
+    if unresolved:
+        out.append("**Not established:** " + " ".join(unresolved))
+
+    out.append(f"\n**Quoted verbatim from {src_citation} — its wording, screen names and figures "
+               f"refer to {src_parent}:**\n")
+    return "\n".join(out) + "\n" + label_captions(body, src_parent) + "\n"
+
+
 def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, str], XrefReport]:
     rep = XrefReport()
     sections = sections_of(pages)
@@ -221,8 +305,9 @@ def resolve_xrefs(pages: dict[int, str], max_depth: int = 3) -> tuple[dict[int, 
         via = ""
         if len(chain) > 2:  # the manual's own chain of pointers, stated so the reader can verify it
             via = " (reached via " + ", ".join(f"section {number_of(t)}" for t in chain[1:-1]) + ", which itself refers onward)"
-        inserts[(s.page, s.end)] = (f"\n\n(Cross-reference resolved: the steps for {here + ' › ' if here else ''}{title_words(s.title).title()} "
-                                    f"are the same as {src}{via}. They are:)\n{target.body}\n")
+        inserts[(s.page, s.end)] = render_resolved(
+            dest_parent=here, dest_title=title_words(s.title).title(), src_citation=src + via,
+            src_parent=_parent_title(sections, target) or target.title, body=target.body)
     out = dict(pages)
     for (pn, off), text in sorted(inserts.items(), key=lambda kv: (kv[0][0], -kv[0][1])):
         md = out[pn]

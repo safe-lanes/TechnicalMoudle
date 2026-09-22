@@ -1,0 +1,55 @@
+{
+  "_README": [
+    "Destination-specific facts used by xrefs.py when it resolves a cross-reference. Every entry is",
+    "VERIFIED against the product code at the revision named below and cites file and lines, or it is",
+    "not in this file at all. Nothing here is inferred from the manuals.",
+    "",
+    "A destination absent from this file gets NO generated field list or screen claim — the adaptation",
+    "says only what the manual's own section heading establishes, and marks the rest unresolved. That is",
+    "deliberate: the Crewing screens (Appraisals, Crew Promotion, the Annual/Periodic/Monthly/Other/",
+    "Summary drug & alcohol tests, and the Recruited/Waitlist/Rejected crew lists) are not in any",
+    "repository available here, so their field lists cannot be verified and must not be invented.",
+    "",
+    "Keys are matched case-insensitively against the destination sub-module name that xrefs.py derives",
+    "from the manual's own structure."
+  ],
+  "_revision": "aa35c4721 (TechnicalMoudle, branch chatbot-enterprise, 22-Sep-2026)",
+  "stores": {
+    "screen": "Stores",
+    "own_screen_evidence": "client/src/pages/TechnicalModule.tsx:218-221 renders <Spares /> and <Stores /> as separate components",
+    "filters": [
+      "Search",
+      "Stock"
+    ],
+    "filters_evidence": "client/src/pages/stores/Stores.tsx:2716 (Search), 2740 (Stock); 'criticality' and 'rotation' occur 0 times in the file",
+    "not_present": [
+      "Criticality",
+      "Rotation Item"
+    ],
+    "export": "Stores exports from its own screen to stores_<tab>_inventory_<timestamp>.xlsx and stores_<tab>_history_<timestamp>.xlsx",
+    "export_evidence": "client/src/pages/stores/Stores.tsx:861-909, Export control at 2580"
+  },
+  "surveys": {
+    "screen": "Surveys",
+    "own_screen_evidence": "client/src/pages/cert-surveys/SurveysPage.tsx contains 0 occurrences of 'Certificates'",
+    "edit": "A survey is edited in place in the Surveys grid; the edited cell saves and the Last Edit timestamp refreshes",
+    "edit_evidence": "client/src/pages/cert-surveys/SurveysPage.tsx:108-109 (canEditSurvey), CellEditingStoppedEvent import at :4, lastEdit refresh at :259-265",
+    "export": "Surveys exports from its own screen as PDF, CSV or Excel",
+    "export_evidence": "client/src/pages/cert-surveys/SurveysPage.tsx:589 (PDF), 632 (CSV), 653 (Excel)",
+    "unresolved": [
+      {
+        "when": "filters",
+        "text": "The filter field list quoted from Certificates ('Fleet', 'Add Group', 'Due Status') is NOT verified for Surveys. 'Add Group' occurs 0 times in the Surveys page AND 0 times in the Certificates page, and the due control is labelled 'Due in...'. The list is stale against the code for both screens, so it is left to the quoted source and not restated here."
+      }
+    ]
+  },
+  "condition of class coc": {
+    "screen": "Condition of Class (CoC)",
+    "own_screen_evidence": "client/src/pages/defects/DefectsCoC.tsx:244 is its own page with its own export at :421/:715",
+    "creation": "A CoC record is created through the same defect form as a defect log entry, with the CoC flag set, so the creation steps transfer",
+    "creation_evidence": "client/src/pages/defects/DefectFormWizard.tsx:186,200 (is_coc default from the isCoc prop)",
+    "unresolved": [
+      "A shared creation form establishes only that CREATION transfers. Whether every filter, export and permission also transfers is NOT established and is left unresolved."
+    ]
+  }
+}
