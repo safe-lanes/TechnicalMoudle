@@ -31,27 +31,40 @@ STEP = re.compile(r"(?:^|\n)\s*(?:\d+[.)]|[-*•])\s|\b(?:click|select|choose|en
 # ever match and every attribution and denial was scored as a wrong instruction. self_test() pins both.
 CITATION = re.compile("same as|same steps|section |page |source *:|cross-?referenc|"
                       "quoted|according to|stated as", re.I)
-DENIAL = re.compile("not available|not exist|does not exist|are not|is not|no longer|"
-                    "not present|not offered|not on this screen|unavailable", re.I)
+# Widened 22-Sep after the reviewer found three false failures: "does **not** use the Spares-only
+# Criticality or Rotation Item filters", "do **not** exist on the Stores screen", "Issue Date does not
+# apply to Surveys" — all correct denials. Two causes: the pattern was applied to the RAW sentence,
+# so Markdown bold inside "does **not** use" broke it; and "does not use / apply / establish" were
+# missing. Both patterns are now applied to the normalised sentence.
+DENIAL = re.compile("not available|not exist|does not exist|do not exist|are not|is not|no longer|"
+                    "not present|not offered|not on this screen|unavailable|does not use|do not use|"
+                    "does not apply|do not apply|not apply to|does not establish|do not establish|"
+                    "not established", re.I)
 
 
 def self_test() -> None:
     """A discount rule that cannot fire, or fires on everything, would silently invert this report."""
     must_discount = ["This procedure is the same as In Progress, section 1.2.1.5, page 19.",
-                     "Criticality and Rotation Item are not available on this screen."]
+                     "Criticality and Rotation Item are not available on this screen.",
+                     # the reviewer's three false failures (22-Sep), verbatim from the stored answers
+                     "The Stores screen does **not** use the Spares-only **Criticality** or **Rotation Item** filters.",
+                     "The **Criticality** and **Rotation Item** filters mentioned in the Spares source text do **not** exist on the Stores screen.",
+                     "The certificate field **Issue Date** does not apply to Surveys."]
     must_keep = ["Click the In-Progress sub-sub-module.",
-                 "Use the dropdown filters for Criticality, Rotation Item, or Stock."]
+                 "Use the dropdown filters for Criticality, Rotation Item, or Stock.",
+                 "- **Criticality**"]                     # a bare bullet offering the field IS an instruction
     # the reviewer's catch: bold markers between the words hid three wrong-screen instructions
     bold = "Go to the **Certificates** sub-submodule."
     if "certificates sub" not in normalise(bold):
         raise SystemExit("judge self-test FAILED: Markdown bold still hides a must_not term")
     if not (CITATION.search(bold) is None and DENIAL.search(bold) is None):
         raise SystemExit("judge self-test FAILED: a bare wrong-screen instruction was discounted")
+    # tested exactly as judge() tests them: on the NORMALISED sentence (bold, dashes, quotes stripped)
     for s in must_discount:
-        if not (CITATION.search(s) or DENIAL.search(s)):
+        if not (CITATION.search(normalise(s)) or DENIAL.search(normalise(s))):
             raise SystemExit(f"judge self-test FAILED: should discount -> {s!r}")
     for s in must_keep:
-        if CITATION.search(s) or DENIAL.search(s):
+        if CITATION.search(normalise(s)) or DENIAL.search(normalise(s)):
             raise SystemExit(f"judge self-test FAILED: should NOT discount -> {s!r}")
     print("judge self-test: passed (discounts attribution and denial, keeps real instructions)\n")
 
@@ -103,8 +116,9 @@ def judge(case: dict, text: str) -> tuple[str, list[str]]:
     for pat in case.get("must_not", []):
         npat = normalise(pat)
         for sent in sentences(text):
-            if npat in normalise(sent):
-                if CITATION.search(sent) or DENIAL.search(sent):
+            nsent = normalise(sent)
+            if npat in nsent:
+                if CITATION.search(nsent) or DENIAL.search(nsent):
                     discounted.append(f"{pat!r} discounted (attribution/denial): “{sent[:110]}”")
                 else:
                     hits.append(f"{pat!r} as an instruction: “{sent[:110]}”")

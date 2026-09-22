@@ -262,3 +262,22 @@ def test_quote_excluded_layout_keeps_source_text_out_of_the_page(monkeypatch):
     q = xrefs.SOURCE_QUOTES[0]
     assert q["page"] == 44 and "Click on the 'Spares' sub-sub module" in q["quote"]
     assert "[illustration of the Spares screen]" in q["quote"]
+
+
+def test_parenthesised_filter_list_is_rewritten_to_the_verified_list():
+    """Reviewer, 22-Sep-2026: rule 2 detected a parenthesised list but only rewrote 'such as'/'by'
+    lists, so "(Criticality, Rotation Item, or Stock)" survived INSIDE the adapted Stores steps while the
+    same block said those filters do not exist. Generated contradiction. Pinned here."""
+    body = ("* Click on the 'Spares' sub-sub module.\n"
+            "* The user can use the search field and dropdown filters (Criticality, Rotation Item, or Stock) "
+            "to refine the displayed records.")
+    f = xrefs.facts_for("Stores")
+    steps, _notes = xrefs.adapt_steps(body, "Spares", "Stores", "How To Apply Filter",
+                                      "How To Apply Filter", f, allow_substitution=True)
+    joined = "\n".join(steps)
+    assert "Criticality" not in joined and "Rotation Item" not in joined
+    assert "(Search, All Categories, Stock)" in joined
+    # and with NO verified facts the parenthetical is dropped, not carried over
+    steps2, notes2 = xrefs.adapt_steps(body, "Spares", "Consumables", "How To Apply Filter",
+                                       "How To Apply Filter", {}, allow_substitution=True)
+    assert "Criticality" not in "\n".join(steps2) and any("not repeated" in n for n in notes2)
