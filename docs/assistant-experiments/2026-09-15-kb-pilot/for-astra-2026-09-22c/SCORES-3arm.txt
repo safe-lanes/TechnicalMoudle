@@ -1,0 +1,41 @@
+judge self-test: passed (discounts attribution and denial, keeps real instructions)
+
+63 answers · 3 runs · 7 frozen cases · errors 0
+
+case                       baseline r1    baseline r2    baseline r3    repaired_a r1  repaired_a r2  repaired_a r3  repaired_b r1  repaired_b r2  repaired_b r3 
+----------------------------------------------------------------------------------------------------------------
+waitlist-export            incorrect      incorrect      incorrect      correct        correct        correct        correct        incorrect      correct       
+monthly-test-create        correct        correct        correct        correct        correct        correct        correct        correct        correct       
+appraisals-filter          incorrect      incorrect      incorrect      limited        limited        limited        limited        limited        limited       
+stores-export              incorrect      incorrect      incorrect      correct        correct        correct        correct        correct        correct       
+stores-filter              incorrect      incorrect      incorrect      correct        correct        correct        correct        correct        correct       
+surveys-edit               incorrect      incorrect      incorrect      correct        correct        correct        correct        correct        correct       
+audit-history-regression   correct        correct        correct        correct        correct        correct        correct        correct        correct       
+
+TOTALS per arm (each of 3 runs counted separately)
+   baseline   correct  6/21   limited  0/21   incorrect 15/21
+   repaired_a correct 18/21   limited  3/21   incorrect  0/21
+   repaired_b correct 17/21   limited  3/21   incorrect  1/21
+
+WHY, per case (run 1 shown; differences across runs flagged)
+   waitlist-export            baseline   incorrect  must_not 'in-progress' as an instruction: “Open the **In-Progress** su
+   waitlist-export            repaired_a correct    PROVENANCE: attributes the indexing note to the manual; 'in progress' 
+   waitlist-export            repaired_b correct    'in progress' discounted (attribution/denial): “The Waitlist export pr   [varies across runs: ['correct', 'incorrect', 'correct']]
+   monthly-test-create        baseline   correct    'annual d&a record' discounted (attribution/denial): “These steps are 
+   monthly-test-create        repaired_a correct    PROVENANCE: attributes the indexing note to the manual
+   monthly-test-create        repaired_b correct    -
+   appraisals-filter          baseline   incorrect  must_not 'promotion rank' as an instruction: “**Name, Promotion Rank, 
+   appraisals-filter          repaired_a limited    capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was gen
+   appraisals-filter          repaired_b limited    capped at 'limited': Reviewer, 22-Sep, added BEFORE any answer was gen
+   stores-export              baseline   incorrect  must_not 'spares sub' as an instruction: “Click the **Spares** sub-sub
+   stores-export              repaired_a correct    -
+   stores-export              repaired_b correct    -
+   stores-filter              baseline   incorrect  must_not 'criticality' as an instruction: “- **Criticality**”; must_no
+   stores-filter              repaired_a correct    'criticality' discounted (attribution/denial): “Although the quoted Sp
+   stores-filter              repaired_b correct    'criticality' discounted (attribution/denial): “The guidance states th
+   surveys-edit               baseline   incorrect  must_not 'certificates sub' as an instruction: “Go to the **Certificat
+   surveys-edit               repaired_a correct    -
+   surveys-edit               repaired_b correct    -
+   audit-history-regression   baseline   correct    -
+   audit-history-regression   repaired_a correct    -
+   audit-history-regression   repaired_b correct    -

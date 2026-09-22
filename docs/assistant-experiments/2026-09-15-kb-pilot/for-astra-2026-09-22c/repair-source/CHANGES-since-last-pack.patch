@@ -1,0 +1,162 @@
+diff --git a/central-assistant-py/indexer/index_documents.py b/central-assistant-py/indexer/index_documents.py
+index aa0acab3d..2905dded9 100644
+--- a/central-assistant-py/indexer/index_documents.py
++++ b/central-assistant-py/indexer/index_documents.py
+@@ -135,7 +135,12 @@ async def parse_store_put(conn: asyncpg.Connection | None, *, key: str, file: st
+         json.dumps(result, ensure_ascii=False), pages)
+ 
+ 
+-def llamaparse(path: Path, *, api_key: str, tier: str, version: str, fresh: bool, cache_dir: Path, log) -> dict[str, Any]:
++class CacheMiss(RuntimeError):
++    """Raised under --cache-only when a document has no cached parse. Never a paid call."""
++
++
++def llamaparse(path: Path, *, api_key: str, tier: str, version: str, fresh: bool, cache_dir: Path, log,
++               cache_only: bool = False) -> dict[str, Any]:
+     """Call LlamaParse v2 (or reuse the on-disk copy of an identical request). The DB parse store
+     is consulted BEFORE this in main(); this is the last resort that actually parses."""
+     cache_dir.mkdir(parents=True, exist_ok=True)
+@@ -144,6 +149,11 @@ def llamaparse(path: Path, *, api_key: str, tier: str, version: str, fresh: bool
+     if result_f.exists():
+         log(f"   on-disk LlamaParse result for {path.name} ({result_f.name})")
+         return json.loads(result_f.read_text(encoding="utf-8"))
++    if cache_only:
++        # 22-Sep-2026: an unplanned run re-parsed ~12-16 documents because --dry-run silently skipped
++        # the parse store. With --cache-only a miss is an ERROR, never a paid call.
++        raise CacheMiss(f"{path.name}: no cached parse (store key miss and no {result_f.name}); "
++                        f"--cache-only forbids calling LlamaParse")
+     if not api_key:
+         raise RuntimeError("LLAMA_CLOUD_API_KEY missing")
+     configuration = {"tier": tier, "version": version, "disable_cache": bool(fresh),
+@@ -294,7 +304,9 @@ async def main() -> int:
+     ap.add_argument("--max-chunk", type=int, default=1200)
+     ap.add_argument("--overlap", type=int, default=150)
+     ap.add_argument("--embed-batch", type=int, default=128)
+-    ap.add_argument("--dry-run", action="store_true", help="parse + chunk only; no embedding, no DB writes")
++    ap.add_argument("--dry-run", action="store_true", help="parse + chunk only; no embedding, no DB writes (the parse store is still READ)")
++    ap.add_argument("--cache-only", action="store_true",
++                    help="never call LlamaParse: abort on the first document whose parse is in neither the DB parse store nor --cache-dir")
+     ap.add_argument("--clean", action="store_true", help="pre-chunk cleanup: cover, TOC, page header/footer, screenshot figure zones, inline tags")
+     ap.add_argument("--resolve-xrefs", action="store_true", help="append the target section's text to cross-reference-only sections")
+     ap.add_argument("--reparse", action="store_true", help="ignore the accepted parse in the parse store and parse again (normally never needed)")
+@@ -325,7 +337,11 @@ async def main() -> int:
+             return 2
+     log(f"index set '{a.index_set}': {len(files)} files in {docs}; tier={a.tier} version={a.version} fresh={a.fresh_parse} dry_run={a.dry_run}")
+ 
+-    conn = None if a.dry_run else await asyncpg.connect(os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://"))
++    # The parse store is READ on every run, dry or not. Before 22-Sep-2026 a dry run had no connection
++    # at all, so parse_store_get() always missed and every document went to LlamaParse — an unplanned
++    # re-parse of ~12-16 documents. Writes stay gated on `conn`, which is still None under --dry-run.
++    read_conn = await asyncpg.connect(os.environ["DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://"))
++    conn = None if a.dry_run else read_conn
+     oai = None if a.dry_run else OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+     summary: list[dict[str, Any]] = []
+     failures = 0
+@@ -346,12 +362,12 @@ async def main() -> int:
+             log(f"> {f.name} [{module}/{source_type}]")
+             try:
+                 pkey = parse_key_for(sha, a.tier, a.version)
+-                result = None if a.reparse else await parse_store_get(conn, pkey)
++                result = None if a.reparse else await parse_store_get(read_conn, pkey)
+                 if result is not None:
+                     log(f"   accepted parse from the parse store (key {pkey[:12]}…) — parser not called")
+                 else:
+                     result = llamaparse(f, api_key=os.environ.get("LLAMA_CLOUD_API_KEY", ""), tier=a.tier, version=a.version,
+-                                        fresh=a.fresh_parse, cache_dir=cache_dir, log=log)
++                                        fresh=a.fresh_parse, cache_dir=cache_dir, log=log, cache_only=a.cache_only)
+                 md, page_map = markdown_and_pages(result)
+                 job_id = (result.get("job") or {}).get("id")
+                 present, vfield = version_evidence(result)
+diff --git a/central-assistant-py/indexer/xrefs.py b/central-assistant-py/indexer/xrefs.py
+index e4b1abad0..31ad779cb 100644
+--- a/central-assistant-py/indexer/xrefs.py
++++ b/central-assistant-py/indexer/xrefs.py
+@@ -24,6 +24,7 @@ from __future__ import annotations
+ 
+ import difflib
+ import json
++import os
+ import re
+ from pathlib import Path
+ from dataclasses import dataclass, field
+@@ -285,6 +286,16 @@ def adapt_steps(body: str, src_parent: str, dest_parent: str, dest_title: str, s
+                 notes.append(f"The filter fields available in {dest_parent} are not established by the "
+                              f"manual or by code available here, so the list quoted from {src_parent} "
+                              f"is not repeated. Use the filters the screen offers.")
++        # rule 2b — a quoted FIELD NAME that the destination screen does not have ('Issue Date' in a
++        # Surveys edit step). Only when the destination's editable fields are code-verified; the
++        # source name is replaced, never guessed at, and the omission is reported.
++        if allow_substitution and f.get("editable_fields"):
++            have = {norm(x) for x in f["editable_fields"]}
++            for q in re.findall(r"[‘'\"]([A-Z][A-Za-z0-9 /&.-]{2,30})[’'\"]\s+(?:cell|field|column)", s):
++                if norm(q) not in have:
++                    s = s.replace(q, "required editable", 1)
++                    notes.append(f"'{q}' is a {src_parent} field; {dest_parent} edits "
++                                 f"{', '.join(f['editable_fields'])} instead.")
+         if allow_substitution and swap:                                       # rule 3
+             s = re.sub(rf"\b{re.escape(swap[0])}\b", swap[1], s, flags=re.I)
+         # rule 3b — the source SUB-MODULE name used as a record qualifier ("refine crew promotion
+@@ -334,6 +345,9 @@ def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_pa
+     for key in ("edit", "export", "creation"):
+         if f.get(key) and relevant[key]:
+             out.append(f"{f[key]}.")
++    if relevant["edit"] and f.get("editable_fields"):
++        out.append(f"Verified editable fields on this screen: **{', '.join(f['editable_fields'])}**. "
++                   f"Field names in the quoted steps that are not in this list belong to {src_parent}.")
+ 
+     # An unresolved note may be scoped to one action: {"when": "filter", "text": "..."}. A plain
+     # string always shows. Without this, the Certificates filter caveat appeared on an EDIT section.
+@@ -343,9 +357,16 @@ def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_pa
+     if not allow:
+         step_notes.append(f"The steps below are NOT rewritten for {where}: {why_sub}.")
+     if steps:
+-        out.append(f"\n**Steps for {where}** — adapted from the source section below; the manual "
+-                   f"states the procedure is the same, and the screen facts above are from the "
+-                   f"product code. This is an adaptation, not a quotation:\n")
++        # say exactly WHO establishes what: the manual only when its pointer said "same steps"; the
++        # code only when facts exist. Never "the manual states" when it does not.
++        basis = []
++        if "manual" in why_sub:
++            basis.append("the manual's own pointer says the procedure is the same")
++        if f:
++            basis.append("the screen facts above are verified in the product code")
++        out.append(f"\n**Steps for {where}** — an adaptation of the source section below, prepared at "
++                   f"index time by the cross-reference resolver ({'; '.join(basis) or 'no external basis'}). "
++                   f"This is an adaptation, not a quotation:\n")
+         out.extend(steps)
+ 
+     unresolved = list(step_notes)
+@@ -357,14 +378,26 @@ def render_resolved(dest_parent: str, dest_title: str, src_citation: str, src_pa
+             unresolved.append(u)
+     if not f:
+         unresolved.append(
+-            f"No verified description of the {where} screen is available, so the screen names, record "
+-            f"types, field lists and figures in the quoted steps below describe {src_parent} and have "
+-            f"NOT been confirmed for {where}. Treat the sequence of actions as the transferable part.")
++            f"No verified description of the {where} screen was available to the resolver, so the screen "
++            f"names, record types, field lists and figures in the quoted steps below describe {src_parent} "
++            f"and have not been confirmed for {where}. The manual itself makes no such statement; the "
++            f"sequence of actions is the transferable part.")
+     if unresolved:
+-        out.append("**Not established:** " + " ".join(unresolved))
+-
+-    out.append(f"\n**Quoted verbatim from {src_citation} — its wording, screen names and figures "
+-               f"refer to {src_parent}:**\n")
++        # Attributed explicitly. Without the author, three answers reported "the manual notes that the
++        # screen details have not been verified" — the manual notes nothing of the kind; this note is ours.
++        out.append("**Indexing note (written at index time by the cross-reference resolver, NOT a statement "
++                   "from the manual) — not established:** " + " ".join(unresolved))
++
++    # XREF_LAYOUT=adapted-primary (reviewer, 22-Sep-2026): the adapted procedure is the actionable
++    # guidance and the quotation is kept for audit and citation only, labelled so it does not compete
++    # with the steps above it. The quote itself is still verbatim and still present in the chunk.
++    if os.environ.get("XREF_LAYOUT", "quote-after").lower() == "adapted-primary":
++        out.append(f"\n**Audit copy — the source text of {src_citation}, kept verbatim for citation. "
++                   f"It is NOT the procedure for {where}: its screen names, record types, field lists "
++                   f"and figures describe {src_parent}. Use the steps above.**\n")
++    else:
++        out.append(f"\n**Quoted verbatim from {src_citation} — its wording, screen names and figures "
++                   f"refer to {src_parent}:**\n")
+     return "\n".join(out) + "\n" + label_captions(body, src_parent) + "\n"
+ 
+ 
