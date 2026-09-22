@@ -18,6 +18,16 @@ export interface RhEstimate {
   basis: string;
 }
 
+export const RH_ESTIMATE_BASIS_VERSION = 'RH_COMPLETION_FIRST_LATEST_V2';
+
+export function isCurrentRhEstimateBasis(basis: string | null | undefined): boolean {
+  return Boolean(basis?.startsWith(`${RH_ESTIMATE_BASIS_VERSION}_`));
+}
+
+export function rhEstimateBasis(reason: string): string {
+  return `${RH_ESTIMATE_BASIS_VERSION}_${reason}`;
+}
+
 interface HistoricalRhUtilization {
   averagePerDay: number;
   latestDate: Date;
@@ -50,15 +60,14 @@ function calculateHistoricalRhUtilization(points: HistoricalRhPoint[]): Historic
       return String(a.point.enteredAtUTC || '').localeCompare(String(b.point.enteredAtUTC || ''));
     });
 
-  // A reset/replacement starts a new counter epoch. Keep only readings after
-  // the latest boundary, rather than allowing a pre-reset value to become the
-  // "previous" point for a post-reset value.
+  // A reset/replacement reading is the first valid baseline of the new counter
+  // epoch. Keep that boundary row and everything after it.
   let lastBoundary = -1;
   ordered.forEach((item, index) => {
     if (item.point.meterReplaced || item.point.isRenewalReset) lastBoundary = index;
   });
   const valid = ordered
-    .slice(lastBoundary + 1)
+    .slice(Math.max(0, lastBoundary))
     .filter((item): item is { point: HistoricalRhPoint; date: Date; rh: number; stamp: string | null } =>
       item.rh !== null);
 
@@ -139,29 +148,41 @@ export async function resolveAuthoritativeRhComponent<T extends RhComponentRef>(
 }
 
 export function estimateRhDueDate(
-  nextDueRh: string | number | null | undefined,
+  completionDate: string | null | undefined,
+  rhFrequency: string | number | null | undefined,
   points: HistoricalRhPoint[],
 ): RhEstimate {
   const utilization = calculateHistoricalRhUtilization(points);
-  if (!utilization) return { dueDate: null, averagePerDay: null, basis: 'INSUFFICIENT_HISTORY' };
-  const dueRH = numeric(nextDueRh);
-  if (dueRH === null || dueRH < 0) {
-    return { dueDate: null, averagePerDay: utilization.averagePerDay, basis: 'MISSING_NEXT_DUE_RH' };
+  if (!utilization) {
+    return { dueDate: null, averagePerDay: null, basis: rhEstimateBasis('INSUFFICIENT_HISTORY') };
+  }
+  const completion = parseWorkOrderDate(completionDate);
+  if (!completion) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis('INVALID_COMPLETION_DATE'),
+    };
+  }
+  const frequency = numeric(rhFrequency);
+  if (frequency === null || frequency <= 0) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis('MISSING_RH_FREQUENCY'),
+    };
   }
 
-  const remainingRh = dueRH - utilization.latestRh;
-  const projectedDays = remainingRh <= 0
-    ? 0
-    : Math.max(1, Math.round(remainingRh / utilization.averagePerDay));
+  const projectedDays = Math.max(0, Math.round(frequency / utilization.averagePerDay));
   const due = new Date(Date.UTC(
-    utilization.latestDate.getUTCFullYear(),
-    utilization.latestDate.getUTCMonth(),
-    utilization.latestDate.getUTCDate() + projectedDays,
+    completion.getUTCFullYear(),
+    completion.getUTCMonth(),
+    completion.getUTCDate() + projectedDays,
   ));
   return {
     dueDate: formatWorkOrderCalendarDate(due),
     averagePerDay: utilization.averagePerDay,
-    basis: 'HISTORICAL',
+    basis: rhEstimateBasis('HISTORICAL'),
   };
 }
 

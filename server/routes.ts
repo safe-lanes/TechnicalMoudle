@@ -457,6 +457,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let updatedRhEstimate = 0;
       const {
         estimateRhDueDate,
+        isCurrentRhEstimateBasis,
+        rhEstimateBasis,
         resolveAuthoritativeRhComponent,
       } = await import("./services/rhDueDateService");
 
@@ -530,8 +532,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // the same audit scan until a real completion recalculates the cycle.
         if (
           (job.maintenanceBasis === 'Running Hours' || job.maintenanceBasis === 'Dual Frequency')
-          && !job.rhEstimatedDueDate
-          && !job.rhEstimateBasis
+          && !isCurrentRhEstimateBasis(job.rhEstimateBasis)
+          && job.lastDoneDate
+          && Number(job.intervalRunningHour) > 0
           && Number(effectiveNextDueRh) >= 0
         ) {
           let component: any = job.componentId
@@ -546,32 +549,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             (code, vesselId) => storage.getComponentByCode(code, vesselId),
             job.vesselId,
           );
+          let estimate = {
+            dueDate: null as string | null,
+            averagePerDay: null as number | null,
+            basis: rhEstimateBasis('MISSING_RH_SOURCE'),
+          };
           if (component) {
             const audits = await storage.getRunningHoursAudits(component.cuuid || component.id);
-            const estimate = estimateRhDueDate(
-              effectiveNextDueRh,
+            estimate = estimateRhDueDate(
+              job.lastDoneDate,
+              job.intervalRunningHour,
               audits,
             );
-            // Compare-and-set prevents this detached startup backfill from
-            // replacing a cycle estimate written by a concurrent completion.
-            const db = await getDb();
-            const saved = await db.update(jobsTable)
-              .set({
-                rhEstimatedDueDate: estimate.dueDate,
-                rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
-                rhEstimateBasis: estimate.basis,
-                updatedAt: new Date(),
-              })
-              .where(and(
-                eq(jobsTable.juuid, job.juuid),
-                sql`${jobsTable.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
-                sql`${jobsTable.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
-                isNull(jobsTable.rhEstimatedDueDate),
-                isNull(jobsTable.rhEstimateBasis),
-              ))
-              .returning({ juuid: jobsTable.juuid });
-            if (saved.length > 0) updatedRhEstimate++;
           }
+          // Compare-and-set prevents this detached startup backfill from
+          // replacing a cycle estimate written by a concurrent completion.
+          const db = await getDb();
+          const saved = await db.update(jobsTable)
+            .set({
+              rhEstimatedDueDate: estimate.dueDate,
+              rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
+              rhEstimateBasis: estimate.basis,
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(jobsTable.juuid, job.juuid),
+              sql`${jobsTable.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+              sql`${jobsTable.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
+              sql`${jobsTable.rhEstimatedDueDate} IS NOT DISTINCT FROM ${job.rhEstimatedDueDate}`,
+              sql`${jobsTable.rhEstimateBasis} IS NOT DISTINCT FROM ${job.rhEstimateBasis}`,
+            ))
+            .returning({ juuid: jobsTable.juuid });
+          if (saved.length > 0) updatedRhEstimate++;
         }
 
       }

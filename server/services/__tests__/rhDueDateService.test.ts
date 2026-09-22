@@ -3,6 +3,7 @@ import {
   calculateHistoricalRhAverage,
   estimateRhDueDate,
   effectiveDueDate,
+  RH_ESTIMATE_BASIS_VERSION,
   resolveAuthoritativeRhComponent,
 } from '../rhDueDateService';
 
@@ -12,11 +13,11 @@ describe('historical RH due-date projection', () => {
     { cumulativeRH: '1000', dateUpdatedLocal: '22-Sep-2026' },
   ];
 
-  it('uses the supplied 900 RH over 244 days example', () => {
-    const result = estimateRhDueDate(1200, points);
+  it('projects the full frequency from the WO completion date', () => {
+    const result = estimateRhDueDate('20-Sep-2026', 200, points);
     expect(result.averagePerDay).toBeCloseTo(900 / 244, 8);
-    expect(result.dueDate).toBe('2026-11-15');
-    expect(result.basis).toBe('HISTORICAL');
+    expect(result.dueDate).toBe('2026-11-13');
+    expect(result.basis).toBe(`${RH_ESTIMATE_BASIS_VERSION}_HISTORICAL`);
   });
 
   it('rejects invalid, non-increasing, same-day, and reset points', () => {
@@ -36,7 +37,7 @@ describe('historical RH due-date projection', () => {
       { cumulativeRH: 100, dateUpdatedLocal: '01-Jan-2026' },
       { cumulativeRH: 0, dateUpdatedLocal: '02-Jan-2026', isRenewalReset: true },
       { cumulativeRH: 50, dateUpdatedLocal: '03-Jan-2026' },
-    ])).toBeNull();
+    ])).toBeCloseTo(50, 8);
   });
 
   it('skips duplicate same-day audit snapshots and uses the latest earlier reading', () => {
@@ -47,16 +48,16 @@ describe('historical RH due-date projection', () => {
     ])).toBeCloseTo(100 / 9, 8);
   });
 
-  it('uses the full valid history even when the Job completion date is much older', () => {
-    const result = estimateRhDueDate(6500, [
+  it('uses full valid history for the rate but anchors on Job completion', () => {
+    const result = estimateRhDueDate('20-Jan-2026', 400, [
       { cumulativeRH: 500, dateUpdatedLocal: '28-Dec-2025' },
       { cumulativeRH: 6000, dateUpdatedLocal: '06-Jan-2026' },
       { cumulativeRH: 6000, dateUpdatedLocal: '07-Jan-2026' },
       { cumulativeRH: 6100, dateUpdatedLocal: '15-Feb-2026' },
     ]);
     expect(result.averagePerDay).toBeCloseTo(5600 / 49, 8);
-    expect(result.dueDate).toBe('2026-02-19');
-    expect(result.basis).toBe('HISTORICAL');
+    expect(result.dueDate).toBe('2026-01-24');
+    expect(result.basis).toBe(`${RH_ESTIMATE_BASIS_VERSION}_HISTORICAL`);
   });
 
   it('uses the earliest and latest valid readings rather than only the latest pair', () => {
@@ -67,14 +68,21 @@ describe('historical RH due-date projection', () => {
     ])).toBeCloseTo(600 / 20, 8);
   });
 
-  it('marks the threshold due on the latest reading date when already reached', () => {
-    const result = estimateRhDueDate(900, points);
+  it('does not reduce the full frequency by RH consumed after completion', () => {
+    const result = estimateRhDueDate('20-Sep-2026', 200, points);
+    expect(result.dueDate).toBe('2026-11-13');
+  });
+
+  it('uses ordinary rounding when the frequency projects below half a day', () => {
+    const result = estimateRhDueDate('22-Sep-2026', 1, points);
     expect(result.dueDate).toBe('2026-09-22');
   });
 
-  it('projects at least one day for a positive fractional-day remainder', () => {
-    const result = estimateRhDueDate(1001, points);
-    expect(result.dueDate).toBe('2026-09-23');
+  it('returns versioned unavailable reasons for invalid completion data', () => {
+    expect(estimateRhDueDate(null, 200, points).basis)
+      .toBe(`${RH_ESTIMATE_BASIS_VERSION}_INVALID_COMPLETION_DATE`);
+    expect(estimateRhDueDate('20-Sep-2026', null, points).basis)
+      .toBe(`${RH_ESTIMATE_BASIS_VERSION}_MISSING_RH_FREQUENCY`);
   });
 
   it('does not bridge non-contiguous stamp epochs', () => {

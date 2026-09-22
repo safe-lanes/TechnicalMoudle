@@ -33,6 +33,7 @@ import { syncDiag } from './syncDiagLogger';
 import { getJobCompletionDate } from '../work-orders/utils/completedWorkOrderDate';
 import {
   estimateRhDueDate,
+  rhEstimateBasis,
   resolveAuthoritativeRhComponent,
 } from '../../services/rhDueDateService';
 
@@ -98,12 +99,26 @@ export async function refreshRhEstimatesFromAuditRows(
           OR c.id::text = ANY($1::text[])
           OR c.rh_master_component_id = ANY($1::text[])
           OR c.rh_counter_source = ANY($2::text[])
-        )`,
+         )
+       ORDER BY j.juuid`,
     [componentIdentities, componentCodes],
   );
 
   let refreshed = 0;
   for (const job of jobsRes.rows) {
+    // Serialize audit-driven refreshes for the same Job. After waiting for this
+    // lock, the transaction sees all audit rows committed by the prior
+    // refresher, so an older audit batch cannot overwrite a newer calculation.
+    const lockedJobRes = await client.query(
+      `SELECT last_done_date, last_done_rh, next_due_rh, interval_running_hour
+         FROM jobs
+        WHERE juuid = $1
+        FOR UPDATE`,
+      [job.juuid],
+    );
+    const lockedJob = lockedJobRes.rows[0];
+    if (!lockedJob) continue;
+
     const toRhComponent = (row: any) => row ? ({
       id: row.id,
       cuuid: row.cuuid,
@@ -142,7 +157,11 @@ export async function refreshRhEstimatesFromAuditRows(
       job.vessel_id,
     );
 
-    let estimate = { dueDate: null as string | null, averagePerDay: null as number | null, basis: 'MISSING_RH_SOURCE' };
+    let estimate = {
+      dueDate: null as string | null,
+      averagePerDay: null as number | null,
+      basis: rhEstimateBasis('MISSING_RH_SOURCE'),
+    };
     if (source?.cuuid) {
       const audits = await client.query(
         `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
@@ -154,7 +173,8 @@ export async function refreshRhEstimatesFromAuditRows(
         [source.cuuid],
       );
       estimate = estimateRhDueDate(
-        job.next_due_rh,
+        lockedJob.last_done_date,
+        lockedJob.interval_running_hour,
         audits.rows.map(row => ({
           cumulativeRH: row.cumulative_rh,
           newRH: row.new_rh,
@@ -184,9 +204,9 @@ export async function refreshRhEstimatesFromAuditRows(
         estimate.dueDate,
         estimate.averagePerDay,
         estimate.basis,
-        job.last_done_date,
-        job.last_done_rh,
-        job.next_due_rh,
+        lockedJob.last_done_date,
+        lockedJob.last_done_rh,
+        lockedJob.next_due_rh,
       ],
     );
     refreshed += update.rowCount ?? 0;
@@ -392,7 +412,7 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
       ) {
         jobUpdates.rhEstimatedDueDate = null;
         jobUpdates.rhAveragePerDay = null;
-        jobUpdates.rhEstimateBasis = 'MISSING_RH_SOURCE';
+        jobUpdates.rhEstimateBasis = rhEstimateBasis('MISSING_RH_SOURCE');
         const toRhComponent = (row: any) => row ? ({
           id: row.id,
           cuuid: row.cuuid,
@@ -446,7 +466,8 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
             [sourceId],
           );
           const estimate = estimateRhDueDate(
-            jobUpdates.nextDueRH,
+            jobCompletionDate,
+            job.interval_running_hour,
             auditsRes.rows.map(row => ({
               cumulativeRH: row.cumulative_rh,
               newRH: row.new_rh,

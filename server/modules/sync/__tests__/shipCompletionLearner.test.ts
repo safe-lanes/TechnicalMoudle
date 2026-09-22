@@ -6,6 +6,7 @@ import {
   learnFromShipCompletions,
   refreshRhEstimatesFromAuditRows,
 } from '../shipCompletionLearner';
+import { RH_ESTIMATE_BASIS_VERSION } from '../../../services/rhDueDateService';
 
 describe('collectCompletionWouuidsFromLogs', () => {
   it('collects ANY applied work_orders log (learner filters by persisted status) and dedupes', () => {
@@ -338,7 +339,7 @@ describe('refreshRhEstimatesFromAuditRows', () => {
               component_id: 'master-1',
               maintenance_basis: 'Running Hours',
               interval_running_hour: 200,
-              last_done_date: '22-Sep-2026',
+              last_done_date: '20-Sep-2026',
               last_done_rh: '1000',
               next_due_rh: '1200',
               component_cuuid: 'master-1',
@@ -347,6 +348,17 @@ describe('refreshRhEstimatesFromAuditRows', () => {
               rh_counter_type: 'MASTER',
               rh_master_component_id: null,
               rh_counter_source: null,
+            }],
+            rowCount: 1,
+          };
+        }
+        if (text.includes('FROM jobs') && text.includes('FOR UPDATE')) {
+          return {
+            rows: [{
+              last_done_date: '20-Sep-2026',
+              last_done_rh: '1000',
+              next_due_rh: '1200',
+              interval_running_hour: 200,
             }],
             rowCount: 1,
           };
@@ -370,12 +382,13 @@ describe('refreshRhEstimatesFromAuditRows', () => {
     const candidateQuery = queries.find(query => query.text.includes('FROM jobs j'));
     expect(candidateQuery?.text).toContain('c.id::text = j.component_id');
     expect(candidateQuery?.text).toContain('c.rh_master_component_id = ANY($1::text[])');
+    expect(candidateQuery?.text).toContain('ORDER BY j.juuid');
     expect(update?.values).toEqual([
       'job-rh',
-      '2026-11-15',
+      '2026-11-13',
       expect.closeTo(900 / 244, 8),
-      'HISTORICAL',
-      '22-Sep-2026',
+      `${RH_ESTIMATE_BASIS_VERSION}_HISTORICAL`,
+      '20-Sep-2026',
       '1000',
       '1200',
     ]);

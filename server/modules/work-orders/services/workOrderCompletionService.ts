@@ -17,6 +17,7 @@ import {
 } from '../utils/completedWorkOrderDate';
 import {
   estimateRhDueDate,
+  rhEstimateBasis,
   resolveAuthoritativeRhComponent,
 } from '../../../services/rhDueDateService';
 
@@ -819,7 +820,7 @@ export async function completeWorkOrder(
       ) {
         jobUpdates.rhEstimatedDueDate = null;
         jobUpdates.rhAveragePerDay = null;
-        jobUpdates.rhEstimateBasis = 'MISSING_RH_SOURCE';
+        jobUpdates.rhEstimateBasis = rhEstimateBasis('MISSING_RH_SOURCE');
         const rhComponent = await resolveAuthoritativeRhComponent(
           component,
           repo.findComponent,
@@ -829,7 +830,8 @@ export async function completeWorkOrder(
         if (rhComponent) {
           const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
           const estimate = estimateRhDueDate(
-            jobUpdates.nextDueRH,
+            jobCompletionDate,
+            job.intervalRunningHour,
             audits,
           );
           jobUpdates.rhEstimatedDueDate = estimate.dueDate;
@@ -1084,7 +1086,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
       ) {
         jobUpdates.rhEstimatedDueDate = null;
         jobUpdates.rhAveragePerDay = null;
-        jobUpdates.rhEstimateBasis = 'MISSING_RH_SOURCE';
+        jobUpdates.rhEstimateBasis = rhEstimateBasis('MISSING_RH_SOURCE');
         const rhComponent = await resolveAuthoritativeRhComponent(
           component,
           repo.findComponent,
@@ -1094,7 +1096,8 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
         if (rhComponent) {
           const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
           const estimate = estimateRhDueDate(
-            jobUpdates.nextDueRH,
+            jobCompletionDate,
+            job.intervalRunningHour,
             audits,
           );
           jobUpdates.rhEstimatedDueDate = estimate.dueDate;
