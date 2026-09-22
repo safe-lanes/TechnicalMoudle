@@ -340,6 +340,7 @@ describe('refreshRhEstimatesFromAuditRows', () => {
               interval_running_hour: 200,
               last_done_date: '22-Sep-2026',
               last_done_rh: '1000',
+              next_due_rh: '1200',
               component_cuuid: 'master-1',
               component_legacy_id: '1',
               component_vessel_id: 'vessel-1',
@@ -376,6 +377,7 @@ describe('refreshRhEstimatesFromAuditRows', () => {
       'HISTORICAL',
       '22-Sep-2026',
       '1000',
+      '1200',
     ]);
   });
 });

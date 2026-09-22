@@ -12,7 +12,7 @@ import { ensureMaintenanceHistoryImmutability, ensureCertApplicabilityIndex } fr
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
 import { getDb } from "./db";
 import { jobs as jobsTable } from "@shared/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL: Ensure immutability trigger exists BEFORE registering routes
@@ -463,6 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const job of allJobs) {
         let updates: any = {};
         let needsUpdate = false;
+        let effectiveNextDueRh = job.nextDueRH;
 
         // Calendar-based jobs: Calculate nextDueDate if missing
         if (job.maintenanceBasis === 'Calendar' && !job.nextDueDate) {
@@ -484,17 +485,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Running Hours-based jobs: Calculate nextDueRH if missing
         // Only use intervalRunningHour, not frequencyValue
         // VALIDATION: interval must be a valid number > 0
-        if (job.maintenanceBasis === 'Running Hours' && !job.nextDueRH) {
+        if (
+          (job.maintenanceBasis === 'Running Hours' || job.maintenanceBasis === 'Dual Frequency')
+          && !job.nextDueRH
+        ) {
           const lastDoneRH = job.lastDoneRH;
           const intervalRH = Number(job.intervalRunningHour);
           if (lastDoneRH && !isNaN(intervalRH) && intervalRH > 0) {
             const lastRH = Number(lastDoneRH);
             if (!isNaN(lastRH)) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-              needsUpdate = true;
-              updatedRH++;
+              const derivedNextDueRh = String(lastRH + intervalRH);
+              const db = await getDb();
+              const repaired = await db.update(jobsTable)
+                .set({
+                  nextDueRH: derivedNextDueRh,
+                  updatedAt: new Date(),
+                })
+                .where(and(
+                  eq(jobsTable.juuid, job.juuid),
+                  isNull(jobsTable.nextDueRH),
+                  sql`${jobsTable.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+                ))
+                .returning({ nextDueRH: jobsTable.nextDueRH });
+              if (repaired.length > 0) {
+                effectiveNextDueRh = repaired[0].nextDueRH;
+                updatedRH++;
+              } else {
+                // A live completion or another repair won after the startup
+                // snapshot. Its cycle writer owns the matching estimate.
+                effectiveNextDueRh = null;
+              }
             }
           }
+        }
+
+        // Persist basic due-field repairs first so estimate compare-and-set sees
+        // the same current RH threshold in this startup pass.
+        if (needsUpdate) {
+          await storage.updateJob(job.juuid, updates);
         }
 
         // Historical-utilization projection for existing RH and Dual jobs.
@@ -504,8 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (job.maintenanceBasis === 'Running Hours' || job.maintenanceBasis === 'Dual Frequency')
           && !job.rhEstimatedDueDate
           && !job.rhEstimateBasis
-          && job.lastDoneDate
-          && Number(job.intervalRunningHour) > 0
+          && Number(effectiveNextDueRh) >= 0
         ) {
           let component: any = job.componentId
             ? await storage.getComponent(job.componentId)
@@ -522,8 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (component) {
             const audits = await storage.getRunningHoursAudits(component.cuuid || component.id);
             const estimate = estimateRhDueDate(
-              job.lastDoneDate,
-              job.intervalRunningHour,
+              effectiveNextDueRh,
               audits,
             );
             // Compare-and-set prevents this detached startup backfill from
@@ -538,7 +564,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(and(
                 eq(jobsTable.juuid, job.juuid),
-                eq(jobsTable.lastDoneDate, job.lastDoneDate),
+                sql`${jobsTable.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+                sql`${jobsTable.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
                 isNull(jobsTable.rhEstimatedDueDate),
                 isNull(jobsTable.rhEstimateBasis),
               ))
@@ -547,10 +574,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Apply updates if needed
-        if (needsUpdate) {
-          await storage.updateJob(job.juuid, updates);
-        }
       }
 
       if (updatedCalendar > 0 || updatedRH > 0 || updatedRhEstimate > 0) {

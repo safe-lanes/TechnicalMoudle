@@ -829,8 +829,7 @@ export async function completeWorkOrder(
         if (rhComponent) {
           const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
           const estimate = estimateRhDueDate(
-            jobCompletionDate,
-            job.intervalRunningHour,
+            jobUpdates.nextDueRH,
             audits,
           );
           jobUpdates.rhEstimatedDueDate = estimate.dueDate;
@@ -1095,8 +1094,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
         if (rhComponent) {
           const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
           const estimate = estimateRhDueDate(
-            jobCompletionDate,
-            job.intervalRunningHour,
+            jobUpdates.nextDueRH,
             audits,
           );
           jobUpdates.rhEstimatedDueDate = estimate.dueDate;

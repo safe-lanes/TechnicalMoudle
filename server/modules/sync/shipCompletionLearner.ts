@@ -82,7 +82,7 @@ export async function refreshRhEstimatesFromAuditRows(
     `SELECT DISTINCT
             j.juuid, j.vessel_id, j.component_id, j.component_code,
             j.maintenance_basis, j.interval_running_hour,
-            j.last_done_date, j.last_done_rh,
+            j.last_done_date, j.last_done_rh, j.next_due_rh,
             c.cuuid AS component_cuuid, c.id AS component_legacy_id,
             c.vessel_id AS component_vessel_id, c.rh_counter_type,
             c.rh_master_component_id, c.rh_counter_source
@@ -92,8 +92,7 @@ export async function refreshRhEstimatesFromAuditRows(
          OR c.id::text = j.component_id
          OR (c.component_code = j.component_code AND c.vessel_id = j.vessel_id)
       WHERE j.maintenance_basis IN ('Running Hours', 'Dual Frequency')
-        AND j.last_done_date IS NOT NULL
-        AND j.interval_running_hour > 0
+        AND j.next_due_rh IS NOT NULL
         AND (
           c.cuuid = ANY($1::text[])
           OR c.id::text = ANY($1::text[])
@@ -155,8 +154,7 @@ export async function refreshRhEstimatesFromAuditRows(
         [source.cuuid],
       );
       estimate = estimateRhDueDate(
-        job.last_done_date,
-        job.interval_running_hour,
+        job.next_due_rh,
         audits.rows.map(row => ({
           cumulativeRH: row.cumulative_rh,
           newRH: row.new_rh,
@@ -179,7 +177,8 @@ export async function refreshRhEstimatesFromAuditRows(
               updated_at = NOW()
         WHERE juuid = $1
           AND last_done_date IS NOT DISTINCT FROM $5
-          AND last_done_rh IS NOT DISTINCT FROM $6`,
+          AND last_done_rh IS NOT DISTINCT FROM $6
+          AND next_due_rh IS NOT DISTINCT FROM $7`,
       [
         job.juuid,
         estimate.dueDate,
@@ -187,6 +186,7 @@ export async function refreshRhEstimatesFromAuditRows(
         estimate.basis,
         job.last_done_date,
         job.last_done_rh,
+        job.next_due_rh,
       ],
     );
     refreshed += update.rowCount ?? 0;
@@ -350,7 +350,7 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
       // Row-lock the job against concurrent shore edits within this transaction.
       const jobRes = await client.query(
         `SELECT juuid, job_no, vessel_id, component_id, frequency_value, frequency_unit, interval_running_hour,
-                last_done_date, last_done_rh, rh_estimated_due_date
+                last_done_date, last_done_rh, next_due_rh, rh_estimated_due_date
            FROM jobs WHERE juuid = $1 FOR UPDATE`,
         [wo.job_id],
       );
@@ -446,8 +446,7 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
             [sourceId],
           );
           const estimate = estimateRhDueDate(
-            jobCompletionDate,
-            job.interval_running_hour,
+            jobUpdates.nextDueRH,
             auditsRes.rows.map(row => ({
               cumulativeRH: row.cumulative_rh,
               newRH: row.new_rh,

@@ -18,6 +18,12 @@ export interface RhEstimate {
   basis: string;
 }
 
+interface HistoricalRhUtilization {
+  averagePerDay: number;
+  latestDate: Date;
+  latestRh: number;
+}
+
 function numeric(value: unknown): number | null {
   if (value === null || value === undefined || String(value).trim() === '') return null;
   const result = Number(value);
@@ -28,12 +34,7 @@ function pointDate(point: HistoricalRhPoint): Date | null {
   return parseWorkOrderDate(point.dateUpdatedLocal);
 }
 
-/**
- * Calculate utilization from the two latest valid readings in the same counter
- * epoch. Sorting is chronological rather than insertion order because synced
- * audit rows can arrive out of order.
- */
-export function calculateHistoricalRhAverage(points: HistoricalRhPoint[]): number | null {
+function calculateHistoricalRhUtilization(points: HistoricalRhPoint[]): HistoricalRhUtilization | null {
   const ordered = points
     .map(point => ({
       point,
@@ -63,22 +64,35 @@ export function calculateHistoricalRhAverage(points: HistoricalRhPoint[]): numbe
 
   if (valid.length < 2) return null;
   const latest = valid[valid.length - 1];
+  let latestStampStart = valid.length - 1;
+  while (
+    latestStampStart > 0
+    && valid[latestStampStart - 1].stamp === latest.stamp
+  ) {
+    latestStampStart--;
+  }
 
-  // Find the latest earlier, increasing reading in the same contiguous stamp
-  // epoch. Multiple audit events can exist on one calendar day (for example a
-  // WO snapshot after the RH-module update); those are not a utilization
-  // period and must be skipped rather than making otherwise valid history
-  // unavailable.
-  for (let previousIndex = valid.length - 2; previousIndex >= 0; previousIndex--) {
-    const previous = valid[previousIndex];
-    if (previous.stamp !== latest.stamp) break;
+  // Use the full valid active history period: earliest valid increasing
+  // reading in the latest contiguous stamp epoch through the latest reading.
+  // The Job's completion date is intentionally irrelevant to utilization.
+  for (let startIndex = latestStampStart; startIndex < valid.length - 1; startIndex++) {
+    const start = valid[startIndex];
 
-    const days = (latest.date.getTime() - previous.date.getTime()) / 86400000;
-    const delta = latest.rh - previous.rh;
+    const days = (latest.date.getTime() - start.date.getTime()) / 86400000;
+    const delta = latest.rh - start.rh;
     if (!(days > 0) || !(delta > 0)) continue;
-    return delta / days;
+    return {
+      averagePerDay: delta / days,
+      latestDate: latest.date,
+      latestRh: latest.rh,
+    };
   }
   return null;
+}
+
+/** Calculate average RH/day across the full valid active counter epoch. */
+export function calculateHistoricalRhAverage(points: HistoricalRhPoint[]): number | null {
+  return calculateHistoricalRhUtilization(points)?.averagePerDay ?? null;
 }
 
 interface RhComponentRef {
@@ -125,34 +139,28 @@ export async function resolveAuthoritativeRhComponent<T extends RhComponentRef>(
 }
 
 export function estimateRhDueDate(
-  completionDate: string | null | undefined,
-  rhFrequency: string | number | null | undefined,
+  nextDueRh: string | number | null | undefined,
   points: HistoricalRhPoint[],
 ): RhEstimate {
-  const completion = parseWorkOrderDate(completionDate);
-  const historicalPoints = completion
-    ? points.filter(point => {
-        const readingDate = pointDate(point);
-        return readingDate !== null && readingDate.getTime() <= completion.getTime();
-      })
-    : points;
-  const averagePerDay = calculateHistoricalRhAverage(historicalPoints);
-  const dueRH = numeric(rhFrequency);
-  if (averagePerDay === null) return { dueDate: null, averagePerDay: null, basis: 'INSUFFICIENT_HISTORY' };
-  if (!completion) return { dueDate: null, averagePerDay, basis: 'INVALID_COMPLETION_DATE' };
-  if (dueRH === null || dueRH <= 0) return { dueDate: null, averagePerDay, basis: 'MISSING_RH_FREQUENCY' };
+  const utilization = calculateHistoricalRhUtilization(points);
+  if (!utilization) return { dueDate: null, averagePerDay: null, basis: 'INSUFFICIENT_HISTORY' };
+  const dueRH = numeric(nextDueRh);
+  if (dueRH === null || dueRH < 0) {
+    return { dueDate: null, averagePerDay: utilization.averagePerDay, basis: 'MISSING_NEXT_DUE_RH' };
+  }
 
-  // Keep the fractional day for the rate calculation, then round the
-  // projected calendar-day count as required by the business rule.
-  const projectedDays = Math.max(0, Math.round(dueRH / averagePerDay));
+  const remainingRh = dueRH - utilization.latestRh;
+  const projectedDays = remainingRh <= 0
+    ? 0
+    : Math.max(1, Math.round(remainingRh / utilization.averagePerDay));
   const due = new Date(Date.UTC(
-    completion.getUTCFullYear(),
-    completion.getUTCMonth(),
-    completion.getUTCDate() + projectedDays,
+    utilization.latestDate.getUTCFullYear(),
+    utilization.latestDate.getUTCMonth(),
+    utilization.latestDate.getUTCDate() + projectedDays,
   ));
   return {
     dueDate: formatWorkOrderCalendarDate(due),
-    averagePerDay,
+    averagePerDay: utilization.averagePerDay,
     basis: 'HISTORICAL',
   };
 }
