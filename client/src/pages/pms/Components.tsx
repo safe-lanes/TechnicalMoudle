@@ -913,6 +913,19 @@ const getJobNextDueDateDisplay = (job: any): string => {
   return formatProfessionalDate(job.nextDueDate);
 };
 
+const isJobNextDueDateExpected = (job: any): boolean => {
+  if (job.maintenanceBasis === 'Running Hours') {
+    return Boolean(job.rhEstimatedDueDate);
+  }
+  if (job.maintenanceBasis !== 'Dual Frequency') return false;
+
+  const calendar = parseDate(job.nextDueDate);
+  const rh = parseDate(job.rhEstimatedDueDate);
+  if (!rh) return false;
+  if (!calendar) return true;
+  return rh < calendar;
+};
+
 const getJobNextDueDateTooltip = (job: any, displayedValue: string): string => {
   if (job.maintenanceBasis === 'Running Hours') {
     if (!job.rhEstimatedDueDate) return 'Not available — insufficient valid RH history';
@@ -1222,6 +1235,19 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
         valueGetter: ({ data }) => data ? getJobNextDueDateDisplay(data) : '—',
         tooltipValueGetter: ({ data, value }) =>
           data ? getJobNextDueDateTooltip(data, value) : value,
+        cellRenderer: ({ data, value }: any) => data ? (
+          <div className="flex items-center gap-2">
+            <span>{value}</span>
+            {isJobNextDueDateExpected(data) && (
+              <span
+                className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 whitespace-nowrap"
+                data-testid={`badge-expected-next-due-date-${data.juuid || data.id}`}
+              >
+                Expected
+              </span>
+            )}
+          </div>
+        ) : '—',
       },
       {
         headerName: 'Next Due Hour',
