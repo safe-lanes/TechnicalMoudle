@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   compareWorkOrders,
   getDisplayedWorkOrderDueDate,
+  isDisplayedWorkOrderDueDateExpected,
   shouldShowNextDueHourColumn,
 } from '@shared/utils/workOrderFilters';
 import {
@@ -19,24 +20,38 @@ describe('Work Order due detail display', () => {
   });
 
   it('uses the expected RH date for Running Hours jobs', () => {
-    expect(getDisplayedWorkOrderDueDate({
+    const workOrder = {
       maintenanceBasis: 'Running Hours',
       dueDate: null,
       rhEstimatedDueDate: '13-Nov-2026',
-    })).toBe('13-Nov-2026');
+    };
+    expect(getDisplayedWorkOrderDueDate(workOrder)).toBe('13-Nov-2026');
+    expect(isDisplayedWorkOrderDueDateExpected(workOrder)).toBe(true);
   });
 
   it('uses the earlier calendar or expected RH date for Dual Frequency jobs', () => {
-    expect(getDisplayedWorkOrderDueDate({
+    const rhEarlier = {
       maintenanceBasis: 'Dual Frequency',
       dueDate: '20-Dec-2026',
       rhEstimatedDueDate: '15-Nov-2026',
-    })).toBe('15-Nov-2026');
-    expect(getDisplayedWorkOrderDueDate({
+    };
+    const calendarEarlier = {
       maintenanceBasis: 'Dual Frequency',
       dueDate: '20-Oct-2026',
       rhEstimatedDueDate: '15-Nov-2026',
-    })).toBe('20-Oct-2026');
+    };
+    expect(getDisplayedWorkOrderDueDate(rhEarlier)).toBe('15-Nov-2026');
+    expect(isDisplayedWorkOrderDueDateExpected(rhEarlier)).toBe(true);
+    expect(getDisplayedWorkOrderDueDate(calendarEarlier)).toBe('20-Oct-2026');
+    expect(isDisplayedWorkOrderDueDateExpected(calendarEarlier)).toBe(false);
+  });
+
+  it('does not label Calendar due dates as expected', () => {
+    expect(isDisplayedWorkOrderDueDateExpected({
+      maintenanceBasis: 'Calendar',
+      dueDate: '20-Oct-2026',
+      rhEstimatedDueDate: '10-Oct-2026',
+    })).toBe(false);
   });
 
   it('keeps a missing estimate separate from an available RH threshold', () => {

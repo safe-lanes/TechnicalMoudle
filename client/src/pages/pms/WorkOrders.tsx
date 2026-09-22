@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue } from "@/components/filters/PeriodFilter";
-import { getDisplayStatus, getDisplayedWorkOrderDueDate, getEffectiveStatus, filterAndSortWorkOrders, shouldShowNextDueHourColumn, type WorkOrderApprovalTierCounts } from "@shared/utils/workOrderFilters";
+import { getDisplayStatus, getDisplayedWorkOrderDueDate, getEffectiveStatus, filterAndSortWorkOrders, isDisplayedWorkOrderDueDateExpected, shouldShowNextDueHourColumn, type WorkOrderApprovalTierCounts } from "@shared/utils/workOrderFilters";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -566,11 +566,20 @@ const WorkOrders: React.FC = () => {
             return <span>{wo.dueDate ? formatProfessionalDate(wo.dueDate) : wo.submittedDate ? formatProfessionalDate(wo.submittedDate) : '—'}</span>;
           }
           const displayedDueDate = getDisplayedWorkOrderDueDate(wo);
+           const isExpectedDueDate = isDisplayedWorkOrderDueDateExpected(wo);
           return (
             <div className="flex items-center gap-2">
               <span data-testid={`text-due-date-${wo.id}`}>
                 {displayedDueDate ? formatProfessionalDate(displayedDueDate) : '—'}
               </span>
+               {displayedDueDate && isExpectedDueDate && (
+                 <span
+                   className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 whitespace-nowrap"
+                   data-testid={`badge-expected-due-date-${wo.id}`}
+                 >
+                   Expected
+                 </span>
+               )}
               {displayedDueDate && wo.leadTimeValue && wo.leadTimeUnit && (() => {
                 const leadTimeStatus = calculateLeadTimeStatus(displayedDueDate, wo.leadTimeValue, wo.leadTimeUnit);
                 if (leadTimeStatus.isInLeadTimePeriod) {

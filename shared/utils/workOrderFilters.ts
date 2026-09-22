@@ -62,22 +62,43 @@ export interface FilterableWorkOrder {
   approvalTier?: string | null;
 }
 
-export function getDisplayedWorkOrderDueDate(wo: FilterableWorkOrder): string | null {
+function resolveDisplayedWorkOrderDueDate(wo: FilterableWorkOrder): {
+  date: string | null;
+  isExpectedRhDate: boolean;
+} {
   const basis = String(wo.maintenanceBasis || '').trim().toLowerCase();
   const calendarDueDate = wo.dueDate || null;
   const expectedRhDueDate = wo.rhEstimatedDueDate || null;
 
-  if (basis === 'running hours') return expectedRhDueDate;
-  if (basis !== 'dual frequency') return calendarDueDate;
+  if (basis === 'running hours') {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (basis !== 'dual frequency') {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
 
-  if (!calendarDueDate) return expectedRhDueDate;
-  if (!expectedRhDueDate) return calendarDueDate;
+  if (!calendarDueDate) {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (!expectedRhDueDate) {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
 
   const calendar = parseWorkOrderDate(calendarDueDate);
   const expectedRh = parseWorkOrderDate(expectedRhDueDate);
-  if (!calendar) return expectedRhDueDate;
-  if (!expectedRh) return calendarDueDate;
-  return expectedRh.getTime() < calendar.getTime() ? expectedRhDueDate : calendarDueDate;
+  if (!calendar) return { date: expectedRhDueDate, isExpectedRhDate: true };
+  if (!expectedRh) return { date: calendarDueDate, isExpectedRhDate: false };
+  return expectedRh.getTime() < calendar.getTime()
+    ? { date: expectedRhDueDate, isExpectedRhDate: true }
+    : { date: calendarDueDate, isExpectedRhDate: false };
+}
+
+export function getDisplayedWorkOrderDueDate(wo: FilterableWorkOrder): string | null {
+  return resolveDisplayedWorkOrderDueDate(wo).date;
+}
+
+export function isDisplayedWorkOrderDueDateExpected(wo: FilterableWorkOrder): boolean {
+  return resolveDisplayedWorkOrderDueDate(wo).isExpectedRhDate;
 }
 
 export function shouldShowNextDueHourColumn(activeTab: string): boolean {
