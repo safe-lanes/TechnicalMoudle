@@ -86,7 +86,9 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         # ── Stage 3: module with a Data API → tool loop (data tools + search_module_docs) ──
         manifest = None if body.get("routeOnly") is True else await agent.manifest_for(ui_module)
         if manifest is not None:
-            r = await agent.run_tool_loop(message, ui_module, identity_token, masker, manifest["tools"])
+            # the selected vessel travels as context in the message text (masked on the wire); the log keeps the
+            # user's own question. Authorisation stays with the module's Data API.
+            r = await agent.run_tool_loop(agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker, manifest["tools"])
             if masker and masker.warnings:
                 print("[assistant] unmask warnings:", masker.warnings)
             log("answer", r.text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used)

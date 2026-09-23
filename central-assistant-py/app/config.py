@@ -42,6 +42,10 @@ class Settings(BaseSettings):
 
     # sampling: "0.2" (served default) or "default" = send no temperature (models such as gpt-5.6-luna accept only their default)
     chat_temperature: str = "0.2"
+    # Tool loop only (Data API answers). gpt-5.6-luna refuses function tools on chat.completions unless
+    # reasoning_effort is explicitly 'none' (OpenAI 400, PROVEN on the pilot 23-Sep-2026). "" = do not send.
+    # The documentation path never attaches function tools and is not affected by this setting.
+    assistant_tool_reasoning_effort: str = "none"
 
     # step 4 (owner brief 15-Sep-2026) — both OFF = the served behaviour; each is measured on its own candidate:
     #   route_intent: an explicit module or manual/sub-module name in the question decides the module; the originating

@@ -38,6 +38,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models import ModelRequestParameters
+from pydantic_ai.models.openai import OpenAIChatModelSettings
 from pydantic_ai.models.wrapper import WrapperModel
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import ToolDefinition
@@ -238,6 +239,21 @@ def _model_settings() -> ModelSettings:
     return ModelSettings(temperature=float(t), timeout=s.llm_timeout_ms / 1000.0)
 
 
+def _tool_loop_settings() -> ModelSettings:
+    """The tool loop's settings = the served settings + an explicit reasoning effort.
+
+    23-Sep-2026 (pilot, PROVEN): with a module Data API configured, every answer failed with OpenAI 400
+    "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions …
+    set reasoning_effort to 'none'". The request never named an effort — the model's default applied.
+    pydantic-ai 2.42 sends OpenAIChatModelSettings.openai_reasoning_effort as `reasoning_effort`.
+    Only the tool loop uses this; answer_docs() (no function tools) keeps _model_settings() unchanged."""
+    base = _model_settings()
+    effort = settings().assistant_tool_reasoning_effort.strip().lower()
+    if not effort:
+        return base
+    return OpenAIChatModelSettings(**base, openai_reasoning_effort=effort)  # type: ignore[typeddict-item]
+
+
 def _usage(result: Any) -> dict[str, int] | None:
     """Token usage of the run. FIX 15-Sep-2026: in pydantic-ai 2.42 `AgentRunResult.usage` is a PROPERTY, so the former
     `result.usage()` raised TypeError and every conversation row logged tokens as None (found while recording the
@@ -300,8 +316,29 @@ TOOL_LOOP_INSTRUCTIONS = (
     "repository revision); neither automatically overrides the other; where two excerpts actually conflict, state both and name each source; "
     "where an excerpt is marked draft, unverified or revision-specific, say so in one clause. No 'Method' / 'Applies to' / 'Requirements' labels. "
     "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
+    "RULE — vessel: the message may start with an [App context] line naming the vessel the user has selected; use that vesselId "
+    "for vessel-specific tools unless the user explicitly names a different vessel. NEVER guess, invent or derive a vessel ID — "
+    "if no vessel is known, ask the user which vessel. The selection is context only: access is decided by the tools, and a tool "
+    "refusal or an 'unknown vessel' error must be relayed as such, never reported as zero records. "
     "Answer in short plain language; numbered steps for how-tos."
 )
+
+
+def vessel_context_prefix(ctx: dict[str, Any] | None) -> str:
+    """The widget's vessel selection, handed to the tool loop as CONTEXT (never as authorisation).
+
+    23-Sep-2026 (pilot, PROVEN): with the vesselId only in the request body, the model asked for an id, or guessed one
+    and got zeros. The id and name go into the message text so the existing masking choke point carries them: the
+    UUID becomes [ID_n] and the registered name [VESSEL_n] on the wire, and unmask_json() restores the real id in the
+    tool arguments — the same path the user-typed id took. Access is still decided by the module's Data API."""
+    ctx = ctx or {}
+    vid = str(ctx.get("vesselId") or "").strip()
+    if not vid:
+        return ""
+    name = str(ctx.get("vesselName") or "").strip()
+    who = f"{name} (vesselId {vid})" if name else f"vesselId {vid}"
+    return (f"[App context] Selected vessel: {who}. Use this vesselId for vessel-specific tools unless the user names a "
+            f"different vessel; never guess a vessel ID.\n\nUser question: ")
 PARTIAL_NOTE = "\n\n(Note: answered from partial data — some lookups did not complete in time.)"
 
 
@@ -310,7 +347,7 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     token = current_masker.set(masker)
     try:
         agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=TOOL_LOOP_INSTRUCTIONS.format(module=ui_module),
-                                        toolsets=[ManifestToolset(manifest_tools)], model_settings=_model_settings(), retries=0)
+                                        toolsets=[ManifestToolset(manifest_tools)], model_settings=_tool_loop_settings(), retries=0)
         result = await agent.run(message, deps=deps)
     finally:
         current_masker.reset(token)

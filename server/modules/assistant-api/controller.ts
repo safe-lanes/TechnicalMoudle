@@ -66,6 +66,8 @@ export async function handleExecute(req: AuthenticatedRequest, res: Response) {
   // Same access object shape the embedded bot builds (chatbotController.ts) — the
   // scope decision inside executeTool is therefore byte-identical on both paths.
   const access: VesselAccess = { role: v.identity.role, vesselId: v.identity.vesselId ?? null };
+  // Audit line: the ACTUAL tool arguments the central service sent (no answer text, no secrets).
+  console.log(`[assistant-api] execute ${tool} args=${JSON.stringify(args || {}).slice(0, 300)} user=${v.identity.userId} role=${v.identity.role} req=${requestId ?? '-'}`);
   try {
     const data = await executeTool(tool, args || {}, storage, access);
     if (data && typeof data === 'object' && 'error' in data && Object.keys(data).length === 1) {

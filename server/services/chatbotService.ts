@@ -816,6 +816,18 @@ export async function executeTool(
       }
     }
 
+    // 23-Sep-2026 (pilot): a vessel that does not exist must be an explicit failure, not "zero records" —
+    // the assistant reported an unknown id as "0 work orders". Accepts the vessel's id or vuuid (the LLM
+    // passes whichever the widget/context carried; work orders are keyed by vuuid in the pilot data).
+    if (typeof args?.vesselId === "string" && args.vesselId && args.vesselId !== "all" && toolName !== "get_fleet_overview") {
+      const known = (await storage.getVessels({ includeDeleted: false })).some(
+        (v) => v.id === args.vesselId || v.vuuid === args.vesselId
+      );
+      if (!known) {
+        return { error: `Unknown vessel '${args.vesselId}': no vessel with this ID exists here. Check the vessel selection.` };
+      }
+    }
+
     switch (toolName) {
       case "get_work_orders": {
         const workOrders = await storage.getWorkOrders(args.vesselId);
