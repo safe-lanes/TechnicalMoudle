@@ -1,0 +1,131 @@
+===== POST-DEPLOY (public endpoints) 2026-09-23T05:38:50Z — deployed = kb-xref-e 965 / prompt v5 / image 722127cab537 =====
+
+--- ROUTING probes, both paths 05:38:50 ---
+routing suite 2026-09-15.2 · 13 cases · routeOnly (no answer model)
+
+[rt-general-01] How do I create a work order?  (context=technical)
+   public-assistant ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   public-viqmap ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+
+[rt-general-02] How to create work order in PMS?  (context=technical)
+   public-assistant ✓ gate=answer module=Technical conf=1.0 routing=explicit: module name in question | lexical rescue: How work orders are created — the three  | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   public-viqmap ✓ gate=answer module=Technical conf=1.0 routing=explicit: module name in question | lexical rescue: How work orders are created — the three  | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+
+[rt-general-03] Steps to create a new work order  (context=technical)
+   public-assistant ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   public-viqmap ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual For Of | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+
+[rt-named-01] How do I create an unplanned work order?  (context=technical)
+   public-assistant ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of | Technical - Recent Updates & Chang | Technical - KB pilot: How work ord
+   public-viqmap ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual For Of | Technical - Recent Updates & Chang | Technical - KB pilot: How work ord
+
+[rt-named-02] How does Generate Now work in the office?  (context=technical)
+   public-assistant ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - Recent Updates & Chang | Technical - KB pilot: 'Generate WO | Technical - Recent Updates & Chang | Technical - KB pilot: How work ord
+   public-viqmap ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: Office 'Gene | Technical - Recent Updates & Chang | Technical - KB pilot: 'Generate WO | Technical - Recent Updates & Chang | Technical - KB pilot: How work ord
+
+[rt-named-03] How do I generate a work order for one job from Components?  (context=technical)
+   public-assistant ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - Recent Updates & Chang | Technical - PMS User Manual_Vessel
+   public-viqmap ✓ gate=answer module=Technical conf=1.0 routing=vector routing | Technical - KB pilot: 'Generate WO | Technical - PMS User Manual For Of | Technical - KB pilot: How work ord | Technical - Recent Updates & Chang | Technical - PMS User Manual_Vessel
+
+[rt-pump-01] I need to raise a work order for a pump — how do I do that?  (context=technical)
+   public-assistant ✓ gate=answer module=Technical conf=1.0 routing=vector routing | lexical rescue: How work orders are created — the three  | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+   public-viqmap ✓ gate=answer module=Technical conf=1.0 routing=vector routing | lexical rescue: How work orders are created — the three  | Technical - PMS User Manual For Of | Technical - PMS User Manual_Vessel | Technical - KB pilot: Create an un | Technical - PMS User Manual_Vessel | Technical - KB pilot: How work ord
+
+[rt-05-ctx-technical] What are the hazard categories in a risk assessment?  (context=technical)
+   public-assistant ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | lexical rescue: 8. HOW TO FILL VESSEL RISK ASSESSMENT FO | cross-module: incident Part B: Severity Assessment | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   public-viqmap ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | lexical rescue: 8. HOW TO FILL VESSEL RISK ASSESSMENT FO | cross-module: incident Part B: Severity Assessment | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-no-ctx] What are the hazard categories in a risk assessment?  (context=None)
+   public-assistant ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | lexical rescue: 8. HOW TO FILL VESSEL RISK ASSESSMENT FO | cross-module: incident Part B: Severity Assessment | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   public-viqmap ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | lexical rescue: 8. HOW TO FILL VESSEL RISK ASSESSMENT FO | cross-module: incident Part B: Severity Assessment | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-ctx-safety] What are the hazard categories in a risk assessment?  (context=safety)
+   public-assistant ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | lexical rescue: 8. HOW TO FILL VESSEL RISK ASSESSMENT FO | cross-module: incident Part B: Severity Assessment | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+   public-viqmap ✓ gate=answer module=Safety conf=1.0 routing=explicit: manual/sub-module name in question | lexical rescue: 8. HOW TO FILL VESSEL RISK ASSESSMENT FO | cross-module: incident Part B: Severity Assessment | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu | Safety - Risk Assessment User Manu
+
+[rt-05-explicit-conflict] In the Incident module, what are the hazard categories in a risk assessment?  (context=technical)
+   public-assistant ✓ gate=answer module=Incident conf=1.0 routing=explicit: module name in question | cross-module: safety ⮚ Method 1: Add Hazards from Datab | Incident - Incident User Manual R0 | Incident - Near Miss User Manual R | Incident - Incident User Manual R0 | Safety - Risk Assessment User Manu
+   public-viqmap ✓ gate=answer module=Incident conf=1.0 routing=explicit: module name in question | cross-module: safety ⮚ Method 1: Add Hazards from Datab | Incident - Incident User Manual R0 | Incident - Near Miss User Manual R | Incident - Incident User Manual R0 | Safety - Risk Assessment User Manu
+
+[rt-ctx-no-override] How do I report a near miss?  (context=technical)
+   public-assistant ✓ gate=answer module=Incident conf=1.0 routing=explicit: manual/sub-module name in question | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+   public-viqmap ✓ gate=answer module=Incident conf=1.0 routing=explicit: manual/sub-module name in question | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R | Incident - Near Miss User Manual R
+
+[rt-explicit-module] In the Safety module, how do I record a safety meeting?  (context=technical)
+   public-assistant ✓ gate=answer module=Safety conf=1.0 routing=explicit: module name in question | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+   public-viqmap ✓ gate=answer module=Safety conf=1.0 routing=explicit: module name in question | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua | Safety - Safety Meeting User Manua
+
+== totals ==
+   public-assistant 13/13
+   public-viqmap 13/13
+
+--- RETRIEVAL 18, both paths 05:38:59 ---
+
+== Part 1: documents — per set: chunks / <100-char / avg len / html-tagged chunks
+  manual                                  public-assistant      |       public-viqmap       
+  TOTAL                                   0 /  0 /      /   0   |      0 /  0 /      /   0  
+
+== Part 2: retrieval — public-assistant (https://assistant.sl-sail.com) | public-viqmap (https://viqmap.sl-sail.com/assistant)   [module ✓/✗, manual ✓/✗, margin, top-distance]  expectations v1
+  how do I create a work order                 ✓✓ m=1.000 d=0.8084            | ✓✓ m=1.000 d=0.8084           
+  how to upload data in bulk data import       ✓✓ m=1.000 d=0.8458            | ✓✓ m=1.000 d=0.8458           
+  why did the running hours not go down after  ✓✓ m=1.000 d=1.0186            | ✓✓ m=1.000 d=1.0186           
+  how do I raise a defect on equipment         ✓✓ m=1.000 d=0.9056            | ✓✓ m=1.000 d=0.9056           
+  how do vessels sync their data with the offi ✓✓ m=1.000 d=0.7657            | ✓✓ m=1.000 d=0.7657           
+  how do I share an audit with the fleet from  ✓✓ m=1.000 d=0.7533            | ✓✓ m=1.000 d=0.7533           
+  how do I prepare for an upcoming audit       ✓✓ m=1.000 d=0.9558            | ✓✓ m=1.000 d=0.9558           
+  where can I see the history of past audits   ✓✓ m=1.000 d=0.889             | ✓✓ m=1.000 d=0.889            
+  how do I create an MOC                       ✓✓ m=1.000 d=0.8441            | ✓✓ m=1.000 d=0.8441           
+  how do I carry out a risk assessment on the  ✓✓ m=1.000 d=0.7233            | ✓✓ m=1.000 d=0.7233           
+  how do I record a safety meeting             ✓✓ m=1.000 d=0.8213            | ✓✓ m=1.000 d=0.8213           
+  how does the master review the safety manage ✓✓ m=1.000 d=0.7683            | ✓✓ m=1.000 d=0.7683           
+  how do I report a near miss                  ✓✓ m=1.000 d=0.8269            | ✓✓ m=1.000 d=0.8269           
+  how do I report an incident on board         ✓✓ m=1.000 d=0.968             | ✓✓ m=1.000 d=0.9682           
+  how do I raise a lesson learnt               ✓✓ m=1.000 d=1.0127            | ✓✓ m=1.000 d=1.0127           
+  how do fleet notifications reach the vessel  ✓✓ m=1.000 d=0.7342            | ✓✓ m=1.000 d=0.7342           
+  how do I plan a crew change                  ✓✓ m=1.000 d=0.7967            | ✓✓ m=1.000 d=0.7967           
+  how do I add a new crew member to a vessel   ✓✓ m=1.000 d=0.7845            | ✓✓ m=1.000 d=0.7845           
+  what is the weather in Singapore today       gate=not_documented            | gate=not_documented           
+  how do I change my payroll bank account      gate=not_documented            | gate=not_documented           
+
+  routing+manual correct (expectations v1): public-assistant 18/18   public-viqmap 18/18
+  routing+manual correct (expectations v2, same responses): public-assistant 18/18   public-viqmap 18/18
+
+--- WORK-ORDER 8+5 x3, assistant path 05:39:07 ---
+work-order suite 2026-09-14.11 · 8 cases · repeat=3
+
+[wo-generic-01] How do I create a work order?
+   public-assistant answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'The excerpts support four ways to create a work order:\n\n1. **Pla'
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+[wo-generic-02] How are planned work orders created in PMS — do I have to create them myself?
+   public-assistant answer ✓  cite ✓  rule ✓ (automatic generation ✓; user need not create ✓; Generate Now described with its conditions ✓)  gate=answer cite=Technical - PMS User Manua p29 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'Planned work orders are created in two ways, depending on where '
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+[wo-generic-03] How to create work order in PMS?
+   public-assistant answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p28 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'The excerpts support three ways to create a work order:\n\n1. **Pl'
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+[wo-phr-01] What are the different ways to create a work order in PMS?
+   public-assistant answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'PMS supports three ways to create a work order. The first is des'
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+[wo-phr-02] I need to raise a work order for a pump — how do I do that?
+   public-assistant answer ✓  cite ✓  rule ✓ (unplanned procedure ✓; note of the other ways ✓)  gate=answer cite=Technical - PMS User Manua p29 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'For a pump, the supported ways to create a work order are:\n\n### '
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+[wo-phr-03] Do I create work orders myself or does the system create them?
+   public-assistant answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'Both: the system creates some work orders automatically, while u'
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+[wo-phr-04] Steps to create a new work order
+   public-assistant answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - PMS User Manua p29 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'The excerpts support three ways to create a work order:\n\n**1. Pl'
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+[wo-phr-05] How do work orders get created in the Technical module?
+   public-assistant answer ✓  cite ✓  rule ✓ (automatic generation ✓; pairing ✓)  gate=answer cite=Technical - KB pilot: How  pNone support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Technical' → 14 corpus documents, support=unverified"]] | 'Work orders are created in three ways:\n\n1. **Planned or schedule'
+   public-assistant PASS ✓ [3/3 — all runs required]
+
+== totals ==
+   public-assistant 8/8
+
+===== DONE 2026-09-23T05:43:08Z =====

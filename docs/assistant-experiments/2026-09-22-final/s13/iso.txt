@@ -1,0 +1,13 @@
+A first ask: 200 answer Technical 1. Open the **Work Orders** sub-module. 2. **Office only:** 
+B first ask: 200 answer Technical To create an unplanned work order:  - **Requirements:** Sign
+admin toggle A off (tunnel-only path): 200 False
+A after disable: 200 disabled  The assistant isn't enabled for Technical in your organizati
+B still: 200 answer Technical To create an unplanned work order:  1. Sign in and ensure yo
+expired token: 401 identity rejected: expired
+wrong-key token: 401 identity rejected: bad-signature
+no token: 401 identity rejected: missing
+A re-enabled: 200 True
+A after re-enable: 200 answer Technical To create an unplanned work order:  1. Sign in and open the 
+public /admin denied: 403
+TENANTS deploy-iso-a-1790141818 deploy-iso-b-1790141818
+RESULT PASS
