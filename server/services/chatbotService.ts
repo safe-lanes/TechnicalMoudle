@@ -1017,46 +1017,65 @@ export async function executeTool(
 
       case "get_due_work_orders": {
         const workOrders = await loadWorkOrders(args.vesselId);
-        let due = workOrders.filter(
+        const due = workOrders.filter(
           (wo) =>
             (wo.status === "Due" || wo.status === "Due (Grace P)") &&
             wo.dataScope === "vessel"
         );
 
-        if (args.dateRange) {
+        // 23-Sep-2026: calendar-dated and running-hours jobs are reported SEPARATELY. A running-hours job is Due by
+        // hours and has no calendar due date — that date cannot be determined from the hours available — so a
+        // date-range question ("due this week") counts ONLY calendar-dated jobs, and the running-hours ones are
+        // listed apart with that statement: never silently counted in, never silently dropped.
+        const rhBased = due.filter((wo) => wo.maintenanceBasis === "Running Hours" || !wo.dueDate);
+        let calendar = due.filter((wo) => !rhBased.includes(wo));
+        const rangeLabel: string | null = ["week", "month", "quarter"].includes(args.dateRange) ? args.dateRange : null;
+        if (rangeLabel) {
           const now = new Date();
           const cutoffDate = new Date();
-          if (args.dateRange === "week") cutoffDate.setDate(now.getDate() + 7);
-          else if (args.dateRange === "month")
-            cutoffDate.setDate(now.getDate() + 30);
-          else if (args.dateRange === "quarter")
-            cutoffDate.setDate(now.getDate() + 90);
-
-          due = due.filter((wo) => {
-            // 23-Sep-2026: a running-hours job is due NOW (by hours) and has no calendar date — a date-range
-            // filter must not drop it (PROVEN on the pilot: "due this week" answered 0 while 6 were due)
-            if (!wo.dueDate) return wo.maintenanceBasis === "Running Hours";
-            const dueDate = new Date(wo.dueDate);
-            return dueDate <= cutoffDate;
-          });
+          cutoffDate.setDate(now.getDate() + (rangeLabel === "week" ? 7 : rangeLabel === "month" ? 30 : 90));
+          calendar = calendar.filter((wo) => new Date(wo.dueDate) <= cutoffDate);
         }
-
-        return {
-          totalDue: due.length,
-          note: "A work order with no dueDate is due by running hours (see maintenanceBasis, dueRH, currentRH).",
-          workOrders: due.slice(0, 50).map((wo) => ({
+        const row = (wo: any) => {
+          const dueRH = wo.dueRH ?? wo.nextDueReading ?? null;
+          const currentRH = wo.currentRH ?? null;
+          const remaining = dueRH != null && currentRH != null ? Number(dueRH) - Number(currentRH) : null;
+          return {
             id: wo.id,
             workOrderNo: wo.workOrderNo,
             component: wo.component,
             componentCode: wo.componentCode,
             jobTitle: wo.jobTitle,
-            dueDate: wo.dueDate,
+            dueDate: wo.dueDate ?? null,
             assignedTo: wo.assignedTo,
             jobPriority: wo.jobPriority,
             maintenanceBasis: wo.maintenanceBasis ?? null,
-            dueRH: wo.dueRH ?? wo.nextDueReading ?? null,
-            currentRH: wo.currentRH ?? null,
-          })),
+            dueRH,
+            currentRH,
+            rhRemaining: remaining,
+            rhLeadTimeHours: wo.rhLeadTimeHours ?? null,
+            // the application's rule: Due when 0 <= remaining hours <= the vessel's running-hours lead time
+            rhStatusBasis: remaining == null ? null
+              : remaining <= 0 ? "due hours reached"
+              : `${remaining} h remaining, within the ${wo.rhLeadTimeHours ?? "configured"} h running-hours lead time`,
+          };
+        };
+
+        return {
+          totalDue: due.length,
+          dateRange: rangeLabel,
+          calendarDue: {
+            count: calendar.length,
+            note: rangeLabel
+              ? `Calendar-dated work orders due within the next ${rangeLabel}.`
+              : "Calendar-dated work orders currently Due.",
+            workOrders: calendar.slice(0, 50).map(row),
+          },
+          runningHoursDue: {
+            count: rhBased.length,
+            note: "Running-hours work orders currently Due. Their calendar due date cannot be determined from the available hours, so they are NOT counted in the date-range figure. rhStatusBasis states why each is Due under the application's rule; a reading of 0 h or one unchanged for a long time needs confirmation on board.",
+            workOrders: rhBased.slice(0, 50).map(row),
+          },
         };
       }
 
