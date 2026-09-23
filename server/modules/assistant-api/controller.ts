@@ -63,9 +63,15 @@ export async function handleExecute(req: AuthenticatedRequest, res: Response) {
     return res.json({ ok: false, error: `Unknown tool '${tool}' for module ${MODULE_ID}` });
   }
 
-  // Same access object shape the embedded bot builds (chatbotController.ts) — the
-  // scope decision inside executeTool is therefore byte-identical on both paths.
-  const access: VesselAccess = { role: v.identity.role, vesselId: v.identity.vesselId ?? null };
+  // 23-Sep-2026 (pilot): executeTool's vessel-scope rule speaks the LEGACY role vocabulary
+  // ('Office' = any vessel, 'Ship' = assigned vessel only, plus the two admin names), but the token
+  // carries the SAILERP role NAME ('Admin', 'User', 'Vessel User', …), so every office user except
+  // 'Sail Admin' was refused on every vessel. Decide by the forwarded user TYPE, which is what the
+  // module's own guards use (auth.ts rbac.userType); fall back to the role name when the type is
+  // absent (older tokens). A Ship user with no assigned vessel on the session stays refused.
+  const ut = v.identity.userType ?? undefined;
+  const scopeRole = ut === 'Ship' ? 'Ship' : ut === 'Office' ? 'Office' : v.identity.role;
+  const access: VesselAccess = { role: scopeRole, vesselId: v.identity.vesselId ?? null };
   // Audit line: the ACTUAL tool arguments the central service sent (no answer text, no secrets).
   console.log(`[assistant-api] execute ${tool} args=${JSON.stringify(args || {}).slice(0, 300)} user=${v.identity.userId} role=${v.identity.role} req=${requestId ?? '-'}`);
   try {
@@ -96,6 +102,7 @@ export async function handleMintToken(req: AuthenticatedRequest, res: Response) 
       userId,
       userName: req.user?.fullName,
       role: rbac.role, // the REAL forwarded role — never the mock req.user.role
+      userType: rbac.userType ?? null, // 'Office' | 'Ship' — the vessel-scope decision key (23-Sep-2026)
       vesselId: (req as any).user?.vesselId ?? null,
       tenantDomain: (req as any).tenantDomain ?? null,
       tuid: (req as any).tenantTuid ?? null,

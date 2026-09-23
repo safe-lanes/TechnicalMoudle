@@ -15,6 +15,7 @@ export interface ForwardedIdentity {
   userId: string;
   userName?: string;
   role: string;
+  userType?: 'Office' | 'Ship' | null; // additive (23-Sep-2026): the vessel-scope decision key; absent on older tokens
   vesselId?: string | null;
   tenantDomain?: string | null;
   tuid?: string | null;
