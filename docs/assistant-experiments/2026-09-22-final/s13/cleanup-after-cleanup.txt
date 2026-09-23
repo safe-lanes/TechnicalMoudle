@@ -1,0 +1,31 @@
+https 127.0.0.1 200
+http 127.0.0.1 200
+https 13.250.51.71 200
+http 13.250.51.71 200
+https assistant.sl-sail.com 200
+http assistant.sl-sail.com 301
+https devsmsragai.com 000
+http devsmsragai.com 000
+https localhost 200
+http localhost 200
+https viqmap.sl-sail.com 200
+http viqmap.sl-sail.com 301
+viqmap-osm 404
+viqmap-maran 404
+smsrag-8010 200
+crew_api Up
+crew_db Up
+crew_ui Up
+graphagent_new Up
+safe-lanes-v19-auditgraphai Up
+safe-lanes-v19-dev-auditgraphai Up
+safe-lanes-v19-erp-auditgraphai Up
+sail-assistant-db Up
+sail-assistant-py-cand Up
+sail-assistant-py-cand2 Up
+sms-rag-app Up
+technical-chromadb Up
+viq-rag-system-embedded Up
+viq-rag-system-new Up
+viq-risq-testing Up
+active

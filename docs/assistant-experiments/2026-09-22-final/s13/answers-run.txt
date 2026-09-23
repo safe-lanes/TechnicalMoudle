@@ -1,0 +1,59 @@
+acceptance suite 2026-09-14.4 · 12 cases · repeat=3
+
+[01 callout] In the audit preparation checklist observations view, how do I export the data and what do I do with vessel comments?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p15 support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | '1. In the Inspector Observation Data view, click the **Excel ico'
+
+[02 callout] In Audit Preparation, what does the email notification icon do and is it configurable?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Audit - Preparation Manual p9 support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The **Email Notification** icon sends an email to the Office not'
+
+[03 callout] How do I upload a document for the first time in the SMS module?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - SMS User Manual_O p14 support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'To upload a document for the first time in the SMS module:\n\n1. C'
+
+[04 table] In the Master Review module, what do the grey and red icons mean?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Master Review Man p6 support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | '- **Grey icon:** Response Due.\n- **Red icon:** Response Overdue.'
+
+[05 table] What are the hazard categories in a risk assessment?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - Risk Assessment U p19 support=unverified [supporting citation present, not first] [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'Risk Assessment' → 2 corpus documents, support=unverified"]] | 'The risk-assessment hazard categories are:\n\n1. **Work Environmen'
+
+[06 table] What actions can I take on a near miss record from the list — what do the icons do?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Incident - Near Miss User  p5 support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'From the Near Miss records list, you can:\n\n1. Click the **eye ic'
+
+[07 xref] How do I apply a filter in the Stores sub-module of PMS?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p49 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'PMS User Manual' → 2 corpus documents, support=unverified"]] | '**Office PMS** — the Stores procedure is the same as Spares sect'
+
+[08 xref] How do I export crew details from the Waitlist in Crewing?
+   public-assistant answer ✗  cite ✓  attrib ✓  JOINT ✗ [0/3]  gate=answer cite=Crewing - Crewing User Man p22 support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The Waitlist export procedure is the same as **section 1.2.1.5, '
+
+[09 xref] How do I create a COC defect record?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - Defects User M p19 support=unverified [REVIEW: ['citation support unverified (no captured model input)']] | 'The COC creation procedure is the same as section **1.1.4.3, “Ho'
+
+[10 note] When filling MoC Part B, what happens if I select No for further assessment?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_O p11 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'MOC' → 2 corpus documents, support=unverified"]] | 'If you select **“No”** for further assessment in **MoC Part B**,'
+
+[11 note] In PMS, is there another way to add a component besides the components panel?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Technical - PMS User Manua p24 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'PMS User Manual' → 2 corpus documents, support=unverified"]] | 'Yes. In the Office PMS:\n\n1. Click the **“+ Add Component”** butt'
+
+[12 note] What should I review after deleting an implication in a vessel MoC?
+   public-assistant answer ✓  cite ✓  attrib ✓  JOINT ✓ [3/3]  gate=answer cite=Safety - MOC User Manual_V p9 support=unverified [REVIEW: ['citation support unverified (no captured model input)', "ambiguous expected manual 'MOC' → 2 corpus documents, support=unverified"]] | 'After deleting an implication, review the **Part E – Action tabl'
+
+== run-to-run disagreement (cases where runs split, 3 runs) ==
+   none
+
+== per-case JOINT (answer ∧ citation ∧ attribution) — out of 12 ==
+   case          public-assis
+   01 callout               ✓
+   02 callout               ✓
+   03 callout               ✓
+   04 table                 ✓
+   05 table                 ✓
+   06 table                 ✓
+   07 xref                  ✓
+   08 xref                  ✗
+   09 xref                  ✓
+   10 note                  ✓
+   11 note                  ✓
+   12 note                  ✓
+
+== totals: answer / citation / attribution / JOINT ==
+   public-assistant 11/12  12/12  12/12  JOINT 11/12
+DONE

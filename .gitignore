@@ -55,3 +55,9 @@ attached_assets/*
 # assistant API key files — never commit (owner rule: keys in files, never in chat or git)
 central-assistant/newchatbotkey.txt
 central-assistant/*key*.txt
+
+# private model-input captures and review packs stay out of the repository (23-Sep-2026)
+docs/assistant-experiments/**/*capture*.jsonl
+docs/assistant-experiments/**/*captured-input*.txt
+docs/assistant-experiments/**/ANSWERS-FULL-captured-run.txt
+docs/assistant-experiments/**/*.zip
