@@ -804,28 +804,33 @@ export async function executeTool(
     // access check. Verify the caller may see the requested vessel before any DB read.
     // Gated by CHATBOT_ENFORCE_VESSEL_SCOPE (default on); no-op for Office/Admin/Sail Admin
     // (so current single-user/admin behavior is unchanged).
+    // 23-Sep-2026 (pilot): resolve the requested vessel FIRST — the widget's selector carries `vessels.id`
+    // (pilot: 'WKFV') while every data table is keyed by `vuuid`; the two differ on the pilot BY DESIGN
+    // (the identity trap) and may differ elsewhere. Unknown vessel = explicit failure, never "zero records"
+    // (the assistant reported an unknown id as "0 work orders"). Access is then checked against BOTH forms.
+    let requested: { id: string; vuuid: string } | null = null;
+    if (typeof args?.vesselId === "string" && args.vesselId && args.vesselId !== "all" && toolName !== "get_fleet_overview") {
+      const vessel = (await storage.getVessels({ includeDeleted: false })).find(
+        (v) => v.id === args.vesselId || v.vuuid === args.vesselId
+      );
+      if (!vessel) {
+        return { error: `Unknown vessel '${args.vesselId}': no vessel with this ID exists here. Check the vessel selection.` };
+      }
+      requested = { id: vessel.id, vuuid: vessel.vuuid };
+    }
     if (access && process.env.CHATBOT_ENFORCE_VESSEL_SCOPE !== "false") {
       if (toolName === "get_fleet_overview") {
         if (access.role === "Ship") {
           return { error: "Fleet-wide data isn't available for your role. Ask about your assigned vessel instead." };
         }
-      } else if (typeof args?.vesselId === "string" && args.vesselId && args.vesselId !== "all") {
-        if (!canAccessVessel(access, args.vesselId)) {
+      } else if (requested) {
+        if (!canAccessVessel(access, requested.vuuid) && !canAccessVessel(access, requested.id)) {
           return { error: `You don't have access to vessel '${args.vesselId}'. You can only view data for your assigned vessel.` };
         }
       }
     }
-
-    // 23-Sep-2026 (pilot): a vessel that does not exist must be an explicit failure, not "zero records" —
-    // the assistant reported an unknown id as "0 work orders". Accepts the vessel's id or vuuid (the LLM
-    // passes whichever the widget/context carried; work orders are keyed by vuuid in the pilot data).
-    if (typeof args?.vesselId === "string" && args.vesselId && args.vesselId !== "all" && toolName !== "get_fleet_overview") {
-      const known = (await storage.getVessels({ includeDeleted: false })).some(
-        (v) => v.id === args.vesselId || v.vuuid === args.vesselId
-      );
-      if (!known) {
-        return { error: `Unknown vessel '${args.vesselId}': no vessel with this ID exists here. Check the vessel selection.` };
-      }
+    if (requested && requested.vuuid !== args.vesselId) {
+      args = { ...args, vesselId: requested.vuuid }; // tools query by vuuid
     }
 
     switch (toolName) {
