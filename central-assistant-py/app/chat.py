@@ -88,7 +88,10 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         if manifest is not None:
             # the selected vessel travels as context in the message text (masked on the wire); the log keeps the
             # user's own question. Authorisation stays with the module's Data API.
-            r = await agent.run_tool_loop(agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker, manifest["tools"])
+            # the widget's earlier turns ride along as history (masked on the wire like everything else) so
+            # follow-ups ('readable format', 'more') refer to the previous answer instead of restarting.
+            r = await agent.run_tool_loop(agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker, manifest["tools"],
+                                          history=agent.build_history(body.get("conversationHistory")))
             if masker and masker.warnings:
                 print("[assistant] unmask warnings:", masker.warnings)
             log("answer", r.text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used)
@@ -99,19 +102,32 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         # Step 4 (owner brief 15-Sep-2026): the same one embedding call; routing may consult the question's own words and
         # the originating module (ASSISTANT_ROUTE_INTENT), excerpt selection may fuse a lexical ranking inside the routed
         # module (ASSISTANT_HYBRID). Both default off = served behaviour. Neither touches identity, tenant or vessel checks.
-        emb = await llm.embed(message, masker)
+        history = agent.build_history(body.get("conversationHistory"))
+        query = message
+        emb = await llm.embed(query, masker)
         hits = await retrieval.retrieve(emb)
         terms = await retrieval.title_terms() if s.assistant_route_intent.lower() == "on" else None
-        routed = retrieval.route(hits, message, ui_module, terms)
+        routed = retrieval.route(hits, query, ui_module, terms)
+        if history and routed.gate != "answer" and agent.last_user_turn(history):
+            # 23-Sep-2026 follow-ups: 'explain step 2' retrieves nothing on its own words. With the widget's history
+            # present and no answerable route, retry ONCE with the previous user question prepended. Without history
+            # (every regression suite, the API contract examples) this block never runs — the served path is unchanged.
+            query = f"{agent.last_user_turn(history)}\n{message}"
+            emb = await llm.embed(query, masker)
+            hits = await retrieval.retrieve(emb)
+            routed = retrieval.route(hits, query, ui_module, terms)
+            reasons_prefix = ["follow-up: retrieved with the previous question"]
+        else:
+            reasons_prefix = []
         hybrid = s.assistant_hybrid.lower()
-        reasons: list[str] = []
+        reasons: list[str] = list(reasons_prefix)
         if routed.gate == "answer" and hybrid in ("on", "rescue") and routed.module:
             vec = [h for h in hits if h.module == routed.module and h.distance <= s.route_sim_floor]
-            lex = [h for h in await db.search_lexical(emb, masker.mask_text(message) if masker else message, routed.module, s.route_top_k) if h.distance <= s.route_sim_floor]
+            lex = [h for h in await db.search_lexical(emb, masker.mask_text(query) if masker else query, routed.module, s.route_top_k) if h.distance <= s.route_sim_floor]
             if hybrid == "rescue":
                 # r7: served selection kept; the lexical leader takes the last slot only if it earns it on relevance
                 # (score per content word) AND does not displace materially nearer evidence.
-                n_terms = len(retrieval.content_terms(masker.mask_text(message) if masker else message))
+                n_terms = len(retrieval.content_terms(masker.mask_text(query) if masker else query))
                 routed.hits, rescued, dropped = retrieval.guarded_lexical_rescue(
                     vec, lex, s.answer_chunks, n_terms, s.assistant_rescue_lex_per_term, s.assistant_rescue_max_penalty)
                 if rescued is not None:
@@ -148,7 +164,14 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
             return 200, {"gate": "answer", "module": label, "confidence": round(routed.confidence, 4), "citations": citations, "routeOnly": True,
                          "routing": getattr(routed, "reason", "vector routing")}
         system, user = retrieval.docs_prompt(message, routed)
-        text, usage = await agent.answer_docs(system, user, masker)
+        if history:
+            # follow-up in a conversation: 'step 2' / 'that' point at the assistant's previous answer (in the history),
+            # not at whichever excerpt happens to be numbered. Excerpts still supply every detail (PROVEN needed on the
+            # pilot: without this line 'explain step 2' explained step 2 of a different procedure).
+            system += (" This message is a follow-up in an ongoing conversation whose earlier turns are provided as history; "
+                       "references such as 'step 2' or 'that' point to YOUR previous answer — explain that item, using the excerpts "
+                       "for the details, and say plainly if the excerpts do not cover it. Never switch to a different procedure.")
+        text, usage = await agent.answer_docs(system, user, masker, history=history)
         if masker and masker.warnings:
             print("[assistant] unmask warnings:", masker.warnings)
         log("answer", text, module=routed.module, citations=citations, confidence=routed.confidence, usage=usage, model=s.chat_model)

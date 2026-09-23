@@ -320,8 +320,63 @@ TOOL_LOOP_INSTRUCTIONS = (
     "for vessel-specific tools unless the user explicitly names a different vessel. NEVER guess, invent or derive a vessel ID — "
     "if no vessel is known, ask the user which vessel. The selection is context only: access is decided by the tools, and a tool "
     "refusal or an 'unknown vessel' error must be relayed as such, never reported as zero records. "
+    "RULE — follow-ups: earlier turns of this conversation are provided as history. A short follow-up ('readable format', "
+    "'more', 'sort by age', 'and the due ones?') refers to the previous answer: reformat, continue or extend it directly — "
+    "never ask what the user wants when the history makes it clear; call a tool again only when new data is needed. "
+    "RULE — options: whenever you offer the user a choice of what to ask, include documentation how-to questions (for example "
+    "'How do I complete a work order?', 'How do I update running hours?') beside the live-data options. "
+    "RULE — running hours: a work order with no calendar due date is due by running hours — say so and quote its due and "
+    "current running hours (e.g. '0 of 500 h') instead of 'date not specified'. Never invent a calendar date, never say a job "
+    "has reached its due hours unless currentRH is at or above dueRH, and never invent a reason why the system marks it Due. "
+    "When a summary figure (for example the oldest overdue) is not among the listed rows, name the work order it comes "
+    "from and its priority, and say the list is sorted by priority first. "
+    "RULE — fresh data: for any request for data (counts, lists, status), call the tool again even if the history holds a "
+    "similar figure; reuse the history only to reformat, explain or continue the same result. "
+    "RULE — vessel change: if the [App context] vessel of the current message differs from the vessel earlier answers were "
+    "about, never reuse those figures — call the tools for the current vessel. Refer to a vessel by its name, never print its ID. "
+    "RULE — more: when the user asks for more rows of a list, call the list tool again with the next offset (offset = rows already shown); "
+    "when a tool returns fewer than the total, say how many remain. "
     "Answer in short plain language; numbered steps for how-tos."
 )
+
+
+def last_user_turn(history: list[ModelMessage]) -> str:
+    """The most recent user text in a built history ('' when none) — the docs path prepends it to a short follow-up
+    ('explain step 2') whose own words retrieve nothing."""
+    for m in reversed(history):
+        if isinstance(m, ModelRequest):
+            for p in m.parts:
+                if isinstance(p, UserPromptPart) and isinstance(p.content, str):
+                    return p.content
+    return ""
+
+
+def build_history(raw: Any, limit: int | None = None) -> list[ModelMessage]:
+    """The widget's conversationHistory ([{role, content}, …]) as Pydantic AI message history for the tool loop.
+
+    23-Sep-2026 (pilot, PROVEN): the widget always sent the history and the service dropped it, so 'give that in a
+    readable format' was answered with 'what would you like?'. Only the last `assistant_history_messages` messages
+    are kept, each capped in length; unknown roles and empty texts are skipped. Every part goes through the same
+    masking choke point as the live message (G3, MaskingModel.request), so nothing here bypasses masking."""
+    n = settings().assistant_history_messages if limit is None else limit
+    if n <= 0 or not isinstance(raw, list):
+        return []
+    out: list[ModelMessage] = []
+    for item in raw[-n:]:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").lower()
+        text = str(item.get("content") or "").strip()[:4000]
+        if not text:
+            continue
+        if role == "user":
+            out.append(ModelRequest(parts=[UserPromptPart(content=text)]))
+        elif role == "assistant":
+            out.append(ModelResponse(parts=[TextPart(content=text)]))
+    # history must start with a request and alternate sensibly; drop a leading assistant turn
+    while out and isinstance(out[0], ModelResponse):
+        out.pop(0)
+    return out
 
 
 def vessel_context_prefix(ctx: dict[str, Any] | None) -> str:
@@ -342,13 +397,14 @@ def vessel_context_prefix(ctx: dict[str, Any] | None) -> str:
 PARTIAL_NOTE = "\n\n(Note: answered from partial data — some lookups did not complete in time.)"
 
 
-async def run_tool_loop(message: str, ui_module: str, identity_token: str, masker: Masker | None, manifest_tools: list[dict[str, Any]]) -> LoopResult:
+async def run_tool_loop(message: str, ui_module: str, identity_token: str, masker: Masker | None, manifest_tools: list[dict[str, Any]],
+                        history: list[ModelMessage] | None = None) -> LoopResult:
     deps = Deps(masker=masker, ui_module=ui_module, identity_token=identity_token, started_at=time.monotonic())
     token = current_masker.set(masker)
     try:
         agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=TOOL_LOOP_INSTRUCTIONS.format(module=ui_module),
                                         toolsets=[ManifestToolset(manifest_tools)], model_settings=_tool_loop_settings(), retries=0)
-        result = await agent.run(message, deps=deps)
+        result = await agent.run(message, deps=deps, message_history=history or None)
     finally:
         current_masker.reset(token)
     text = masker.unmask_text(result.output) if masker else result.output
@@ -357,12 +413,14 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial)
 
 
-async def answer_docs(system: str, user: str, masker: Masker | None) -> tuple[str, dict[str, int] | None]:
-    """Docs-only answer (no tools) through the SAME masking choke point."""
+async def answer_docs(system: str, user: str, masker: Masker | None, history: list[ModelMessage] | None = None) -> tuple[str, dict[str, int] | None]:
+    """Docs-only answer (no tools) through the SAME masking choke point. `history` (the widget's earlier turns, bounded
+    by build_history) lets a follow-up such as 'explain step 2' refer to the previous answer; without it the path is
+    byte-for-byte the served one."""
     token = current_masker.set(masker)
     try:
         agent: Agent[None, str] = Agent(_model(), instructions=system, model_settings=_model_settings(), retries=0)
-        result = await agent.run(user)
+        result = await agent.run(user, message_history=history or None)
     finally:
         current_masker.reset(token)
     text = masker.unmask_text(result.output) if masker else result.output

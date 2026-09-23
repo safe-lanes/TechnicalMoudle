@@ -43,3 +43,25 @@ def test_vessel_context_prefix_carries_id_and_name_and_is_empty_without_a_vessel
     assert "743ef9d1-841a-11ed-aa7c-7003bca91a86" not in masked and "WK Frontier Pilot" not in masked
     tok = masked.split("vesselId ")[1].split(")")[0]
     assert m.unmask_json({"vesselId": tok}) == {"vesselId": "743ef9d1-841a-11ed-aa7c-7003bca91a86"}
+
+
+def test_build_history_keeps_last_turns_in_order_and_skips_junk(monkeypatch):
+    agent = _reload(monkeypatch, CHAT_TEMPERATURE="default", IDENTITY_SIGNING_KEY="k", OPENAI_API_KEY="x", DATABASE_URL="postgres://u:p@h/db",
+                    ASSISTANT_HISTORY_MESSAGES="4")
+    from pydantic_ai.messages import ModelRequest, ModelResponse
+    raw = [
+        {"role": "assistant", "content": "welcome"},                # leading assistant turn is dropped
+        {"role": "user", "content": "old question"},               # beyond the cap of 4 → dropped
+        {"role": "assistant", "content": "old answer"},
+        {"role": "user", "content": "Show overdue work orders"},
+        {"role": "assistant", "content": "There are 142 overdue …"},
+        {"role": "system", "content": "ignored role"},
+        {"role": "user", "content": "   "},                        # empty text skipped
+    ]
+    h = agent.build_history(raw)
+    assert [type(m) for m in h] == [ModelRequest, ModelResponse]
+    assert h[0].parts[0].content == "Show overdue work orders" and h[1].parts[0].content == "There are 142 overdue …"
+    assert agent.build_history(None) == [] and agent.build_history("nope") == []
+    assert agent.build_history(raw, limit=0) == []               # switched off = no history
+    long = agent.build_history([{"role": "user", "content": "x" * 9000}])
+    assert len(long[0].parts[0].content) == 4000                  # per-message cap

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # reasoning_effort is explicitly 'none' (OpenAI 400, PROVEN on the pilot 23-Sep-2026). "" = do not send.
     # The documentation path never attaches function tools and is not affected by this setting.
     assistant_tool_reasoning_effort: str = "none"
+    # 23-Sep-2026: how many prior messages of the widget's conversationHistory the tool loop sees (0 = none).
+    # Tool loop only; the documentation path is unchanged.
+    assistant_history_messages: int = 8
 
     # step 4 (owner brief 15-Sep-2026) — both OFF = the served behaviour; each is measured on its own candidate:
     #   route_intent: an explicit module or manual/sub-module name in the question decides the module; the originating

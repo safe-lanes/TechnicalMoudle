@@ -224,14 +224,18 @@ export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "get_overdue_work_orders",
       description:
-        "Get all overdue work orders for a vessel. Use when user asks about overdue maintenance.",
+        "Get all overdue work orders for a vessel. Use when user asks about overdue maintenance. Returns at most 10 rows per call (priority first, then days overdue); pass offset to page through the rest.",
       parameters: {
         type: "object",
         properties: {
           vesselId: { type: "string", description: "Vessel ID (required)" },
           limit: {
             type: "number",
-            description: "Maximum number of results (default: 50)",
+            description: "Maximum number of results per call (max 10)",
+          },
+          offset: {
+            type: "number",
+            description: "Rows to skip — use the number already shown to get the next page",
           },
         },
         required: ["vesselId"],
@@ -975,6 +979,10 @@ export async function executeTool(
             assignedTo: wo.assignedTo,
             jobPriority: wo.jobPriority,
             daysOverdue: wo.dueDate ? Math.max(0, Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24))) : 0,
+            // 23-Sep-2026: running-hours jobs have no calendar due date — give the basis and the hours instead
+            maintenanceBasis: wo.maintenanceBasis ?? null,
+            dueRH: wo.dueRH ?? wo.nextDueReading ?? null,
+            currentRH: wo.currentRH ?? null,
           }))
           .sort((a, b) => {
             const priorityOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
@@ -985,17 +993,25 @@ export async function executeTool(
           });
 
         const limit = Math.min(args.limit || 10, 10);
+        // 23-Sep-2026: paging ('show more') — offset = rows already shown
+        const offset = Math.max(0, Math.min(Number(args.offset) || 0, sorted.length));
+        const page = sorted.slice(offset, offset + limit);
+        // the list is priority-first, so the oldest item can sit below the cut — name it explicitly
+        const oldest = sorted.length > 0 ? [...sorted].sort((a, b) => b.daysOverdue - a.daysOverdue)[0] : null;
         return {
           totalOverdue: overdue.length,
-          showing: Math.min(limit, sorted.length),
-          remainingSummary: sorted.length > limit ? `...and ${sorted.length - limit} more overdue items` : null,
+          offset,
+          showing: page.length,
+          remainingSummary: sorted.length > offset + page.length ? `...and ${sorted.length - offset - page.length} more overdue items (call again with offset ${offset + page.length})` : null,
+          listOrder: "priority (Critical first) then days overdue — the oldest item may not be among the rows shown",
           analysisSummary: {
             byPriority,
             topComponents,
             oldestOverdueDays: oldestDays,
+            oldestOverdue: oldest ? { workOrderNo: oldest.workOrderNo, component: oldest.component, jobPriority: oldest.jobPriority, daysOverdue: oldest.daysOverdue } : null,
             averageOverdueDays: agingDays.length > 0 ? Math.round(agingDays.reduce((a, b) => a + b, 0) / agingDays.length) : 0,
           },
-          workOrders: sorted.slice(0, limit),
+          workOrders: page,
         };
       }
 
@@ -1017,7 +1033,9 @@ export async function executeTool(
             cutoffDate.setDate(now.getDate() + 90);
 
           due = due.filter((wo) => {
-            if (!wo.dueDate) return false;
+            // 23-Sep-2026: a running-hours job is due NOW (by hours) and has no calendar date — a date-range
+            // filter must not drop it (PROVEN on the pilot: "due this week" answered 0 while 6 were due)
+            if (!wo.dueDate) return wo.maintenanceBasis === "Running Hours";
             const dueDate = new Date(wo.dueDate);
             return dueDate <= cutoffDate;
           });
@@ -1025,6 +1043,7 @@ export async function executeTool(
 
         return {
           totalDue: due.length,
+          note: "A work order with no dueDate is due by running hours (see maintenanceBasis, dueRH, currentRH).",
           workOrders: due.slice(0, 50).map((wo) => ({
             id: wo.id,
             workOrderNo: wo.workOrderNo,
@@ -1034,6 +1053,9 @@ export async function executeTool(
             dueDate: wo.dueDate,
             assignedTo: wo.assignedTo,
             jobPriority: wo.jobPriority,
+            maintenanceBasis: wo.maintenanceBasis ?? null,
+            dueRH: wo.dueRH ?? wo.nextDueReading ?? null,
+            currentRH: wo.currentRH ?? null,
           })),
         };
       }

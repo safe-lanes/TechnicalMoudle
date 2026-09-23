@@ -25,6 +25,17 @@ export function useChat() {
 
   const currentVessel = vessels.find((v) => v.id === vesselId);
 
+  // 23-Sep-2026: a change of the selected vessel starts a fresh conversation — the earlier turns were about
+  // the previous vessel and are sent to the assistant as history, so they must not carry over.
+  const lastVesselRef = useRef(vesselId);
+  useEffect(() => {
+    if (lastVesselRef.current !== vesselId) {
+      lastVesselRef.current = vesselId;
+      setMessages([]);
+      setError(null);
+    }
+  }, [vesselId]);
+
   const toggleChat = useCallback(() => {
     setIsOpen((prev) => !prev);
   }, []);
