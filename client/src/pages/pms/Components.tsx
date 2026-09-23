@@ -3959,7 +3959,7 @@ const Components: React.FC = () => {
   }
 
   return (
-    <div className={`flex flex-col ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`} style={{ height: 'calc(100vh - 120px)' }}>
+    <div className={`flex h-full min-h-0 flex-col ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`}>
       {/* Header - Fixed */}
       <div className="flex-shrink-0 space-y-4 pb-4">
         {/* Change Mode Banner */}
@@ -4116,8 +4116,8 @@ const Components: React.FC = () => {
           style={{ gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 7fr)' }}
         >
         {/* Left Panel - Component Tree (30%) */}
-        <div className="min-w-0 min-h-0" data-testid="B6">
-          <div className="bg-white rounded-lg shadow-sm h-full min-h-0 flex flex-col">
+        <div className="min-w-0 min-h-0 overflow-hidden" data-testid="B6">
+          <div className="bg-white rounded-lg shadow-sm h-full min-h-0 overflow-hidden flex flex-col">
             <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2 rounded-t-lg">
               <div className="flex items-center gap-2">
                 <Marker id="B6" /> COMPONENTS
@@ -4189,9 +4189,9 @@ const Components: React.FC = () => {
         </div>
 
         {/* Right Panel - Component Details Form (70%) */}
-        <div className="min-w-0 min-h-0" data-testid="B7">
+        <div className="min-w-0 min-h-0 overflow-hidden" data-testid="B7">
           {selectedComponent ? (
-            <div className="bg-white rounded-lg shadow-sm h-full min-h-0 flex flex-col">
+            <div className="bg-white rounded-lg shadow-sm h-full min-h-0 overflow-hidden flex flex-col">
               <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
                 <Marker id="B7" />
                 <div className="flex items-center justify-between">

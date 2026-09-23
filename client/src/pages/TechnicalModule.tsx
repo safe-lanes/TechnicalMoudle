@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TopMenuBar } from "@/components/TopMenuBar";
 import { SideMenuBar } from "@/components/SideMenuBar";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -113,6 +113,8 @@ export const TechnicalModule = () => {
   const { subModule, menuItem } = getStateFromUrl();
   const [selectedSubModule, setSelectedSubModule] = useState(subModule);
   const [selectedMenuItem, setSelectedMenuItem] = useState(menuItem);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const isComponentsPage = selectedSubModule === "pms" && selectedMenuItem === "components";
   
   // Update state when URL changes
   useEffect(() => {
@@ -120,6 +122,23 @@ export const TechnicalModule = () => {
     setSelectedSubModule(subModule);
     setSelectedMenuItem(menuItem);
   }, [location]);
+
+  useEffect(() => {
+    if (!isComponentsPage) return;
+
+    const previousDocumentOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    window.scrollTo({ top: 0, left: 0 });
+    mainContentRef.current?.scrollTo({ top: 0, left: 0 });
+
+    return () => {
+      document.documentElement.style.overflow = previousDocumentOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [isComponentsPage]);
 
   const handleSubModuleChange = (subModule: string) => {
     setSelectedSubModule(subModule);
@@ -175,7 +194,10 @@ export const TechnicalModule = () => {
         </div>
         
         {/* Main Content Area */}
-        <div className={`flex-1 min-h-0 overflow-auto ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}>
+        <div
+          ref={mainContentRef}
+          className={`flex-1 min-h-0 ${isComponentsPage ? "overflow-hidden" : "overflow-auto"} ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}
+        >
           {(permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
