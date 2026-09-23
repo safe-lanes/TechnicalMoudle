@@ -4109,11 +4109,14 @@ const Components: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex gap-6 h-full min-h-0">
+      {/* Main Content Area - Scrollable panels */}
+      <div className="flex-1 overflow-hidden min-h-0">
+        <div
+          className="grid gap-6 h-full min-h-0 overflow-hidden"
+          style={{ gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 7fr)' }}
+        >
         {/* Left Panel - Component Tree (30%) */}
-        <div className="w-[30%]" data-testid="B6">
+        <div className="min-w-0" data-testid="B6">
           <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
             <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2 rounded-t-lg">
               <div className="flex items-center gap-2">
@@ -4186,7 +4189,7 @@ const Components: React.FC = () => {
         </div>
 
         {/* Right Panel - Component Details Form (70%) */}
-        <div className="w-[70%]" data-testid="B7">
+        <div className="min-w-0" data-testid="B7">
           {selectedComponent ? (
             <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
               <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
