@@ -5,6 +5,21 @@ import { vessels as vesselsTable, vesselCertificateData, vesselSurveyData, shipC
 import { eq, and } from "drizzle-orm";
 import { canAccessVessel } from "../middleware/auth";
 
+/**
+ * CONTRACT (CLAUDE.md, Work Order Status): every overdue/due read goes through
+ * getWorkOrdersWithComputedStatus — the SAME enrichment + status computation the Work Orders
+ * screen and the reports use. The derived band (Active / Due / Due (Grace P) / Overdue) is never
+ * persisted, so the raw storage rows the tools read before (23-Sep-2026) carried stale stored
+ * statuses AND archived (soft-deleted) rows: pilot vessel 302 raw rows / 140 "Overdue" vs the
+ * screen's 153 rows / 142 Overdue. Rows come back with `status` = computed status and keep
+ * every raw column the tools use (dataScope, component, jobTitle, dueDate, jobPriority, …).
+ */
+async function loadWorkOrders(vesselId?: string): Promise<any[]> {
+  const { getWorkOrdersWithComputedStatus } = await import("../modules/work-orders/services/workOrderService");
+  return getWorkOrdersWithComputedStatus(vesselId);
+}
+
+
 let openaiClient: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI {
@@ -835,7 +850,7 @@ export async function executeTool(
 
     switch (toolName) {
       case "get_work_orders": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const workOrders = await loadWorkOrders(args.vesselId);
         let filtered = workOrders.filter(
           (wo) => wo.dataScope === "vessel"
         );
@@ -889,7 +904,7 @@ export async function executeTool(
       }
 
       case "get_work_order_detail": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const wo = allWOs.find(
           (w) =>
             w.id === args.workOrderId ||
@@ -920,7 +935,7 @@ export async function executeTool(
       }
 
       case "get_overdue_work_orders": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const workOrders = await loadWorkOrders(args.vesselId);
         const overdue = workOrders.filter(
           (wo) => wo.status === "Overdue" && wo.dataScope === "vessel"
         );
@@ -985,7 +1000,7 @@ export async function executeTool(
       }
 
       case "get_due_work_orders": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const workOrders = await loadWorkOrders(args.vesselId);
         let due = workOrders.filter(
           (wo) =>
             (wo.status === "Due" || wo.status === "Due (Grace P)") &&
@@ -1024,14 +1039,19 @@ export async function executeTool(
       }
 
       case "get_work_order_counts": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
-        const overdueCount = vesselWOs.filter((wo) => wo.status === "Overdue").length;
-        const dueCount = vesselWOs.filter((wo) => wo.status === "Due" || wo.status === "Due (Grace P)").length;
-        const completedCount = vesselWOs.filter((wo) => wo.status === "Completed").length;
-        const activeCount = vesselWOs.filter((wo) => wo.status === "Active").length;
-        const postponedCount = vesselWOs.filter((wo) => wo.status === "Postponed").length;
-        const pendingCount = vesselWOs.filter((wo) => wo.status === "Pending Approval").length;
+        // 23-Sep-2026: the SAME tab-badge calculation as the Work Orders screen (computeWorkOrderTabCounts
+        // over computed statuses) so the assistant quotes the numbers the user sees on screen. "active" is
+        // the screen's "Scheduled" tab (planned, not yet due); Due includes "Due (Grace P)".
+        const { computeWorkOrderTabCounts } = await import("@shared/utils/workOrderFilters");
+        const tabs = computeWorkOrderTabCounts(vesselWOs);
+        const overdueCount = tabs["Overdue"];
+        const dueCount = tabs["Due"];
+        const completedCount = tabs["Completed"];
+        const activeCount = tabs["Planned"];
+        const postponedCount = tabs["Postponed"];
+        const pendingCount = tabs["Pending Approval"];
         const totalActionable = overdueCount + dueCount + completedCount;
         const completionRate = totalActionable > 0 ? Math.round((completedCount / totalActionable) * 100) : 0;
         const overdueRate = vesselWOs.length > 0 ? Math.round((overdueCount / vesselWOs.length) * 100) : 0;
@@ -1045,7 +1065,9 @@ export async function executeTool(
           completionRate,
           pendingApproval: pendingCount,
           active: activeCount,
+          unplanned: tabs["Unplanned"],
           postponed: postponedCount,
+          basis: "Same calculation as the Work Orders screen tabs (computed status; archived work orders excluded). 'active' is the screen's Scheduled tab.",
           insight: overdueRate > 20 ? "HIGH_OVERDUE_RATE" : overdueRate > 10 ? "ELEVATED_OVERDUE_RATE" : "NORMAL",
         };
       }
@@ -1562,7 +1584,7 @@ export async function executeTool(
       }
 
       case "get_maintenance_calendar": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const workOrders = await loadWorkOrders(args.vesselId);
         const vesselWOs = workOrders.filter((wo) => wo.dataScope === "vessel");
 
         const now = new Date();
@@ -1713,7 +1735,7 @@ export async function executeTool(
       }
 
       case "get_maintenance_insights": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
 
@@ -1883,7 +1905,7 @@ export async function executeTool(
       }
 
       case "get_workload_analysis": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
 
@@ -1973,7 +1995,7 @@ export async function executeTool(
       }
 
       case "get_component_health_score": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const components = await storage.getComponents(args.vesselId);
         const topN = args.topN || 10;
@@ -2071,7 +2093,7 @@ export async function executeTool(
       }
 
       case "get_performance_trends": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const periodDays = args.periodDays || 90;
         const now = new Date();
@@ -2210,7 +2232,7 @@ export async function executeTool(
           });
         }
 
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const rhBasedDue = allWOs.filter((wo) => wo.dataScope === "vessel" && (wo.status === "Due" || wo.status === "Overdue") && wo.driverType === "RH");
 
         return {
@@ -2230,7 +2252,7 @@ export async function executeTool(
 
       case "get_maintenance_planner": {
         const periodDays = args.periodDays || 90;
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
         const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
@@ -2585,7 +2607,7 @@ export async function executeTool(
           return { error: `No equipment found matching "${args.equipmentFilter}". Try a broader search term.`, suggestions: ["pump", "separator", "generator", "compressor", "engine"] };
         }
 
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         let defects: any[] = [];
         try { defects = await storage.getDefects({ vesselId: args.vesselId }); } catch (e) {}
@@ -2632,7 +2654,7 @@ export async function executeTool(
       }
 
       case "get_cost_impact_estimate": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
         const now = new Date();
@@ -2688,7 +2710,7 @@ export async function executeTool(
 
       case "get_workload_forecast": {
         const forecastMonths = args.forecastMonths || 3;
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
 

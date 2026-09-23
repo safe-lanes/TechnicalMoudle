@@ -95,7 +95,17 @@ export async function handleMintToken(req: AuthenticatedRequest, res: Response) 
   }
   const key = signingKey();
   if (!key) return res.status(503).json({ error: 'assistant identity signing not configured' });
-  const userId = String((req as any).user?.id || (req as any).user?.username || '');
+  // 23-Sep-2026 (pilot): req.user.id is the MOCK session (always 1), so every user minted userId '1' —
+  // one shared central rate-limit bucket and useless audit lines. For a forwarded session the user id
+  // is the forwarded x-user-id (auth.ts stores it on req.user.userUuid) — the same trust level as the
+  // role and userType beside it (client-forwarded SAILERP identity, NOT server-verified; identical to
+  // what the module's own RBAC guards trust). The mock id remains only for the mock source.
+  const userId = String(
+    (rbac.source === 'forwarded' && (req as any).user?.userUuid) ||
+      (req as any).user?.id ||
+      (req as any).user?.username ||
+      '',
+  );
   if (!userId) return res.status(403).json({ error: 'cannot mint: no user id on session' });
   const token = signIdentity(
     {
