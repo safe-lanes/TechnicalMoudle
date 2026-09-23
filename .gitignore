@@ -61,3 +61,8 @@ docs/assistant-experiments/**/*capture*.jsonl
 docs/assistant-experiments/**/*captured-input*.txt
 docs/assistant-experiments/**/ANSWERS-FULL-captured-run.txt
 docs/assistant-experiments/**/*.zip
+
+# assistant DATA lives on the indexing server (and in the assistant data folder), not in the app repo (23-Sep-2026)
+kb/
+central-assistant-py/generated-docs/**/*.docx
+docs/assistant-experiments/**/*.jsonl
