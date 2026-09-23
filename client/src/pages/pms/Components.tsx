@@ -4116,8 +4116,8 @@ const Components: React.FC = () => {
           style={{ gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 7fr)' }}
         >
         {/* Left Panel - Component Tree (30%) */}
-        <div className="min-w-0" data-testid="B6">
-          <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
+        <div className="min-w-0 min-h-0" data-testid="B6">
+          <div className="bg-white rounded-lg shadow-sm h-full min-h-0 flex flex-col">
             <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2 rounded-t-lg">
               <div className="flex items-center gap-2">
                 <Marker id="B6" /> COMPONENTS
@@ -4178,7 +4178,7 @@ const Components: React.FC = () => {
             </div>
             <div
               ref={componentTreeScrollRef}
-              className="flex-1 overflow-auto"
+              className="flex-1 min-h-0 overflow-auto"
               onScroll={persistComponentViewState}
             >
               <div>
@@ -4189,9 +4189,9 @@ const Components: React.FC = () => {
         </div>
 
         {/* Right Panel - Component Details Form (70%) */}
-        <div className="min-w-0" data-testid="B7">
+        <div className="min-w-0 min-h-0" data-testid="B7">
           {selectedComponent ? (
-            <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
+            <div className="bg-white rounded-lg shadow-sm h-full min-h-0 flex flex-col">
               <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
                 <Marker id="B7" />
                 <div className="flex items-center justify-between">
@@ -4256,7 +4256,7 @@ const Components: React.FC = () => {
                   </div>
                 )}
               </div>
-              <div className="flex-1 overflow-auto p-4">
+              <div className="flex-1 min-h-0 overflow-auto p-4">
                 <div className="space-y-2">
                   {formSections.map((section) => {
                     const isExpanded = expandedSections.has(section.id);
