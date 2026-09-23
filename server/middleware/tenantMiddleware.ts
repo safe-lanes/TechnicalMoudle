@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { tenantConnectionManager } from "../utils/tenantConnectionManager";
 import { isExemptPath } from "./exemptPaths";
+import { assistantServiceTenant } from "../modules/assistant-api/serviceTenant";
 
 /**
  * Phase 2 — tenant resolution from the verified SAILERP `domain` claim.
@@ -40,36 +41,50 @@ export function tenantMiddleware(req: Request, res: Response, next: NextFunction
   // Server-to-server / public routes that legitimately carry no SAILERP browser token.
   if (isExemptPath(req.path)) return next();
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    // Defensive — boot already fails loud if this is missing in multi-tenant mode.
-    res.status(500).json({ error: "server_misconfigured", message: "JWT_SECRET not set in multi-tenant mode" });
+  // Assistant Data API, server-to-server (central assistant → this module): that hop carries no SAILERP
+  // Bearer. Its tenant is the module's OWN signed identity token's tenantDomain (copied from the verified
+  // JWT at mint time), accepted only together with the shared service secret — two verified credentials,
+  // no exemption, no browser header trusted. Everything else keeps the Bearer rule below. (23-Sep-2026)
+  let domain = "";
+  const svc = assistantServiceTenant(req);
+  if (svc.kind === "reject") {
+    res.status(svc.status).json({ error: svc.error, message: svc.message });
     return;
   }
-
-  const token = extractBearer(req);
-  if (!token) {
-    res.status(401).json({ error: "unauthorized", message: "Missing authorization token" });
-    return;
-  }
-
-  let payload: jwt.JwtPayload | string;
-  try {
-    payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
-  } catch (err: any) {
-    if (err && err.name === "TokenExpiredError") {
-      res.status(401).json({ error: "token_expired", message: "Authorization token has expired" });
+  if (svc.kind === "manifest") return next(); // static tool definitions — touches no tenant data
+  if (svc.kind === "domain") {
+    domain = svc.domain;
+  } else {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      // Defensive — boot already fails loud if this is missing in multi-tenant mode.
+      res.status(500).json({ error: "server_misconfigured", message: "JWT_SECRET not set in multi-tenant mode" });
       return;
     }
-    res.status(401).json({ error: "invalid_token", message: "Invalid authorization token" });
-    return;
-  }
 
-  const domain =
-    typeof payload === "object" && typeof payload.domain === "string" ? payload.domain.trim() : "";
-  if (!domain) {
-    res.status(401).json({ error: "invalid_token", message: "Token is missing the domain claim" });
-    return;
+    const token = extractBearer(req);
+    if (!token) {
+      res.status(401).json({ error: "unauthorized", message: "Missing authorization token" });
+      return;
+    }
+
+    let payload: jwt.JwtPayload | string;
+    try {
+      payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
+    } catch (err: any) {
+      if (err && err.name === "TokenExpiredError") {
+        res.status(401).json({ error: "token_expired", message: "Authorization token has expired" });
+        return;
+      }
+      res.status(401).json({ error: "invalid_token", message: "Invalid authorization token" });
+      return;
+    }
+
+    domain = typeof payload === "object" && typeof payload.domain === "string" ? payload.domain.trim() : "";
+    if (!domain) {
+      res.status(401).json({ error: "invalid_token", message: "Token is missing the domain claim" });
+      return;
+    }
   }
 
   // Expose the verified domain on req so downstream handlers that need it (e.g.

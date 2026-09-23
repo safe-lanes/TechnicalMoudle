@@ -127,6 +127,25 @@ own hosts; clock mismatch has caused real incidents in this fleet) and rejects
 future-dated tokens beyond it. Implementations: `central-assistant/identity.mjs` (JS)
 and `server/modules/assistant-api/identityToken.ts` (TS) — same wire format.
 
+### 3.1 Multi-tenant modules: which tenant does `/assistant/execute` run in? (23-Sep-2026)
+
+The central service's call to `POST {moduleApi}/assistant/execute` carries **no SAILERP Bearer** — the
+browser's JWT never leaves the browser↔module hop. A multi-tenant module therefore selects the tenant
+from the **identity token's `tenantDomain`**, which the module itself copied from the JWT-verified domain
+when it minted the token (`GET /assistant/token` runs under the module's tenant middleware). The module
+accepts that only together with the shared service secret: **two verified credentials, no exemption, no
+browser header trusted**. A token without `tenantDomain` (minted by a single-tenant instance) is refused
+by a multi-tenant module (`401 invalid_identity`, fail closed). `GET /assistant/manifest` is static tool
+metadata and needs the service secret only. Technical's implementation:
+`server/modules/assistant-api/serviceTenant.ts`, consulted by `server/middleware/tenantMiddleware.ts`;
+regression harness `scripts/verify-assistant-multitenant-auth.ts` (21 checks: mint and execute hops,
+tenant/database selection, cross-tenant refusal, missing/expired/tampered credentials, ship shore-only).
+
+What that harness does **not** prove: that a production SAILERP JWT carries the claims the module reads
+(`domain`, `userType`); the test mints its own HS256 JWT with the module's `JWT_SECRET`, exactly as
+`scripts/verify-mt-parity.ts` does. Role and user id in the identity token are still the browser-forwarded
+`x-user-*` headers (Phase 0 audit identity) — the same trust level as the module's own RBAC guards.
+
 ## 4. Deployment configuration (who sets what)
 
 | Where | Setting | Purpose |
