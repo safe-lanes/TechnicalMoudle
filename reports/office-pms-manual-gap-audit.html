@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Office PMS Manual — Current-System Gap Audit</title>
+  <style>
+    :root { color-scheme: light; --ink:#18304a; --muted:#526579; --line:#dce5ee; --blue:#1765a3; --pale:#eff6fb; --amber:#9d5d12; --red:#9e3140; --green:#216b50; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#f1f5f8; font:15px/1.55 system-ui,-apple-system,Segoe UI,Arial,sans-serif; }
+    main { max-width:980px; margin:32px auto; padding:42px 52px 64px; background:white; box-shadow:0 6px 34px #18304a10; }
+    h1 { font-size:31px; line-height:1.18; letter-spacing:-.025em; margin:4px 0 14px; }
+    h2 { font-size:20px; margin:32px 0 12px; border-bottom:2px solid var(--line); padding-bottom:7px; }
+    h3 { font-size:16px; margin:23px 0 6px; }
+    p { margin:7px 0 12px; }
+    .eyebrow { text-transform:uppercase; color:var(--blue); font-size:12px; font-weight:750; letter-spacing:.12em; }
+    .lede { font-size:17px; color:#334e68; }
+    .meta { color:var(--muted); font-size:13px; }
+    .callout { background:var(--pale); border-left:4px solid var(--blue); padding:12px 18px; margin:19px 0; }
+    .finding { border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:15px 0; break-inside:avoid; }
+    .finding h3 { margin:0 0 10px; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:20px; background:#e7eff5; color:var(--ink); font-size:11px; font-weight:750; letter-spacing:.03em; vertical-align:2px; }
+    .high { background:#f9e8eb; color:var(--red); }
+    .medium { background:#fff0d9; color:var(--amber); }
+    .low { background:#e4f2ed; color:var(--green); }
+    .finding dl { display:grid; grid-template-columns:106px minmax(0,1fr); gap:5px 12px; margin:0; }
+    .finding dt { font-weight:700; color:#526579; }
+    .finding dd { margin:0; }
+    code { font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; color:#215781; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th,td { padding:10px 11px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+    th { background:#eff5fa; }
+    ul,ol { padding-left:23px; }
+    li { margin:5px 0; }
+    a { color:var(--blue); text-decoration:none; }
+    .small { font-size:13px; color:var(--muted); }
+    @media(max-width:700px) { body { background:white; } main { padding:22px 18px 45px; margin:0; box-shadow:none; } .finding dl { grid-template-columns:1fr; gap:2px; } .finding dt { margin-top:7px; } table { display:block; overflow-x:auto; } }
+    @media print { body { background:white; } main { max-width:none; margin:0; padding:0; box-shadow:none; } a { color:inherit; } h2 { break-after:avoid; } .finding { break-inside:avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Documentation audit · Office PMS</div>
+  <h1>Office PMS Manual vs Current System</h1>
+  <p class="lede">A source-traceable comparison of the supplied Office manual with the application as currently implemented.</p>
+  <p class="meta">24 September 2026 · Scope: Dashboard, Components, Work Orders, Running Hours, Spares, Stores, Reports, Modify PMS, and Admin/Bulk Data Import.</p>
+
+  <div class="callout"><strong>Executive summary.</strong> The manual broadly describes the same modules as the current system. The most consequential differences are the manual’s implication that all component changes need approval despite a direct-save path, an incorrect Running Hours inheritance rule, a missing Spares “create location” action in the documented workflow, a Stores Location export that calls the Inventory exporter, and an overbroad claim that every report offers both PDF and Excel. Several smaller wording/behavior differences are listed below. This is a documentation-and-source audit, <strong>not</strong> an end-to-end role/permission test or a claim that every screenshot is current.</div>
+
+  <h2>Scope and evidence standard</h2>
+  <p><strong>Manual of record:</strong> <code>attached_assets/Technical_-_PMS_User_Manual_-_Office_(AutoRecovered)_1790223008308.docx</code>. Figure numbers refer to that attached document, not another manual in the repository. The prose and representative embedded screenshots (including Figures 9, 35, 60, 66, 83, 103, and 105) were inspected. Source references below are workspace paths and line ranges at the time of this audit; they are not permanent line anchors.</p>
+  <p><strong>Classification:</strong> “Confirmed” means a manual statement and current source disagree; “Product/policy review” means implementation and documented rule conflict, but the intended business rule must be chosen by the product owner; “Matched” means checked examples agree. Screenshot-based observations were cross-checked with code. A live preview showed the Management dashboard under a Sail Admin session, but Office, HOD, and Vessel role journeys were not performed. Exports, edits, approvals, and imports were not executed against live data.</p>
+
+  <h2>Findings requiring action</h2>
+
+  <div class="finding">
+    <h3>01 · Component save versus change-request approval <span class="tag high">High · product/policy review</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Figures 35 and 37 tell users to click <strong>Save</strong>, then <strong>Submit</strong> to add or update a component. The Modify PMS introduction before Figure 90 says <em>any</em> component, job, spare, or store change must be submitted as a formal approved change request before it takes effect.</dd>
+      <dt>System</dt><dd>The current Component Register form has a direct <strong>Save</strong> path; an authorized component edit sends a <code>PATCH /technical/api/components/:id</code> without waiting for a Modify PMS request. Adding a component sends a direct <code>POST</code>. Modify PMS has a separate request-and-approval workflow. See <code>client/src/components/ComponentRegisterAddEdit.tsx:845-862,937-969,1275-1282</code>; <code>client/src/pages/pms/Components.tsx:4201-4217,4437-4468</code>.</dd>
+      <dt>Impact</dt><dd>Users could believe Save is a draft awaiting Submit/approval when it is actually a direct master-data change. The manual’s universal approval claim cannot safely be treated as enforced policy.</dd>
+      <dt>Action</dt><dd>Decide which edits, if any, must be approval-gated. Either enforce that policy in product permissions/workflow or amend Figures 35/37 and the Modify PMS introduction to distinguish direct authorized saves from formal change requests. Do not simply rename the button.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>02 · Running Hours cascade direction is reversed <span class="tag high">High · manual correction</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Note after Figure 66: “For components with an Inherited RH type, updates are cascaded to all child components.”</dd>
+      <dt>System</dt><dd>The service accepts a manual master update only when the selected source component has <code>rhCounterType === 'MASTER'</code>; it then updates the master and its inherited dependents. See <code>server/modules/running-hours/services/runningHoursService.ts:905-922,980-1021</code>.</dd>
+      <dt>Impact</dt><dd>The reversed instruction can lead users to choose the wrong counter and misunderstand which machinery readings will change.</dd>
+      <dt>Action</dt><dd>Replace the note with “Update the MASTER running-hours counter; the new reading cascades to components that inherit from that master.” Verify terminology with operations before publication.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>03 · No create-location action in the documented Spares location editor <span class="tag medium">Medium · product gap</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Figure 76 says users can click <strong>+ Create New Location</strong> from the spare’s Location dialog and then Save.</dd>
+      <dt>System</dt><dd>The location editor opens existing selections and validates names against <code>allVesselLocations</code>. On an unknown name it tells users to “create a new location first,” but this editor does not present the documented create action. See <code>client/src/pages/spares/SparesNew.tsx:321-343,360-382</code>.</dd>
+      <dt>Impact</dt><dd>Following the manual cannot complete a new-location stock update from that dialog. A separate admin/location workflow may exist, but it is not the in-context action Figure 76 promises.</dd>
+      <dt>Action</dt><dd>Either add a permission-aware, persisted create-location action there, or document the real route for creating a location before returning to the spare.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>04 · Stores Location export produces Inventory output <span class="tag medium">Medium · product gap</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Stores “How To Export Store Items” (after Figure 86) directs users to follow Spares’ export steps; Spares Figure 83 explicitly says users may export Inventory, Location, or History information.</dd>
+      <dt>System</dt><dd>The Stores Export button calls <code>exportHistoryToExcel</code> only on History; both Inventory <em>and Location</em> call <code>exportInventoryToExcel</code>. See <code>client/src/pages/stores/Stores.tsx:2603-2613</code>.</dd>
+      <dt>Impact</dt><dd>A user on the Location tab receives the wrong dataset/shape for a location-specific audit.</dd>
+      <dt>Action</dt><dd>Provide a dedicated location export using the currently filtered location rows, or clearly relabel the action if a location export is intentionally unavailable.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>05 · “PDF or Excel for all reports” is too broad <span class="tag medium">Medium · report contract</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Reports introduction and Figures 87–88 state that standard/compliance reports are available in PDF or Excel and instruct users to pick either format.</dd>
+      <dt>System</dt><dd>The Maintenance report Excel handler lists a defined set of supported IDs and tells users other Excel exports are “coming soon.” For Work Order Overview (<code>wo-overview</code>), requesting PDF deliberately downloads Excel because the wide matrix is not supported as a PDF. See <code>client/src/pages/reports/MaintenanceReports.tsx:1170-1189,1301-1329</code>.</dd>
+      <dt>Impact</dt><dd>Users may promise a PDF/Excel deliverable the application does not supply for a particular report.</dd>
+      <dt>Action</dt><dd>Document format availability by report (including Work Order Overview’s Excel-only behavior) or implement the missing formats. Do not generalize this gap to Spares reports: the three listed Spares IDs have explicit PDF and Excel handlers in <code>client/src/pages/reports/SparesReports.tsx:473-562</code>.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>06 · “My Team” access note does not describe the current toggle <span class="tag medium">Medium · role documentation</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Figure 9 puts <strong>Me / My Team</strong> on the Operation dashboard; the note after Figure 11 says <strong>only Vessel Admin users</strong> can view and use the toggle.</dd>
+      <dt>System</dt><dd>The toggle is rendered on <strong>Operation</strong> when <code>!isAdminScope</code>, and may be disabled when no team scope is mapped; this is a scope/mapping condition, not a literal Vessel Admin-only display rule. See <code>client/src/pages/pms/Dashboard.tsx:2790-2855</code>. The preview’s Management tab was correctly selected by default, consistent with Figure 3.</dd>
+      <dt>Impact</dt><dd>Users may expect a switch they cannot use, or think a non-Vessel-Admin user seeing it is an access defect.</dd>
+      <dt>Action</dt><dd>Confirm the intended per-role team visibility policy, then update the Figure 11 note to describe it and explain the disabled state. Test Office/HOD/Vessel sessions before asserting exact role coverage.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>07 · Export dialog changes on the Postponed tab <span class="tag low">Low · manual correction</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Figures 59–60 show an <strong>Export All Work Orders</strong> Excel/PDF choice and a separate <strong>Export Component Jobs</strong> Excel choice.</dd>
+      <dt>System</dt><dd>On the Postponed tab the dialog instead labels the second choice <strong>Export Postponed Work Orders</strong>, exporting filtered postponed records and extra postponement fields. On other tabs the “All Work Orders” choice remains. See <code>client/src/pages/pms/WorkOrders.tsx:1233-1287,1959-2008</code>.</dd>
+      <dt>Impact</dt><dd>Readers on Postponed see a different result from the unqualified “all” instruction. Component Jobs export itself is present, not a missing feature.</dd>
+      <dt>Action</dt><dd>Add a short note or alternate screenshot for the Postponed export. Leave the current specialized export behavior intact unless policy says otherwise.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>08 · Bulk Running Hours rules are omitted <span class="tag medium">Medium · manual safety guidance</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Figures 63–66 say to enter date, comments, values, and click Save, but do not explain restrictions on counter resets/decreases.</dd>
+      <dt>System</dt><dd>When vessel RH validation is enabled, Set Total to zero is blocked in bulk, a decrease without meter replacement is blocked, and Add Delta must be positive. The UI directs zero/reset cases to the individual update flow. See <code>client/src/pages/pms/RunningHours.tsx:1383-1413</code>.</dd>
+      <dt>Impact</dt><dd>A user preparing bulk entries may meet an unexpected block and cannot tell how to record a genuine meter replacement.</dd>
+      <dt>Action</dt><dd>Document the conditional validation and the approved individual reset/replacement route alongside Figures 63–66.</dd>
+    </dl>
+  </div>
+
+  <div class="finding">
+    <h3>09 · Modify PMS approval is more than a single generic decision <span class="tag low">Low · workflow documentation</span></h3>
+    <dl>
+      <dt>Manual</dt><dd>Figure 103 describes opening a Pending Approval request and approving or rejecting it in the dialog.</dd>
+      <dt>System</dt><dd>The current dialog can display Level 1 and Level 2 approval steps and tells the viewer which level is pending. Buttons depend on the active configured approver step, with a fallback for older requests/no approvers. See <code>client/src/pages/pms/ModifyPMS.tsx:226-248,1198-1258</code> and <code>server/modules/change-requests/services/changeRequestsService.ts:342-355</code>.</dd>
+      <dt>Impact</dt><dd>A pending request may not yet be actionable for the viewer; one approval may not be final.</dd>
+      <dt>Action</dt><dd>Explain configured sequential approval levels and what “Awaiting Level … approval” means. Do not claim the attached manual specifies an “Office Head” approver: its Figure 103 text does not say that.</dd>
+    </dl>
+  </div>
+
+  <h2>Section-by-section disposition</h2>
+  <table>
+    <thead><tr><th>Area</th><th>Manual figures</th><th>Conclusion</th><th>Evidence / note</th></tr></thead>
+    <tbody>
+      <tr><td>Dashboard</td><td>3–18</td><td>Partial gap: finding 06.</td><td>Management/Operation tab layout and default Management match source and preview. Manual does cover superintendent anomaly acknowledgment (Figures 16–17); not a missing-manual feature.</td></tr>
+      <tr><td>Components</td><td>19–41</td><td>Policy conflict: finding 01.</td><td>Direct add/edit saves differ from Save-then-Submit wording; separate CR entry exists. Other shown component detail sections are not called absent on this audit.</td></tr>
+      <tr><td>Work Orders</td><td>42–60</td><td>Minor gap: finding 07.</td><td>Planner with Days/Rank/Planner State filters and Excel/PDF exports exists (<code>client/src/pages/pms/WorkOrderPlanner.tsx:391-460,664-680</code>). The manual does cover Completed → Reopen in Figures 56–58; do not report it missing.</td></tr>
+      <tr><td>Running Hours</td><td>61–71</td><td>High-priority correction: findings 02 and 08.</td><td>Overview, History, individual and bulk entry, and exports are covered by the manual; the inheritance sentence and omitted validation need attention.</td></tr>
+      <tr><td>Spares</td><td>72–83</td><td>Workflow mismatch: finding 03.</td><td>Existing location validation is confirmed. Do not infer that all locations are impossible to create elsewhere.</td></tr>
+      <tr><td>Stores</td><td>84–86; cross-reference 83</td><td>Export mismatch: finding 04.</td><td>Bulk Store action exists, although the button label is category-dependent rather than the manual’s fixed wording; not counted as a functional gap.</td></tr>
+      <tr><td>Reports</td><td>87–89</td><td>Format promise too broad: finding 05.</td><td>Three listed Spares reports have both format handlers; check format availability per report rather than applying a blanket claim.</td></tr>
+      <tr><td>Modify PMS</td><td>90–103</td><td>Policy/description gaps: findings 01 and 09.</td><td>Change-request workflow exists; direct Component Register edits and configured multilevel approvals need clearer separation.</td></tr>
+      <tr><td>Admin / Bulk Import</td><td>104–105</td><td>No confirmed functional gap in checked steps.</td><td>CSV, XLS, XLSX are accepted in <code>client/src/components/admin/UniformBulkUpload.tsx:301-345,894</code>. Vessel imports and role-gated fleet import are represented in <code>client/src/pages/admin/BulkDataImport.tsx:251-285,368-394</code>. “Stored” after Figure 105 appears to mean “Stores” (copy correction only).</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Recommended sequence</h2>
+  <ol>
+    <li><strong>Decide approval policy first.</strong> Component direct-save versus mandatory CR approval has operational and audit implications; align product behavior and manual before changing either.</li>
+    <li><strong>Correct safety-critical instructions.</strong> Fix MASTER → inherited RH direction and document bulk RH rejection/reset paths.</li>
+    <li><strong>Resolve demonstrable UI/export gaps.</strong> Choose an in-context Spares location creation path and make Stores Location export reflect location data.</li>
+    <li><strong>Update scoped documentation.</strong> List report formats by report, note Postponed export behavior, clarify team toggle availability and Modify PMS approval stages.</li>
+  </ol>
+  <p class="small"><strong>Verification still needed:</strong> role-by-role walkthrough (Office/HOD/Vessel), real file-download content checks, and representative data-state checks for approvals, RH updates, and imports. These are validation requests, not claims of failures. No application code or source manual was changed for this audit.</p>
+</main>
+</body>
+</html>
