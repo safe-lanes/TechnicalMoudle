@@ -12,18 +12,20 @@
  *   2. x-assistant-identity — the SIGNED forwarded identity; unsigned/tampered/
  *      expired/future-dated are rejected even with a valid secret.
  *
- * Mint (GET /assistant/token): converts the module's own resolved session into a
- * signed identity for the widget to attach to central-service calls. The role
- * comes from req.rbac — the REAL forwarded SAILERP role — NEVER the mock
- * req.user.role, and an rbac source of "none" is REFUSED (403), not defaulted:
- * a token minted from the mock would launder its over-permission behind a valid
- * signature (auth.ts mock-identity backlog).
+ * Mint (GET /assistant/token): converts the VERIFIED SAILERP login into a signed
+ * identity for the widget to attach to central-service calls. Option A (24-Sep-2026):
+ * user id, role and user type are read from the JWT-verified claims that
+ * tenantMiddleware exposes as req.verifiedUser — never from the browser's x-user-*
+ * headers, req.rbac or the mock req.user. Missing claims → 403 (no header fallback);
+ * a role outside ASSISTANT_ALLOWED_ROLES (default 'Sail Admin') → 403; an instance
+ * that verifies no token (single-tenant, AUTH_BYPASS) cannot mint at all.
  *
  * R3: tool denials/failures are DATA ({ok:false, error}) with HTTP 200 so the
  * LLM can relay them politely; non-200 is reserved for transport/auth failures.
  */
 import { Response } from 'express';
-import { type AuthenticatedRequest, getRbacIdentity } from '../../middleware/auth';
+import { type AuthenticatedRequest } from '../../middleware/auth';
+import type { VerifiedUser } from '../../middleware/tenantMiddleware';
 import { CHATBOT_TOOLS, executeTool, type VesselAccess } from '../../services/chatbotService';
 import { storage } from '../../storage';
 import { signIdentity, verifyIdentity } from './identityToken';
@@ -86,33 +88,37 @@ export async function handleExecute(req: AuthenticatedRequest, res: Response) {
 }
 
 /** Mint a signed identity from the module's REAL resolved session (see header). */
+/** Roles allowed to obtain an assistant token — server-enforced on the VERIFIED role (24-Sep-2026). */
+const allowedRoles = () =>
+  (process.env.ASSISTANT_ALLOWED_ROLES || 'Sail Admin').split(',').map((s) => s.trim()).filter(Boolean);
+
 export async function handleMintToken(req: AuthenticatedRequest, res: Response) {
-  const rbac = getRbacIdentity(req);
-  if (rbac.source === 'none' || !rbac.role) {
-    return res.status(403).json({
-      error: 'cannot mint: no real forwarded identity on this session (rbac source is none) — refusing to sign the mock fallback',
-    });
-  }
   const key = signingKey();
   if (!key) return res.status(503).json({ error: 'assistant identity signing not configured' });
-  // 23-Sep-2026 (pilot): req.user.id is the MOCK session (always 1), so every user minted userId '1' —
-  // one shared central rate-limit bucket and useless audit lines. For a forwarded session the user id
-  // is the forwarded x-user-id (auth.ts stores it on req.user.userUuid) — the same trust level as the
-  // role and userType beside it (client-forwarded SAILERP identity, NOT server-verified; identical to
-  // what the module's own RBAC guards trust). The mock id remains only for the mock source.
-  const userId = String(
-    (rbac.source === 'forwarded' && (req as any).user?.userUuid) ||
-      (req as any).user?.id ||
-      (req as any).user?.username ||
-      '',
-  );
-  if (!userId) return res.status(403).json({ error: 'cannot mint: no user id on session' });
+  // Option A (24-Sep-2026, pilot): the token's user id, role and user type come ONLY from the VERIFIED
+  // SAILERP login token (tenantMiddleware → req.verifiedUser). Browser headers (x-user-*), the mock
+  // session and req.rbac are NOT consulted — missing claims are refused, never filled from headers.
+  // Single-tenant / AUTH_BYPASS instances verify no token and therefore cannot mint (fail closed).
+  const vu = (req as any).verifiedUser as VerifiedUser | undefined;
+  if (!vu) {
+    return res.status(403).json({
+      error: 'cannot mint: no verified login identity on this request (multi-tenant mode with a SAILERP token is required)',
+    });
+  }
+  if (vu.missing.length) {
+    return res.status(403).json({
+      error: `cannot mint: the login token is missing required claim(s): ${vu.missing.join(', ')}`,
+    });
+  }
+  if (!allowedRoles().includes(vu.role!)) {
+    return res.status(403).json({ error: `cannot mint: role '${vu.role}' is not permitted to use the assistant` });
+  }
   const token = signIdentity(
     {
-      userId,
-      userName: req.user?.fullName,
-      role: rbac.role, // the REAL forwarded role — never the mock req.user.role
-      userType: rbac.userType ?? null, // 'Office' | 'Ship' — the vessel-scope decision key (23-Sep-2026)
+      userId: vu.userId!,
+      userName: req.user?.fullName, // display/masking only (from the profile) — never used for authorisation
+      role: vu.role!, // VERIFIED token claim
+      userType: vu.userType, // VERIFIED token claim — the vessel-scope decision key
       vesselId: (req as any).user?.vesselId ?? null,
       tenantDomain: (req as any).tenantDomain ?? null,
       tuid: (req as any).tenantTuid ?? null,

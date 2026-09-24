@@ -33,6 +33,38 @@ function extractBearer(req: Request): string | null {
   return m ? m[1].trim() : null;
 }
 
+/** The user identity carried by the VERIFIED SAILERP token (never by browser headers). */
+export interface VerifiedUser {
+  userId: string | null;
+  role: string | null;
+  userType: "Office" | "Ship" | null;
+  /** claim names that were looked up but absent/empty — a consumer can name them in its refusal */
+  missing: string[];
+}
+
+const USER_CLAIM_NAMES = (() => {
+  const raw = (process.env.SAILERP_JWT_USER_CLAIMS || "id,role,userType").split(",").map((s) => s.trim());
+  return { userId: raw[0] || "id", role: raw[1] || "role", userType: raw[2] || "userType" };
+})();
+
+function claimString(payload: jwt.JwtPayload, name: string): string | null {
+  const v = (payload as Record<string, unknown>)[name];
+  if (typeof v === "number") return String(v);
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+export function readVerifiedUser(payload: jwt.JwtPayload): VerifiedUser {
+  const userId = claimString(payload, USER_CLAIM_NAMES.userId);
+  const role = claimString(payload, USER_CLAIM_NAMES.role);
+  const ut = claimString(payload, USER_CLAIM_NAMES.userType);
+  const userType: VerifiedUser["userType"] = ut === "Office" || ut === "Ship" ? ut : null;
+  const missing: string[] = [];
+  if (!userId) missing.push(USER_CLAIM_NAMES.userId);
+  if (!role) missing.push(USER_CLAIM_NAMES.role);
+  if (!userType) missing.push(USER_CLAIM_NAMES.userType);
+  return { userId, role, userType, missing };
+}
+
 export function tenantMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Inert unless multi-tenant mode is on — preserves today's single-tenant path exactly.
   if (!tenantConnectionManager.isMultiTenantEnabled) return next();
@@ -85,6 +117,12 @@ export function tenantMiddleware(req: Request, res: Response, next: NextFunction
       res.status(401).json({ error: "invalid_token", message: "Token is missing the domain claim" });
       return;
     }
+    // Option A (24-Sep-2026, pilot): expose the VERIFIED user claims of the same token — user id, role, user
+    // type — for consumers that must not trust the browser's x-user-* headers (the assistant token mint).
+    // Claim names default to the SAILERP shape and are configurable (SAILERP_JWT_USER_CLAIMS="id,role,userType")
+    // so the genuine-session inspection can correct them without code. Nothing is rejected HERE — every
+    // other route keeps its existing identity handling; a consumer decides whether missing claims are fatal.
+    (req as any).verifiedUser = readVerifiedUser(payload as jwt.JwtPayload);
   }
 
   // Expose the verified domain on req so downstream handlers that need it (e.g.

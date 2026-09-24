@@ -53,7 +53,7 @@ Test/diagnostic mode: add `"routeOnly": true` → routing decision + citations, 
 End-user feedback. Same identity header. Body `{ "conversationId": "…", "rating": 1 | -1, "note": "optional" }` → `{ "ok": true }`.
 
 ### GET /health
-`{ ok, collection, chroma, db, llmCalls }` — llmCalls is a process counter used by test
+`{ ok, store: "pgvector", indexSet, chunks, db, llmCalls, prompt, chatModel, temperature }` — llmCalls is a process counter used by test
 suites to prove zero-cost gates.
 
 ### /admin/* (NOT public — nginx denies; SSH tunnel only)
@@ -141,33 +141,36 @@ is static tool metadata and needs the service secret only. Technical's implement
 regression harness `scripts/verify-assistant-multitenant-auth.ts` (21 checks: mint and execute hops,
 tenant/database selection, cross-tenant refusal, missing/expired/tampered credentials, ship shore-only).
 
-### 3.2 What is verified, and by what — the two identities in the token (24-Sep-2026)
-
-The identity token carries two DIFFERENT kinds of fact. Do not describe them as one "verified identity".
+### 3.2 What is verified, and by what — the two identities in the token (24-Sep-2026, Option A implemented on the pilot)
 
 | Field(s) | Source | Verified by | Trust |
 |---|---|---|---|
-| `tenantDomain`, `tuid` | SAILERP Bearer JWT, `domain` claim | HS256 signature with the shared `JWT_SECRET` (tenantMiddleware) | **Server-verified.** Cannot be set by the browser. |
-| `userId`, `role`, `userType`, `vesselId` | Browser headers `x-user-id`, `x-user-role`, `x-user-type` (…) — the client's fetch interceptor forwards them from the decrypted `userProfile` that SAILERP handed to the browser at login. **The SAILERP login token itself also carries user id, role and userType (Ghazi, 24-Sep-2026) — the module simply does not read them from the token yet.** | Nothing server-side today. Only the identity token's OWN signature protects them after minting | **Browser-supplied as used today.** Whoever controls the browser session can send any header value. This is the Phase 0 "audit identity", exactly what Technical's own RBAC guards (`permissions.ts`, controllers) use — the assistant is no weaker and no stronger than the module. |
+| `tenantDomain`, `tuid` | SAILERP login token, `domain` claim | HS256 signature with the shared `JWT_SECRET` (tenantMiddleware) | **Server-verified.** Cannot be set by the browser. |
+| `userId`, `role`, `userType` | SAILERP login token claims (`id`, `role`, `userType` — names configurable via `SAILERP_JWT_USER_CLAIMS`), read by tenantMiddleware from the SAME verified token and exposed as `req.verifiedUser` | Same HS256 signature | **Server-verified (Option A, pilot).** The mint reads ONLY these; the browser's `x-user-*` headers, the mock session and `req.rbac` are not consulted. A token missing any of the three claims cannot mint (403, no header fallback). |
+| `userName` | Browser profile header | — | Display and masking only; never used for authorisation. |
+| `vesselId` | Session (null on the shore) | — | Ship users never reach the shore assistant; a Ship-type identity with no vessel is refused by the tools. |
 
-Consequently the assistant's vessel-scope decision (Office = any vessel of the tenant, Ship = the assigned
-vessel) and the module's role guards rest on browser-supplied values. **They are access rules applied to a
-claimed identity, not verified permissions.** The tenant boundary IS verified: a user can never reach
-another tenant's database whatever they put in the headers.
+**Sail Admin restriction is server-enforced.** The mint refuses any VERIFIED role outside
+`ASSISTANT_ALLOWED_ROLES` (default `Sail Admin`) with 403 — the hidden button is only the visual half. To
+widen access, change the allow-list on the module; the widget gate stays `Sail_Admin` view mode until the
+product decides otherwise.
 
-**`userType` — exactly where it comes from.** SAILERP supplies it twice: as a claim in the signed login
-token AND as a field of the encrypted `userProfile` in local storage (Ghazi, 24-Sep-2026; the Crewing-validated
-token shape is `{ id, domain, userType, … }`). **The module reads it from the `x-user-type` header** (the
-profile) → `req.rbac.userType` — never from the token. tenantMiddleware reads exactly one token claim, `domain`;
-no other claim is read anywhere on the server (grep `payload.` — one hit). **What the current code requires
-from SAILERP:** (1) a Bearer JWT, HS256, signed with the shared `JWT_SECRET`, carrying `domain` — mandatory in
-multi-tenant mode; the user claims it also carries are present but unused; (2) the encrypted `userProfile`
-handoff in the browser (`userUuid`, `userType`, `role`, …) and the `credentials.token` blob, which the client
-forwards as headers. Closing the gap = reading id / role / userType from the verified token (§3.4 option A).
+**Scope of Option A.** It changes the assistant token mint only. Technical's own RBAC guards
+(`permissions.ts`, controllers) still read `req.rbac` from the profile headers — the module-wide
+"mock-identity hardening" backlog item, unchanged here. Single-tenant or `AUTH_BYPASS` instances verify no
+token and therefore cannot mint at all (fail closed) — the assistant needs multi-tenant mode, which dev and
+production run.
 
-**Widget gate.** The chat button is shown only to the `Sail_Admin` view mode, decided client-side from the
-same profile. The server mint does not enforce a role: any forwarded role can mint a token. Shore-only IS
-server-enforced (deployment mode, §3.1 harness).
+**`userType` — exactly where it comes from.** SAILERP supplies it in the signed login token AND in the
+encrypted `userProfile` in local storage (Ghazi, 24-Sep-2026). Since Option A the assistant reads it from the
+**token**; the rest of the module still reads the header. The server requires from SAILERP: an HS256 Bearer
+signed with the shared `JWT_SECRET` carrying `domain`, and — for the assistant — `id`, `role`, `userType`
+(the exact claim names are confirmed by the §3.3 inspection; until then they are the Crewing-validated
+defaults, and a mismatch shows up as "missing required claim(s)", never as a silent header fallback).
+
+Harness (`scripts/verify-assistant-multitenant-auth.ts`, 24 checks + 3 ship checks): headers claiming another
+user id or user type do not change the minted identity; a valid token mints with no headers at all; a token
+missing `role` or `userType` is refused; a verified `User` or `Vessel User` role is refused by the allow-list.
 
 ### 3.3 Remaining production check — genuine SAILERP session (NOT done; pilot cannot do it)
 
@@ -189,17 +192,17 @@ environment, with a genuine SAILERP login:
    `GENUINE_DOMAIN=<expected domain>` — it prints claim names only, never the token.
 4. Record the outcome in the deployment note (claim names, domain matched yes/no, mint 200 yes/no).
 
-### 3.4 Decision required before production live-data enablement — user identity trust
+### 3.4 User identity trust — Option A done on the pilot; what remains before production
 
-Today the assistant answers as whoever the browser claims to be (within the verified tenant). Two options
-make `userId` / `role` / `userType` server-verified WITHOUT a new authentication architecture; either is a
-product/platform decision, not a pilot task:
+Before Option A the assistant answered as whoever the browser claimed to be (within the verified tenant).
+Two options made `userId` / `role` / `userType` server-verified without a new authentication architecture;
+A is implemented on the pilot, B remains available for the module's own guards:
 
-- **A. Trusted token claims — the expected path.** The genuine SAILERP JWT carries user id, role and
-  userType (Ghazi, 24-Sep-2026; §3.3 is the recorded inspection that confirms the exact claim names). The module
-  reads those from the verified payload in tenantMiddleware and the mint (and, if wanted, the RBAC guards) use
-  them, ignoring the headers for those fields. A small, additive server change — NOT started; functional
-  changes are frozen pending approval.
+- **A. Trusted token claims — IMPLEMENTED on the pilot (24-Sep-2026, §3.2).** The mint reads user id, role
+  and userType from the verified token; headers are ignored; missing claims are refused. Remaining: the §3.3
+  inspection confirms the real claim names (set `SAILERP_JWT_USER_CLAIMS` if they differ), then the same
+  change deploys with the Data API. Extending the module's own RBAC guards to the verified claims is a
+  separate, larger decision.
 - **B. Server-side identity lookup.** The tenant database already holds SAILERP's user and role tables:
   `master_users` (columns include `role`, `userType`, `designation`, `department`), `users` (`role`,
   `vesselId`), `admn_role_master` (`assignedRole`), `master_user_vessels` (user ↔ vessel). The mint (and, if
@@ -208,15 +211,16 @@ product/platform decision, not a pilot task:
   (option A for the id alone) or matched server-side. Needs a decision on which table is authoritative and
   how fresh it is on the shore (they are synced master data).
 
-Until one is chosen and verified with a genuine session, live-data enablement in production means: tenant
-isolation verified; user-level permissions are the module's existing browser-trusted RBAC.
+Production live-data enablement still needs: (1) the §3.3 genuine-session inspection (claim names), (2) the
+deployment decision. Tenant isolation and the assistant's user identity are then both token-verified; the
+module's other screens keep their existing header-based RBAC until the hardening backlog item is taken up.
 
 ## 4. Deployment configuration (who sets what)
 
 | Where | Setting | Purpose |
 |---|---|---|
-| Central service (`assistant.env` on the AI server) | `OPENAI_API_KEY` | The assistant's dedicated key (embedding + gpt-4o-mini) |
-| | `DATABASE_URL`, `CHROMA_URL` | Its own Postgres + the knowledge store |
+| Central service (`assistant.env` on the AI server) | `OPENAI_API_KEY` | The assistant's key (embeddings `text-embedding-3-large`; chat `CHAT_MODEL`, released value `gpt-5.6-luna`) |
+| | `DATABASE_URL`, `ASSISTANT_INDEX_SET` | Its own Postgres (pgvector) holds the knowledge store; the index set names the released index (`kb-xref-e`). `CHROMA_URL` is a leftover of the retired Node service — unused by the Python service |
 | | `IDENTITY_SIGNING_KEY` | Shared with each module backend |
 | | `ADMIN_TOKEN` | Admin surface auth (tunnel-only anyway) |
 | | `ASSISTANT_CORS_ORIGINS` | The app origins allowed to embed (e.g. `https://dev.sl-sail.com`) |
@@ -225,9 +229,19 @@ isolation verified; user-level permissions are the module's existing browser-tru
 | | `ASSISTANT_IDENTITY_SIGNING_KEY` | SAME value as the service's signing key |
 | App client build | `VITE_ASSISTANT_CENTRAL_URL` | The assistant base URL (optional — defaults to `https://assistant.sl-sail.com`) |
 
+| Module backend | `ASSISTANT_ALLOWED_ROLES` | Roles (verified token claim) allowed to obtain an assistant token; default `Sail Admin` |
+| Module backend | `SAILERP_JWT_USER_CLAIMS` | Claim names for user id, role, user type in the SAILERP token; default `id,role,userType` — set after the genuine-session inspection if the real names differ |
+
+**Dev / pilot versus production are SEPARATE assistant deployments with separate keys.** Each
+environment (pilot, dev, production) runs its own assistant container with its own `IDENTITY_SIGNING_KEY`,
+its own `ASSISTANT_MODULE_APIS` pointing only at THAT environment's module URL and secret, and its own
+`OPENAI_API_KEY`. The `dev.sl-sail.com` example above is for the dev assistant only — never copy it into the
+shared production assistant's environment, and never share a signing key or service secret between
+environments (a dev-signed identity must be worthless in production, and vice versa).
+
 To bring live-data answers to an environment: deploy the module build containing its
-Data API, set the two PM2 values, add the module to `ASSISTANT_MODULE_APIS`, restart
-the assistant container. Nothing else.
+Data API, set the PM2 values above for THAT environment, add the module to THAT environment's
+`ASSISTANT_MODULE_APIS`, restart THAT assistant container. Nothing else.
 
 ## 5. Embedding checklist (any module / the SAILERP shell)
 

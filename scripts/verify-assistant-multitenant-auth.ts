@@ -44,8 +44,10 @@ function record(name: string, pass: boolean, got: string) {
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}  → ${got}`);
 }
 
-const sailerpJwt = (domain: string, userId: string, opts: jwt.SignOptions = {}, secret = JWT_SECRET) =>
-  jwt.sign({ id: 1, domain, userType: 'Office', userId }, secret, { algorithm: 'HS256', expiresIn: '1h', ...opts });
+// SAILERP-shaped login token: { id, domain, userType, role } (claim names per SAILERP_JWT_USER_CLAIMS, default id,role,userType)
+const sailerpJwt = (domain: string, userId: string, opts: jwt.SignOptions = {}, secret = JWT_SECRET,
+                    claims: Record<string, unknown> = { role: 'Sail Admin', userType: 'Office' }) =>
+  jwt.sign({ id: userId, domain, ...claims }, secret, { algorithm: 'HS256', expiresIn: '1h', ...opts });
 
 const identityHeaders = (userId: string, role: string, type: 'Office' | 'Ship') => ({
   'x-user-id': userId, 'x-user-name': `Test ${userId}`, 'x-user-type': type, 'x-user-role': role,
@@ -103,6 +105,20 @@ async function main() {
   const idB = tokenB ? decodeIdentity(tokenB) : {};
   record(`mint: valid tenant-B JWT → 200, identity.tenantDomain=${DOMAIN_B}`, r.status === 200 && idB.tenantDomain === DOMAIN_B, `${r.status} tenantDomain=${idB.tenantDomain} tuid=${idB.tuid}`);
 
+  // ── Option A (24-Sep-2026): user identity comes from the VERIFIED token, never from browser headers ──
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1'), identityHeaders('attacker-id', 'Sail Admin', 'Ship'));
+  const idH = r.body?.token ? decodeIdentity(r.body.token) : {};
+  record('optionA: headers claim another user id / type → token carries the JWT values (headers ignored)',
+    r.status === 200 && idH.userId === 'pilot-super-1' && idH.userType === 'Office', `${r.status} userId=${idH.userId} userType=${idH.userType} role=${idH.role}`);
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1'), {});
+  record('optionA: no x-user-* headers at all, valid JWT → 200 (headers not needed)', r.status === 200, `${r.status}`);
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1', {}, JWT_SECRET, { userType: 'Office' }), office);
+  record('optionA: JWT without role claim, headers carry a role → 403, no header fallback', r.status === 403 && /missing required claim/.test(r.text) && /role/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1', {}, JWT_SECRET, { role: 'Sail Admin' }), office);
+  record('optionA: JWT without userType claim → 403', r.status === 403 && /userType/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-user-1', {}, JWT_SECRET, { role: 'User', userType: 'Office' }), identityHeaders('u-user-1', 'Sail Admin', 'Office'));
+  record("optionA: verified role 'User' (header says Sail Admin) → 403 not permitted (server-enforced allow-list)", r.status === 403 && /not permitted/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+
   // ── hop 2: execute = service secret + module-signed identity (tenant from the identity) ──
   r = await call(BASE, '/assistant/manifest', { headers: { 'x-service-secret': SERVICE_SECRET } });
   record('manifest: service secret → 200', r.status === 200 && Array.isArray(r.body?.tools), `${r.status} tools=${r.body?.tools?.length}`);
@@ -149,9 +165,12 @@ async function main() {
   record('execute: tenant B identity asking for tenant A\'s vessel → refused (unknown in B\'s database)',
     r.status === 200 && r.body?.ok === false && /Unknown vessel/.test(r.body?.error || ''), `${r.status} ok=${r.body?.ok} ${String(r.body?.error || '').slice(0, 70)}`);
 
-  const shipTokenA = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-vesseluser'), identityHeaders('u-vesseluser', 'Vessel User', 'Ship'));
-  r = await execute(BASE, SERVICE_SECRET, shipTokenA.body?.token || '', 'get_work_order_counts', { vesselId: VESSEL });
-  record('execute: Ship-type user (no assigned vessel on session) → vessel refused', r.status === 200 && r.body?.ok === false && /access/.test(r.body?.error || ''), `${r.status} ok=${r.body?.ok} ${String(r.body?.error || '').slice(0, 60)}`);
+  const shipTokenA = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-vesseluser', {}, JWT_SECRET, { role: 'Vessel User', userType: 'Ship' }), identityHeaders('u-vesseluser', 'Vessel User', 'Ship'));
+  record("mint: verified Ship-type 'Vessel User' → 403 (role not permitted; ship users never reach the shore assistant)", shipTokenA.status === 403, `${shipTokenA.status} ${shipTokenA.body?.error ?? ''}`);
+  // the vessel-scope rule itself, exercised with a Ship-type identity signed directly (as a permitted Ship role would be)
+  const shipIdentity = signIdentity({ userId: 'u-vesseluser', role: 'Vessel User', userType: 'Ship', vesselId: null, tenantDomain: DOMAIN_A, tuid: idA.tuid ?? null }, SIGNING_KEY, 60);
+  r = await execute(BASE, SERVICE_SECRET, shipIdentity, 'get_work_order_counts', { vesselId: VESSEL });
+  record('execute: Ship-type identity with no assigned vessel → vessel refused', r.status === 200 && r.body?.ok === false && /access/.test(r.body?.error || ''), `${r.status} ok=${r.body?.ok} ${String(r.body?.error || '').slice(0, 60)}`);
 
   // ── shore-only: the ship refuses every assistant route before any credential is read ──
   if (SHIP_BASE) {
