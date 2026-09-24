@@ -31,7 +31,7 @@ Checks at head: `npx tsc --noEmit` = 294 (branch baseline, unchanged); assistant
 | Counts match the Technical screen | Same vessel, same snapshot: Work Orders tab badges = assistant counts (Overdue 142, Due 6, …) | PROVEN |
 | Follow-ups, tables, running hours, paging, starters | Complete conversations through the real widget; see `docs/ASSISTANT-API.md` and commit messages 5–6 | PROVEN (widget) |
 | **Tenant identity** | Pilot shore in multi-tenant mode: SAILERP-shaped HS256 JWT → tenant database selected; cross-tenant vessel unknown; missing / expired / tampered JWT and identity tokens refused at both hops | PROVEN (harness 21/21 + widget) — with a JWT minted by the test using the pilot `JWT_SECRET` |
-| **User identity and role (Option A)** | Assistant token carries `userId`, `role`, `userType` read from the VERIFIED login token; headers claiming another user or type do not change it; a token missing a claim is refused (no header fallback); a valid token mints with no headers at all | PROVEN (harness) — with a test-minted JWT whose claim NAMES are the Crewing-validated defaults; the genuine names are confirmed by §4 |
+| **User identity and role (Option A)** | Assistant token carries `userId`, `role`, `userType` read from the VERIFIED login token; headers claiming another user or type do not change it; a token missing a claim is refused (no header fallback); a valid token mints with no headers at all | PROVEN (harness) — with a test-minted JWT whose claim NAMES are the Crewing-validated defaults; the genuine names WILL BE confirmed by the §4 inspection, which is still pending |
 | **Sail Admin restriction** | Server-enforced at the mint on the verified role (`ASSISTANT_ALLOWED_ROLES`, default `Sail Admin`): verified `User` and `Vessel User` → 403. The hidden button is only the visual half | PROVEN (harness) |
 | Module's own RBAC guards | Still read the profile headers (unchanged; module-wide hardening backlog) | LIMITATION, out of scope |
 | Genuine SAILERP login | Not available on the pilot | **PENDING** |
@@ -61,8 +61,8 @@ deployment decision. For the module's OTHER screens, two ways exist to move off 
 (`docs/ASSISTANT-API.md` §3.4) — a separate backlog decision:
 
 - **A. Trusted token claims — DONE on the pilot (commit 10).** The mint reads user id / role / user type from
-  the verified payload; headers ignored; missing claims refused. §4 confirms the exact claim names before
-  deployment (set `SAILERP_JWT_USER_CLAIMS` if they differ).
+  the verified payload; headers ignored; missing claims refused. §4 will confirm the exact claim names before
+  deployment (still pending) (set `SAILERP_JWT_USER_CLAIMS` if they differ).
 - **B. Server-side identity lookup** — resolve role / user type / vessels from the tenant's synced SAILERP
   user tables (`master_users.role/userType`, `users`, `admn_role_master`, `master_user_vessels`) by a verified
   user id.

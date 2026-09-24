@@ -165,7 +165,7 @@ production run.
 encrypted `userProfile` in local storage (Ghazi, 24-Sep-2026). Since Option A the assistant reads it from the
 **token**; the rest of the module still reads the header. The server requires from SAILERP: an HS256 Bearer
 signed with the shared `JWT_SECRET` carrying `domain`, and — for the assistant — `id`, `role`, `userType`
-(the exact claim names are confirmed by the §3.3 inspection; until then they are the Crewing-validated
+(the exact claim names WILL BE confirmed by the §3.3 inspection, still pending; until then they are the Crewing-validated
 defaults, and a mismatch shows up as "missing required claim(s)", never as a silent header fallback).
 
 Harness (`scripts/verify-assistant-multitenant-auth.ts`, 24 checks + 3 ship checks): headers claiming another
