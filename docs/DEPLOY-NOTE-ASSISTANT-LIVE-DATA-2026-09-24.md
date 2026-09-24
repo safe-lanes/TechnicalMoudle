@@ -29,7 +29,7 @@ Verify after the first boot: `\d tenants` shows `ai_enabled`; `\d chatbot_intera
 
 | Variable | Required for | Value source |
 |---|---|---|
-| `ASSISTANT_INSTANCE_ID` | Names this Technical instance to the shared assistant (`technical-dev` on dev, `technical-prod` on production) | Fixed per environment; must match the entry registered on the assistant |
+| `ASSISTANT_INSTANCE_ID` | Names this Technical instance to the shared assistant (`technical-dev` on dev, `technical-prod` on production) | Fixed per environment; must match the entry registered on the assistant (§10 B) |
 | `ASSISTANT_SERVICE_SECRET` | Data API: locks manifest/execute to the shared assistant | This environment's own value, handed over by Ghazi/support; registered on the assistant under the same instance id |
 | `ASSISTANT_IDENTITY_SIGNING_KEY` | Signs the identity token the widget carries to the assistant | This environment's own key, registered on the assistant under the same instance id (handed over by Ghazi/support, never in chat or Git). Dev and production keys are different. |
 | `ASSISTANT_ALLOWED_ROLES` | Optional. Roles (verified token claim) allowed to use the assistant | Default `Sail Admin`. Comma-separated SAILERP role names to widen. |
@@ -115,3 +115,45 @@ from `MaintenanceOrchestrator.tick` (`server/services/maintenanceOrchestrator.ts
 caught, so Node exits. This code is replit_dev's own (fork commit `ec2ef72af`), untouched by the chatbot
 branch. Under PM2 the process restarts, but a slow or saturated database would produce a restart loop. Owner:
 Nilesh / Jeevan. Not fixed here (out of scope of this merge); recorded so it is not attributed to the assistant.
+
+## 10. Assistant rollout — SEPARATE deployment actions (prepared, NOT executed; each needs Ghazi's explicit go)
+
+These are not part of the code merge. Both are done on the AI server by Ghazi/support. The production assistant
+stays as it is until step A is executed.
+
+### A. Switch the shared assistant to the new image
+
+1. Build: on the AI server, `~/build-…` from this merge's `central-assistant-py` →
+   `docker build -t sail-assistant-py:v7-r2 .` (the image must show `"instances": []` and no
+   `REGISTRY REJECTED` lines when started with the current env — documentation-only behaviour identical).
+2. Env: copy the live container's env to `~/central-assistant/v7.env`; keep every existing value; REMOVE
+   `ASSISTANT_MODULE_APIS` (retired); leave `IDENTITY_SIGNING_KEY` (shared documentation key) as it is.
+3. Start beside the live one: `docker run -d --name sail-assistant-py-v7 --network technical-rag-net
+   --env-file ~/central-assistant/v7.env -p 127.0.0.1:8046:8000 --restart unless-stopped sail-assistant-py:v7-r2
+   sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"`.
+   Check `curl 127.0.0.1:8046/health` → same `indexSet`/`docsPromptSha` as 8041, `instances: []`.
+4. Back up and switch nginx: the two assistant upstreams (`assistant.conf`, `safelanes.conf` — the same two
+   lines changed on 23-Sep) from 8041 to 8046; `nginx -t`; reload.
+5. Post-switch checks through the public URL: health; a documentation question with a no-issuer token → answer
+   with citations; the routing + retrieval quick suites (13 + 18) against the public path.
+6. Keep `sail-assistant-py-cand2` (8041) running for rollback.
+
+**Rollback A:** point the two nginx upstreams back to 8041, reload. Nothing else to undo.
+
+### B. Register `technical-dev` (after the dev shore is deployed with §3 values)
+
+1. Generate the dev instance's signing key and service secret (never in chat, ticket or Git). Put the same
+   values into the dev shore PM2 env (`ASSISTANT_INSTANCE_ID=technical-dev`, `ASSISTANT_IDENTITY_SIGNING_KEY`,
+   `ASSISTANT_SERVICE_SECRET`) and restart the dev shore.
+2. Add to `~/central-assistant/v7.env`:
+   `ASSISTANT_MODULE_INSTANCES={"technical-dev":{"module":"technical","env":"dev","url":"https://<dev host>/technical/api","secret":"…","signingKey":"…"}}`
+   — the key MUST differ from `IDENTITY_SIGNING_KEY` and from every other instance's key/secret, or the instance
+   is rejected at startup (visible as `instancesRejected` on `/health`).
+3. Restart the v7 container; `/health` must show `"instances": ["technical-dev"]`, `"instancesRejected": []`.
+4. Checks: dev widget → mint 200 (token `iss: technical-dev`) → one live question matches the Work Orders
+   screen; the dev shore log shows `[assistant-api] execute …`; a documentation question still answers.
+
+**Rollback B:** remove the entry from `ASSISTANT_MODULE_INSTANCES` and restart the v7 container (dev returns to
+documentation-only); or rollback A entirely.
+
+Later, `technical-prod` is registered the same way with its own key and secret — never by copying dev's values.
