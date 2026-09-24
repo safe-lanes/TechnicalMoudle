@@ -1861,6 +1861,12 @@ var init_schema = __esm({
       // Last completion running hours (for RH-based jobs)
       nextDueRH: text2("next_due_rh"),
       // Calculated: lastDoneRH + frequencyValue (for RH-based jobs)
+      rhEstimatedDueDate: text2("rh_estimated_due_date"),
+      // Historical-utilization projection; never an RH trigger
+      rhAveragePerDay: decimal2("rh_average_per_day", { precision: 12, scale: 6 }),
+      // Full-precision RH/day used for the projection
+      rhEstimateBasis: text2("rh_estimate_basis"),
+      // 'HISTORICAL' or an explicit unavailable reason
       // Authorized-rebaseline stamp (migration 161): shore tracking values only pass the
       // one-way applier's job-tracking guard when this incoming stamp is newer than local.
       trackingRebaselinedAt: timestamp3("tracking_rebaselined_at"),
@@ -5564,7 +5570,7 @@ var init_syncConfig = __esm({
         isGlobal: false,
         isConfigurable: false,
         businessRules: "Ship can request changes via Modify PMS (change_request) but cannot edit jobs directly",
-        notes: "Job definitions managed by office. Ship uses change_request for modifications. PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh are SHIP-owned once non-NULL \u2014 the one-way applier strips incoming shore values unless the row carries a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). See oneWayApplier evaluateJobTrackingGuard."
+        notes: "Job definitions managed by office. Ship uses change_request for modifications. PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh are SHIP-owned once non-NULL \u2014 the one-way applier strips incoming shore values unless the row carries a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). Historical RH estimate columns rh_estimated_due_date, rh_average_per_day, and rh_estimate_basis are protected with the RH cycle so an older shore row cannot replace a newer ship completion estimate; completion learning writes them with sync bypass. See oneWayApplier evaluateJobTrackingGuard."
       },
       job_component_links: {
         tableName: "job_component_links",
@@ -5576,7 +5582,7 @@ var init_syncConfig = __esm({
         isGlobal: false,
         isConfigurable: false,
         businessRules: null,
-        notes: "Job-component associations managed by office. Integer PK, no UUID identity. PROTECTED TRACKING COLUMNS (migration 161): same guard as jobs \u2014 last_done_date/next_due_date/last_done_rh/next_due_rh preserved on ship unless a newer tracking_rebaselined_at authorizes the overwrite."
+        notes: "Job-component associations managed by office. Integer PK, no UUID identity. Job cycle tracking is read from the jobs table only."
       },
       // ── Fleet Management ──
       fleet_components: {
@@ -7163,6 +7169,180 @@ var init_requestContext = __esm({
   }
 });
 
+// server/modules/shared/errors.ts
+var errors_exports = {};
+__export(errors_exports, {
+  AppError: () => AppError,
+  ConflictError: () => ConflictError,
+  ForbiddenError: () => ForbiddenError,
+  NotFoundError: () => NotFoundError,
+  ValidationError: () => ValidationError
+});
+var AppError, NotFoundError, ValidationError, ConflictError, ForbiddenError;
+var init_errors = __esm({
+  "server/modules/shared/errors.ts"() {
+    "use strict";
+    AppError = class extends Error {
+      constructor(statusCode, message, details) {
+        super(message);
+        this.statusCode = statusCode;
+        this.details = details;
+        this.name = this.constructor.name;
+      }
+    };
+    NotFoundError = class extends AppError {
+      constructor(message = "Resource not found", details) {
+        super(404, message, details);
+      }
+    };
+    ValidationError = class extends AppError {
+      constructor(message = "Validation failed", details) {
+        super(400, message, details);
+      }
+    };
+    ConflictError = class extends AppError {
+      constructor(message = "Resource already exists", details) {
+        super(409, message, details);
+      }
+    };
+    ForbiddenError = class extends AppError {
+      constructor(message = "Forbidden", details) {
+        super(403, message, details);
+      }
+    };
+  }
+});
+
+// server/modules/work-orders/utils/completedWorkOrderDate.ts
+function nonBlank(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+function isCompletedWorkOrderStatus(value) {
+  return typeof value === "string" && value.trim().toLowerCase() === "completed";
+}
+function isRealCalendarDate(year, month, day) {
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+function namedMonthNumber(value) {
+  const month = MONTH_NUMBER[value.slice(0, 3).toLowerCase()];
+  return month ?? null;
+}
+function hasValidTimeSuffix(value) {
+  if (!value.trim()) return true;
+  const match = value.match(/^(?:T|\s+)(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-](\d{2}):?(\d{2}))?$/);
+  if (!match) return false;
+  const [, hour, minute, second = "0", offsetHour, offsetMinute] = match;
+  if (Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59) return false;
+  return offsetHour === void 0 || Number(offsetHour) <= 23 && Number(offsetMinute) <= 59;
+}
+function isValidNamedMonthDate(date2) {
+  let match = date2.match(/^(\d{1,2})[-/\s]([A-Za-z]{3,9})[-/\s](\d{4})(.*)$/);
+  if (match) {
+    const [, day, monthName, year, trailing] = match;
+    const month = namedMonthNumber(monthName);
+    if (month === null || !isRealCalendarDate(Number(year), month, Number(day))) return false;
+    return hasValidTimeSuffix(trailing);
+  }
+  match = date2.match(/^([A-Za-z]{3,9})[\s-](\d{1,2}),?[\s-](\d{4})(.*)$/);
+  if (match) {
+    const [, monthName, day, year, trailing] = match;
+    const month = namedMonthNumber(monthName);
+    if (month === null || !isRealCalendarDate(Number(year), month, Number(day))) return false;
+    return hasValidTimeSuffix(trailing);
+  }
+  return false;
+}
+function isValidCompletedWorkOrderDate(value) {
+  const date2 = nonBlank(value);
+  if (!date2) return false;
+  const isoMatch = date2.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    if (!isRealCalendarDate(Number(year), Number(month), Number(day))) return false;
+    return date2.length === 10 || !Number.isNaN(new Date(date2).getTime());
+  }
+  const numericMatch = date2.match(/^(\d{2})[-/](\d{2})[-/](\d{4})(.*)$/);
+  if (numericMatch) {
+    const [, day, month, year, trailing] = numericMatch;
+    return isRealCalendarDate(Number(year), Number(month), Number(day)) && hasValidTimeSuffix(trailing);
+  }
+  return isValidNamedMonthDate(date2);
+}
+function getJobCompletionDate(workOrder) {
+  const date2 = nonBlank(workOrder.dateCompleted);
+  if (!date2 || !isValidCompletedWorkOrderDate(date2)) return null;
+  let match = date2.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  match = date2.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+  match = date2.match(/^(\d{1,2})[-/\s]([A-Za-z]{3,9})[-/\s](\d{4})/);
+  if (match) {
+    const month = namedMonthNumber(match[2]);
+    return month === null ? null : `${match[3]}-${String(month).padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  }
+  match = date2.match(/^([A-Za-z]{3,9})[\s-](\d{1,2}),?[\s-](\d{4})/);
+  if (match) {
+    const month = namedMonthNumber(match[1]);
+    return month === null ? null : `${match[3]}-${String(month).padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+  }
+  return null;
+}
+function resolveFinalCompletionDate(workOrder) {
+  return nonBlank(workOrder.dateCompleted) ?? nonBlank(workOrder.completionDateTime);
+}
+function ensureCompletedWorkOrderDate(existing, update7) {
+  const resultingStatus = update7.status ?? existing?.status;
+  if (!isCompletedWorkOrderStatus(resultingStatus)) return update7;
+  const outgoingDate = nonBlank(update7.dateCompleted);
+  if (outgoingDate) {
+    if (!isValidCompletedWorkOrderDate(outgoingDate)) {
+      throw new ValidationError("A completed work order requires a valid completion date.");
+    }
+    return update7;
+  }
+  const savedFinalDate = nonBlank(existing?.dateCompleted);
+  if (savedFinalDate) {
+    if (!isValidCompletedWorkOrderDate(savedFinalDate)) {
+      throw new ValidationError("A completed work order has an invalid stored completion date.");
+    }
+    update7.dateCompleted = savedFinalDate;
+    return update7;
+  }
+  const savedExecutionDate = nonBlank(existing?.completionDateTime);
+  if (savedExecutionDate) {
+    if (!isValidCompletedWorkOrderDate(savedExecutionDate)) {
+      throw new ValidationError("A completed work order requires a valid completion date.");
+    }
+    update7.dateCompleted = savedExecutionDate;
+    return update7;
+  }
+  throw new ValidationError("A completion date is required before a work order can be marked Completed.");
+}
+var MONTH_NUMBER;
+var init_completedWorkOrderDate = __esm({
+  "server/modules/work-orders/utils/completedWorkOrderDate.ts"() {
+    "use strict";
+    init_errors();
+    MONTH_NUMBER = {
+      jan: 1,
+      feb: 2,
+      mar: 3,
+      apr: 4,
+      may: 5,
+      jun: 6,
+      jul: 7,
+      aug: 8,
+      sep: 9,
+      oct: 10,
+      nov: 11,
+      dec: 12
+    };
+  }
+});
+
 // server/modules/running-hours/utils/readingDate.ts
 var readingDate_exports = {};
 __export(readingDate_exports, {
@@ -7733,12 +7913,12 @@ async function getColumnMeta(pool4, tableName) {
 async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
   try {
     const params = [componentId];
-    let sql25 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
+    let sql26 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
     if (excludeRhruuid) {
-      sql25 += ` AND rhruuid <> $2`;
+      sql26 += ` AND rhruuid <> $2`;
       params.push(excludeRhruuid);
     }
-    const res = await conn.query(sql25, params);
+    const res = await conn.query(sql26, params);
     const v = res.rows[0]?.latest;
     if (!v) return null;
     const d = v instanceof Date ? v : new Date(String(v));
@@ -7788,6 +7968,19 @@ function evaluateJobTrackingGuard(localRow, incomingRow) {
     const localVal = localRow[col];
     if (localVal !== null && localVal !== void 0 && localVal !== "") {
       strip.push(col);
+    }
+  }
+  const estimateColumns = ["rh_estimated_due_date", "rh_average_per_day", "rh_estimate_basis"];
+  const localRhCycleInitialized = [
+    "last_done_rh",
+    ...estimateColumns
+  ].some((col) => {
+    const value = localRow[col];
+    return value !== null && value !== void 0 && value !== "";
+  });
+  if (localRhCycleInitialized) {
+    for (const col of estimateColumns) {
+      if (!strip.includes(col)) strip.push(col);
     }
   }
   if (strip.length > 0) strip.push("tracking_rebaselined_at");
@@ -7897,7 +8090,7 @@ async function applyOneWayRows(tableName, rows) {
           result.softDeleted++;
         } else {
           let rowToApply = row;
-          if (tableName === "jobs" || tableName === "job_component_links") {
+          if (tableName === "jobs") {
             try {
               const localRes = await pool4.query(
                 `SELECT last_done_date, next_due_date, last_done_rh, next_due_rh, tracking_rebaselined_at
@@ -8251,6 +8444,26 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       if (tableName === "work_orders" && (rowData["id"] === void 0 || rowData["id"] === null)) {
         rowData["id"] = `WO-SYNC-${rowUuid}`;
       }
+      if (tableName === "work_orders" && isCompletedWorkOrderStatus(rowData["status"])) {
+        if (!isValidCompletedWorkOrderDate(rowData["date_completed"])) {
+          if (isValidCompletedWorkOrderDate(rowData["completion_date_time"])) {
+            rowData["date_completed"] = rowData["completion_date_time"];
+          } else {
+            const msg = `${tableName}.${rowUuid}: Completed row has no valid date_completed or completion_date_time`;
+            errors.push(msg);
+            needsFullRows.push({ tableName, rowUuid });
+            failedRowUuids.push(rowUuid);
+            syncDiag(`FIELD-LOG-INSERT DEFER COMPLETED: ${msg}`);
+            if (externalClient) {
+              try {
+                await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+              } catch {
+              }
+            }
+            continue;
+          }
+        }
+      }
       if (meta && meta.requiredCols.size > 0) {
         const missingRequired = Array.from(meta.requiredCols).filter(
           (c) => !meta.identityAlwaysCols.has(c) && rowData[c] == null
@@ -8567,7 +8780,8 @@ async function applyFullRowsIfAbsent(tableName, rows) {
   const identityCol = config.identityColumn || "id";
   const pool4 = await getPool();
   const meta = await getColumnMeta(pool4, tableName);
-  for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+  for (const incomingRow of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+    let row = incomingRow;
     const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
     if (!identity) {
       out.errors.push(`${tableName}: row missing identity ${identityCol}`);
@@ -8582,6 +8796,17 @@ async function applyFullRowsIfAbsent(tableName, rows) {
         out.skipped++;
         syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
         continue;
+      }
+      if (tableName === "work_orders" && isCompletedWorkOrderStatus(row.status)) {
+        if (!isValidCompletedWorkOrderDate(row.date_completed ?? row.dateCompleted)) {
+          const executionDate = row.completion_date_time ?? row.completionDateTime;
+          if (!isValidCompletedWorkOrderDate(executionDate)) {
+            out.errors.push(`${tableName}.${identity}: Completed full row has no valid completion date`);
+            syncDiag(`SELF-HEAL DEFER COMPLETED: ${tableName}.${identity} has no valid completion date`);
+            continue;
+          }
+          row = { ...row, date_completed: executionDate };
+        }
       }
       const parts = buildInsertParts(
         row,
@@ -8739,8 +8964,17 @@ var init_oneWayApplier = __esm({
     init_db();
     init_syncConfig();
     init_syncDiagLogger();
+    init_completedWorkOrderDate();
     columnMetaCache = /* @__PURE__ */ new Map();
-    JOB_TRACKING_COLUMNS = ["last_done_date", "next_due_date", "last_done_rh", "next_due_rh"];
+    JOB_TRACKING_COLUMNS = [
+      "last_done_date",
+      "next_due_date",
+      "last_done_rh",
+      "next_due_rh",
+      "rh_estimated_due_date",
+      "rh_average_per_day",
+      "rh_estimate_basis"
+    ];
     SYNC_COLUMN_ALIASES = { location2: "location_2" };
     SKIP_UPDATE_COLUMNS = /* @__PURE__ */ new Set(["id", "created_at", "createdAt"]);
     SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
@@ -10363,50 +10597,6 @@ var init_fileSyncProcessor = __esm({
   }
 });
 
-// server/modules/shared/errors.ts
-var errors_exports = {};
-__export(errors_exports, {
-  AppError: () => AppError,
-  ConflictError: () => ConflictError,
-  ForbiddenError: () => ForbiddenError,
-  NotFoundError: () => NotFoundError,
-  ValidationError: () => ValidationError
-});
-var AppError, NotFoundError, ValidationError, ConflictError, ForbiddenError;
-var init_errors = __esm({
-  "server/modules/shared/errors.ts"() {
-    "use strict";
-    AppError = class extends Error {
-      constructor(statusCode, message, details) {
-        super(message);
-        this.statusCode = statusCode;
-        this.details = details;
-        this.name = this.constructor.name;
-      }
-    };
-    NotFoundError = class extends AppError {
-      constructor(message = "Resource not found", details) {
-        super(404, message, details);
-      }
-    };
-    ValidationError = class extends AppError {
-      constructor(message = "Validation failed", details) {
-        super(400, message, details);
-      }
-    };
-    ConflictError = class extends AppError {
-      constructor(message = "Resource already exists", details) {
-        super(409, message, details);
-      }
-    };
-    ForbiddenError = class extends AppError {
-      constructor(message = "Forbidden", details) {
-        super(403, message, details);
-      }
-    };
-  }
-});
-
 // server/modules/shared/middleware.ts
 import { ZodError } from "zod";
 function asyncHandler(fn) {
@@ -10942,6 +11132,32 @@ function parseWorkOrderDate(value) {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
+function normalizeWorkOrderCalendarDate(value) {
+  const parsed = parseWorkOrderDate(value);
+  if (!parsed) return null;
+  return new Date(Date.UTC(
+    parsed.getUTCFullYear(),
+    parsed.getUTCMonth(),
+    parsed.getUTCDate()
+  ));
+}
+function formatWorkOrderCalendarDate(value) {
+  const date2 = normalizeWorkOrderCalendarDate(value);
+  return date2 ? date2.toISOString().slice(0, 10) : null;
+}
+function addWorkOrderCalendarDays(value, days) {
+  const date2 = normalizeWorkOrderCalendarDate(value);
+  if (!date2) return null;
+  date2.setUTCDate(date2.getUTCDate() + days);
+  return date2;
+}
+function currentWorkOrderCalendarDate(now = /* @__PURE__ */ new Date()) {
+  return new Date(Date.UTC(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ));
+}
 var MONTH_SHORT;
 var init_dateParse = __esm({
   "shared/workOrders/dateParse.ts"() {
@@ -10972,10 +11188,78 @@ __export(dateUtils_exports, {
   formatLocalDateTimeDDMMMYYYY: () => formatLocalDateTimeDDMMMYYYY,
   formatRHWithSeparators: () => formatRHWithSeparators,
   formatRelativeTime: () => formatRelativeTime,
+  formatWorkOrderDateDDMMYYYY: () => formatWorkOrderDateDDMMYYYY,
   normalizeDateToDDMMMYYYY: () => normalizeDateToDDMMMYYYY,
-  shouldGenerateWorkOrder: () => shouldGenerateWorkOrder
+  normalizeWorkOrderDateTyping: () => normalizeWorkOrderDateTyping,
+  parseWorkOrderDateDDMMYYYYInput: () => parseWorkOrderDateDDMMYYYYInput,
+  shouldGenerateWorkOrder: () => shouldGenerateWorkOrder,
+  workOrderDateInputValue: () => workOrderDateInputValue,
+  workOrderOverdueCompletionMessage: () => workOrderOverdueCompletionMessage
 });
 import { format, parse, add, isValid, differenceInCalendarDays, differenceInMonths, differenceInYears } from "date-fns";
+function validatedCalendarParts(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  const date2 = new Date(Date.UTC(year, month - 1, day));
+  if (date2.getUTCFullYear() !== year || date2.getUTCMonth() !== month - 1 || date2.getUTCDate() !== day) return null;
+  return [
+    String(day).padStart(2, "0"),
+    String(month).padStart(2, "0"),
+    year
+  ].join("-");
+}
+function formatWorkOrderDateDDMMYYYY(dateInput, fallback = "") {
+  if (dateInput === null || dateInput === void 0 || dateInput === "") return fallback;
+  const raw = String(dateInput).trim();
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
+  if (match) {
+    return validatedCalendarParts(Number(match[1]), Number(match[2]), Number(match[3])) ?? fallback;
+  }
+  match = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (match) {
+    return validatedCalendarParts(Number(match[3]), Number(match[2]), Number(match[1])) ?? fallback;
+  }
+  match = raw.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/ ](\d{4})$/);
+  if (match) {
+    const month = MONTH_NUMBER_BY_NAME[match[2].slice(0, 3).toLowerCase()];
+    if (month) {
+      return validatedCalendarParts(Number(match[3]), Number(month), Number(match[1])) ?? fallback;
+    }
+  }
+  const parsed = parseWorkOrderDate(dateInput);
+  if (!parsed) return fallback;
+  return [
+    String(parsed.getUTCDate()).padStart(2, "0"),
+    String(parsed.getUTCMonth() + 1).padStart(2, "0"),
+    parsed.getUTCFullYear()
+  ].join("-");
+}
+function workOrderDateInputValue(dateInput) {
+  const displayValue = formatWorkOrderDateDDMMYYYY(dateInput);
+  const match = displayValue.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return "";
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+function parseWorkOrderDateDDMMYYYYInput(value) {
+  const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+  const displayValue = validatedCalendarParts(
+    Number(match[3]),
+    Number(match[2]),
+    Number(match[1])
+  );
+  if (!displayValue) return null;
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+function normalizeWorkOrderDateTyping(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+}
+function workOrderOverdueCompletionMessage(dueDate) {
+  const displayedDueDate = formatWorkOrderDateDDMMYYYY(dueDate, String(dueDate ?? ""));
+  return `Work was completed after the scheduled due date (${displayedDueDate}). The record will be tagged as overdue.`;
+}
 function normalizeDateToDDMMMYYYY(dateInput) {
   if (!dateInput) return null;
   try {
@@ -11163,11 +11447,25 @@ function formatRHWithSeparators(value) {
   if (isNaN(num)) return String(value);
   return num.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
-var MONTH_ABBREV_3;
+var MONTH_NUMBER_BY_NAME, MONTH_ABBREV_3;
 var init_dateUtils = __esm({
   "shared/dateUtils.ts"() {
     "use strict";
     init_dateParse();
+    MONTH_NUMBER_BY_NAME = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
     MONTH_ABBREV_3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   }
 });
@@ -11175,8 +11473,42 @@ var init_dateUtils = __esm({
 // shared/workOrders/jobCycleCalc.ts
 var jobCycleCalc_exports = {};
 __export(jobCycleCalc_exports, {
-  computeJobCycleUpdates: () => computeJobCycleUpdates
+  computeJobCycleUpdates: () => computeJobCycleUpdates,
+  preserveNewerJobRhState: () => preserveNewerJobRhState
 });
+function finiteRh(value) {
+  if (value === null || value === void 0 || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function preserveNewerJobRhState(job, updates) {
+  const guarded = { ...updates };
+  const currentDate = parseWorkOrderDate(job.lastDoneDate);
+  const incomingDate = parseWorkOrderDate(guarded.lastDoneDate);
+  if (currentDate && incomingDate && incomingDate.getTime() <= currentDate.getTime()) {
+    delete guarded.lastDoneDate;
+    delete guarded.nextDueDate;
+  }
+  const currentLastDone = finiteRh(job.lastDoneRH);
+  const incomingLastDone = finiteRh(guarded.lastDoneRH);
+  if (currentLastDone !== null && incomingLastDone !== null && incomingLastDone <= currentLastDone) {
+    delete guarded.lastDoneRH;
+    delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
+    return guarded;
+  }
+  const currentNextDue = finiteRh(job.nextDueRH);
+  const incomingNextDue = finiteRh(guarded.nextDueRH);
+  if (currentNextDue !== null && incomingNextDue !== null && incomingNextDue < currentNextDue) {
+    delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
+  }
+  return guarded;
+}
 function computeJobCycleUpdates(input) {
   const { maintenanceBasis, dateOfCompletion, completionRH, originalDueDate, job } = input;
   const jobUpdates = {};
@@ -11213,15 +11545,152 @@ function computeJobCycleUpdates(input) {
     applyCalendarLeg();
     applyRhLeg();
   }
+  if (maintenanceBasis === "Running Hours" && dateOfCompletion) {
+    jobUpdates.lastDoneDate = dateOfCompletion;
+  }
   if (maintenanceBasis === "Running Hours" && completionRH) {
     applyRhLeg();
   }
-  return { jobUpdates };
+  return { jobUpdates: preserveNewerJobRhState(job, jobUpdates) };
 }
 var init_jobCycleCalc = __esm({
   "shared/workOrders/jobCycleCalc.ts"() {
     "use strict";
     init_dateUtils();
+    init_dateParse();
+  }
+});
+
+// server/services/rhDueDateService.ts
+var rhDueDateService_exports = {};
+__export(rhDueDateService_exports, {
+  RH_ESTIMATE_BASIS_VERSION: () => RH_ESTIMATE_BASIS_VERSION,
+  calculateHistoricalRhAverage: () => calculateHistoricalRhAverage,
+  effectiveDueDate: () => effectiveDueDate,
+  estimateRhDueDate: () => estimateRhDueDate,
+  isCurrentRhEstimateBasis: () => isCurrentRhEstimateBasis,
+  resolveAuthoritativeRhComponent: () => resolveAuthoritativeRhComponent,
+  rhEstimateBasis: () => rhEstimateBasis
+});
+function isCurrentRhEstimateBasis(basis) {
+  return Boolean(basis?.startsWith(`${RH_ESTIMATE_BASIS_VERSION}_`));
+}
+function rhEstimateBasis(reason) {
+  return `${RH_ESTIMATE_BASIS_VERSION}_${reason}`;
+}
+function numeric3(value) {
+  if (value === null || value === void 0 || String(value).trim() === "") return null;
+  const result = Number(value);
+  return Number.isFinite(result) ? result : null;
+}
+function pointDate(point) {
+  return parseWorkOrderDate(point.dateUpdatedLocal);
+}
+function calculateHistoricalRhUtilization(points) {
+  const ordered = points.map((point) => ({
+    point,
+    date: pointDate(point),
+    rh: numeric3(point.cumulativeRH ?? point.newRH),
+    stamp: point.stampHolder || null
+  })).filter((item) => item.date !== null && item.point.isDeleted !== true).sort((a, b) => {
+    const byDate = a.date.getTime() - b.date.getTime();
+    if (byDate !== 0) return byDate;
+    return String(a.point.enteredAtUTC || "").localeCompare(String(b.point.enteredAtUTC || ""));
+  });
+  let lastBoundary = -1;
+  ordered.forEach((item, index3) => {
+    if (item.point.meterReplaced || item.point.isRenewalReset) lastBoundary = index3;
+  });
+  const valid = ordered.slice(Math.max(0, lastBoundary)).filter((item) => item.rh !== null);
+  if (valid.length < 2) return null;
+  const latest = valid[valid.length - 1];
+  let latestStampStart = valid.length - 1;
+  while (latestStampStart > 0 && valid[latestStampStart - 1].stamp === latest.stamp) {
+    latestStampStart--;
+  }
+  for (let startIndex = latestStampStart; startIndex < valid.length - 1; startIndex++) {
+    const start = valid[startIndex];
+    const days = (latest.date.getTime() - start.date.getTime()) / 864e5;
+    const delta = latest.rh - start.rh;
+    if (!(days > 0) || !(delta > 0)) continue;
+    return {
+      averagePerDay: delta / days,
+      latestDate: latest.date,
+      latestRh: latest.rh
+    };
+  }
+  return null;
+}
+function calculateHistoricalRhAverage(points) {
+  return calculateHistoricalRhUtilization(points)?.averagePerDay ?? null;
+}
+async function resolveAuthoritativeRhComponent(component, findById5, findByCode2, fallbackVesselId) {
+  if (!component) return null;
+  const expectedVesselId = component.vesselId || fallbackVesselId || null;
+  const isAuthoritativeMaster = (candidate) => Boolean(
+    candidate && String(candidate.rhCounterType || "").toUpperCase() === "MASTER" && (!expectedVesselId || candidate.vesselId === expectedVesselId)
+  );
+  if (String(component.rhCounterType || "").toUpperCase() !== "INHERITED") {
+    return isAuthoritativeMaster(component) ? component : null;
+  }
+  let master = null;
+  if (component.rhMasterComponentId) {
+    master = await findById5(String(component.rhMasterComponentId));
+  }
+  if (!isAuthoritativeMaster(master) && component.rhCounterSource && expectedVesselId) {
+    master = await findByCode2(component.rhCounterSource, expectedVesselId);
+  }
+  return isAuthoritativeMaster(master) ? master : null;
+}
+function estimateRhDueDate(completionDate, rhFrequency, points) {
+  const utilization = calculateHistoricalRhUtilization(points);
+  if (!utilization) {
+    return { dueDate: null, averagePerDay: null, basis: rhEstimateBasis("INSUFFICIENT_HISTORY") };
+  }
+  const completion = parseWorkOrderDate(completionDate);
+  if (!completion) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis("INVALID_COMPLETION_DATE")
+    };
+  }
+  const frequency = numeric3(rhFrequency);
+  if (frequency === null || frequency <= 0) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis("MISSING_RH_FREQUENCY")
+    };
+  }
+  const projectedDays = Math.max(0, Math.round(frequency / utilization.averagePerDay));
+  const due = new Date(Date.UTC(
+    completion.getUTCFullYear(),
+    completion.getUTCMonth(),
+    completion.getUTCDate() + projectedDays
+  ));
+  return {
+    dueDate: formatWorkOrderCalendarDate(due),
+    averagePerDay: utilization.averagePerDay,
+    basis: rhEstimateBasis("HISTORICAL")
+  };
+}
+function effectiveDueDate(calendarDueDate, rhDueDate) {
+  if (!calendarDueDate && !rhDueDate) return { date: null, basis: "UNAVAILABLE" };
+  if (!calendarDueDate) return { date: rhDueDate || null, basis: "RUNNING_HOURS" };
+  if (!rhDueDate) return { date: calendarDueDate, basis: "CALENDAR" };
+  const calendar = parseWorkOrderDate(calendarDueDate);
+  const rh = parseWorkOrderDate(rhDueDate);
+  if (!calendar || !rh) return { date: calendarDueDate, basis: "CALENDAR" };
+  if (calendar.getTime() === rh.getTime()) return { date: calendarDueDate, basis: "CALENDAR_AND_RUNNING_HOURS" };
+  return calendar < rh ? { date: calendarDueDate, basis: "CALENDAR" } : { date: rhDueDate, basis: "RUNNING_HOURS" };
+}
+var RH_ESTIMATE_BASIS_VERSION;
+var init_rhDueDateService = __esm({
+  "server/services/rhDueDateService.ts"() {
+    "use strict";
+    init_dateParse();
+    RH_ESTIMATE_BASIS_VERSION = "RH_COMPLETION_FIRST_LATEST_V2";
   }
 });
 
@@ -11231,8 +11700,171 @@ __export(shipCompletionLearner_exports, {
   collectCompletionWouuidsFromFullRows: () => collectCompletionWouuidsFromFullRows,
   collectCompletionWouuidsFromLogs: () => collectCompletionWouuidsFromLogs,
   filterAdvanceOnly: () => filterAdvanceOnly,
-  learnFromShipCompletions: () => learnFromShipCompletions
+  learnFromShipCompletions: () => learnFromShipCompletions,
+  refreshRhEstimatesFromAuditRows: () => refreshRhEstimatesFromAuditRows
 });
+async function refreshRhEstimatesFromAuditRows(client, auditRowUuids) {
+  if (auditRowUuids.length === 0) return 0;
+  const componentsRes = await client.query(
+    `SELECT DISTINCT
+            a.component_id,
+            c.cuuid AS component_cuuid,
+            c.id::text AS component_legacy_id,
+            c.component_code
+       FROM running_hours_audit a
+       LEFT JOIN components c
+         ON c.cuuid = a.component_id OR c.id::text = a.component_id
+      WHERE a.rhauuid = ANY($1::text[])`,
+    [auditRowUuids]
+  );
+  const componentIdentities = Array.from(new Set(
+    componentsRes.rows.flatMap((row) => [
+      row.component_id,
+      row.component_cuuid,
+      row.component_legacy_id
+    ].filter(Boolean).map(String))
+  ));
+  const componentCodes = Array.from(new Set(
+    componentsRes.rows.map((row) => row.component_code).filter(Boolean).map(String)
+  ));
+  if (componentIdentities.length === 0) return 0;
+  const jobsRes = await client.query(
+    `SELECT DISTINCT
+            j.juuid, j.vessel_id, j.component_id, j.component_code,
+            j.maintenance_basis, j.interval_running_hour,
+            j.last_done_date, j.last_done_rh, j.next_due_rh,
+            c.cuuid AS component_cuuid, c.id AS component_legacy_id,
+            c.vessel_id AS component_vessel_id, c.rh_counter_type,
+            c.rh_master_component_id, c.rh_counter_source
+       FROM jobs j
+       JOIN components c
+         ON c.cuuid = j.component_id
+         OR c.id::text = j.component_id
+         OR (c.component_code = j.component_code AND c.vessel_id = j.vessel_id)
+      WHERE j.maintenance_basis IN ('Running Hours', 'Dual Frequency')
+        AND j.next_due_rh IS NOT NULL
+        AND (
+          c.cuuid = ANY($1::text[])
+          OR c.id::text = ANY($1::text[])
+          OR c.rh_master_component_id = ANY($1::text[])
+          OR c.rh_counter_source = ANY($2::text[])
+         )
+       ORDER BY j.juuid`,
+    [componentIdentities, componentCodes]
+  );
+  let refreshed = 0;
+  for (let i = 0; i < jobsRes.rows.length; i++) {
+    const job = jobsRes.rows[i];
+    const sp = `rh_refresh_${i}`;
+    await client.query(`SAVEPOINT ${sp}`);
+    try {
+      const lockedJobRes = await client.query(
+        `SELECT last_done_date, last_done_rh, next_due_rh, interval_running_hour
+         FROM jobs
+        WHERE juuid = $1
+        FOR UPDATE`,
+        [job.juuid]
+      );
+      const lockedJob = lockedJobRes.rows[0];
+      if (!lockedJob) continue;
+      const toRhComponent = (row) => row ? {
+        id: row.id,
+        cuuid: row.cuuid,
+        vesselId: row.vessel_id,
+        rhCounterType: row.rh_counter_type,
+        rhMasterComponentId: row.rh_master_component_id,
+        rhCounterSource: row.rh_counter_source
+      } : null;
+      const findById5 = async (id) => {
+        const result = await client.query(
+          `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE cuuid = $1 OR id::text = $1 LIMIT 1`,
+          [id]
+        );
+        return toRhComponent(result.rows[0]);
+      };
+      const findByCode2 = async (code, vesselId) => {
+        const result = await client.query(
+          `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE component_code = $1 AND vessel_id = $2 LIMIT 1`,
+          [code, vesselId]
+        );
+        return toRhComponent(result.rows[0]);
+      };
+      const source = await resolveAuthoritativeRhComponent(
+        {
+          id: job.component_legacy_id,
+          cuuid: job.component_cuuid,
+          vesselId: job.component_vessel_id,
+          rhCounterType: job.rh_counter_type,
+          rhMasterComponentId: job.rh_master_component_id,
+          rhCounterSource: job.rh_counter_source
+        },
+        findById5,
+        findByCode2,
+        job.vessel_id
+      );
+      let estimate = {
+        dueDate: null,
+        averagePerDay: null,
+        basis: rhEstimateBasis("MISSING_RH_SOURCE")
+      };
+      if (source?.cuuid) {
+        const audits = await client.query(
+          `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+           FROM running_hours_audit
+          WHERE component_id = $1
+            AND COALESCE(is_deleted, false) = false
+          ORDER BY entered_at_utc DESC`,
+          [source.cuuid]
+        );
+        estimate = estimateRhDueDate(
+          lockedJob.last_done_date,
+          lockedJob.interval_running_hour,
+          audits.rows.map((row) => ({
+            cumulativeRH: row.cumulative_rh,
+            newRH: row.new_rh,
+            previousRH: row.previous_rh,
+            dateUpdatedLocal: row.date_updated_local,
+            meterReplaced: row.meter_replaced,
+            isRenewalReset: row.is_renewal_reset,
+            stampHolder: row.stamp_holder,
+            enteredAtUTC: row.entered_at_utc,
+            isDeleted: row.is_deleted
+          }))
+        );
+      }
+      const update7 = await client.query(
+        `UPDATE jobs
+          SET rh_estimated_due_date = $2,
+              rh_average_per_day = $3,
+              rh_estimate_basis = $4,
+              updated_at = NOW()
+        WHERE juuid = $1
+          AND last_done_date IS NOT DISTINCT FROM $5
+          AND last_done_rh IS NOT DISTINCT FROM $6
+          AND next_due_rh IS NOT DISTINCT FROM $7`,
+        [
+          job.juuid,
+          estimate.dueDate,
+          estimate.averagePerDay,
+          estimate.basis,
+          lockedJob.last_done_date,
+          lockedJob.last_done_rh,
+          lockedJob.next_due_rh
+        ]
+      );
+      refreshed += update7.rowCount ?? 0;
+      await client.query(`RELEASE SAVEPOINT ${sp}`);
+    } catch (err) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+      await client.query(`RELEASE SAVEPOINT ${sp}`);
+      syncDiag(`RH-ESTIMATE REFRESH ERROR: job=${job.juuid}: ${String(err?.message || err).substring(0, 160)}`);
+    }
+  }
+  return refreshed;
+}
 function collectCompletionWouuidsFromLogs(logs) {
   const out = /* @__PURE__ */ new Set();
   for (const log2 of logs) {
@@ -11277,7 +11909,14 @@ function filterAdvanceOnly(localJob, jobUpdates) {
     if (!advance) {
       delete ju.lastDoneRH;
       delete ju.nextDueRH;
+      delete ju.rhEstimatedDueDate;
+      delete ju.rhAveragePerDay;
+      delete ju.rhEstimateBasis;
     }
+  } else if (ju.rhEstimatedDueDate !== void 0 || ju.rhAveragePerDay !== void 0 || ju.rhEstimateBasis !== void 0) {
+    delete ju.rhEstimatedDueDate;
+    delete ju.rhAveragePerDay;
+    delete ju.rhEstimateBasis;
   }
   return Object.keys(ju).length > 0 ? ju : null;
 }
@@ -11288,14 +11927,14 @@ function buildSet(updates, startIdx) {
   for (const [k, col] of Object.entries(COL_MAP)) {
     if (updates[k] !== void 0) {
       parts.push(`"${col}" = $${i++}`);
-      values.push(String(updates[k]));
+      values.push(updates[k] === null ? null : String(updates[k]));
     }
   }
   parts.push(`updated_at = NOW()`);
   return { sql: parts.join(", "), values };
 }
 async function learnFromShipCompletions(client, wouuids) {
-  const result = { candidates: wouuids.length, jobsAdvanced: 0, skipped: 0, errors: 0 };
+  const result = { candidates: wouuids.length, jobsAdvanced: 0, skipped: 0, errors: 0, errorWouuids: [] };
   await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
   for (let i = 0; i < wouuids.length; i++) {
     const wouuid = wouuids[i];
@@ -11305,6 +11944,7 @@ async function learnFromShipCompletions(client, wouuids) {
       const woRes = await client.query(
         `SELECT wouuid, status, job_id, vessel_id, maintenance_basis,
                 date_completed, wo_completion_rh, completion_rh, current_reading,
+                component_id,
                 next_due_date, due_date, work_order_no
            FROM work_orders WHERE wouuid = $1 LIMIT 1`,
         [wouuid]
@@ -11329,8 +11969,8 @@ async function learnFromShipCompletions(client, wouuids) {
         continue;
       }
       const jobRes = await client.query(
-        `SELECT juuid, job_no, vessel_id, frequency_value, frequency_unit, interval_running_hour,
-                last_done_date, last_done_rh
+        `SELECT juuid, job_no, vessel_id, component_id, frequency_value, frequency_unit, interval_running_hour,
+                last_done_date, last_done_rh, next_due_rh
            FROM jobs WHERE juuid = $1 FOR UPDATE`,
         [wo.job_id]
       );
@@ -11348,17 +11988,21 @@ async function learnFromShipCompletions(client, wouuids) {
         continue;
       }
       const completionRH = wo.wo_completion_rh ?? wo.completion_rh ?? wo.current_reading;
+      const jobCompletionDate = getJobCompletionDate({ dateCompleted: wo.date_completed });
       const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: wo.maintenance_basis,
-        dateOfCompletion: wo.date_completed,
+        dateOfCompletion: jobCompletionDate,
         completionRH: completionRH != null ? String(completionRH) : null,
         originalDueDate: wo.next_due_date || wo.due_date || null,
         job: {
           frequencyValue: job.frequency_value,
           frequencyUnit: job.frequency_unit,
-          intervalRunningHour: job.interval_running_hour
+          intervalRunningHour: job.interval_running_hour,
+          lastDoneDate: job.last_done_date,
+          lastDoneRH: job.last_done_rh
         }
       });
+      const rhAdvance = jobUpdates.lastDoneRH !== void 0 && completionRH != null && (wo.maintenance_basis === "Running Hours" || wo.maintenance_basis === "Dual Frequency");
       const filtered = filterAdvanceOnly(job, jobUpdates);
       if (!filtered) {
         result.skipped++;
@@ -11366,13 +12010,113 @@ async function learnFromShipCompletions(client, wouuids) {
         await client.query(`RELEASE SAVEPOINT ${sp}`);
         continue;
       }
+      if (rhAdvance && filtered.lastDoneRH !== void 0) {
+        filtered.rhEstimatedDueDate = null;
+        filtered.rhAveragePerDay = null;
+        filtered.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+      }
       const jobSet = buildSet(filtered, 2);
-      await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
+      const coreWrite = await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
+      if (coreWrite.rowCount === 0) throw new Error(`Job ${job.juuid} disappeared before core update`);
       result.jobsAdvanced++;
       syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} \u2192 ${JSON.stringify(filtered)}`);
+      if (rhAdvance && filtered.lastDoneRH !== void 0) {
+        const estimateSp = `learn_estimate_${i}`;
+        await client.query(`SAVEPOINT ${estimateSp}`);
+        try {
+          const toRhComponent = (row) => row ? {
+            id: row.id,
+            cuuid: row.cuuid,
+            vesselId: row.vessel_id,
+            rhCounterType: row.rh_counter_type,
+            rhMasterComponentId: row.rh_master_component_id,
+            rhCounterSource: row.rh_counter_source
+          } : null;
+          const findComponentById = async (id) => {
+            const result2 = await client.query(
+              `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE cuuid = $1 OR id::text = $1
+              LIMIT 1`,
+              [id]
+            );
+            return toRhComponent(result2.rows[0]);
+          };
+          const findComponentByCode3 = async (code, vesselId) => {
+            const result2 = await client.query(
+              `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE component_code = $1 AND vessel_id = $2
+              LIMIT 1`,
+              [code, vesselId]
+            );
+            return toRhComponent(result2.rows[0]);
+          };
+          const componentRes = await client.query(
+            `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+             FROM components
+            WHERE cuuid = $1 OR id::text = $1
+            LIMIT 1`,
+            [wo.component_id || job.component_id]
+          );
+          const sourceComponent = await resolveAuthoritativeRhComponent(
+            toRhComponent(componentRes.rows[0]),
+            findComponentById,
+            findComponentByCode3,
+            wo.vessel_id || job.vessel_id
+          );
+          const sourceId = sourceComponent?.cuuid;
+          if (sourceId) {
+            const auditsRes = await client.query(
+              `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                    meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+               FROM running_hours_audit
+               WHERE component_id = $1
+                 AND COALESCE(is_deleted, false) = false
+              ORDER BY entered_at_utc DESC`,
+              [sourceId]
+            );
+            const estimate = estimateRhDueDate(
+              jobCompletionDate,
+              job.interval_running_hour,
+              auditsRes.rows.map((row) => ({
+                cumulativeRH: row.cumulative_rh,
+                newRH: row.new_rh,
+                previousRH: row.previous_rh,
+                dateUpdatedLocal: row.date_updated_local,
+                meterReplaced: row.meter_replaced,
+                isRenewalReset: row.is_renewal_reset,
+                stampHolder: row.stamp_holder,
+                enteredAtUTC: row.entered_at_utc,
+                isDeleted: row.is_deleted
+              }))
+            );
+            await client.query(
+              `UPDATE jobs SET rh_estimated_due_date = $2, rh_average_per_day = $3, rh_estimate_basis = $4, updated_at = NOW()
+              WHERE juuid = $1 AND last_done_rh IS NOT DISTINCT FROM $5
+                AND last_done_date IS NOT DISTINCT FROM $6 AND next_due_rh IS NOT DISTINCT FROM $7`,
+              [
+                job.juuid,
+                estimate.dueDate,
+                estimate.averagePerDay,
+                estimate.basis,
+                String(filtered.lastDoneRH),
+                filtered.lastDoneDate ?? job.last_done_date,
+                String(filtered.nextDueRH ?? job.next_due_rh)
+              ]
+            );
+          }
+          await client.query(`RELEASE SAVEPOINT ${estimateSp}`);
+        } catch (estimateErr) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${estimateSp}`);
+          await client.query(`RELEASE SAVEPOINT ${estimateSp}`);
+          syncDiag(`COMPLETION-LEARN ESTIMATE ERROR: WO ${wouuid} job=${job.juuid}: ${String(estimateErr?.message || estimateErr).substring(0, 160)}`);
+        }
+      }
       await client.query(`RELEASE SAVEPOINT ${sp}`);
     } catch (err) {
       result.errors++;
+      result.errorWouuids.push(wouuid);
       try {
         await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
@@ -11394,11 +12138,16 @@ var init_shipCompletionLearner = __esm({
     init_dateParse();
     init_workOrderStatus();
     init_syncDiagLogger();
+    init_completedWorkOrderDate();
+    init_rhDueDateService();
     COL_MAP = {
       lastDoneDate: "last_done_date",
       nextDueDate: "next_due_date",
       lastDoneRH: "last_done_rh",
-      nextDueRH: "next_due_rh"
+      nextDueRH: "next_due_rh",
+      rhEstimatedDueDate: "rh_estimated_due_date",
+      rhAveragePerDay: "rh_average_per_day",
+      rhEstimateBasis: "rh_estimate_basis"
     };
   }
 });
@@ -12163,6 +12912,198 @@ var init_unknownColumnRetryPolicy = __esm({
   }
 });
 
+// server/modules/sync/completedWorkOrderDateSync.ts
+function toSnakeCase3(fieldName) {
+  return fieldName.includes("_") ? fieldName : fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+}
+async function ensureDateBeforeSyncedCompletedStatus(client, log2, incomingCompletionDate) {
+  if (log2.tableName !== "work_orders" || toSnakeCase3(log2.fieldName) !== "status" || !isCompletedWorkOrderStatus(log2.newValue)) {
+    return;
+  }
+  const rowResult = await client.query(
+    `SELECT date_completed, completion_date_time FROM work_orders WHERE wouuid = $1 LIMIT 1`,
+    [log2.rowUuid]
+  );
+  if (rowResult.rows.length === 0) return;
+  const row = rowResult.rows[0];
+  if (isValidCompletedWorkOrderDate(row.date_completed)) return;
+  const fallback = isValidCompletedWorkOrderDate(row.completion_date_time) ? row.completion_date_time : isValidCompletedWorkOrderDate(incomingCompletionDate) ? incomingCompletionDate : null;
+  if (!fallback) {
+    const error = new Error(
+      `Synced work order ${log2.rowUuid} cannot be marked Completed without a valid completion date.`
+    );
+    error.code = COMPLETED_DATE_SYNC_ERROR;
+    throw error;
+  }
+  await client.query(
+    `UPDATE work_orders SET date_completed = $1 WHERE wouuid = $2`,
+    [fallback, log2.rowUuid]
+  );
+}
+var COMPLETED_DATE_SYNC_ERROR;
+var init_completedWorkOrderDateSync = __esm({
+  "server/modules/sync/completedWorkOrderDateSync.ts"() {
+    "use strict";
+    init_completedWorkOrderDate();
+    COMPLETED_DATE_SYNC_ERROR = "COMPLETED_WORK_ORDER_DATE_REQUIRED";
+  }
+});
+
+// server/modules/work-orders/utils/workOrderPartADates.ts
+var workOrderPartADates_exports = {};
+__export(workOrderPartADates_exports, {
+  IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS: () => IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS,
+  buildRunningHoursWorkOrderSnapshots: () => buildRunningHoursWorkOrderSnapshots,
+  findAttemptedWorkOrderSnapshotFields: () => findAttemptedWorkOrderSnapshotFields,
+  isImmutableWorkOrderSnapshotField: () => isImmutableWorkOrderSnapshotField,
+  normalizePartADateForInput: () => normalizePartADateForInput,
+  normalizePartARunningHours: () => normalizePartARunningHours,
+  resolveWorkOrderPartADates: () => resolveWorkOrderPartADates,
+  shouldApplySyncedWorkOrderSnapshot: () => shouldApplySyncedWorkOrderSnapshot
+});
+function buildRunningHoursWorkOrderSnapshots(source) {
+  const dueRH = firstNonEmptyRH(source.dueRH);
+  const lastDoneRH = firstNonEmptyRH(source.lastDoneRH);
+  const currentRH = firstNonEmptyRH(source.currentRH);
+  const interval = firstNonEmptyRH(source.intervalRunningHour);
+  return {
+    driverType: "RH",
+    cycleDueRhSnapshot: dueRH || null,
+    dueRhSnapshot: dueRH || null,
+    nextDueReading: dueRH || null,
+    rhLastDoneSnapshot: lastDoneRH || null,
+    lastDoneDateSnapshot: source.lastDoneDate?.trim() || null,
+    effectiveRhAtGeneration: currentRH || null,
+    currentReading: currentRH || null,
+    intervalRunningHour: interval || null
+  };
+}
+function findAttemptedWorkOrderSnapshotFields(input) {
+  return Object.keys(input).filter(
+    (key) => IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS.includes(key)
+  );
+}
+function isImmutableWorkOrderSnapshotField(fieldName) {
+  return IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS.includes(fieldName) || IMMUTABLE_WORK_ORDER_SNAPSHOT_COLUMNS.has(fieldName);
+}
+function shouldApplySyncedWorkOrderSnapshot(currentValue, senderOldValue) {
+  const receiverEmpty = currentValue === null || currentValue === void 0 || String(currentValue).trim() === "";
+  const senderCreatedField = senderOldValue === null || senderOldValue === void 0 || String(senderOldValue).trim() === "";
+  return receiverEmpty && senderCreatedField;
+}
+function firstNonEmptyDate(...values) {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+function firstNonEmptyRH(...values) {
+  for (const value of values) {
+    if (value === null || value === void 0) continue;
+    const trimmed = String(value).trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+function normalizePartARunningHours(value) {
+  const trimmed = value === null || value === void 0 ? "" : String(value).trim();
+  if (!trimmed) return "";
+  const numeric4 = Number(trimmed);
+  return Number.isFinite(numeric4) ? String(numeric4) : trimmed;
+}
+function normalizePartADateForInput(value) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const numericMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (numericMatch) {
+    return `${numericMatch[3]}-${numericMatch[2].padStart(2, "0")}-${numericMatch[1].padStart(2, "0")}`;
+  }
+  const namedMonthMatch = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (namedMonthMatch) {
+    const month = MONTH_NUMBER2[namedMonthMatch[2].toLowerCase()];
+    if (month) {
+      return `${namedMonthMatch[3]}-${month}-${namedMonthMatch[1].padStart(2, "0")}`;
+    }
+  }
+  return trimmed;
+}
+function resolveWorkOrderPartADates(workOrder) {
+  const normalizedBasis = workOrder.maintenanceBasis?.trim().toLowerCase();
+  const hasCalendarLeg = normalizedBasis !== "running hours";
+  const hasRunningHoursLeg = normalizedBasis === "running hours" || normalizedBasis === "dual frequency";
+  return {
+    lastCompletedOn: normalizePartADateForInput(
+      firstNonEmptyDate(workOrder.lastDoneDateSnapshot)
+    ),
+    nextDueDate: hasCalendarLeg ? normalizePartADateForInput(
+      firstNonEmptyDate(
+        workOrder.dueDateSnapshot,
+        workOrder.dueDate,
+        workOrder.nextDueDate
+      )
+    ) : "",
+    lastCompletedRH: normalizePartARunningHours(
+      firstNonEmptyRH(workOrder.rhLastDoneSnapshot)
+    ),
+    nextDueRH: hasRunningHoursLeg ? normalizePartARunningHours(
+      firstNonEmptyRH(
+        workOrder.dueRhSnapshot,
+        workOrder.cycleDueRhSnapshot,
+        workOrder.nextDueReading
+      )
+    ) : ""
+  };
+}
+var IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS, IMMUTABLE_WORK_ORDER_SNAPSHOT_COLUMNS, MONTH_NUMBER2;
+var init_workOrderPartADates = __esm({
+  "server/modules/work-orders/utils/workOrderPartADates.ts"() {
+    "use strict";
+    IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS = [
+      "driverType",
+      "dualTriggerLeg",
+      "cycleDueRhSnapshot",
+      "generateRhSnapshot",
+      "dueRhSnapshot",
+      "effectiveRhAtGeneration",
+      "rhLastDoneSnapshot",
+      "cycleDueDateSnapshot",
+      "generateDateSnapshot",
+      "dueDateSnapshot",
+      "lastDoneDateSnapshot"
+    ];
+    IMMUTABLE_WORK_ORDER_SNAPSHOT_COLUMNS = /* @__PURE__ */ new Set([
+      "driver_type",
+      "dual_trigger_leg",
+      "cycle_due_rh_snapshot",
+      "generate_rh_snapshot",
+      "due_rh_snapshot",
+      "effective_rh_at_generation",
+      "rh_last_done_snapshot",
+      "cycle_due_date_snapshot",
+      "generate_date_snapshot",
+      "due_date_snapshot",
+      "last_done_date_snapshot"
+    ]);
+    MONTH_NUMBER2 = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
+  }
+});
+
 // server/modules/sync/service.ts
 var service_exports = {};
 __export(service_exports, {
@@ -12176,6 +13117,7 @@ __export(service_exports, {
   initiateSyncSession: () => initiateSyncSession,
   preparePullData: () => preparePullData,
   receivePushData: () => receivePushData,
+  refreshRhEstimatesSafely: () => refreshRhEstimatesSafely,
   resolveConflictAction: () => resolveConflictAction
 });
 async function getVesselCodeForUuid(vesselId) {
@@ -12210,6 +13152,21 @@ async function initiateSyncSession(instanceId, vesselId, lastCheckpoint) {
     batchUuid: batch.batchUuid,
     serverTimestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
+}
+async function refreshRhEstimatesSafely(client, auditIds, batchUuid, refresh) {
+  if (!auditIds.length) return 0;
+  await client.query("SAVEPOINT rh_refresh_batch");
+  try {
+    const count2 = await refresh(client, auditIds);
+    await client.query("RELEASE SAVEPOINT rh_refresh_batch");
+    syncDiag(`RH-ESTIMATE REFRESH: audits=${auditIds.length} jobs=${count2}`);
+    return count2;
+  } catch (err) {
+    await client.query("ROLLBACK TO SAVEPOINT rh_refresh_batch");
+    await client.query("RELEASE SAVEPOINT rh_refresh_batch");
+    syncDiag(`RH-ESTIMATE REFRESH ERROR: batch=${batchUuid}: ${String(err?.message || err).substring(0, 160)}`);
+    return 0;
+  }
 }
 async function receivePushData(batchUuid, vesselId, payload) {
   syncDiag(`RECEIVE-PUSH START: batch=${batchUuid}, vessel=${vesselId}, fieldLogs=${payload.fieldLogs?.length || 0}, oneWayRows=${payload.oneWayRows?.length || 0}, fullRows=${payload.fullRows?.length || 0}`);
@@ -12268,6 +13225,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
     }
   }
   const completionWouuids = /* @__PURE__ */ new Set();
+  const rhAuditRowUuids = /* @__PURE__ */ new Set();
   let selfHealInserted = 0;
   if (payload.fullRows && payload.fullRows.length > 0) {
     const { collectCompletionWouuidsFromFullRows: collectCompletionWouuidsFromFullRows2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
@@ -12278,6 +13236,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
         continue;
       }
       collectCompletionWouuidsFromFullRows2(t.tableName, t.rows).forEach((w) => completionWouuids.add(w));
+      if (t.tableName === "running_hours_audit") {
+        t.rows.forEach((row) => {
+          const id = row.rhauuid ?? row.Rhauuid;
+          if (id) rhAuditRowUuids.add(String(id));
+        });
+      }
       const r = await applyFullRowsIfAbsent(t.tableName, t.rows);
       selfHealInserted += r.inserted;
       if (r.errors.length > 0) r.errors.slice(0, 3).forEach((e) => syncDiag(`SELF-HEAL APPLY ERROR: ${e.substring(0, 150)}`));
@@ -12334,6 +13298,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
           const dropped = new Set(insertResult.failedRowUuids || []);
           const appliedInsertLogs = acceptedLogs.filter((l) => (l.oldValue === null || l.oldValue === void 0) && !deferred.has(l) && !dropped.has(l.rowUuid));
           collectCompletionWouuidsFromLogs2(appliedInsertLogs).forEach((w) => completionWouuids.add(w));
+          appliedInsertLogs.filter((log2) => log2.tableName === "running_hours_audit").forEach((log2) => rhAuditRowUuids.add(log2.rowUuid));
         }
         fieldLogApplyErrors += insertResult.errors.length;
         (insertResult.failedRowUuids || []).forEach((r) => droppedRowUuids.add(r));
@@ -12370,7 +13335,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
           const config = getTableSyncConfig(log2.tableName);
           if (!config) continue;
           const identityCol = config.identityColumn || "id";
-          const fieldNameSnake = toSnakeCase3(log2.fieldName);
+          const fieldNameSnake = toSnakeCase4(log2.fieldName);
           const pushSp = `push_upd_${pushUpdIdx++}`;
           try {
             await client.query(`SAVEPOINT ${pushSp}`);
@@ -12490,6 +13455,26 @@ async function receivePushData(batchUuid, vesselId, payload) {
               fieldLogsApplied++;
               continue;
             }
+            if (log2.tableName === "work_orders" && isImmutableWorkOrderSnapshotField(log2.fieldName)) {
+              const currentResult = await client.query(
+                `SELECT "${fieldNameSnake}" AS value FROM "work_orders" WHERE "${identityCol}" = $1 LIMIT 1`,
+                [log2.rowUuid]
+              );
+              if (currentResult.rows.length > 0 && !shouldApplySyncedWorkOrderSnapshot(
+                currentResult.rows[0]?.value,
+                log2.oldValue
+              )) {
+                fieldLogsApplied++;
+                syncDiag(
+                  `RECEIVE UPDATE SNAPSHOT-ACK immutable work_orders.${fieldNameSnake} row=${log2.rowUuid}`
+                );
+                try {
+                  await client.query(`RELEASE SAVEPOINT ${pushSp}`);
+                } catch {
+                }
+                continue;
+              }
+            }
             let valueToApply = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
               try {
@@ -12498,6 +13483,11 @@ async function receivePushData(batchUuid, vesselId, payload) {
                 valueToApply = "[]";
               }
             }
+            await ensureDateBeforeSyncedCompletedStatus(
+              client,
+              log2,
+              dualCtxPush.incomingCompletionDateByRow.get(log2.rowUuid) ?? null
+            );
             const updateResult = await client.query(
               `UPDATE "${log2.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
               [valueToApply, log2.rowUuid, logChangedAt]
@@ -12507,6 +13497,8 @@ async function receivePushData(batchUuid, vesselId, payload) {
               droppedRowUuids.add(log2.rowUuid);
               console.warn(`[Sync Push] UPDATE skipped \u2014 row missing on receiver: ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} (change dropped; see FIELD-LOG-INSERT RECOVERY)`);
               syncDiag(`UPDATE-MISS: ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 row not found, UPDATE had no effect`);
+            } else if (log2.tableName === "running_hours_audit") {
+              rhAuditRowUuids.add(log2.rowUuid);
             }
             if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
               try {
@@ -12563,6 +13555,9 @@ async function receivePushData(batchUuid, vesselId, payload) {
               syncDiag(`RECEIVE UPDATE IMMUTABLE-ACK (terminal): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 ${(err.message || "").substring(0, 120)}`);
               console.warn(`[Sync Push] Immutable-table UPDATE rejected \u2014 acked as terminal (not retried): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid}`);
             } else {
+              if (err.code === COMPLETED_DATE_SYNC_ERROR) {
+                droppedRowUuids.add(log2.rowUuid);
+              }
               console.error(`[Sync Push] Failed to apply field log ${log2.tableName}.${log2.fieldName} for ${log2.rowUuid}: ${err.message}`);
             }
           }
@@ -12696,6 +13691,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
         }
         {
           const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+          acceptedLogs.filter((log2) => log2.tableName === "work_orders" && !droppedRowUuids.has(log2.rowUuid)).forEach((log2) => completionWouuids.add(log2.rowUuid));
           dualConflictWouuids.forEach((w) => completionWouuids.delete(w));
           if (completionWouuids.size > 0) {
             const { findWouuidsWithOpenDualConflicts: findWouuidsWithOpenDualConflicts2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
@@ -12703,8 +13699,17 @@ async function receivePushData(batchUuid, vesselId, payload) {
             stillOpen.forEach((w) => completionWouuids.delete(w));
           }
           if (completionWouuids.size > 0) {
-            await learnFromShipCompletions2(client, Array.from(completionWouuids));
+            const learned = await learnFromShipCompletions2(client, Array.from(completionWouuids));
+            if (learned.errors > 0) {
+              syncDiag(`COMPLETION-LEARN CORE ERRORS: batch=${batchUuid} count=${learned.errors} \u2014 retaining affected WO logs for retry`);
+              learned.errorWouuids.forEach((w) => droppedRowUuids.add(w));
+            }
             completionWouuids.clear();
+          }
+          if (rhAuditRowUuids.size > 0) {
+            const { refreshRhEstimatesFromAuditRows: refreshRhEstimatesFromAuditRows2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+            await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows2);
+            rhAuditRowUuids.clear();
           }
         }
         await client.query("COMMIT");
@@ -12718,9 +13723,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
     }
     totalReceived += fieldLogsStored;
   }
-  if (completionWouuids.size > 0) {
+  if (completionWouuids.size > 0 || rhAuditRowUuids.size > 0) {
     try {
-      const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+      const {
+        learnFromShipCompletions: learnFromShipCompletions2,
+        refreshRhEstimatesFromAuditRows: refreshRhEstimatesFromAuditRows2
+      } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
       const pool4 = await getPool();
       const client = await pool4.connect();
       try {
@@ -12730,7 +13738,11 @@ async function receivePushData(batchUuid, vesselId, payload) {
         const stillOpen = await findWouuidsWithOpenDualConflicts2(client, Array.from(completionWouuids));
         stillOpen.forEach((w) => completionWouuids.delete(w));
         if (completionWouuids.size > 0) {
-          await learnFromShipCompletions2(client, Array.from(completionWouuids));
+          const learned = await learnFromShipCompletions2(client, Array.from(completionWouuids));
+          learned.errorWouuids.forEach((w) => droppedRowUuids.add(w));
+        }
+        if (rhAuditRowUuids.size > 0) {
+          await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows2);
         }
         await client.query("COMMIT");
       } catch (learnErr) {
@@ -12743,6 +13755,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
         client.release();
       }
       completionWouuids.clear();
+      rhAuditRowUuids.clear();
     } catch (learnOuterErr) {
       syncDiag(`COMPLETION-LEARN (fullRows-only) setup failed: ${String(learnOuterErr?.message || learnOuterErr).substring(0, 160)}`);
     }
@@ -12919,7 +13932,7 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
   const config = getTableSyncConfig(conflict.tableName);
   if (config) {
     const identityCol = config.identityColumn || "id";
-    const fieldNameSnake = toSnakeCase3(conflict.fieldName);
+    const fieldNameSnake = toSnakeCase4(conflict.fieldName);
     try {
       const pool4 = await getPool();
       await pool4.query(
@@ -13138,7 +14151,7 @@ async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints
   }
   return { batches: results, tableMax };
 }
-function toSnakeCase3(str) {
+function toSnakeCase4(str) {
   return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 }
 function normalizeFieldLog(row) {
@@ -13249,6 +14262,8 @@ var init_service = __esm({
     init_alertsRepository();
     init_conflictReviewRepository();
     init_unknownColumnRetryPolicy();
+    init_completedWorkOrderDateSync();
+    init_workOrderPartADates();
     vesselCodeCache = /* @__PURE__ */ new Map();
   }
 });
@@ -17910,6 +18925,8 @@ var init_syncEngine = __esm({
     init_syncDiagLogger();
     init_syncRole();
     init_unknownColumnRetryPolicy();
+    init_completedWorkOrderDateSync();
+    init_workOrderPartADates();
     CHUNK_SIZE = 200;
     MAX_RETRIES = 3;
     RETRY_DELAYS = [5e3, 15e3, 45e3];
@@ -18638,6 +19655,11 @@ var init_syncEngine = __esm({
                     }
                   }
                 }
+                await ensureDateBeforeSyncedCompletedStatus(
+                  client,
+                  log2,
+                  dualCtxPull.incomingCompletionDateByRow.get(log2.rowUuid) ?? null
+                );
                 await this.applyFieldLog(log2, client);
                 try {
                   await client.query(`RELEASE SAVEPOINT ${updSp}`);
@@ -18773,6 +19795,19 @@ var init_syncEngine = __esm({
         const identityCol = config.identityColumn || "id";
         const fieldNameSnake = SYNC_COLUMN_ALIASES[log2.fieldName] ?? camelToSnake(log2.fieldName);
         const conn = client || await getPool();
+        if (log2.tableName === "work_orders" && isImmutableWorkOrderSnapshotField(log2.fieldName)) {
+          const currentResult = await conn.query(
+            `SELECT "${fieldNameSnake}" AS value FROM "work_orders" WHERE "${identityCol}" = $1 LIMIT 1`,
+            [log2.rowUuid]
+          );
+          const currentValue = currentResult.rows[0]?.value;
+          if (currentResult.rows.length > 0 && !shouldApplySyncedWorkOrderSnapshot(currentValue, log2.oldValue)) {
+            syncDiag(
+              `APPLY-FIELD-LOG SNAPSHOT-ACK immutable work_orders.${fieldNameSnake} row=${log2.rowUuid}`
+            );
+            return;
+          }
+        }
         const meta = await getColumnMeta(conn, log2.tableName);
         if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
           if (shouldRetryUnknownSyncColumn(log2.tableName, fieldNameSnake)) {
@@ -25014,7 +26049,10 @@ var init_postgresStorage = __esm({
         const db2 = await getDb();
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
-        let query = db2.select().from(runningHoursAudit).where(or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC));
+        let query = db2.select().from(runningHoursAudit).where(and6(
+          or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId)),
+          or(eq7(runningHoursAudit.isDeleted, false), isNull2(runningHoursAudit.isDeleted))
+        )).orderBy(desc2(runningHoursAudit.enteredAtUTC));
         if (limit) {
           return await query.limit(limit);
         }
@@ -29621,14 +30659,14 @@ var init_postgresStorage = __esm({
       }
       async archiveWorkOrder(id) {
         const db2 = await getDb();
-        const existingWO2 = await this.getWorkOrder(id);
+        const existingWO = await this.getWorkOrder(id);
         const result = await db2.update(workOrders).set({ isActive: false }).where(or(eq7(workOrders.wouuid, id), eq7(workOrders.id, id))).returning();
         if (result.length === 0) {
           throw new Error(`WorkOrder not found: ${id}`);
         }
-        if (existingWO2) {
+        if (existingWO) {
           try {
-            await logFieldChanges("work_orders", result[0].wouuid, result[0].vesselId || null, existingWO2, result[0], "system");
+            await logFieldChanges("work_orders", result[0].wouuid, result[0].vesselId || null, existingWO, result[0], "system");
           } catch (e) {
             console.error("[FieldLogger] WO archive:", e);
           }
@@ -30163,16 +31201,12 @@ var init_postgresStorage = __esm({
         const links = await db2.select({
           componentId: jobComponentLinks.componentId,
           componentCode: components.componentCode,
-          componentName: components.name,
-          lastDoneRH: jobComponentLinks.lastDoneRH,
-          nextDueRH: jobComponentLinks.nextDueRH
+          componentName: components.name
         }).from(jobComponentLinks).innerJoin(components, eq7(jobComponentLinks.componentId, components.cuuid)).where(eq7(jobComponentLinks.jobId, jobId));
         return links.map((l) => ({
           componentId: l.componentId,
           componentCode: l.componentCode || "",
-          componentName: l.componentName || "",
-          lastDoneRH: l.lastDoneRH,
-          nextDueRH: l.nextDueRH
+          componentName: l.componentName || ""
         }));
       }
       /**
@@ -30189,18 +31223,14 @@ var init_postgresStorage = __esm({
           jobId: jobComponentLinks.jobId,
           componentId: jobComponentLinks.componentId,
           componentCode: components.componentCode,
-          componentName: components.name,
-          lastDoneRH: jobComponentLinks.lastDoneRH,
-          nextDueRH: jobComponentLinks.nextDueRH
+          componentName: components.name
         }).from(jobComponentLinks).innerJoin(components, eq7(jobComponentLinks.componentId, components.cuuid)).where(inArray2(jobComponentLinks.jobId, jobIds));
         for (const l of links) {
           const arr = result.get(l.jobId) ?? [];
           arr.push({
             componentId: l.componentId,
             componentCode: l.componentCode || "",
-            componentName: l.componentName || "",
-            lastDoneRH: l.lastDoneRH,
-            nextDueRH: l.nextDueRH
+            componentName: l.componentName || ""
           });
           result.set(l.jobId, arr);
         }
@@ -30218,33 +31248,6 @@ var init_postgresStorage = __esm({
           jobNo: l.jobNo || "",
           jobTitle: l.jobTitle || ""
         }));
-      }
-      // Component-specific tracking updates (prevents data mixing between components sharing the same job)
-      // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-      async updateJobComponentLinkTracking(vesselId, jobId, componentId, updates) {
-        if (!vesselId) {
-          throw new Error("vesselId is required for updateJobComponentLinkTracking to ensure vessel isolation");
-        }
-        const db2 = await getDb();
-        const result = await db2.update(jobComponentLinks).set(updates).where(and6(
-          eq7(jobComponentLinks.vesselId, vesselId),
-          eq7(jobComponentLinks.jobId, jobId),
-          eq7(jobComponentLinks.componentId, componentId)
-        )).returning();
-        return result[0] || null;
-      }
-      // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-      async getJobComponentLinkWithTracking(vesselId, jobId, componentId) {
-        if (!vesselId) {
-          throw new Error("vesselId is required for getJobComponentLinkWithTracking to ensure vessel isolation");
-        }
-        const db2 = await getDb();
-        const result = await db2.select().from(jobComponentLinks).where(and6(
-          eq7(jobComponentLinks.vesselId, vesselId),
-          eq7(jobComponentLinks.jobId, jobId),
-          eq7(jobComponentLinks.componentId, componentId)
-        ));
-        return result[0] || null;
       }
       // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============
       async getSpareLocationStock(spareId) {
@@ -33049,6 +34052,7 @@ var init_workOrderService = __esm({
     init_jobService();
     init_sync();
     init_dateParse();
+    init_completedWorkOrderDate();
     init_workOrderStatus();
     WO_GEN_VERBOSE = process.env.WO_GEN_VERBOSE_LOGS === "true";
     WorkOrderService = class {
@@ -33179,6 +34183,7 @@ var init_workOrderService = __esm({
           workOrderData.workOrderNo = await generateUnplannedWorkOrderNumber(storage, workOrderData.vesselId, componentCode);
           workOrderData.templateCode = workOrderData.workOrderNo;
         }
+        ensureCompletedWorkOrderDate(null, workOrderData);
         const createdWO = await storage.createWorkOrder(workOrderData);
         try {
           const actor = workOrderData.userId || workOrderData.performedBy || "auto-generation";
@@ -33193,6 +34198,8 @@ var init_workOrderService = __esm({
        */
       async updateWorkOrder(id, updates) {
         const updatesAny = updates;
+        const existingWO = await storage.getWorkOrder(id);
+        ensureCompletedWorkOrderDate(existingWO, updatesAny);
         if (updatesAny.status === "Pending Approval" && updatesAny.currentReading) {
           const runningHours = parseInt(updatesAny.currentReading);
           if (!isNaN(runningHours) && runningHours > 0) {
@@ -33205,7 +34212,7 @@ var init_workOrderService = __esm({
               updatesAny.rhJustificationDate = /* @__PURE__ */ new Date();
             }
             try {
-              const wo = await storage.getWorkOrder(id);
+              const wo = existingWO;
               if (wo) {
                 const { validateRHEntry: validateRHEntry3, getCurrentRH: getCurrentRH3 } = await Promise.resolve().then(() => (init_rhTimelineValidationService(), rhTimelineValidationService_exports));
                 const allComponents = wo.vesselId ? await storage.getComponents(wo.vesselId) : [];
@@ -33344,22 +34351,22 @@ var init_workOrderService = __esm({
           generated: 0,
           workOrders: []
         };
-        const today = /* @__PURE__ */ new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = currentWorkOrderCalendarDate();
         for (const job of calendarJobs) {
-          const dueDate = parseWorkOrderDate(job.nextDueDate);
+          const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate);
           if (!dueDate) {
             console.warn(`\u26A0\uFE0F [Calendar WO Gen] Job ${job.jobNo} has unparseable nextDueDate "${job.nextDueDate}" \u2014 skipping (fix the job's due date)`);
             continue;
           }
-          dueDate.setHours(0, 0, 0, 0);
-          const generateDate = new Date(dueDate);
-          generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+          const generateDate = addWorkOrderCalendarDays(
+            dueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
           if (today < generateDate) {
             continue;
           }
-          const dueDateStr = dueDate.toISOString().split("T")[0];
-          const generateDateStr = generateDate.toISOString().split("T")[0];
+          const dueDateStr = formatWorkOrderCalendarDate(dueDate);
+          const generateDateStr = formatWorkOrderCalendarDate(generateDate);
           const linkedComponents = [...calendarLinksMap.get(job.juuid) ?? []];
           if (linkedComponents.length === 0 && job.componentId) {
             const primaryComponent = await getComponentFromCache(job.componentId, job.vesselId);
@@ -33773,7 +34780,7 @@ var init_jobDueScanner = __esm({
               console.warn(`\u26A0\uFE0F No component code for linked component of RH job ${job.jobNo} - skipping`);
               continue;
             }
-            const rhLastDone = parseFloat(linkedComponent.lastDoneRH || job.lastDoneRH || "0");
+            const rhLastDone = parseFloat(job.lastDoneRH || "0");
             let componentCurrentRH = rhEffectiveCurrent;
             const linkedComp = await getComponentFromCache(linkedComponent.componentId, job.vesselId);
             if (linkedComp) {
@@ -33847,7 +34854,8 @@ var init_jobDueScanner = __esm({
               generateRhSnapshot: String(rhGenerate),
               dueRhSnapshot: String(rhDue),
               effectiveRhAtGeneration: String(rhEffectiveCurrent),
-              rhLastDoneSnapshot: String(rhLastDone)
+              rhLastDoneSnapshot: String(rhLastDone),
+              lastDoneDateSnapshot: job.lastDoneDate || null
             };
             try {
               const createdWO = await workOrderService.createWorkOrder(workOrderData);
@@ -33924,8 +34932,7 @@ var init_jobDueScanner = __esm({
         };
         const dualLinksMap = await storage.getLinkedComponentsForJobs(dualJobs.map((j) => j.juuid));
         let generated = 0;
-        const today = /* @__PURE__ */ new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = currentWorkOrderCalendarDate();
         for (const job of dualJobs) {
           if (!job.componentId) {
             skipReasons.noComponentId++;
@@ -33941,14 +34948,15 @@ var init_jobDueScanner = __esm({
             skipReasons.wrongCounterType++;
             continue;
           }
-          const dueDate = parseWorkOrderDate(job.nextDueDate);
+          const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate);
           if (!dueDate) {
             skipReasons.missingCalendarData++;
             continue;
           }
-          dueDate.setHours(0, 0, 0, 0);
-          const generateDate = new Date(dueDate);
-          generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+          const generateDate = addWorkOrderCalendarDays(
+            dueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
           const calendarDue = today >= generateDate;
           let rhEffectiveCurrent;
           if (rhCounterType === "MASTER") {
@@ -33987,8 +34995,8 @@ var init_jobDueScanner = __esm({
             skipReasons.noLinkedComponents++;
             continue;
           }
-          const dueDateStr = dueDate.toISOString().split("T")[0];
-          const generateDateStr = generateDate.toISOString().split("T")[0];
+          const dueDateStr = formatWorkOrderCalendarDate(dueDate);
+          const generateDateStr = formatWorkOrderCalendarDate(generateDate);
           for (const linkedComponent of linkedComponents) {
             const componentCode = linkedComponent.componentCode;
             const componentName = linkedComponent.componentName;
@@ -34198,14 +35206,14 @@ var init_jobDueScanner = __esm({
           const dualRhDueValue = dualRhLastDone + dualFrequencyRH;
           const dualRhGenerate = Math.max(0, dualRhDueValue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
           dueRH = dualRhDueValue;
-          const dualDueDate = parseWorkOrderDate(job.nextDueDate) ?? /* @__PURE__ */ new Date();
-          dualDueDate.setHours(0, 0, 0, 0);
-          const dualDueDateStr = dualDueDate.toISOString().split("T")[0];
-          const dualGenerateDate = new Date(dualDueDate);
-          dualGenerateDate.setDate(dualGenerateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
-          const dualGenerateDateStr = dualGenerateDate.toISOString().split("T")[0];
-          const dualToday = /* @__PURE__ */ new Date();
-          dualToday.setHours(0, 0, 0, 0);
+          const dualDueDate = normalizeWorkOrderCalendarDate(job.nextDueDate) ?? currentWorkOrderCalendarDate();
+          const dualDueDateStr = formatWorkOrderCalendarDate(dualDueDate);
+          const dualGenerateDate = addWorkOrderCalendarDays(
+            dualDueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
+          const dualGenerateDateStr = formatWorkOrderCalendarDate(dualGenerateDate);
+          const dualToday = currentWorkOrderCalendarDate();
           const calLegDue = dualToday >= dualGenerateDate;
           const rhLegDue = currentRH >= dualRhGenerate;
           const dualTriggerLeg = calLegDue ? "CALENDAR" : rhLegDue ? "RH" : "CALENDAR";
@@ -34274,6 +35282,7 @@ var init_jobDueScanner = __esm({
             dueRhSnapshot: String(rhDueValue),
             effectiveRhAtGeneration: String(currentRH),
             rhLastDoneSnapshot: String(rhLastDone),
+            lastDoneDateSnapshot: job.lastDoneDate || null,
             nextDueReading: String(rhDueValue),
             currentReading: String(currentRH),
             intervalRunningHour: job.intervalRunningHour
@@ -34281,12 +35290,13 @@ var init_jobDueScanner = __esm({
           console.log(`[Manual Trigger 3] RH Job: RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS}hrs, Vessel LT=${rhLeadTimeHours}hrs`);
           console.log(`   RH_due=${rhDueValue}, RH_generate=${rhGenerate}, RH_current=${currentRH}`);
         } else {
-          const dueDate = parseWorkOrderDate(job.nextDueDate) ?? /* @__PURE__ */ new Date();
-          dueDate.setHours(0, 0, 0, 0);
-          const dueDateStr = dueDate.toISOString().split("T")[0];
-          const generateDate = new Date(dueDate);
-          generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
-          const generateDateStr = generateDate.toISOString().split("T")[0];
+          const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate) ?? currentWorkOrderCalendarDate();
+          const dueDateStr = formatWorkOrderCalendarDate(dueDate);
+          const generateDate = addWorkOrderCalendarDays(
+            dueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
+          const generateDateStr = formatWorkOrderCalendarDate(generateDate);
           const calVesselId = job.vesselId || "unknown";
           const calCompCode = effectiveComponentCode || "unknown";
           const calCycleKey = `${calVesselId}|${job.jobNo}|${calCompCode}|${dueDateStr}`;
@@ -34539,9 +35549,6 @@ async function findMaintenanceHistoryByWorkOrderId(woId) {
 }
 async function findMaintenanceHistoryByJobId2(jobId) {
   return storage.getMaintenanceHistoryByJobId(jobId);
-}
-async function findAllJobComponentLinks() {
-  return storage.getAllJobComponentLinks();
 }
 async function findUser(userId) {
   return storage.getUser(parseInt(userId, 10));
@@ -34890,6 +35897,31 @@ var init_complianceAnomalyService = __esm({
 });
 
 // shared/utils/workOrderFilters.ts
+function resolveDisplayedWorkOrderDueDate(wo) {
+  const basis = String(wo.maintenanceBasis || "").trim().toLowerCase();
+  const calendarDueDate = wo.dueDate || null;
+  const expectedRhDueDate = wo.rhEstimatedDueDate || null;
+  if (basis === "running hours") {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (basis !== "dual frequency") {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
+  if (!calendarDueDate) {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (!expectedRhDueDate) {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
+  const calendar = parseWorkOrderDate(calendarDueDate);
+  const expectedRh = parseWorkOrderDate(expectedRhDueDate);
+  if (!calendar) return { date: expectedRhDueDate, isExpectedRhDate: true };
+  if (!expectedRh) return { date: calendarDueDate, isExpectedRhDate: false };
+  return expectedRh.getTime() < calendar.getTime() ? { date: expectedRhDueDate, isExpectedRhDate: true } : { date: calendarDueDate, isExpectedRhDate: false };
+}
+function getDisplayedWorkOrderDueDate(wo) {
+  return resolveDisplayedWorkOrderDueDate(wo).date;
+}
 function isStoredCompleted(wo) {
   return !!wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
 }
@@ -35091,9 +36123,12 @@ function compareWorkOrders(a, b, field, dir, activeTab = "") {
       break;
     case "dueDate": {
       const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
-      const aVal = useSubmitted ? a.submittedDate || "" : a.dueDate || "";
-      const bVal = useSubmitted ? b.submittedDate || "" : b.dueDate || "";
-      cmp = aVal.localeCompare(bVal);
+      const aVal = useSubmitted ? a.submittedDate || "" : getDisplayedWorkOrderDueDate(a) || "";
+      const bVal = useSubmitted ? b.submittedDate || "" : getDisplayedWorkOrderDueDate(b) || "";
+      const aDate = parseWorkOrderDate(aVal);
+      const bDate = parseWorkOrderDate(bVal);
+      if (aDate && bDate) cmp = aDate.getTime() - bDate.getTime();
+      else cmp = aVal.localeCompare(bVal);
       break;
     }
     case "status": {
@@ -35182,6 +36217,171 @@ function requiresWoCompletionRh(maintenanceBasis, rhCounterType) {
 }
 var init_woCompletionRhRequirement = __esm({
   "shared/workOrders/woCompletionRhRequirement.ts"() {
+    "use strict";
+  }
+});
+
+// shared/workOrderPayload.ts
+function isWorkOrderB3Applicable(rhCounterType) {
+  const normalizedCounterType = String(rhCounterType || "").trim().toUpperCase();
+  return normalizedCounterType === "MASTER" || normalizedCounterType === "INHERITED";
+}
+function sanitizeWorkOrderB3Fields(input, rhCounterType) {
+  const output = { ...input };
+  if (!isWorkOrderB3Applicable(rhCounterType)) {
+    for (const field of WORK_ORDER_B3_FIELDS) {
+      delete output[field];
+    }
+  } else {
+    delete output.previousReading;
+  }
+  return output;
+}
+var WORK_ORDER_B3_FIELDS;
+var init_workOrderPayload = __esm({
+  "shared/workOrderPayload.ts"() {
+    "use strict";
+    WORK_ORDER_B3_FIELDS = [
+      "runningHours",
+      "previousReading",
+      "runningHoursDifference",
+      "readingDate",
+      "currentReadingDate",
+      "currentReading"
+    ];
+  }
+});
+
+// shared/workOrders/workOrderB2Validation.ts
+function normalizeWorkOrderB2Date(value) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const numeric4 = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (numeric4) {
+    return `${numeric4[3]}-${numeric4[2].padStart(2, "0")}-${numeric4[1].padStart(2, "0")}`;
+  }
+  const named = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+  if (named) {
+    const month = MONTH_NUMBER3[named[2].toLowerCase()];
+    if (month) return `${named[3]}-${month}-${named[1].padStart(2, "0")}`;
+  }
+  return null;
+}
+function finiteNumber(value) {
+  if (value === null || value === void 0 || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function validateWorkOrderB2Baselines(input) {
+  const errors = [];
+  const basis = String(input.maintenanceBasis || "").trim().toUpperCase();
+  const validatesStartDate = basis === "CALENDAR" || basis === "RUNNING HOURS" || basis === "DUAL FREQUENCY";
+  if (validatesStartDate) {
+    const startDate = normalizeWorkOrderB2Date(input.startDateTime);
+    const lastCompletedOn = normalizeWorkOrderB2Date(input.lastDoneDateSnapshot);
+    if (startDate && lastCompletedOn && startDate <= lastCompletedOn) {
+      errors.push({
+        code: "START_DATE_NOT_AFTER_LAST_COMPLETED",
+        field: "startDateTime",
+        message: `Start Date must be after Last Completed On (${lastCompletedOn}).`
+      });
+    }
+  }
+  if (basis === "RUNNING HOURS") {
+    const completionRH = finiteNumber(input.woCompletionRh);
+    const lastCompletedRH = finiteNumber(input.rhLastDoneSnapshot);
+    if (completionRH !== null && lastCompletedRH !== null && completionRH <= lastCompletedRH) {
+      errors.push({
+        code: "WO_COMPLETION_RH_NOT_AFTER_LAST_COMPLETED",
+        field: "woCompletionRh",
+        message: `WO Completion RH must be greater than Last Completed At (${lastCompletedRH} Hours).`
+      });
+    }
+  }
+  return errors;
+}
+function getWorkOrderB2PatchValidationScope(context) {
+  const requestedStatus = String(context.requestedStatus || "").trim().toLowerCase();
+  const isStoredPendingApproval = context.existingStatus === "Pending Approval" && requestedStatus === "completed" && context.approvalAction === "approved";
+  const isSubmittingForApproval = requestedStatus === "pending approval" && context.existingStatus !== "Pending Approval";
+  const isFinalizing = (requestedStatus === "approved" || requestedStatus === "completed") && context.existingStatus !== "Approved" && context.existingStatus !== "Completed";
+  return {
+    startDate: context.startDateChanged === true || isSubmittingForApproval || isFinalizing && !isStoredPendingApproval,
+    completionRh: context.completionRhChanged === true || isSubmittingForApproval || isFinalizing && !isStoredPendingApproval
+  };
+}
+var MONTH_NUMBER3;
+var init_workOrderB2Validation = __esm({
+  "shared/workOrders/workOrderB2Validation.ts"() {
+    "use strict";
+    MONTH_NUMBER3 = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
+  }
+});
+
+// server/modules/work-orders/utils/workOrderListHydration.ts
+function buildHydrationJobIndexes(jobs2) {
+  const byVesselJobAndComponentCode = /* @__PURE__ */ new Map();
+  const byVesselJobAndComponentId = /* @__PURE__ */ new Map();
+  const jobsByVesselAndNumber = /* @__PURE__ */ new Map();
+  for (const job of jobs2) {
+    if (job.vesselId && job.jobNo) {
+      const baseKey = `${job.vesselId}:${job.jobNo}`;
+      const matches = jobsByVesselAndNumber.get(baseKey) ?? [];
+      matches.push(job);
+      jobsByVesselAndNumber.set(baseKey, matches);
+      if (job.componentCode) {
+        byVesselJobAndComponentCode.set(`${baseKey}:${job.componentCode}`, job);
+      }
+      if (job.componentId) {
+        byVesselJobAndComponentId.set(`${baseKey}:${job.componentId}`, job);
+      }
+    }
+  }
+  const uniqueByVesselAndJob = /* @__PURE__ */ new Map();
+  jobsByVesselAndNumber.forEach((matches, key) => {
+    if (matches.length === 1) uniqueByVesselAndJob.set(key, matches[0]);
+  });
+  return {
+    byVesselJobAndComponentCode,
+    byVesselJobAndComponentId,
+    uniqueByVesselAndJob
+  };
+}
+function resolveWorkOrderHydrationJob(workOrder, jobsById, indexes) {
+  if (workOrder.jobId) {
+    return jobsById.get(workOrder.jobId) ?? null;
+  }
+  if (workOrder.vesselId && workOrder.templateCode) {
+    const baseKey = `${workOrder.vesselId}:${workOrder.templateCode}`;
+    if (workOrder.componentCode) {
+      const byCode = indexes.byVesselJobAndComponentCode.get(`${baseKey}:${workOrder.componentCode}`);
+      if (byCode) return byCode;
+    }
+    if (workOrder.component) {
+      const byId = indexes.byVesselJobAndComponentId.get(`${baseKey}:${workOrder.component}`);
+      if (byId) return byId;
+    }
+    return indexes.uniqueByVesselAndJob.get(baseKey) ?? null;
+  }
+  return null;
+}
+var init_workOrderListHydration = __esm({
+  "server/modules/work-orders/utils/workOrderListHydration.ts"() {
     "use strict";
   }
 });
@@ -36971,6 +38171,7 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
     allJobs = await findJobs2(vesselId);
   }
   const jobsMap = new Map(allJobs.map((job) => [job.juuid, job]));
+  const hydrationJobIndexes = buildHydrationJobIndexes(allJobs);
   const componentsByCodeMap = /* @__PURE__ */ new Map();
   const componentsMap = /* @__PURE__ */ new Map();
   if (isAllVessels) {
@@ -36998,16 +38199,6 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
     const vesselSettings = await findPmsVesselSettings2(vesselId);
     if (vesselSettings) {
       vesselSettingsMap.set(vesselId, vesselSettings);
-    }
-  }
-  const allLinks = await findAllJobComponentLinks();
-  const linksByJobComponent = /* @__PURE__ */ new Map();
-  for (const link of allLinks) {
-    if (link.lastDoneRH || link.nextDueRH) {
-      linksByJobComponent.set(`${link.jobId}:${link.componentId}`, {
-        lastDoneRH: link.lastDoneRH,
-        nextDueRH: link.nextDueRH
-      });
     }
   }
   const rankLabelMap = await buildRankLabelMap();
@@ -37044,17 +38235,17 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
       rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
       rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
     } : void 0;
-    const job = wo.jobId ? jobsMap.get(wo.jobId) : wo.templateCode ? allJobs.find((j) => j.jobNo === wo.templateCode) : null;
+    const job = resolveWorkOrderHydrationJob(wo, jobsMap, hydrationJobIndexes);
+    const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || null;
+    const isRhBased = maintenanceBasis === "Running Hours" || maintenanceBasis === "Dual Frequency";
     const component = wo.componentCode ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`) : wo.component ? componentsMap.get(wo.component) : null;
     const componentId = component?.cuuid || component?.id;
-    const linkKey = wo.jobId && componentId ? `${wo.jobId}:${componentId}` : null;
-    const linkData = linkKey ? linksByJobComponent.get(linkKey) : null;
     let dueRH;
-    if (wo.maintenanceBasis === "Running Hours") {
-      dueRH = parseRH3(linkData?.nextDueRH);
+    if (maintenanceBasis === "Running Hours") {
+      dueRH = parseRH3(job?.nextDueRH);
       if (dueRH == null) {
         const woNextDue = parseRH3(wo.nextDueReading);
-        const lastDone = parseRH3(linkData?.lastDoneRH) ?? parseRH3(job?.lastDoneRH);
+        const lastDone = parseRH3(job?.lastDoneRH);
         const interval = parseRH3(job?.intervalRunningHour);
         const computed = lastDone != null && interval != null && interval > 0 ? lastDone + interval : void 0;
         if (woNextDue != null && computed != null && computed > woNextDue) {
@@ -37064,7 +38255,9 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
         }
       }
     }
-    const currentRH = wo.maintenanceBasis === "Running Hours" ? parseRH3(component?.currentCumulativeRH) ?? parseRH3(wo.currentReading) : void 0;
+    const nextDueHour = maintenanceBasis === "Running Hours" ? dueRH ?? null : maintenanceBasis === "Dual Frequency" ? parseRH3(job?.nextDueRH) ?? parseRH3(wo.nextDueReading) ?? null : null;
+    const rhEstimatedDueDate = isRhBased ? job?.rhEstimatedDueDate ?? null : null;
+    const currentRH = isRhBased ? parseRH3(component?.currentCumulativeRH) ?? parseRH3(wo.currentReading) : void 0;
     const isJobCritical3 = job?.jobPriority === "Critical" || job?.classRelated === "true" || job?.classRelated === true;
     const rhLeadTimeHours = wo.maintenanceBasis === "Running Hours" ? isJobCritical3 ? vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL : vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL : void 0;
     const calendarLeadTimeDays = wo.maintenanceBasis !== "Running Hours" && vesselSettings ? isJobCritical3 ? vesselSettings.calendarLeadDaysCritical : vesselSettings.calendarLeadDaysNonCritical : void 0;
@@ -37106,6 +38299,7 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
     }
     return {
       ...wo,
+      maintenanceBasis,
       assignedTo: resolvedAssignedTo,
       assignedToRankId: resolvedAssignedToRankId,
       criticality: wo.criticality || job?.criticality || null,
@@ -37115,6 +38309,8 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
       leadTimeUnit: job?.leadTimeUnit ?? null,
       componentCritical: component?.critical === true,
       dueRH: dueRH ?? null,
+      nextDueHour,
+      rhEstimatedDueDate,
       currentRH: currentRH ?? null,
       plannedDate
     };
@@ -37242,25 +38438,12 @@ async function getWorkOrder(id) {
     const num = Number(value);
     return isNaN(num) ? void 0 : num;
   };
-  let linkNextDueRH = null;
-  let linkLastDoneRH = null;
-  const compId = component?.cuuid || component?.id;
-  if (workOrder.maintenanceBasis === "Running Hours" && workOrder.jobId && compId) {
-    const links = await storage.getJobComponentLinksByJob(workOrder.jobId);
-    const link = links.find((l) => l.componentId === compId);
-    if (link?.nextDueRH) {
-      linkNextDueRH = link.nextDueRH;
-    }
-    if (link?.lastDoneRH) {
-      linkLastDoneRH = link.lastDoneRH;
-    }
-  }
   let dueRH;
   if (workOrder.maintenanceBasis === "Running Hours") {
-    dueRH = parseRH3(linkNextDueRH);
+    dueRH = parseRH3(job?.nextDueRH);
     if (dueRH == null) {
       const woNextDue = parseRH3(workOrder.nextDueReading);
-      const lastDone = parseRH3(linkLastDoneRH) ?? parseRH3(job?.lastDoneRH);
+      const lastDone = parseRH3(job?.lastDoneRH);
       const interval = parseRH3(job?.intervalRunningHour);
       const computed = lastDone != null && interval != null && interval > 0 ? lastDone + interval : void 0;
       if (woNextDue != null && computed != null && computed > woNextDue) {
@@ -37304,6 +38487,7 @@ async function getWorkOrder(id) {
 async function createWorkOrder(body) {
   const { insertWorkOrderSchema: insertWorkOrderSchema2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   let workOrderData = insertWorkOrderSchema2.parse(body);
+  let resolvedRhCounterType;
   if (!workOrderData.vesselId) {
     throw new ValidationError("Vessel ID is required to generate a work order number", {
       code: "VESSEL_ID_REQUIRED_FOR_WO_NUMBER"
@@ -37322,6 +38506,7 @@ async function createWorkOrder(body) {
       resolvedComponent = vesselComponents.find((c) => c.name === workOrderData.component);
     }
     if (resolvedComponent) {
+      resolvedRhCounterType = resolvedComponent.rhCounterType;
       if (workOrderData.componentCode && workOrderData.componentCode !== resolvedComponent.componentCode) {
         console.warn(`\u26A0\uFE0F AUTO-CORRECTING componentCode mismatch: passed "${workOrderData.componentCode}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
       }
@@ -37329,6 +38514,7 @@ async function createWorkOrder(body) {
       console.log(`\u2705 Auto-resolved componentCode: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
     }
   }
+  workOrderData = sanitizeWorkOrderB3Fields(workOrderData, resolvedRhCounterType);
   if (workOrderData.dueDate && workOrderData.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
     const [year, month, day] = workOrderData.dueDate.split("-");
     workOrderData.dueDate = `${day}-${month}-${year}`;
@@ -37341,11 +38527,26 @@ async function createWorkOrder(body) {
         (j) => j.componentId === workOrderData.component && j.jobTitle === workOrderData.jobTitle
       );
       if (matchingJob) {
-        workOrderData = { ...workOrderData, jobId: matchingJob.id };
-        console.log(`Auto-resolved jobId: ${matchingJob.id} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
+        const resolvedJobId = matchingJob.juuid || matchingJob.id;
+        workOrderData = { ...workOrderData, jobId: resolvedJobId };
+        console.log(`Auto-resolved jobId: ${resolvedJobId} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
       }
     } catch (error) {
       console.error("Failed to auto-resolve jobId:", error);
+    }
+  }
+  if (workOrderData.maintenanceBasis === "Running Hours" && workOrderData.jobId) {
+    const sourceJob = await findJob(workOrderData.jobId);
+    if (sourceJob) {
+      const dueRh = workOrderData.dueRhSnapshot ?? workOrderData.cycleDueRhSnapshot ?? workOrderData.nextDueReading ?? sourceJob.nextDueRH ?? null;
+      workOrderData = {
+        ...workOrderData,
+        lastDoneDateSnapshot: workOrderData.lastDoneDateSnapshot ?? sourceJob.lastDoneDate ?? null,
+        rhLastDoneSnapshot: workOrderData.rhLastDoneSnapshot ?? sourceJob.lastDoneRH ?? null,
+        dueRhSnapshot: workOrderData.dueRhSnapshot ?? dueRh,
+        cycleDueRhSnapshot: workOrderData.cycleDueRhSnapshot ?? dueRh,
+        nextDueReading: workOrderData.nextDueReading ?? (dueRh != null ? String(dueRh) : null)
+      };
     }
   }
   if (!workOrderData.workOrderNo) {
@@ -37445,6 +38646,7 @@ async function createWorkOrder(body) {
     }
   }
   workOrderData = await applyAssignmentSync({ ...workOrderData });
+  ensureCompletedWorkOrderDate(null, workOrderData);
   const workOrder = await create6(workOrderData);
   try {
     await logFieldChanges("work_orders", workOrder.wouuid, workOrder.vesselId || null, null, workOrder, body.userId || body.performedBy || "system");
@@ -37479,9 +38681,20 @@ async function updateWorkOrder(id, body) {
   let submittedRHApproval = null;
   let latestRHApproval = null;
   let latestRHDateApproval = null;
-  const existingWO2 = await findById3(id);
-  if (!existingWO2) {
+  const existingWO = await findById3(id);
+  if (!existingWO) {
     throw new NotFoundError("Work order not found");
+  }
+  const { findAttemptedWorkOrderSnapshotFields: findAttemptedWorkOrderSnapshotFields2 } = await Promise.resolve().then(() => (init_workOrderPartADates(), workOrderPartADates_exports));
+  const attemptedSnapshotFields = findAttemptedWorkOrderSnapshotFields2(body);
+  if (attemptedSnapshotFields.length > 0) {
+    throw new ValidationError(
+      `Cannot modify immutable Work Order snapshot fields: ${attemptedSnapshotFields.join(", ")}`,
+      {
+        code: "WORK_ORDER_SNAPSHOT_FIELDS_READ_ONLY",
+        disallowedFields: attemptedSnapshotFields
+      }
+    );
   }
   const SERVER_OWNED_RH_FIELDS = [
     "rhSyncedAt",
@@ -37499,14 +38712,14 @@ async function updateWorkOrder(id, body) {
     );
   }
   if (body.partBOfficeEdit === true) {
-    if (existingWO2.status !== "Pending Approval") {
+    if (existingWO.status !== "Pending Approval") {
       throw new ValidationError("Part B office edit is only permitted when the work order is in Pending Approval status.");
     }
     const PART_B_EDIT_ALLOWED_ROLES = ["Office", "PMS Admin", "Sail Admin"];
     if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
       throw new ValidationError("Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.");
     }
-    if (existingWO2.approvalTier === "superintendent_locked" && await isSuperintendentLockEnabled(existingWO2.vesselId)) {
+    if (existingWO.approvalTier === "superintendent_locked" && await isSuperintendentLockEnabled(existingWO.vesselId)) {
       throw new ValidationError("This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.");
     }
     const B3_FIELDS = ["runningHours", "previousReading", "runningHoursDifference", "readingDate", "currentReadingDate", "currentReading"];
@@ -37564,13 +38777,26 @@ async function updateWorkOrder(id, body) {
       if (key === "partBOfficeEdit") continue;
       if (ALLOWED_FIELDS.has(key)) updateData2[key] = value;
     }
-    console.log(`\u{1F4DD} Part B office edit \u2014 WO ${existingWO2.workOrderNo}: updating [${Object.keys(updateData2).filter((k) => !["userId", "userRole", "userUuid"].includes(k)).join(", ")}]`);
+    const b2BaselineError2 = validateWorkOrderB2Baselines({
+      maintenanceBasis: existingWO.maintenanceBasis,
+      startDateTime: updateData2.startDateTime ?? existingWO.startDateTime,
+      lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+      woCompletionRh: existingWO.woCompletionRh,
+      rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot
+    })[0];
+    if (b2BaselineError2) {
+      throw new ValidationError(b2BaselineError2.message, {
+        code: b2BaselineError2.code,
+        field: b2BaselineError2.field
+      });
+    }
+    console.log(`\u{1F4DD} Part B office edit \u2014 WO ${existingWO.workOrderNo}: updating [${Object.keys(updateData2).filter((k) => !["userId", "userRole", "userUuid"].includes(k)).join(", ")}]`);
     const workOrder2 = await update6(id, updateData2);
     return workOrder2;
   }
-  if (existingWO2.status === "Pending Approval" && !body.partBOfficeEdit) {
+  if (existingWO.status === "Pending Approval" && !body.partBOfficeEdit) {
     const actionClassification = classifyApprovalTransition({
-      existingStatus: existingWO2.status,
+      existingStatus: existingWO.status,
       requestedStatus: body.status,
       approvalAction: body.approvalAction
     });
@@ -37580,7 +38806,26 @@ async function updateWorkOrder(id, body) {
         { code: "INVALID_APPROVAL_ACTION_STATUS" }
       );
     }
-    const PENDING_APPROVAL_IMMUTABLE_FIELDS = [
+    const PENDING_APPROVAL_SUBMITTED_FIELDS = [
+      // B1 — submitted checklist / document decisions
+      "riskAssessmentStatus",
+      "safetyChecklistsStatus",
+      "operationalFormsStatus",
+      "uploadedDocuments",
+      // B2 — submitted execution details
+      "startDateTime",
+      "completionDateTime",
+      "dateCompleted",
+      "dateOfCompletion",
+      "executionAssignedTo",
+      "performedBy",
+      "noOfPersons",
+      "totalTimeHours",
+      "manhours",
+      "workCarriedOut",
+      "jobExperienceNotes",
+      "remarks",
+      "completionRemarks",
       // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
       "runningHours",
       "previousReading",
@@ -37588,16 +38833,66 @@ async function updateWorkOrder(id, body) {
       "readingDate",
       "currentReadingDate",
       "currentReading",
+      "completionRH",
       "woCompletionRh",
+      "completionRHSource",
+      "completionRHValidationDetails",
+      "completionRHValidated",
+      "rhJustification",
+      "rhJustificationProvidedBy",
+      "rhJustificationDate",
+      "rhBackdatedEntry",
+      // Execution identity is assigned before submission and must not change at approval.
+      "woExecutionId",
       // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
       "consumedSpareParts"
     ];
-    const attempted = Object.keys(body).filter((k) => PENDING_APPROVAL_IMMUTABLE_FIELDS.includes(k));
-    if (attempted.length > 0) {
-      console.warn(`\u26A0\uFE0F Blocked attempt to modify protected fields on Pending Approval WO ${existingWO2.workOrderNo}: ${attempted.join(", ")}`);
+    const sameSubmittedValue = (field, incoming) => {
+      if (field === "dateOfCompletion" || field === "dateCompleted" || field === "completionDateTime") {
+        const incomingDate = parseWorkOrderDate(incoming);
+        if (!incomingDate) return false;
+        const storedDates = [
+          parseWorkOrderDate(existingWO.completionDateTime),
+          parseWorkOrderDate(existingWO.dateCompleted)
+        ].filter((value) => value !== null);
+        if (field === "dateOfCompletion") {
+          const incomingDay = incomingDate.toISOString().slice(0, 10);
+          return storedDates.some(
+            (storedDate) => storedDate.toISOString().slice(0, 10) === incomingDay
+          );
+        }
+        return storedDates.some(
+          (storedDate) => storedDate.getTime() === incomingDate.getTime()
+        );
+      }
+      const stored = existingWO[field];
+      if (stored === incoming) return true;
+      if (stored == null || incoming == null) return stored == null && incoming == null;
+      if (typeof stored === "object" || typeof incoming === "object") {
+        try {
+          return JSON.stringify(stored) === JSON.stringify(incoming);
+        } catch {
+          return false;
+        }
+      }
+      return String(stored) === String(incoming);
+    };
+    const submittedFieldsInPayload = Object.keys(body).filter((key) => PENDING_APPROVAL_SUBMITTED_FIELDS.includes(key));
+    const changedSubmittedFields = submittedFieldsInPayload.filter((key) => !sameSubmittedValue(key, body[key]));
+    if (changedSubmittedFields.length > 0) {
+      console.warn(`\u26A0\uFE0F Blocked attempt to modify submitted fields on Pending Approval WO ${existingWO.workOrderNo}: ${changedSubmittedFields.join(", ")}`);
       throw new ValidationError(
-        `Cannot modify [${attempted.join(", ")}] on a Pending Approval work order. Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+        `Cannot modify [${changedSubmittedFields.join(", ")}] on a Pending Approval work order. Submitted execution data is locked until the work order is approved or rejected.`,
+        {
+          code: "PENDING_APPROVAL_EXECUTION_FIELDS_READ_ONLY",
+          disallowedFields: changedSubmittedFields
+        }
       );
+    }
+    if (actionClassification.explicitApproval) {
+      for (const key of submittedFieldsInPayload) {
+        delete body[key];
+      }
     }
     if (body.superintendentAck) {
       const ACK_ALLOWED_FIELDS = /* @__PURE__ */ new Set([
@@ -37638,27 +38933,27 @@ async function updateWorkOrder(id, body) {
     }
   }
   const { isCompletedStatus: isCompletedStatus3 } = await Promise.resolve().then(() => (init_workOrderStatus(), workOrderStatus_exports));
-  const woIsCompleted = isCompletedStatus3(existingWO2.status);
+  const woIsCompleted = isCompletedStatus3(existingWO.status);
   if (woIsCompleted) {
     const allowedFieldsForCompletedWO = ["remarks", "completionRemarks", "jobExperienceNotes"];
     const requestedFields = Object.keys(body);
     const disallowedFields = requestedFields.filter((f) => !allowedFieldsForCompletedWO.includes(f));
     if (disallowedFields.length > 0) {
-      const storedStatus = existingWO2.status || "Completed";
-      const dueDate = existingWO2.dueDate;
+      const storedStatus = existingWO.status || "Completed";
+      const dueDate = existingWO.dueDate;
       if (dueDate) {
         const parsedDue = parseWorkOrderDate(dueDate);
         if (parsedDue && parsedDue < /* @__PURE__ */ new Date()) {
           console.warn(
-            `\u26A0\uFE0F Data inconsistency: WO ${existingWO2.workOrderNo} has stored status "${storedStatus}" but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
+            `\u26A0\uFE0F Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
           );
         }
       }
-      console.warn(`\u26A0\uFE0F Attempted to modify completed WO ${existingWO2.workOrderNo}: ${disallowedFields.join(", ")}`);
+      console.warn(`\u26A0\uFE0F Attempted to modify completed WO ${existingWO.workOrderNo}: ${disallowedFields.join(", ")}`);
       throw new ValidationError(
         `Cannot modify work order: This work order is marked as "${storedStatus}" and cannot be modified. Only remarks can be added. If you need to re-complete this work order, please contact your administrator.`,
         {
-          message: `Work Order ${existingWO2.workOrderNo} is marked as "${storedStatus}" and cannot be modified.`,
+          message: `Work Order ${existingWO.workOrderNo} is marked as "${storedStatus}" and cannot be modified.`,
           storedStatus,
           disallowedFields
         }
@@ -37675,6 +38970,31 @@ async function updateWorkOrder(id, body) {
       delete updateData[key];
     }
   });
+  const componentRef = updateData.component || existingWO.component;
+  const componentCodeRef = updateData.componentCode || existingWO.componentCode;
+  const vesselId = updateData.vesselId || existingWO.vesselId;
+  let resolvedComponent = null;
+  if (vesselId && (componentRef || componentCodeRef)) {
+    if (componentRef) resolvedComponent = await findComponent2(componentRef);
+    if (!resolvedComponent && componentCodeRef) {
+      resolvedComponent = await findComponentByCode2(componentCodeRef, vesselId);
+    }
+    if (!resolvedComponent && componentRef) {
+      const vesselComponents = await findComponents2(vesselId);
+      resolvedComponent = vesselComponents.find((c) => c.name === componentRef);
+    }
+    if (resolvedComponent) {
+      updateData.componentCode = resolvedComponent.componentCode;
+    }
+  }
+  const effectiveRhCounterType = resolvedComponent?.rhCounterType;
+  if (updateData.draftExecutionData && typeof updateData.draftExecutionData === "object" && !Array.isArray(updateData.draftExecutionData)) {
+    updateData.draftExecutionData = sanitizeWorkOrderB3Fields(
+      updateData.draftExecutionData,
+      effectiveRhCounterType
+    );
+  }
+  updateData = sanitizeWorkOrderB3Fields(updateData, effectiveRhCounterType);
   const draftDoc = updateData.draftExecutionData;
   const isDraftOnlySave = draftDoc != null && typeof draftDoc === "object" && !Array.isArray(draftDoc) && updateData.status === void 0 && updateData.completionDateTime === void 0 && updateData.dateOfCompletion === void 0;
   if (isDraftOnlySave) {
@@ -37688,11 +39008,11 @@ async function updateWorkOrder(id, body) {
     }
     const workOrder2 = await update6(id, { draftExecutionData: draftDoc });
     try {
-      await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, workOrder2, body.userId || body.performedBy || "system");
+      await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, workOrder2, body.userId || body.performedBy || "system");
     } catch (err) {
       console.error("[FieldLogger] WO draft save:", err);
     }
-    console.log(`\u{1F4DD} Draft saved for WO ${existingWO2.workOrderNo || id} (draft-only update, status/tab unchanged)`);
+    console.log(`\u{1F4DD} Draft saved for WO ${existingWO.workOrderNo || id} (draft-only update, status/tab unchanged)`);
     return workOrder2;
   }
   const validateNumericField = (value, fieldName, opts = {}) => {
@@ -37758,29 +39078,6 @@ async function updateWorkOrder(id, body) {
       );
     }
   }
-  const componentRef = updateData.component || existingWO2.component;
-  const componentCodeRef = updateData.componentCode || existingWO2.componentCode;
-  const vesselId = updateData.vesselId || existingWO2.vesselId;
-  let resolvedComponent = null;
-  if (vesselId && (componentRef || componentCodeRef)) {
-    if (componentRef) {
-      resolvedComponent = await findComponent2(componentRef);
-    }
-    if (!resolvedComponent && componentCodeRef) {
-      resolvedComponent = await findComponentByCode2(componentCodeRef, vesselId);
-    }
-    if (!resolvedComponent && componentRef) {
-      const vesselComponents = await findComponents2(vesselId);
-      resolvedComponent = vesselComponents.find((c) => c.name === componentRef);
-    }
-    if (resolvedComponent) {
-      if (componentCodeRef && componentCodeRef !== resolvedComponent.componentCode) {
-        console.warn(`\u26A0\uFE0F AUTO-CORRECTING WO PATCH componentCode mismatch: current "${componentCodeRef}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
-      }
-      updateData.componentCode = resolvedComponent.componentCode;
-      console.log(`\u2705 Auto-resolved componentCode in PATCH: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
-    }
-  }
   const hasCompletionData = !!(updateData.completionDateTime || updateData.dateOfCompletion);
   const hasExplicitStatus = updateData.status !== void 0;
   const normalizeDateToISO = (dateStr) => {
@@ -37824,18 +39121,38 @@ async function updateWorkOrder(id, body) {
       console.log("\u{1F4DD} Auto-setting status to Pending Approval (completion data provided without explicit status)");
     }
   }
-  const isSubmittingForApproval = updateData.status === "Pending Approval" && existingWO2.status !== "Pending Approval";
-  const effectiveCompletionRh = updateData.woCompletionRh ?? existingWO2.woCompletionRh;
+  const isSubmittingForApproval = updateData.status === "Pending Approval" && existingWO.status !== "Pending Approval";
+  const effectiveCompletionRh = updateData.woCompletionRh ?? existingWO.woCompletionRh;
   const effectiveCounterType = resolvedComponent?.rhCounterType || "MASTER";
-  if (isSubmittingForApproval && requiresWoCompletionRh(existingWO2.maintenanceBasis, effectiveCounterType) && (effectiveCompletionRh === null || effectiveCompletionRh === void 0 || String(effectiveCompletionRh).trim() === "")) {
+  if (isSubmittingForApproval && requiresWoCompletionRh(existingWO.maintenanceBasis, effectiveCounterType) && (effectiveCompletionRh === null || effectiveCompletionRh === void 0 || String(effectiveCompletionRh).trim() === "")) {
     throw new ValidationError(
       "WO Completion RH is required for Running Hours-based Work Orders",
       { code: "WO_COMPLETION_RH_REQUIRED" }
     );
   }
-  if (updateData.woCompletionRh !== void 0 && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== "") {
+  const validationScope = getWorkOrderB2PatchValidationScope({
+    existingStatus: existingWO.status,
+    requestedStatus: updateData.status,
+    approvalAction: updateData.approvalAction,
+    startDateChanged: updateData.startDateTime !== void 0,
+    completionRhChanged: updateData.woCompletionRh !== void 0
+  });
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: existingWO.maintenanceBasis,
+    startDateTime: validationScope.startDate ? updateData.startDateTime ?? existingWO.startDateTime : null,
+    lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+    woCompletionRh: validationScope.completionRh ? effectiveCompletionRh : null,
+    rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field
+    });
+  }
+  if (isWorkOrderB3Applicable(effectiveCounterType) && updateData.woCompletionRh !== void 0 && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== "") {
     const woRhNum = parseFloat(String(updateData.woCompletionRh));
-    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO2.runningHours ?? existingWO2.currentReading;
+    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO.runningHours ?? existingWO.currentReading;
     const readingNum = readingRaw !== void 0 && readingRaw !== null && String(readingRaw).trim() !== "" ? parseFloat(String(readingRaw)) : NaN;
     if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
       throw new ValidationError(
@@ -37844,7 +39161,7 @@ async function updateWorkOrder(id, body) {
       );
     }
   }
-  if (updateData.currentReadingDate) {
+  if (isWorkOrderB3Applicable(effectiveCounterType) && updateData.currentReadingDate) {
     const rdParsed = new Date(String(updateData.currentReadingDate));
     const todayEnd = /* @__PURE__ */ new Date();
     todayEnd.setHours(23, 59, 59, 999);
@@ -37869,7 +39186,7 @@ async function updateWorkOrder(id, body) {
     updateData.superintendentAcknowledged = null;
     console.log("\u{1F4DD} Work order rejected - setting status to Due, wasRejected=true, clearing approval tier for rework");
   }
-  const isRejectedWO = existingWO2.wasRejected === true || existingWO2.status === "Rejected";
+  const isRejectedWO = existingWO.wasRejected === true || existingWO.status === "Rejected";
   if (isRejectedWO && hasCompletionData && !hasExplicitStatus) {
     updateData.status = "Pending Approval";
     updateData.rejectionComments = null;
@@ -37877,7 +39194,7 @@ async function updateWorkOrder(id, body) {
     updateData.approvalAction = null;
     updateData.wasRejected = false;
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
-    if (existingWO2.status === "Rejected") {
+    if (existingWO.status === "Rejected") {
       updateData.superintendentRejectionRemarks = null;
     }
     console.log("\u{1F4DD} Previously rejected WO resubmitted - transitioning to Pending Approval");
@@ -37891,36 +39208,36 @@ async function updateWorkOrder(id, body) {
     console.log("\u{1F4DD} Reviewer-reopened WO explicitly resubmitted to Pending Approval - clearing rejection flags");
   }
   const isSubmissionAction = updateData.approvalAction === "submitted" || updateData.approvalAction === "submit" || updateData.status === "Pending Approval";
-  if (isSubmissionAction && !existingWO2.submittedDate) {
+  if (isSubmissionAction && !existingWO.submittedDate) {
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
     console.log("\u{1F4DD} Capturing submittedDate for audit trail on submission/Pending Approval");
   }
-  if ((isSubmissionAction || hasCompletionData || updateData.status === "Completed") && updateData.draftExecutionData === void 0 && existingWO2.draftExecutionData != null) {
+  if ((isSubmissionAction || hasCompletionData || updateData.status === "Completed") && updateData.draftExecutionData === void 0 && existingWO.draftExecutionData != null) {
     updateData.draftExecutionData = null;
     console.log("\u{1F4DD} Clearing draftExecutionData on submission");
   }
   if (isSubmissionAction || updateData.status === "Pending Approval") {
-    const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted || existingWO2.completionDateTime || existingWO2.dateCompleted;
-    const dueDateForCalc = existingWO2.nextDueDate || existingWO2.dueDate;
-    if (completionDateForCalc && dueDateForCalc && existingWO2.maintenanceBasis !== "Running Hours") {
+    const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted || existingWO.completionDateTime || existingWO.dateCompleted;
+    const dueDateForCalc = existingWO.nextDueDate || existingWO.dueDate;
+    if (completionDateForCalc && dueDateForCalc && existingWO.maintenanceBasis !== "Running Hours") {
       const preCalcMissed = calculateMissedCycles(
         dueDateForCalc,
         completionDateForCalc,
-        existingWO2.frequencyValue || updateData.frequencyValue,
-        existingWO2.frequencyUnit || updateData.frequencyUnit
+        existingWO.frequencyValue || updateData.frequencyValue,
+        existingWO.frequencyUnit || updateData.frequencyUnit
       );
       updateData.missedCycles = preCalcMissed;
       updateData.originalDueDate = dueDateForCalc;
       console.log(`\u{1F4DD} Pre-calculated missedCycles at submission: ${preCalcMissed} (dueDate: ${dueDateForCalc}, completionDate: ${completionDateForCalc})`);
     }
-    const tierCompDate = updateData.completionDateTime || updateData.dateCompleted || existingWO2.completionDateTime || existingWO2.dateCompleted;
-    const tierDueDate = existingWO2.nextDueDate || existingWO2.dueDate;
-    const tierMissedCycles = updateData.missedCycles ?? existingWO2.missedCycles ?? 0;
+    const tierCompDate = updateData.completionDateTime || updateData.dateCompleted || existingWO.completionDateTime || existingWO.dateCompleted;
+    const tierDueDate = existingWO.nextDueDate || existingWO.dueDate;
+    const tierMissedCycles = updateData.missedCycles ?? existingWO.missedCycles ?? 0;
     const tierBackdatingDays = calculateBackdatingDaysForApproval(
       tierCompDate,
-      updateData.submittedDate || existingWO2.submittedDate
+      updateData.submittedDate || existingWO.submittedDate
     );
-    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO2.vesselId);
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO.vesselId);
     const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
@@ -37929,18 +39246,18 @@ async function updateWorkOrder(id, body) {
     updateData.approvalBlockReason = tierResult.approvalBlockReason;
     console.log(`\u{1F4DD} Layer 5: approvalTier=${tierResult.approvalTier}, daysLate=${tierResult.daysLate}, missedCycles=${tierMissedCycles}, backdatingDays=${tierBackdatingDays}`);
     if (tierResult.approvalTier === "superintendent_locked" || tierResult.approvalTier === "superintendent_notification") {
-      const woForNotification = { ...existingWO2, ...updateData };
+      const woForNotification = { ...existingWO, ...updateData };
       await createSuperintendentNotificationForWO(woForNotification, tierResult.daysLate, tierMissedCycles, tierResult.approvalTier, tierBackdatingDays);
     }
     const { resolveHodForDepartment: resolveHodAtSubmit } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
     const submissionHod = await resolveHodAtSubmit(
-      existingWO2.vesselId,
-      existingWO2.department,
-      updateData.approver || existingWO2.approver
+      existingWO.vesselId,
+      existingWO.department,
+      updateData.approver || existingWO.approver
     );
     if (submissionHod.resolved) {
       if (updateData.approver && updateData.approver !== submissionHod.rankName && submissionHod.source !== "fallback") {
-        console.warn(`[Submission] Client approver "${updateData.approver}" differs from org chart HOD "${submissionHod.rankName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Submission] Client approver "${updateData.approver}" differs from org chart HOD "${submissionHod.rankName}" for dept "${existingWO.department}". Using org chart value.`);
       }
       updateData.approver = submissionHod.rankName;
       console.log(`\u{1F4DD} Set approver from org chart: ${submissionHod.rankName} (source: ${submissionHod.source})`);
@@ -37948,7 +39265,7 @@ async function updateWorkOrder(id, body) {
   }
   console.log("\u{1F4DD} Cleaned update data keys:", Object.keys(updateData));
   const approvalTransition = classifyApprovalTransition({
-    existingStatus: existingWO2.status,
+    existingStatus: existingWO.status,
     // Use the immutable request values. Rejection normalization above changes
     // updateData.status from Rejected to Due for rework, but that must not make
     // the original explicit rejection look like an invalid action/status pair.
@@ -37968,28 +39285,31 @@ async function updateWorkOrder(id, body) {
     );
   }
   const isApprovalTransition = approvalTransition.explicitApproval;
+  if (isApprovalTransition && existingWO.dateCompleted) {
+    updateData.dateCompleted = existingWO.dateCompleted;
+  }
   let interceptedForL2Review = false;
   if (isApprovalTransition) {
     const { resolveHodForDepartment: resolveHodForDepartment2, getHodShortLabel: getHodShortLabel2 } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
     const hodResolution = await resolveHodForDepartment2(
-      existingWO2.vesselId,
-      existingWO2.department,
-      existingWO2.approver
+      existingWO.vesselId,
+      existingWO.department,
+      existingWO.approver
     );
     const hodName = hodResolution.rankName;
     const hodShort = getHodShortLabel2(hodName);
     if (hodResolution.resolved) {
       if (updateData.approver && updateData.approver !== hodName && hodResolution.source !== "fallback") {
-        console.warn(`[Approval] Client provided approver "${updateData.approver}" differs from org chart HOD "${hodName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Approval] Client provided approver "${updateData.approver}" differs from org chart HOD "${hodName}" for dept "${existingWO.department}". Using org chart value.`);
       }
       updateData.approver = hodName;
     }
-    let woMissedCycles = existingWO2.missedCycles || 0;
-    if (woMissedCycles === 0 && existingWO2.maintenanceBasis !== "Running Hours") {
-      const approvalCompDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
-      const approvalDueDate = existingWO2.nextDueDate || existingWO2.dueDate;
-      if (approvalCompDate && approvalDueDate && existingWO2.frequencyValue && existingWO2.frequencyUnit) {
-        woMissedCycles = calculateMissedCycles(approvalDueDate, approvalCompDate, existingWO2.frequencyValue, existingWO2.frequencyUnit);
+    let woMissedCycles = existingWO.missedCycles || 0;
+    if (woMissedCycles === 0 && existingWO.maintenanceBasis !== "Running Hours") {
+      const approvalCompDate = existingWO.completionDateTime || existingWO.dateCompleted;
+      const approvalDueDate = existingWO.nextDueDate || existingWO.dueDate;
+      if (approvalCompDate && approvalDueDate && existingWO.frequencyValue && existingWO.frequencyUnit) {
+        woMissedCycles = calculateMissedCycles(approvalDueDate, approvalCompDate, existingWO.frequencyValue, existingWO.frequencyUnit);
         if (woMissedCycles > 0) {
           updateData.missedCycles = woMissedCycles;
           updateData.originalDueDate = approvalDueDate;
@@ -38006,10 +39326,10 @@ async function updateWorkOrder(id, body) {
         );
       }
     }
-    const currentTier = existingWO2.approvalTier || "standard";
+    const currentTier = existingWO.approvalTier || "standard";
     const ceRemarks = (updateData.ceApprovalRemarks || "").trim();
     if (currentTier === "superintendent_locked") {
-      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
       if (lockEnabled) {
         throw new ValidationError(
           `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
@@ -38040,17 +39360,17 @@ async function updateWorkOrder(id, body) {
       }
     }
   }
-  if (isApprovalTransition && existingWO2.jobId) {
+  if (isApprovalTransition && existingWO.jobId) {
     try {
-      const linkedJob = await findJob(existingWO2.jobId);
+      const linkedJob = await findJob(existingWO.jobId);
       if (linkedJob && linkedJob.level2ReviewerRankId) {
         interceptedForL2Review = true;
         updateData.status = "Pending Office Review";
         updateData.approvalDate = (/* @__PURE__ */ new Date()).toISOString();
-        console.log(`\u{1F512} [L2 Review] WO ${existingWO2.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
+        console.log(`\u{1F512} [L2 Review] WO ${existingWO.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
       }
     } catch (err) {
-      console.warn(`[L2 Review] Could not load linked job ${existingWO2.jobId} for L2 check \u2014 proceeding without interception:`, err);
+      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check \u2014 proceeding without interception:`, err);
     }
   }
   const isBeingPostponed = updateData.status === "Postponed";
@@ -38066,38 +39386,39 @@ async function updateWorkOrder(id, body) {
       { code: "OTHER_REASON_REMARKS_REQUIRED" }
     );
   }
+  ensureCompletedWorkOrderDate(existingWO, updateData);
   const { isShipInstance: isShipInstanceForRH } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
   const isShipForRhWrite = await isShipInstanceForRH();
   let officeRhEntryAllowed = false;
-  if (!isShipForRhWrite && existingWO2.vesselId) {
+  if (!isShipForRhWrite && existingWO.vesselId) {
     const { isOfficeRhEntryEnabled: isOfficeRhEntryEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
-    officeRhEntryAllowed = await isOfficeRhEntryEnabled2(existingWO2.vesselId);
+    officeRhEntryAllowed = await isOfficeRhEntryEnabled2(existingWO.vesselId);
   }
-  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO2.rhSyncedAt && (isShipForRhWrite || officeRhEntryAllowed)) {
-    const rhRaw = existingWO2.runningHours || updateData.runningHours;
+  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO.rhSyncedAt && (isShipForRhWrite || officeRhEntryAllowed)) {
+    const rhRaw = existingWO.runningHours || updateData.runningHours;
     if (rhRaw) {
-      let rhComp = await findComponent2(existingWO2.component);
-      if (!rhComp && existingWO2.componentCode && existingWO2.vesselId) {
-        rhComp = await findComponentByCode2(existingWO2.componentCode, existingWO2.vesselId);
+      let rhComp = await findComponent2(existingWO.component);
+      if (!rhComp && existingWO.componentCode && existingWO.vesselId) {
+        rhComp = await findComponentByCode2(existingWO.componentCode, existingWO.vesselId);
       }
       const rhCounterType = (rhComp?.rhCounterType || "MASTER").toUpperCase();
       const rhValue = parseInt(rhRaw);
       const { requireReadingDayInput: requireReadingDayInput2 } = await Promise.resolve().then(() => (init_readingDate(), readingDate_exports));
       const normRhDate = (d) => requireReadingDayInput2(d ?? null, "reading/completion date") ?? void 0;
-      const completionDateNorm = normRhDate(existingWO2.completionDateTime || existingWO2.dateCompleted || updateData.completionDateTime);
-      const readingDateNorm = normRhDate(existingWO2.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
+      const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
+      const readingDateNorm = normRhDate(existingWO.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
       if (!isShipForRhWrite && !readingDateNorm) {
         throw new ValidationError(
           "Office RH entry requires the reading date (Current Reading Date or Completion Date). Enter the date the counter was actually read.",
-          { code: "RH_READING_DATE_REQUIRED", workOrderNo: existingWO2.workOrderNo }
+          { code: "RH_READING_DATE_REQUIRED", workOrderNo: existingWO.workOrderNo }
         );
       }
       if (rhComp && rhCounterType === "MASTER" && !isNaN(rhValue)) {
         const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
         const { getPool: getPoolForClaim } = await Promise.resolve().then(() => (init_db(), db_exports));
         const claimPool = await getPoolForClaim();
-        if (!await claimWoRhSync2(claimPool, existingWO2.wouuid)) {
-          console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
+        if (!await claimWoRhSync2(claimPool, existingWO.wouuid)) {
+          console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
           rhUpdateOutcomeApproval = "already_processed";
           updateData.rhUpdateOutcome = "already_processed";
         } else {
@@ -38106,17 +39427,17 @@ async function updateWorkOrder(id, body) {
             const rhResult = await updateMasterRH3(rhComp.cuuid, {
               newRHValue: rhValue,
               updateSource: "WORKORDER",
-              userId: body.userId || existingWO2.performedBy || "system",
+              userId: body.userId || existingWO.performedBy || "system",
               userUuid: body.userUuid,
               userRole: body.userRole || "Ship",
               adminOverride: body.adminOverride || false,
-              comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
+              comments: `RH update via work order completion ${existingWO.workOrderNo}`,
               dateUpdated: readingDateNorm
             }, {
               allowLowerWorkOrderApprovalSkip: true
             });
             if (rhResult.rhSkipped) {
-              await releaseWoRhSync2(claimPool, existingWO2.wouuid);
+              await releaseWoRhSync2(claimPool, existingWO.wouuid);
               rhBackdatedApproval = true;
               rhUpdateOutcomeApproval = "skipped_lower";
               rhSkipReasonApproval = "LOWER_THAN_LIVE_RH";
@@ -38128,7 +39449,7 @@ async function updateWorkOrder(id, body) {
               updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
               updateData.rhSkipLatestRh = rhResult.currentRH.toString();
               updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
-              console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for WO ${existingWO2.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live ${rhResult.currentRH} RH. RH module was not updated.`);
+              console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for WO ${existingWO.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live ${rhResult.currentRH} RH. RH module was not updated.`);
             } else {
               updateData.rhSyncedAt = /* @__PURE__ */ new Date();
               rhUpdateOutcomeApproval = rhResult.noChange ? "no_change" : "applied";
@@ -38137,10 +39458,10 @@ async function updateWorkOrder(id, body) {
               updateData.rhSkipSubmittedRh = null;
               updateData.rhSkipLatestRh = null;
               updateData.rhSkipLatestRhDate = null;
-              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} processed ${rhValue} RH via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children when increased)`);
+              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} processed ${rhValue} RH via WO ${existingWO.workOrderNo} (cascaded to INHERITED children when increased)`);
             }
           } catch (masterErr) {
-            await releaseWoRhSync2(claimPool, existingWO2.wouuid);
+            await releaseWoRhSync2(claimPool, existingWO.wouuid);
             if (masterErr instanceof ValidationError) {
               const det = masterErr.details || {};
               throw new ValidationError(masterErr.message, {
@@ -38149,7 +39470,7 @@ async function updateWorkOrder(id, body) {
                 requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
                 canOverride: det.validation?.canOverride ?? false,
                 componentId: rhComp.cuuid,
-                componentCode: rhComp.componentCode || existingWO2.componentCode,
+                componentCode: rhComp.componentCode || existingWO.componentCode,
                 rhCounterType: "MASTER"
               });
             }
@@ -38157,7 +39478,7 @@ async function updateWorkOrder(id, body) {
           }
         }
       } else if (rhComp && rhCounterType === "INHERITED" && !isNaN(rhValue)) {
-        const vesselIdForLookup = existingWO2.vesselId || rhComp.vesselId;
+        const vesselIdForLookup = existingWO.vesselId || rhComp.vesselId;
         let masterComp = null;
         if (rhComp.rhMasterComponentId && vesselIdForLookup) {
           const allVesselComps = await findComponents2(vesselIdForLookup);
@@ -38169,8 +39490,8 @@ async function updateWorkOrder(id, body) {
           const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
           const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
           const claimPoolInh = await getPoolInh();
-          if (!await claimInh(claimPoolInh, existingWO2.wouuid)) {
-            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
+          if (!await claimInh(claimPoolInh, existingWO.wouuid)) {
+            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
             rhUpdateOutcomeApproval = "already_processed";
             updateData.rhUpdateOutcome = "already_processed";
           } else {
@@ -38179,17 +39500,17 @@ async function updateWorkOrder(id, body) {
               const rhResult = await updateMasterRH3(masterComp.cuuid, {
                 newRHValue: rhValue,
                 updateSource: "WORKORDER",
-                userId: body.userId || existingWO2.performedBy || "system",
+                userId: body.userId || existingWO.performedBy || "system",
                 userUuid: body.userUuid,
                 userRole: body.userRole || "Ship",
                 adminOverride: body.adminOverride || false,
-                comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+                comments: `WO ${existingWO.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
                 dateUpdated: readingDateNorm
               }, {
                 allowLowerWorkOrderApprovalSkip: true
               });
               if (rhResult.rhSkipped) {
-                await releaseInh(claimPoolInh, existingWO2.wouuid);
+                await releaseInh(claimPoolInh, existingWO.wouuid);
                 rhBackdatedApproval = true;
                 rhUpdateOutcomeApproval = "skipped_lower";
                 rhSkipReasonApproval = "LOWER_THAN_LIVE_RH";
@@ -38201,7 +39522,7 @@ async function updateWorkOrder(id, body) {
                 updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
                 updateData.rhSkipLatestRh = rhResult.currentRH.toString();
                 updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
-                console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for INHERITED WO ${existingWO2.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live master ${rhResult.currentRH} RH. RH module was not updated.`);
+                console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for INHERITED WO ${existingWO.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live master ${rhResult.currentRH} RH. RH module was not updated.`);
               } else {
                 updateData.rhSyncedAt = /* @__PURE__ */ new Date();
                 rhUpdateOutcomeApproval = rhResult.noChange ? "no_change" : "applied";
@@ -38210,10 +39531,10 @@ async function updateWorkOrder(id, body) {
                 updateData.rhSkipSubmittedRh = null;
                 updateData.rhSkipLatestRh = null;
                 updateData.rhSkipLatestRhDate = null;
-                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}; ${rhValue} RH processed via WO ${existingWO2.workOrderNo}`);
+                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}; ${rhValue} RH processed via WO ${existingWO.workOrderNo}`);
               }
             } catch (masterErr) {
-              await releaseInh(claimPoolInh, existingWO2.wouuid);
+              await releaseInh(claimPoolInh, existingWO.wouuid);
               if (masterErr instanceof ValidationError) {
                 const det = masterErr.details || {};
                 throw new ValidationError(masterErr.message, {
@@ -38222,7 +39543,7 @@ async function updateWorkOrder(id, body) {
                   requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
                   canOverride: det.validation?.canOverride ?? false,
                   componentId: masterComp.cuuid,
-                  componentCode: masterComp.componentCode || existingWO2.componentCode,
+                  componentCode: masterComp.componentCode || existingWO.componentCode,
                   rhCounterType: "INHERITED"
                 });
               }
@@ -38240,7 +39561,7 @@ async function updateWorkOrder(id, body) {
                 previousEntry: backdateCheck.previousEntry,
                 nextEntry: backdateCheck.nextEntry,
                 componentId: rhComp.cuuid,
-                componentCode: rhComp.componentCode || existingWO2.componentCode,
+                componentCode: rhComp.componentCode || existingWO.componentCode,
                 rhCounterType: "INHERITED"
               });
             }
@@ -38249,7 +39570,7 @@ async function updateWorkOrder(id, body) {
             const prevRH = parseInt(rhComp.currentCumulativeRH || "0");
             await createRunningHoursAudit2({
               componentId: rhComp.cuuid,
-              vesselId: existingWO2.vesselId || rhComp.vesselId || "V001",
+              vesselId: existingWO.vesselId || rhComp.vesselId || "V001",
               previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
               newRH: rhValue.toString(),
               cumulativeRH: rhValue.toString(),
@@ -38258,32 +39579,32 @@ async function updateWorkOrder(id, body) {
               dateUpdatedLocal: readingDateNorm || completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
               dateUpdatedTZ: "UTC",
               enteredAtUTC: /* @__PURE__ */ new Date(),
-              userId: body.userId || existingWO2.performedBy || "System",
+              userId: body.userId || existingWO.performedBy || "System",
               source: "workorder",
-              notes: `WO ${existingWO2.workOrderNo} (INHERITED \u2014 no master link, child-only record)`,
+              notes: `WO ${existingWO.workOrderNo} (INHERITED \u2014 no master link, child-only record)`,
               meterReplaced: false
             });
           } catch (auditErr) {
             console.error("[RH Sync] Failed to write INHERITED audit snapshot:", auditErr);
           }
           updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-          console.warn(`\u26A0\uFE0F [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} has no valid master link \u2014 recorded on child only (WO ${existingWO2.workOrderNo})`);
+          console.warn(`\u26A0\uFE0F [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} has no valid master link \u2014 recorded on child only (WO ${existingWO.workOrderNo})`);
         }
       }
     }
   }
   const workOrder = await update6(id, updateData);
   try {
-    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, workOrder, body.userId || body.approver || body.performedBy || "system");
+    await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, workOrder, body.userId || body.approver || body.performedBy || "system");
   } catch (err) {
     console.error("[FieldLogger] WO update:", err);
   }
-  if (isBeingPostponed && existingWO2.status !== "Postponed") {
+  if (isBeingPostponed && existingWO.status !== "Postponed") {
     try {
       const existingCount = await storage.getWorkOrderPostponementCount(workOrder.wouuid);
       const postponementNumber = existingCount + 1;
       const postponementId = `pp-${workOrder.id}-${Date.now()}`;
-      const originalDueDate = existingWO2.dueDate || null;
+      const originalDueDate = existingWO.dueDate || null;
       const newDueDate = workOrder.postponementEndDate || workOrder.dueDate || null;
       let durationDays = null;
       if (originalDueDate && newDueDate) {
@@ -38296,7 +39617,7 @@ async function updateWorkOrder(id, body) {
       await storage.createWorkOrderPostponement({
         id: postponementId,
         workOrderId: workOrder.wouuid,
-        vesselId: workOrder.vesselId || existingWO2.vesselId || "",
+        vesselId: workOrder.vesselId || existingWO.vesselId || "",
         postponementNumber,
         originalDueDate,
         newDueDate,
@@ -38315,9 +39636,9 @@ async function updateWorkOrder(id, body) {
   const isApprovalAction = updateData.approvalAction === "approved" && updateData.status === "Completed";
   if (!isApprovalAction && !isBeingRejected && !woIsCompleted && !interceptedForL2Review) {
     const currentConsumed = ensureArray(updateData.consumedSpareParts);
-    const previousConsumed = ensureArray(existingWO2.consumedSpareParts);
+    const previousConsumed = ensureArray(existingWO.consumedSpareParts);
     const sparesToProcess = computeSpareConsumptionDelta(currentConsumed, previousConsumed);
-    const woVesselId = existingWO2.vesselId || "V001";
+    const woVesselId = existingWO.vesselId || "V001";
     if (sparesToProcess.length > 0) {
       const allSpares = await findSpares2(woVesselId);
       const updatedConsumedSpareParts = [...currentConsumed];
@@ -38344,11 +39665,11 @@ async function updateWorkOrder(id, body) {
               eventType: "ADJUST",
               qtyChange: item.reverseQty,
               referenceType: "WORK_ORDER",
-              referenceId: existingWO2.wouuid,
-              referenceNote: `WO Save Reversal: ${existingWO2.workOrderNo} - Qty adjusted due to work order re-save`,
+              referenceId: existingWO.wouuid,
+              referenceNote: `WO Save Reversal: ${existingWO.workOrderNo} - Qty adjusted due to work order re-save`,
               userId: updateData.userId || updateData.performedBy || "system"
             });
-            console.log(`\u{1F504} [Save Consumption] Reversed ${item.reverseQty} units of ${item.partKey} at ${item.locationName} (WO: ${existingWO2.workOrderNo})`);
+            console.log(`\u{1F504} [Save Consumption] Reversed ${item.reverseQty} units of ${item.partKey} at ${item.locationName} (WO: ${existingWO.workOrderNo})`);
           }
           if (item.qty > 0) {
             await performInventoryTransaction({
@@ -38358,11 +39679,11 @@ async function updateWorkOrder(id, body) {
               eventType: "CONSUME",
               qtyChange: -Math.abs(item.qty),
               referenceType: "WORK_ORDER",
-              referenceId: existingWO2.wouuid,
-              referenceNote: `WO Save: ${existingWO2.workOrderNo} - ${item.spare.comments || "Consumed on work order save"}`,
+              referenceId: existingWO.wouuid,
+              referenceNote: `WO Save: ${existingWO.workOrderNo} - ${item.spare.comments || "Consumed on work order save"}`,
               userId: updateData.userId || updateData.performedBy || "system"
             });
-            console.log(`\u2705 [Save Consumption] Deducted ${item.qty} units of ${item.partKey} from ${item.locationName} (WO: ${existingWO2.workOrderNo})`);
+            console.log(`\u2705 [Save Consumption] Deducted ${item.qty} units of ${item.partKey} from ${item.locationName} (WO: ${existingWO.workOrderNo})`);
           }
           if (item.lineIndex >= 0 && item.lineIndex < updatedConsumedSpareParts.length) {
             const currentQty = typeof updatedConsumedSpareParts[item.lineIndex].quantityConsumed === "string" ? parseFloat(updatedConsumedSpareParts[item.lineIndex].quantityConsumed) : updatedConsumedSpareParts[item.lineIndex].quantityConsumed;
@@ -38378,7 +39699,7 @@ async function updateWorkOrder(id, body) {
       }
       try {
         await update6(id, { consumedSpareParts: updatedConsumedSpareParts });
-        console.log(`\u2705 [Save Consumption] Updated _deductedQty flags for WO ${existingWO2.workOrderNo}`);
+        console.log(`\u2705 [Save Consumption] Updated _deductedQty flags for WO ${existingWO.workOrderNo}`);
       } catch (updateError) {
         console.error(`\u274C [Save Consumption] Failed to update _deductedQty flags:`, updateError);
       }
@@ -38388,7 +39709,7 @@ async function updateWorkOrder(id, body) {
     const auditActionType = isBeingRejected ? "reject" : updateData.approvalAction === "approved" && updateData.status === "Completed" ? "approve" : "update";
     const changedFields = {};
     for (const key of Object.keys(body)) {
-      const oldVal = existingWO2[key];
+      const oldVal = existingWO[key];
       const newVal = body[key];
       if (oldVal !== newVal && newVal !== void 0) {
         changedFields[key] = { old: oldVal ?? null, new: newVal };
@@ -38396,24 +39717,24 @@ async function updateWorkOrder(id, body) {
     }
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || id,
+      entityId: existingWO.wouuid || id,
       actionType: auditActionType,
       userId: body.userId || body.approver || body.performedBy || "system",
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         changedFields,
-        status: updateData.status || existingWO2.status,
+        status: updateData.status || existingWO.status,
         ...auditActionType === "approve" && { approvedAt: (/* @__PURE__ */ new Date()).toISOString() },
         ...auditActionType === "reject" && { rejectedAt: (/* @__PURE__ */ new Date()).toISOString(), rejectionComments: body.rejectionComments || null }
       }
     });
-    console.log(`Audit log created for WO ${existingWO2.workOrderNo} (action: ${auditActionType})`);
+    console.log(`Audit log created for WO ${existingWO.workOrderNo} (action: ${auditActionType})`);
   } catch (auditError) {
     console.error("Failed to create audit log entry:", auditError);
   }
@@ -38544,7 +39865,7 @@ async function updateWorkOrder(id, body) {
             }
           }
           if (job) {
-            const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
+            const rawJobCompletionDate = getJobCompletionDate(freshWorkOrder);
             const runningHours = freshWorkOrder.woCompletionRh ?? freshWorkOrder.runningHours;
             const normalizeJobDate = (dateStr) => {
               if (!dateStr) return null;
@@ -38568,16 +39889,26 @@ async function updateWorkOrder(id, body) {
               }
               await updateJob3(job.juuid, calendarUpdates);
             }
+            if (freshWorkOrder.maintenanceBasis === "Running Hours" && dateOfCompletionNorm) {
+              await updateJob3(job.juuid, { lastDoneDate: dateOfCompletionNorm });
+            }
             if (freshWorkOrder.maintenanceBasis === "Running Hours" && runningHours) {
               const currentRH = parseInt(runningHours);
               if (!isNaN(currentRH)) {
                 const rhUpdates = { lastDoneRH: currentRH };
+                if (dateOfCompletionNorm) {
+                  rhUpdates.lastDoneDate = dateOfCompletionNorm;
+                }
                 const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                 if (rhInterval && !isNaN(rhInterval)) {
                   rhUpdates.nextDueRH = currentRH + rhInterval;
                   console.log(`\u2705 Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
                 }
-                await updateJob3(job.juuid, rhUpdates);
+                const { preserveNewerJobRhState: preserveNewerJobRhState2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+                const guardedRhUpdates = preserveNewerJobRhState2(job, rhUpdates);
+                if (Object.keys(guardedRhUpdates).length > 0) {
+                  await updateJob3(job.juuid, guardedRhUpdates);
+                }
                 console.log(`\u{1F4CB} [Layer 7] RH snapshot ${currentRH} recorded for WO ${freshWorkOrder.workOrderNo || freshWorkOrder.id}. Component RH NOT modified (isolation).`);
               }
             }
@@ -38604,7 +39935,11 @@ async function updateWorkOrder(id, body) {
               } else {
                 console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
               }
-              await updateJob3(job.juuid, dualUpdates);
+              const { preserveNewerJobRhState: preserveNewerJobRhState2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+              const guardedDualUpdates = preserveNewerJobRhState2(job, dualUpdates);
+              if (Object.keys(guardedDualUpdates).length > 0) {
+                await updateJob3(job.juuid, guardedDualUpdates);
+              }
               console.log(`\u2705 [Dual] Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletionNorm}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
             }
           }
@@ -38775,11 +40110,11 @@ async function updateWorkOrder(id, body) {
   };
 }
 async function deleteWorkOrder(id) {
-  const existingWO2 = await findById3(id);
+  const existingWO = await findById3(id);
   await remove5(id);
-  if (existingWO2) {
+  if (existingWO) {
     try {
-      await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
+      await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
     } catch (err) {
       console.error("[FieldLogger] WO delete:", err);
     }
@@ -38897,12 +40232,12 @@ async function getScopedOperationData(vesselId, userRankId, mode, userRole, user
   };
 }
 async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
-  let existingWO2 = await findById3(id);
-  if (!existingWO2) existingWO2 = await findByCode(id);
-  if (!existingWO2) throw new NotFoundError("Work order not found");
-  if (existingWO2.status !== "Completed") {
+  let existingWO = await findById3(id);
+  if (!existingWO) existingWO = await findByCode(id);
+  if (!existingWO) throw new NotFoundError("Work order not found");
+  if (existingWO.status !== "Completed") {
     throw new ValidationError(
-      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO2.status}`
+      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO.status}`
     );
   }
   if (!remarks || !remarks.trim()) {
@@ -38919,26 +40254,26 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   const updatedWO = await update6(id, updatePayload);
   await logFieldChanges(
     "work_orders",
-    existingWO2.wouuid,
-    existingWO2.vesselId || null,
-    existingWO2,
+    existingWO.wouuid,
+    existingWO.vesselId || null,
+    existingWO,
     updatedWO,
     actorUserUuid
   );
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || id,
+      entityId: existingWO.wouuid || id,
       actionType: "superintendent_reject_completion",
       userId: actorUserUuid,
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         rejectedAt,
         rejectedByName: actorName || actorUserUuid,
         rejectionRemarks: remarks.trim(),
@@ -38948,13 +40283,13 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   } catch (err) {
     console.error("[AuditLog] Completed WO rejection:", err);
   }
-  if (existingWO2.jobId && existingWO2.vesselId) {
+  if (existingWO.jobId && existingWO.vesselId) {
     try {
-      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
-      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const siblings = await findWorkOrdersByJobId2(existingWO.jobId);
+      const referenceDate = existingWO.completionDateTime || existingWO.dueDate || "";
       const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
       const toCancel = siblings.filter(
-        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+        (wo) => wo.id !== existingWO.id && wo.vesselId === existingWO.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
       );
       for (const sibling of toCancel) {
         const cancelled = await update6(sibling.id, { isDeleted: true, isActive: false });
@@ -38976,11 +40311,11 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
       console.error("[Rejection] Error cancelling sibling WOs:", err);
     }
   }
-  if (existingWO2.jobId && existingWO2.dueDate) {
+  if (existingWO.jobId && existingWO.dueDate) {
     try {
       const db2 = await getDb();
-      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq12(jobs.juuid, existingWO2.jobId));
-      console.log(`\u{1F4C5} [Rejection] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+      await db2.update(jobs).set({ nextDueDate: existingWO.dueDate }).where(eq12(jobs.juuid, existingWO.jobId));
+      console.log(`\u{1F4C5} [Rejection] Reset job nextDueDate to ${existingWO.dueDate} for job ${existingWO.jobId}`);
     } catch (err) {
       console.error("[Rejection] Error resetting job nextDueDate:", err);
     }
@@ -39564,12 +40899,12 @@ async function rejectRePostponement(id, body) {
   return updatedWO;
 }
 async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
-  let existingWO2 = await findById3(id);
-  if (!existingWO2) existingWO2 = await findByCode(id);
-  if (!existingWO2) throw new NotFoundError("Work order not found");
-  if (existingWO2.status !== "Completed") {
+  let existingWO = await findById3(id);
+  if (!existingWO) existingWO = await findByCode(id);
+  if (!existingWO) throw new NotFoundError("Work order not found");
+  if (existingWO.status !== "Completed") {
     throw new ValidationError(
-      `Only Completed work orders can be reopened. Current status: ${existingWO2.status}`
+      `Only Completed work orders can be reopened. Current status: ${existingWO.status}`
     );
   }
   if (!remarks || !remarks.trim()) {
@@ -39586,26 +40921,26 @@ async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   const updatedWO = await update6(id, updatePayload);
   await logFieldChanges(
     "work_orders",
-    existingWO2.wouuid,
-    existingWO2.vesselId || null,
-    existingWO2,
+    existingWO.wouuid,
+    existingWO.vesselId || null,
+    existingWO,
     updatedWO,
     actorUserUuid
   );
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || id,
+      entityId: existingWO.wouuid || id,
       actionType: "superintendent_reopen_completion",
       userId: actorUserUuid,
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         reopenedAt,
         reopenedByName: actorName || actorUserUuid,
         reopenRemarks: remarks.trim(),
@@ -39615,13 +40950,13 @@ async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   } catch (err) {
     console.error("[AuditLog] Completed WO reopen:", err);
   }
-  if (existingWO2.jobId && existingWO2.vesselId) {
+  if (existingWO.jobId && existingWO.vesselId) {
     try {
-      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
-      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const siblings = await findWorkOrdersByJobId2(existingWO.jobId);
+      const referenceDate = existingWO.completionDateTime || existingWO.dueDate || "";
       const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
       const toCancel = siblings.filter(
-        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+        (wo) => wo.id !== existingWO.id && wo.vesselId === existingWO.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
       );
       for (const sibling of toCancel) {
         const cancelled = await update6(sibling.id, { isDeleted: true, isActive: false });
@@ -39643,11 +40978,11 @@ async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
       console.error("[Reopen] Error cancelling sibling WOs:", err);
     }
   }
-  if (existingWO2.jobId && existingWO2.dueDate) {
+  if (existingWO.jobId && existingWO.dueDate) {
     try {
       const db2 = await getDb();
-      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq12(jobs.juuid, existingWO2.jobId));
-      console.log(`\u{1F4C5} [Reopen] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+      await db2.update(jobs).set({ nextDueDate: existingWO.dueDate }).where(eq12(jobs.juuid, existingWO.jobId));
+      console.log(`\u{1F4C5} [Reopen] Reset job nextDueDate to ${existingWO.dueDate} for job ${existingWO.jobId}`);
     } catch (err) {
       console.error("[Reopen] Error resetting job nextDueDate:", err);
     }
@@ -39674,6 +41009,10 @@ var init_workOrderService2 = __esm({
     init_workOrderStatus();
     init_approvalTransition();
     init_woCompletionRhRequirement();
+    init_workOrderPayload();
+    init_workOrderB2Validation();
+    init_completedWorkOrderDate();
+    init_workOrderListHydration();
   }
 });
 
@@ -46294,14 +47633,12 @@ init_errors();
 async function listJobs(vesselId, componentId, vesselIds) {
   const jobs2 = await findJobs(vesselId, componentId, vesselIds);
   let jobLinksMap = /* @__PURE__ */ new Map();
-  let jobLinkTrackingMap = /* @__PURE__ */ new Map();
   if (vesselId && vesselId !== "all") {
     const allLinks = await findJobComponentLinks(vesselId);
     for (const link of allLinks) {
       const existing = jobLinksMap.get(link.jobId) || [];
       existing.push(link.componentCode);
       jobLinksMap.set(link.jobId, existing);
-      jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
     }
   } else if (jobs2.length > 0) {
     const vesselIds2 = Array.from(new Set(jobs2.map((j) => j.vesselId).filter((v) => v != null)));
@@ -46311,7 +47648,6 @@ async function listJobs(vesselId, componentId, vesselIds) {
         const existing = jobLinksMap.get(link.jobId) || [];
         existing.push(link.componentCode);
         jobLinksMap.set(link.jobId, existing);
-        jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
       }
     }
   }
@@ -46335,41 +47671,10 @@ async function listJobs(vesselId, componentId, vesselIds) {
     if (job.componentCode && !linkedComponentCodes.includes(job.componentCode)) {
       linkedComponentCodes.push(job.componentCode);
     }
-    const componentTracking = {};
-    for (const [linkKey, link] of Array.from(jobLinkTrackingMap.entries())) {
-      if (linkKey.startsWith(`${job.juuid}:`)) {
-        const compCode = link.componentCode;
-        if (compCode) {
-          componentTracking[compCode] = {
-            lastDoneDate: link.lastDoneDate || null,
-            nextDueDate: link.nextDueDate || null,
-            lastDoneRH: link.lastDoneRH || null,
-            nextDueRH: link.nextDueRH || null
-          };
-        }
-      }
-    }
     let hydratedJob = {
       ...job,
-      linkedComponentCodes,
-      componentTracking
+      linkedComponentCodes
     };
-    const hasMultipleComponents = Object.keys(componentTracking).length > 1;
-    if (hasMultipleComponents) {
-      hydratedJob.lastDoneDate = null;
-      hydratedJob.nextDueDate = null;
-      hydratedJob.lastDoneRH = null;
-      hydratedJob.nextDueRH = null;
-    } else if (componentId) {
-      const linkKey = `${job.juuid}:${componentId}`;
-      const componentLink = jobLinkTrackingMap.get(linkKey);
-      if (componentLink) {
-        if (componentLink.lastDoneDate) hydratedJob.lastDoneDate = componentLink.lastDoneDate;
-        if (componentLink.nextDueDate) hydratedJob.nextDueDate = componentLink.nextDueDate;
-        if (componentLink.lastDoneRH) hydratedJob.lastDoneRH = componentLink.lastDoneRH;
-        if (componentLink.nextDueRH) hydratedJob.nextDueRH = componentLink.nextDueRH;
-      }
-    }
     if (job.maintenanceBasis === "Running Hours" && job.componentId) {
       const component = await getComponentCached(job.componentId);
       if (component) {
@@ -46395,7 +47700,24 @@ async function createJob(body) {
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   const { z: z8 } = await import("zod");
   const jobCreateSchema = insertJobSchema2.extend({ juuid: z8.string().optional() });
-  let jobData = jobCreateSchema.parse(body);
+  const createInput = { ...body };
+  if (!Object.prototype.hasOwnProperty.call(createInput, "lastDoneDate")) {
+    if (Object.prototype.hasOwnProperty.call(createInput, "lastCompletedDate")) {
+      createInput.lastDoneDate = createInput.lastCompletedDate;
+    } else if (Object.prototype.hasOwnProperty.call(createInput, "lastCompletedOn")) {
+      createInput.lastDoneDate = createInput.lastCompletedOn;
+    }
+  }
+  delete createInput.lastCompletedDate;
+  delete createInput.lastCompletedOn;
+  let jobData = jobCreateSchema.parse(createInput);
+  if (jobData.lastDoneDate) {
+    const normalizedLastDoneDate = normalizeDateToDDMMMYYYY2(jobData.lastDoneDate);
+    if (!normalizedLastDoneDate) {
+      throw new ValidationError("Last Completed Date is invalid");
+    }
+    jobData = { ...jobData, lastDoneDate: normalizedLastDoneDate };
+  }
   let component = null;
   if (jobData.componentId) {
     component = await findComponent(jobData.componentId);
@@ -46534,6 +47856,22 @@ async function createJob(body) {
 async function updateJob(id, body) {
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   let updateData = { ...body };
+  if (!Object.prototype.hasOwnProperty.call(updateData, "lastDoneDate")) {
+    if (Object.prototype.hasOwnProperty.call(updateData, "lastCompletedDate")) {
+      updateData.lastDoneDate = updateData.lastCompletedDate;
+    } else if (Object.prototype.hasOwnProperty.call(updateData, "lastCompletedOn")) {
+      updateData.lastDoneDate = updateData.lastCompletedOn;
+    }
+  }
+  delete updateData.lastCompletedDate;
+  delete updateData.lastCompletedOn;
+  if (updateData.lastDoneDate) {
+    const normalizedLastDoneDate = normalizeDateToDDMMMYYYY2(updateData.lastDoneDate);
+    if (!normalizedLastDoneDate) {
+      throw new ValidationError("Last Completed Date is invalid");
+    }
+    updateData.lastDoneDate = normalizedLastDoneDate;
+  }
   if (Object.prototype.hasOwnProperty.call(updateData, "isDeleted") || Object.prototype.hasOwnProperty.call(updateData, "is_deleted")) {
     throw new ValidationError("Job deletion status can only be changed through the Delete Job action");
   }
@@ -46710,12 +48048,8 @@ async function rebaselineJobTracking(jobId, username) {
     `UPDATE jobs SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE juuid = $1`,
     [jobId]
   );
-  const linkRes = await pool4.query(
-    `UPDATE job_component_links SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE job_id = $1`,
-    [jobId]
-  );
-  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username} (links: ${linkRes.rowCount ?? 0})`);
-  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0, linksStamped: linkRes.rowCount ?? 0 };
+  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username}`);
+  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0 };
 }
 async function generateWorkOrder(jobId, reason, activeComponentCode) {
   if (!reason || !["Planning", "Breakdown", "Other"].includes(reason)) {
@@ -47442,6 +48776,7 @@ init_workOrderService2();
 init_workOrderRepository();
 init_errors();
 init_jsonHelpers();
+init_workOrderPartADates();
 function convertToIsoDate2(dateStr) {
   if (!dateStr) return "";
   const monthMap = {
@@ -47683,6 +49018,14 @@ async function getWorkOrderContext(workOrderId) {
   if (!lastCompletedCurrentReading && lastCompletedRH) {
     lastCompletedCurrentReading = lastCompletedRH;
   }
+  const resolvedPartADates = resolveWorkOrderPartADates({
+    ...workOrder,
+    maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis
+  });
+  const partALastCompletedOn = resolvedPartADates.lastCompletedOn;
+  const partANextDueDate = resolvedPartADates.nextDueDate;
+  const partALastCompletedRH = resolvedPartADates.lastCompletedRH;
+  const partANextDueRH = resolvedPartADates.nextDueRH;
   const rawSpareParts = ensureArray(job?.requiredSpareParts);
   const enrichedSpareParts = await enrichSparePartsWithROB(rawSpareParts, workOrder.vesselId);
   const templateData = job ? {
@@ -47693,7 +49036,7 @@ async function getWorkOrderContext(workOrderId) {
     componentCode: workOrder.componentCode || component.componentCode,
     componentName: component.name,
     sfiCode: job.sfiCode || job.componentCode || component.componentCode,
-    maintenanceBasis: job.maintenanceBasis,
+    maintenanceBasis: workOrder.maintenanceBasis || job.maintenanceBasis,
     maintenanceType: job.maintenanceType,
     frequencyValue: job.frequencyValue?.toString() || "",
     frequencyUnit: job.frequencyUnit || "Months",
@@ -47713,6 +49056,10 @@ async function getWorkOrderContext(workOrderId) {
     lastCompletedRH,
     lastCompletedDateForRH,
     lastCompletedCurrentReading,
+    partALastCompletedOn,
+    partANextDueDate,
+    partALastCompletedRH,
+    partANextDueRH,
     briefWorkDescription: job.briefWorkDescription || job.jobDescription,
     jobDescription: job.jobDescription,
     requiredSpareParts: enrichedSpareParts,
@@ -47748,6 +49095,10 @@ async function getWorkOrderContext(workOrderId) {
     lastCompletedRH,
     lastCompletedDateForRH,
     lastCompletedCurrentReading,
+    partALastCompletedOn,
+    partANextDueDate,
+    partALastCompletedRH,
+    partANextDueRH,
     briefWorkDescription: workOrder.briefWorkDescription,
     jobDescription: workOrder.briefWorkDescription,
     requiredSpareParts: [],
@@ -48035,6 +49386,10 @@ init_sync();
 init_syncRole();
 init_workOrderStatus();
 init_woCompletionRhRequirement();
+init_workOrderPayload();
+init_workOrderB2Validation();
+init_completedWorkOrderDate();
+init_rhDueDateService();
 async function completeWorkOrder(workOrderId, body) {
   const {
     runningHours,
@@ -48055,6 +49410,23 @@ async function completeWorkOrder(workOrderId, body) {
   const workOrder = await findById3(workOrderId);
   if (!workOrder) {
     throw new NotFoundError("Work order not found");
+  }
+  const finalCompletionDate = ensureCompletedWorkOrderDate(workOrder, {
+    status: "Completed",
+    dateCompleted: dateOfCompletion
+  }).dateCompleted;
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: workOrder.maintenanceBasis,
+    startDateTime: executionData.startDateTime ?? workOrder.startDateTime,
+    lastDoneDateSnapshot: workOrder.lastDoneDateSnapshot,
+    woCompletionRh,
+    rhLastDoneSnapshot: workOrder.rhLastDoneSnapshot
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field
+    });
   }
   const vesselCode = workOrder.vesselId ? (await getStorage2().getVessel(workOrder.vesselId))?.vCode : void 0;
   let component = await findComponent2(workOrder.component);
@@ -48100,7 +49472,8 @@ async function completeWorkOrder(workOrderId, body) {
       console.warn("[RULE #19] Department validation skipped due to error:", deptError);
     }
   }
-  const counterType = (component.rhCounterType || "MASTER").toUpperCase();
+  const counterType = (component.rhCounterType || "").toUpperCase();
+  const isB3Applicable = isWorkOrderB3Applicable(counterType);
   if (workOrder.maintenanceBasis === "Running Hours" && counterType !== "NOT_RH_DRIVEN" && !runningHours) {
     throw new ValidationError("Running hours is required for RH-based maintenance work orders");
   }
@@ -48110,7 +49483,7 @@ async function completeWorkOrder(workOrderId, body) {
       { code: "WO_COMPLETION_RH_REQUIRED" }
     );
   }
-  if (woCompletionRh && runningHours) {
+  if (isB3Applicable && woCompletionRh && runningHours) {
     const woRhNum = parseFloat(woCompletionRh);
     const readingNum = parseFloat(runningHours);
     if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
@@ -48120,7 +49493,7 @@ async function completeWorkOrder(workOrderId, body) {
       );
     }
   }
-  if (currentReadingDate) {
+  if (isB3Applicable && currentReadingDate) {
     const readingDateParsed = new Date(currentReadingDate);
     const todayEnd = /* @__PURE__ */ new Date();
     todayEnd.setHours(23, 59, 59, 999);
@@ -48440,10 +49813,10 @@ async function completeWorkOrder(workOrderId, body) {
     }
   }
   const originalDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
-  const updatedWorkOrder = await update6(workOrderId, {
+  const completionUpdate = {
     ...executionData,
     runningHoursAtCompletion: runningHours ? parseInt(runningHours) : void 0,
-    dateCompleted: dateOfCompletion,
+    dateCompleted: finalCompletionDate,
     status: "Completed",
     missedCycles,
     originalDueDate,
@@ -48463,7 +49836,8 @@ async function completeWorkOrder(workOrderId, body) {
     rhBackdatedEntry: rhBackdatedSkipped ? true : void 0,
     // Save as Draft (Task #402): completion supersedes any stashed draft.
     draftExecutionData: null
-  });
+  };
+  const updatedWorkOrder = await update6(workOrderId, completionUpdate);
   try {
     await logFieldChanges("work_orders", workOrder.wouuid, workOrder.vesselId || null, workOrder, updatedWorkOrder, executionData.performedBy || "system");
   } catch (err) {
@@ -48627,14 +50001,37 @@ async function completeWorkOrder(workOrderId, body) {
     }
     if (job) {
       const { computeJobCycleUpdates: computeJobCycleUpdates2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+      const jobCompletionDate = getJobCompletionDate(updatedWorkOrder);
       const { jobUpdates } = computeJobCycleUpdates2({
         maintenanceBasis: workOrder.maintenanceBasis,
-        dateOfCompletion,
+        dateOfCompletion: jobCompletionDate,
         completionRH: cycleRH,
         originalDueDate,
         job
       });
-      if (workOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletion && !cycleRH) {
+      if (jobUpdates.lastDoneRH !== void 0 && cycleRH && (workOrder.maintenanceBasis === "Running Hours" || workOrder.maintenanceBasis === "Dual Frequency")) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          findComponent2,
+          findComponentByCode2,
+          workOrder.vesselId
+        );
+        if (rhComponent) {
+          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
+        }
+      }
+      if (workOrder.maintenanceBasis === "Dual Frequency" && jobCompletionDate && !cycleRH) {
         console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
       }
       if (Object.keys(jobUpdates).length > 0) {
@@ -48753,6 +50150,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
     return;
   }
   const rawCompletionDate = workOrder.completionDateTime || workOrder.dateCompleted || null;
+  const jobCompletionDate = getJobCompletionDate(workOrder);
   const missedCycles = workOrder.missedCycles || 0;
   const originalDueDate = workOrder.originalDueDate || workOrder.nextDueDate || workOrder.dueDate || null;
   const normalizeToISO = (d) => {
@@ -48808,31 +50206,42 @@ async function finalizeWorkOrderCompletion(workOrderId) {
         job = jobs2.find((j) => j.jobNo === extractedJobNo) || null;
       }
     }
-    if (job && rawCompletionDate) {
-      const dateOfCompletionNorm = normalizeToISO(rawCompletionDate);
+    if (job && jobCompletionDate) {
       const basis = workOrder.maintenanceBasis;
-      if ((basis === "Calendar" || basis === "Dual Frequency") && dateOfCompletionNorm) {
-        const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-        const updates = { lastDoneDate: dateOfCompletionNorm };
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) updates.nextDueDate = nextDue;
-        }
-        await updateJob3(job.juuid, updates);
-        console.log(`\u2705 [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
-      }
       const finalizeCycleRH = workOrder.woCompletionRh ?? workOrder.runningHours;
-      if ((basis === "Running Hours" || basis === "Dual Frequency") && finalizeCycleRH) {
-        const currentRH = parseInt(String(finalizeCycleRH));
-        if (!isNaN(currentRH)) {
-          const rhUpdates = { lastDoneRH: currentRH };
-          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-          if (rhInterval && !isNaN(rhInterval)) {
-            rhUpdates.nextDueRH = currentRH + rhInterval;
-          }
-          await updateJob3(job.juuid, rhUpdates);
-          console.log(`\u2705 [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);
+      const { computeJobCycleUpdates: computeJobCycleUpdates2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+      const { jobUpdates } = computeJobCycleUpdates2({
+        maintenanceBasis: basis,
+        dateOfCompletion: jobCompletionDate,
+        completionRH: finalizeCycleRH != null ? String(finalizeCycleRH) : null,
+        originalDueDate,
+        job
+      });
+      if (jobUpdates.lastDoneRH !== void 0 && (basis === "Running Hours" || basis === "Dual Frequency")) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          findComponent2,
+          findComponentByCode2,
+          workOrder.vesselId
+        );
+        if (rhComponent) {
+          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
         }
+      }
+      if (Object.keys(jobUpdates).length > 0) {
+        await updateJob3(job.juuid, jobUpdates);
+        console.log(`\u2705 [Finalize] Updated ${basis} job ${job.jobNo} cycle fields without reducing newer RH state`);
       }
     }
   } catch (err) {
@@ -48902,6 +50311,7 @@ init_hodResolutionService();
 init_complianceAnomalyService();
 init_sync();
 init_workOrderService2();
+init_completedWorkOrderDate();
 async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification) {
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
     throw new ValidationError("workOrderIds array is required");
@@ -48914,69 +50324,69 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
   const remarks = (approverRemarks || "").trim();
   for (const workOrderId of workOrderIds) {
     try {
-      const existingWO2 = await findById3(workOrderId);
-      if (!existingWO2) {
+      const existingWO = await findById3(workOrderId);
+      if (!existingWO) {
         results.failed.push({ id: workOrderId, error: "Work order not found" });
         continue;
       }
-      if (existingWO2.status !== "Pending Approval" && existingWO2.computedStatus !== "Pending Approval") {
-        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO2.status})` });
+      if (existingWO.status !== "Pending Approval") {
+        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
         continue;
       }
       const hodResolution = await resolveHodForDepartment(
-        existingWO2.vesselId,
-        existingWO2.department,
-        existingWO2.approver
+        existingWO.vesselId,
+        existingWO.department,
+        existingWO.approver
       );
       let resolvedApprover = hodResolution.rankName;
       if (approver && approver !== hodResolution.rankName && hodResolution.source !== "fallback") {
-        console.warn(`[Bulk Approve] Caller approver "${approver}" differs from org chart HOD "${hodResolution.rankName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Bulk Approve] Caller approver "${approver}" differs from org chart HOD "${hodResolution.rankName}" for dept "${existingWO.department}". Using org chart value.`);
       } else if (approver && hodResolution.source === "fallback") {
         resolvedApprover = approver;
       }
-      const actualCompletionDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
+      const actualCompletionDate = resolveFinalCompletionDate(existingWO);
       let nextDueDate = void 0;
       let nextDueReading = void 0;
-      const originalDueDate = existingWO2.nextDueDate || existingWO2.dueDate || null;
-      if (existingWO2.maintenanceBasis === "Calendar" && actualCompletionDate) {
-        if (existingWO2.frequencyValue && existingWO2.frequencyUnit) {
-          const computed = calculateNextDueDate(actualCompletionDate, existingWO2.frequencyValue, existingWO2.frequencyUnit, originalDueDate);
+      const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
+      if (existingWO.maintenanceBasis === "Calendar" && actualCompletionDate) {
+        if (existingWO.frequencyValue && existingWO.frequencyUnit) {
+          const computed = calculateNextDueDate(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
           if (computed) {
             nextDueDate = computed;
           }
         }
-      } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
-        const bulkCycleRH = existingWO2.woCompletionRh ?? existingWO2.currentReading;
-        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO2.frequencyValue || "0")).toString();
+      } else if (existingWO.maintenanceBasis === "Running Hours" && (existingWO.woCompletionRh || existingWO.currentReading)) {
+        const bulkCycleRH = existingWO.woCompletionRh ?? existingWO.currentReading;
+        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO.frequencyValue || "0")).toString();
       }
-      const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
+      const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
       let missedCycles;
-      if (existingWO2.maintenanceBasis === "Running Hours") {
-        const completionRHValue = existingWO2.woCompletionRh ?? existingWO2.completionRH;
-        const dueRH = existingWO2.nextDueReading ?? null;
+      if (existingWO.maintenanceBasis === "Running Hours") {
+        const completionRHValue = existingWO.woCompletionRh ?? existingWO.completionRH;
+        const dueRH = existingWO.nextDueReading ?? null;
         let jobIntervalRH = null;
-        if (existingWO2.jobId) {
+        if (existingWO.jobId) {
           try {
-            const jobForRH = await findJob(existingWO2.jobId);
+            const jobForRH = await findJob(existingWO.jobId);
             if (jobForRH?.intervalRunningHour) jobIntervalRH = jobForRH.intervalRunningHour;
           } catch {
           }
         }
-        if (!jobIntervalRH && existingWO2.frequencyValue) jobIntervalRH = existingWO2.frequencyValue;
+        if (!jobIntervalRH && existingWO.frequencyValue) jobIntervalRH = existingWO.frequencyValue;
         missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
       } else {
         missedCycles = calculateMissedCycles(
-          existingWO2.nextDueDate || existingWO2.dueDate,
+          existingWO.nextDueDate || existingWO.dueDate,
           completionDateForCalc,
-          existingWO2.frequencyValue,
-          existingWO2.frequencyUnit
+          existingWO.frequencyValue,
+          existingWO.frequencyUnit
         );
       }
       if (missedCycles > 0) {
         console.log(`\u26A0\uFE0F Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
       }
-      const currentTier = existingWO2.approvalTier || "standard";
-      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
+      const currentTier = existingWO.approvalTier || "standard";
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
       if (currentTier === "superintendent_locked" && lockEnabled) {
         results.failed.push({
           id: workOrderId,
@@ -49003,14 +50413,14 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         }
       }
       let requiresLevel2Review = false;
-      if (existingWO2.jobId) {
+      if (existingWO.jobId) {
         try {
-          const linkedJob = await findJob(existingWO2.jobId);
+          const linkedJob = await findJob(existingWO.jobId);
           if (linkedJob && linkedJob.level2ReviewerRankId) {
             requiresLevel2Review = true;
           }
         } catch (err) {
-          console.warn(`[Bulk Approve] Could not load linked job ${existingWO2.jobId}:`, err);
+          console.warn(`[Bulk Approve] Could not load linked job ${existingWO.jobId}:`, err);
         }
       }
       const updateData = {
@@ -49036,30 +50446,38 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
       if (actualCompletionDate) {
         updateData.dateCompleted = actualCompletionDate;
       }
+      ensureCompletedWorkOrderDate(existingWO, updateData);
       await update6(workOrderId, updateData);
       try {
-        await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, approver || "system");
+        await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, approver || "system");
       } catch (err) {
         console.error("[FieldLogger] WO bulkApprove:", err);
       }
-      if (!requiresLevel2Review && missedCycles >= 1 && existingWO2.maintenanceBasis === "Calendar") {
+      if (!requiresLevel2Review && missedCycles >= 1 && existingWO.maintenanceBasis === "Calendar") {
         try {
           const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
           await createSkippedCycleRecords2({
-            workOrderId: existingWO2.wouuid || workOrderId,
-            componentId: existingWO2.componentId || "",
-            componentCode: existingWO2.componentCode || null,
-            vesselCode: existingWO2.vesselId || null,
-            jobId: existingWO2.jobId || null,
-            jobCode: existingWO2.jobCode || null,
-            jobTitle: existingWO2.jobTitle || null,
+            workOrderId: existingWO.wouuid || workOrderId,
+            componentId: existingWO.componentId || "",
+            componentCode: existingWO.componentCode || null,
+            vesselCode: existingWO.vesselId || null,
+            jobId: existingWO.jobId || null,
+            jobCode: existingWO.jobCode || null,
+            jobTitle: existingWO.jobTitle || null,
             originalDueDate,
             missedCycles,
-            frequencyValue: existingWO2.frequencyValue || "0",
-            frequencyUnit: existingWO2.frequencyUnit || ""
+            frequencyValue: existingWO.frequencyValue || "0",
+            frequencyUnit: existingWO.frequencyUnit || ""
           });
         } catch (err) {
           console.error("[BACKFILL ERROR] Failed to create skipped cycle records (bulk):", err);
+        }
+      }
+      if (!requiresLevel2Review) {
+        try {
+          await finalizeWorkOrderCompletion(workOrderId);
+        } catch (finalizeErr) {
+          console.error("[Bulk Approve] finalizeWorkOrderCompletion failed (non-blocking):", finalizeErr);
         }
       }
       results.success.push(workOrderId);
@@ -49078,38 +50496,38 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
   };
 }
 async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
-  const existingWO2 = await findById3(workOrderId);
-  if (!existingWO2) {
+  const existingWO = await findById3(workOrderId);
+  if (!existingWO) {
     throw new ValidationError("Work order not found");
   }
-  if (existingWO2.status !== "Pending Office Review") {
-    throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  if (existingWO.status !== "Pending Office Review") {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
   }
-  if (existingWO2.approvalTier === "superintendent_locked" && !existingWO2.superintendentAcknowledged) {
-    if (await isSuperintendentLockEnabled(existingWO2.vesselId)) {
+  if (existingWO.approvalTier === "superintendent_locked" && !existingWO.superintendentAcknowledged) {
+    if (await isSuperintendentLockEnabled(existingWO.vesselId)) {
       throw new ValidationError(
         "This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.",
         { code: "SUPERINTENDENT_LOCKED" }
       );
     }
   }
-  const actualCompletionDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
-  const originalDueDate = existingWO2.nextDueDate || existingWO2.dueDate || null;
+  const actualCompletionDate = resolveFinalCompletionDate(existingWO);
+  const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
   let nextDueDate;
   let nextDueReading;
-  if (existingWO2.maintenanceBasis === "Calendar" && actualCompletionDate) {
-    if (existingWO2.frequencyValue && existingWO2.frequencyUnit) {
+  if (existingWO.maintenanceBasis === "Calendar" && actualCompletionDate) {
+    if (existingWO.frequencyValue && existingWO.frequencyUnit) {
       const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-      const computed = calculateNextDueDate2(actualCompletionDate, existingWO2.frequencyValue, existingWO2.frequencyUnit, originalDueDate);
+      const computed = calculateNextDueDate2(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
       if (computed) nextDueDate = computed;
     }
-  } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
-    const cycleRHSrc = existingWO2.woCompletionRh ?? existingWO2.currentReading;
-    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO2.frequencyValue || "0")).toString();
+  } else if (existingWO.maintenanceBasis === "Running Hours" && (existingWO.woCompletionRh || existingWO.currentReading)) {
+    const cycleRHSrc = existingWO.woCompletionRh ?? existingWO.currentReading;
+    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO.frequencyValue || "0")).toString();
   }
   const { calculateMissedCycles: calculateMissedCycles2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-  const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
-  const missedCycles = existingWO2.maintenanceBasis === "Running Hours" ? 0 : calculateMissedCycles2(existingWO2.nextDueDate || existingWO2.dueDate, completionDateForCalc, existingWO2.frequencyValue, existingWO2.frequencyUnit);
+  const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
+  const missedCycles = existingWO.maintenanceBasis === "Running Hours" ? 0 : calculateMissedCycles2(existingWO.nextDueDate || existingWO.dueDate, completionDateForCalc, existingWO.frequencyValue, existingWO.frequencyUnit);
   const updateData = {
     status: "Completed",
     reviewerComments: reviewerComments || null,
@@ -49124,26 +50542,27 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   if (actualCompletionDate) {
     updateData.dateCompleted = actualCompletionDate;
   }
+  ensureCompletedWorkOrderDate(existingWO, updateData);
   await update6(workOrderId, updateData);
   try {
-    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, reviewedByUuid || "system");
+    await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || "system");
   } catch (err) {
     console.error("[FieldLogger] WO reviewerApprove:", err);
   }
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || workOrderId,
+      entityId: existingWO.wouuid || workOrderId,
       actionType: "reviewer_approve",
       userId: reviewedByUuid || "system",
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         status: "Completed",
         approvedAt: (/* @__PURE__ */ new Date()).toISOString(),
         reviewerComments: reviewerComments || null
@@ -49152,21 +50571,21 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   } catch (auditError) {
     console.error("Failed to create audit log for reviewer approve:", auditError);
   }
-  if (missedCycles >= 1 && existingWO2.maintenanceBasis === "Calendar") {
+  if (missedCycles >= 1 && existingWO.maintenanceBasis === "Calendar") {
     try {
       const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
       await createSkippedCycleRecords2({
-        workOrderId: existingWO2.wouuid || workOrderId,
-        componentId: existingWO2.component || "",
-        componentCode: existingWO2.componentCode || null,
-        vesselCode: existingWO2.vesselId || null,
-        jobId: existingWO2.jobId || null,
-        jobCode: existingWO2.templateCode || null,
-        jobTitle: existingWO2.jobTitle || null,
+        workOrderId: existingWO.wouuid || workOrderId,
+        componentId: existingWO.component || "",
+        componentCode: existingWO.componentCode || null,
+        vesselCode: existingWO.vesselId || null,
+        jobId: existingWO.jobId || null,
+        jobCode: existingWO.templateCode || null,
+        jobTitle: existingWO.jobTitle || null,
         originalDueDate,
         missedCycles,
-        frequencyValue: existingWO2.frequencyValue || "0",
-        frequencyUnit: existingWO2.frequencyUnit || ""
+        frequencyValue: existingWO.frequencyValue || "0",
+        frequencyUnit: existingWO.frequencyUnit || ""
       });
     } catch (err) {
       console.error("[BACKFILL ERROR] Reviewer approve skipped cycle records:", err);
@@ -49182,12 +50601,12 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   return { message: "Work order approved by reviewer", workOrderId };
 }
 async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
-  const existingWO2 = await findById3(workOrderId);
-  if (!existingWO2) {
+  const existingWO = await findById3(workOrderId);
+  if (!existingWO) {
     throw new ValidationError("Work order not found");
   }
-  if (existingWO2.status !== "Pending Office Review") {
-    throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  if (existingWO.status !== "Pending Office Review") {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
   }
   const updateData = {
     status: "Reopened",
@@ -49207,24 +50626,24 @@ async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
   };
   await update6(workOrderId, updateData);
   try {
-    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, reviewedByUuid || "system");
+    await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || "system");
   } catch (err) {
     console.error("[FieldLogger] WO reviewerReopen:", err);
   }
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || workOrderId,
+      entityId: existingWO.wouuid || workOrderId,
       actionType: "reviewer_reopen",
       userId: reviewedByUuid || "system",
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         status: "Reopened",
         reopenedAt: (/* @__PURE__ */ new Date()).toISOString(),
         reviewerComments: reviewerComments || null
@@ -49248,23 +50667,23 @@ async function bulkReject(workOrderIds, approver, rejectionComments, actor) {
   };
   for (const workOrderId of workOrderIds) {
     try {
-      const existingWO2 = await findById3(workOrderId);
-      if (!existingWO2) {
+      const existingWO = await findById3(workOrderId);
+      if (!existingWO) {
         results.failed.push({ id: workOrderId, error: "Work order not found" });
         continue;
       }
-      if (existingWO2.status !== "Pending Approval" && existingWO2.computedStatus !== "Pending Approval") {
-        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO2.status})` });
+      if (existingWO.status !== "Pending Approval" && existingWO.computedStatus !== "Pending Approval") {
+        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
         continue;
       }
       const rejectHod = await resolveHodForDepartment(
-        existingWO2.vesselId,
-        existingWO2.department,
-        existingWO2.approver
+        existingWO.vesselId,
+        existingWO.department,
+        existingWO.approver
       );
       let rejectApprover = rejectHod.rankName;
       if (approver && approver !== rejectHod.rankName && rejectHod.source !== "fallback") {
-        console.warn(`[Bulk Reject] Caller approver "${approver}" differs from org chart HOD "${rejectHod.rankName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Bulk Reject] Caller approver "${approver}" differs from org chart HOD "${rejectHod.rankName}" for dept "${existingWO.department}". Using org chart value.`);
       } else if (approver && rejectHod.source === "fallback") {
         rejectApprover = approver;
       }
@@ -49282,24 +50701,24 @@ async function bulkReject(workOrderIds, approver, rejectionComments, actor) {
       };
       await update6(workOrderId, updateData);
       try {
-        await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, actor || rejectApprover || "system");
+        await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, actor || rejectApprover || "system");
       } catch (err) {
         console.error("[FieldLogger] WO bulkReject:", err);
       }
       try {
         await createAuditLog3({
           entityType: "work_order",
-          entityId: existingWO2.wouuid || workOrderId,
+          entityId: existingWO.wouuid || workOrderId,
           actionType: "reject",
           userId: actor || rejectApprover || approver || "system",
           source: "web_ui",
-          vesselCode: existingWO2.vesselId || null,
-          componentCode: existingWO2.componentCode || null,
+          vesselCode: existingWO.vesselId || null,
+          componentCode: existingWO.componentCode || null,
           fieldName: null,
           oldValue: null,
           newValue: null,
           payload: {
-            workOrderNo: existingWO2.workOrderNo,
+            workOrderNo: existingWO.workOrderNo,
             status: "Due",
             rejectedAt: updateData.rejectionDate,
             rejectionComments: rejectionComments || null,
@@ -49384,8 +50803,8 @@ async function autoGenerate(vesselId) {
           vesselId: job.vesselId,
           component: job.componentId,
           componentCode,
-          jobId: job.id,
-          // Store job ID for reliable lead time hydration
+          jobId: job.juuid || job.id,
+          // Canonical Job identity
           workOrderNo,
           workOrderType: "Planned",
           templateCode: workOrderNo,
@@ -49442,6 +50861,7 @@ async function autoGenerate(vesselId) {
     }
     const currentRH = parseInt(component.currentCumulativeRH || "0");
     const dueRH = parseInt(job.nextDueRH || "0");
+    const lastDoneRH = parseInt(job.lastDoneRH || "0");
     const isCritical = job.criticality === "Yes" || job.jobPriority === "Critical";
     const leadTimeHours = isCritical ? rhLeadHoursCritical : rhLeadHoursNonCritical;
     const shouldGen = currentRH >= dueRH - leadTimeHours;
@@ -49461,8 +50881,8 @@ async function autoGenerate(vesselId) {
           component: job.componentId,
           componentCode,
           // Use resolved componentCode
-          jobId: job.id,
-          // Store job ID for reliable lead time hydration
+          jobId: job.juuid || job.id,
+          // Canonical Job identity
           workOrderNo,
           workOrderType: "Planned",
           templateCode: workOrderNo,
@@ -49480,6 +50900,16 @@ async function autoGenerate(vesselId) {
           classRelated: job.classRelated,
           briefWorkDescription: job.briefWorkDescription,
           department: job.department,
+          nextDueReading: String(dueRH),
+          currentReading: String(currentRH),
+          intervalRunningHour: job.intervalRunningHour,
+          driverType: "RH",
+          cycleDueRhSnapshot: String(dueRH),
+          generateRhSnapshot: String(Math.max(0, dueRH - leadTimeHours)),
+          dueRhSnapshot: String(dueRH),
+          effectiveRhAtGeneration: String(currentRH),
+          rhLastDoneSnapshot: String(lastDoneRH),
+          lastDoneDateSnapshot: job.lastDoneDate || null,
           requiredSpareParts: job.requiredSpareParts || [],
           requiredTools: job.requiredTools || [],
           safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }
@@ -50446,6 +51876,16 @@ async function getSuperintendentNotificationSummary(scope, now = /* @__PURE__ */
 init_errors();
 init_storage();
 init_auth();
+
+// server/modules/work-orders/utils/updateActorIdentity.ts
+function enrichWorkOrderUpdateWithActor(body, actor) {
+  if (actor && (!body.userId || body.userId === "system")) {
+    body.userId = actor;
+  }
+  return body;
+}
+
+// server/modules/work-orders/controllers/workOrderController.ts
 function resolveActorIdentity(req) {
   const { user } = req;
   if (!user) return void 0;
@@ -50608,10 +52048,7 @@ async function updateWorkOrder2(req, res) {
     const authReq = req;
     const body = { ...req.body };
     delete body.superintendentAck;
-    if (actor) {
-      if (!body.userId || body.userId === "system") body.userId = actor;
-      if (!body.performedBy || body.performedBy === "system") body.performedBy = actor;
-    }
+    enrichWorkOrderUpdateWithActor(body, actor);
     body.userRole = authReq.user?.role;
     body.userUuid = authReq.user?.userUuid ?? body.userUuid;
     const result = await updateWorkOrder(req.params.id, body);
@@ -73898,6 +75335,8 @@ init_workOrderService2();
 init_workOrderRepository();
 init_sync();
 init_asyncLocalStorage();
+init_completedWorkOrderDate();
+init_workOrderPartADates();
 async function writeOneLocation(spareId, spareUuid, vesselId, locationName, delta, userId, touchedStockKeys, recordOpeningBalance, out) {
   if (delta == null) return;
   const loc = await storage.findOrCreateLocation(vesselId, locationName.trim(), userId);
@@ -75105,7 +76544,12 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         const rhAtCompletion = row["Running Hours at Completion"] != null ? String(row["Running Hours at Completion"]).trim() : null;
         const dueRhSnapshot = row["WO Due Hour"] != null ? String(row["WO Due Hour"]).trim() : null;
         const nextDueHour = row["Next Due Hour"] != null ? String(row["Next Due Hour"]).trim() : null;
-        const existingWO2 = woByNumber.get(woNumber);
+        const parseOptionalSnapshotNumber = (value) => {
+          if (!value) return void 0;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : void 0;
+        };
+        const existingWO = woByNumber.get(woNumber);
         let savedWO;
         const woPayload = {
           vesselId,
@@ -75138,16 +76582,17 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           // text("next_due_reading")
           runningHours: rhAtCompletion || void 0,
           // text("running_hours") — RH at completion
-          dueRhSnapshot: dueRhSnapshot ? parseFloat(dueRhSnapshot) || void 0 : void 0
-          // decimal
+          dueRhSnapshot: parseOptionalSnapshotNumber(dueRhSnapshot),
+          cycleDueRhSnapshot: parseOptionalSnapshotNumber(dueRhSnapshot)
         };
-        if (!existingWO2) {
+        if (!existingWO) {
           if (mode === "update") {
             result.skipped++;
             result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "skipped", error: "WO not found for update" });
             _emitProgress("Processing WO History\u2026");
             continue;
           }
+          ensureCompletedWorkOrderDate(null, woPayload);
           savedWO = await storage.createWorkOrder(woPayload);
           woByNumber.set(woNumber, savedWO);
           try {
@@ -75165,12 +76610,22 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             _emitProgress("Processing WO History\u2026");
             continue;
           }
-          savedWO = await storage.updateWorkOrder(existingWO2.id, woPayload);
+          for (const snapshotField of [
+            "dueRhSnapshot",
+            "cycleDueRhSnapshot"
+          ]) {
+            const currentValue = existingWO[snapshotField];
+            if (currentValue !== null && currentValue !== void 0 && String(currentValue).trim() !== "") {
+              delete woPayload[snapshotField];
+            }
+          }
+          ensureCompletedWorkOrderDate(existingWO, woPayload);
+          savedWO = await storage.updateWorkOrder(existingWO.id, woPayload);
           woByNumber.set(woNumber, savedWO);
           result.updated++;
           result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "updated" });
         }
-        const workOrderUuid = savedWO?.wouuid || existingWO2?.wouuid;
+        const workOrderUuid = savedWO?.wouuid || existingWO?.wouuid;
         if (workOrderUuid) {
           try {
             const existingHistory = await findMaintenanceHistoryByWorkOrderId(workOrderUuid);
@@ -76550,8 +78005,8 @@ async function createWorkOrderFromRow(row, templateCode, vesselId) {
         (j) => j.componentId === component.cuuid && j.jobTitle === jobTitle
       );
       if (matchingJob) {
-        jobId = matchingJob.id;
-        console.log(`Auto-resolved jobId: ${matchingJob.id} for imported work order with component ${componentCode} and job "${jobTitle}"`);
+        jobId = matchingJob.juuid || matchingJob.id;
+        console.log(`Auto-resolved jobId: ${jobId} for imported work order with component ${componentCode} and job "${jobTitle}"`);
       }
     } catch (error) {
       console.error("Failed to auto-resolve jobId during bulk import:", error);
@@ -76570,6 +78025,7 @@ async function createWorkOrderFromRow(row, templateCode, vesselId) {
     }
     workOrderNo = await generateUnplannedWorkOrderNumber(storage, effectiveVesselId, componentCode);
   }
+  const isRunningHours = (row["Schedule_Type"] || matchingJob?.maintenanceBasis) === "Running Hours";
   const workOrderData = {
     vesselId: effectiveVesselId,
     component: component?.name || row["Component_Name"] || componentCode,
@@ -76588,7 +78044,14 @@ async function createWorkOrderFromRow(row, templateCode, vesselId) {
     frequencyUnit: row["Interval_Unit"] || null,
     classRelated: row["Criticality"] || null,
     jobPriority: null,
-    briefWorkDescription: row["Job_Description"] || null
+    briefWorkDescription: row["Job_Description"] || null,
+    ...isRunningHours && matchingJob ? buildRunningHoursWorkOrderSnapshots({
+      lastDoneDate: matchingJob.lastDoneDate,
+      lastDoneRH: matchingJob.lastDoneRH,
+      dueRH: matchingJob.nextDueRH,
+      currentRH: component?.currentCumulativeRH,
+      intervalRunningHour: matchingJob.intervalRunningHour ?? row["Interval"] ?? null
+    }) : {}
   };
   await applyAssignmentSync(workOrderData);
   return await storage.createWorkOrder(workOrderData);
@@ -82139,8 +83602,9 @@ init_status();
 init_constants();
 init_externalApi();
 init_sync();
+init_completedWorkOrderDate();
 init_schema();
-import { sql as sql21, eq as eq28, and as and25 } from "drizzle-orm";
+import { sql as sql21, eq as eq28 } from "drizzle-orm";
 function normalizeSourceDeletionState(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
@@ -82401,7 +83865,8 @@ async function syncWorkOrderStatus(req, res) {
           newStatus: computedStatus
         });
         if (!dryRun2) {
-          const updated = await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
+          const statusUpdate = ensureCompletedWorkOrderDate(wo, { status: computedStatus });
+          const updated = await storage.updateWorkOrder(wo.wouuid, statusUpdate);
           try {
             await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updated, "system");
           } catch (e) {
@@ -82928,8 +84393,6 @@ async function rhDiagnostic(req, res) {
     for (const link of links) {
       const comp = componentMap.get(link.componentId);
       const currentRH = comp ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || "0") : 0;
-      const linkLastDone = parseFloat(link.lastDoneRH || "0");
-      const linkNextDue = parseFloat(link.nextDueRH || "0");
       const jobLastDone = parseFloat(job.lastDoneRH || "0");
       const jobNextDue = parseFloat(job.nextDueRH || "0");
       const completedWOs = rhWOs.filter(
@@ -82948,7 +84411,7 @@ async function rhDiagnostic(req, res) {
         actualLastDoneRH = cyclesPassed * interval;
       }
       const correctNextDue = actualLastDoneRH + interval;
-      const needsRepair = linkNextDue !== correctNextDue || linkLastDone !== actualLastDoneRH;
+      const needsRepair = jobNextDue !== correctNextDue || jobLastDone !== actualLastDoneRH;
       diagnosticRows.push({
         jobNo: job.jobNo,
         jobTitle: job.jobTitle,
@@ -82957,8 +84420,6 @@ async function rhDiagnostic(req, res) {
         interval,
         currentRH,
         stored: {
-          linkLastDoneRH: linkLastDone,
-          linkNextDueRH: linkNextDue,
           jobLastDoneRH: jobLastDone,
           jobNextDueRH: jobNextDue
         },
@@ -82986,8 +84447,6 @@ async function rhDiagnostic(req, res) {
         interval,
         currentRH,
         stored: {
-          linkLastDoneRH: null,
-          linkNextDueRH: null,
           jobLastDoneRH: jobLastDone,
           jobNextDueRH: jobNextDue
         },
@@ -83043,7 +84502,6 @@ async function repairRhTracking(req, res) {
   const allWOs = await storage.getWorkOrders(vesselId || void 0);
   const FINALIZED = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
   let jobsRepaired = 0;
-  let linksRepaired = 0;
   let wosRepaired = 0;
   const repairs = [];
   for (const job of rhJobs) {
@@ -83071,28 +84529,6 @@ async function repairRhTracking(req, res) {
         correctLastDone = cyclesPassed * interval;
       }
       const correctNextDue = correctLastDone + interval;
-      const storedLastDone = parseFloat(link.lastDoneRH || "0");
-      const storedNextDue = parseFloat(link.nextDueRH || "0");
-      if (storedLastDone !== correctLastDone || storedNextDue !== correctNextDue) {
-        if (!dryRun2) {
-          await db2.update(jobComponentLinks).set({
-            lastDoneRH: correctLastDone.toString(),
-            nextDueRH: correctNextDue.toString(),
-            updatedAt: /* @__PURE__ */ new Date()
-          }).where(and25(
-            eq28(jobComponentLinks.jobId, job.juuid),
-            eq28(jobComponentLinks.componentId, link.componentId)
-          ));
-        }
-        linksRepaired++;
-        repairs.push({
-          type: "link",
-          jobNo: job.jobNo,
-          componentCode: compCode,
-          before: { lastDoneRH: storedLastDone, nextDueRH: storedNextDue },
-          after: { lastDoneRH: correctLastDone, nextDueRH: correctNextDue }
-        });
-      }
       if (correctLastDone > jobLevelLastDone) {
         jobLevelLastDone = correctLastDone;
         jobLevelNextDue = correctNextDue;
@@ -83176,17 +84612,16 @@ async function repairRhTracking(req, res) {
       }
     }
   }
-  console.log(`\u{1F527} [RH REPAIR] ${dryRun2 ? "DRY RUN" : "LIVE"} complete: ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} WOs repaired`);
+  console.log(`\u{1F527} [RH REPAIR] ${dryRun2 ? "DRY RUN" : "LIVE"} complete: ${jobsRepaired} jobs, ${wosRepaired} WOs repaired`);
   res.json({
     success: true,
     dryRun: dryRun2,
     vesselId: vesselId || "all",
     totalRhJobs: rhJobs.length,
     jobsRepaired,
-    linksRepaired,
     wosRepaired,
     repairs: repairs.slice(0, 200),
-    message: `${dryRun2 ? "[DRY RUN] Would repair" : "Repaired"} ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} work orders`
+    message: `${dryRun2 ? "[DRY RUN] Would repair" : "Repaired"} ${jobsRepaired} jobs and ${wosRepaired} work orders`
   });
 }
 
@@ -84443,11 +85878,11 @@ function computePointInTimeStatus(input) {
   const woId = wo.wouuid || wo.id;
   const woPostponements = woId ? postponements.filter((p) => p.workOrderId === woId) : [];
   const activePostponement = findActivePostponementAt(woPostponements, refDate);
-  const effectiveDueDate = activePostponement?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
+  const effectiveDueDate2 = activePostponement?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
   const computed = computeWorkOrderStatus({
     // No pre-normalization needed: computeWorkOrderStatus now parses all
     // stored formats via the shared parser (dateParse.ts).
-    dueDate: effectiveDueDate,
+    dueDate: effectiveDueDate2,
     dueRH: parseNumber(wo.nextDueReading),
     currentRH: parseNumber(wo.currentReading),
     isExecution: wo.isExecution ?? false,
@@ -87305,6 +88740,9 @@ var ALL_SEED_IDS = [
 ];
 
 // server/routes.ts
+init_db();
+init_schema();
+import { and as and34, eq as eq39, isNull as isNull6, sql as sql25 } from "drizzle-orm";
 async function registerRoutes(app2) {
   try {
     await ensureMaintenanceHistoryImmutability();
@@ -87636,9 +89074,17 @@ async function registerRoutes(app2) {
       const allJobs = await storage.getJobs();
       let updatedCalendar = 0;
       let updatedRH = 0;
+      let updatedRhEstimate = 0;
+      const {
+        estimateRhDueDate: estimateRhDueDate2,
+        isCurrentRhEstimateBasis: isCurrentRhEstimateBasis2,
+        rhEstimateBasis: rhEstimateBasis2,
+        resolveAuthoritativeRhComponent: resolveAuthoritativeRhComponent2
+      } = await Promise.resolve().then(() => (init_rhDueDateService(), rhDueDateService_exports));
       for (const job of allJobs) {
         let updates = {};
         let needsUpdate = false;
+        let effectiveNextDueRh = job.nextDueRH;
         if (job.maintenanceBasis === "Calendar" && !job.nextDueDate) {
           const rawLastDone = job.lastDoneDate;
           if (rawLastDone && job.frequencyValue && job.frequencyUnit) {
@@ -87653,88 +89099,81 @@ async function registerRoutes(app2) {
             }
           }
         }
-        if (job.maintenanceBasis === "Running Hours" && !job.nextDueRH) {
+        if ((job.maintenanceBasis === "Running Hours" || job.maintenanceBasis === "Dual Frequency") && !job.nextDueRH) {
           const lastDoneRH = job.lastDoneRH;
           const intervalRH = Number(job.intervalRunningHour);
           if (lastDoneRH && !isNaN(intervalRH) && intervalRH > 0) {
             const lastRH = Number(lastDoneRH);
             if (!isNaN(lastRH)) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-              needsUpdate = true;
-              updatedRH++;
+              const derivedNextDueRh = String(lastRH + intervalRH);
+              const db2 = await getDb();
+              const repaired = await db2.update(jobs).set({
+                nextDueRH: derivedNextDueRh,
+                updatedAt: /* @__PURE__ */ new Date()
+              }).where(and34(
+                eq39(jobs.juuid, job.juuid),
+                isNull6(jobs.nextDueRH),
+                sql25`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`
+              )).returning({ nextDueRH: jobs.nextDueRH });
+              if (repaired.length > 0) {
+                effectiveNextDueRh = repaired[0].nextDueRH;
+                updatedRH++;
+              } else {
+                effectiveNextDueRh = null;
+              }
             }
           }
         }
         if (needsUpdate) {
           await storage.updateJob(job.juuid, updates);
         }
+        if ((job.maintenanceBasis === "Running Hours" || job.maintenanceBasis === "Dual Frequency") && !isCurrentRhEstimateBasis2(job.rhEstimateBasis) && job.lastDoneDate && Number(job.intervalRunningHour) > 0 && Number(effectiveNextDueRh) >= 0) {
+          let component = job.componentId ? await storage.getComponent(job.componentId) : null;
+          if (!component && job.componentCode && job.vesselId) {
+            component = await storage.getComponentByCode(job.componentCode, job.vesselId);
+          }
+          component = await resolveAuthoritativeRhComponent2(
+            component,
+            (id) => storage.getComponent(id),
+            (code, vesselId) => storage.getComponentByCode(code, vesselId),
+            job.vesselId
+          );
+          let estimate = {
+            dueDate: null,
+            averagePerDay: null,
+            basis: rhEstimateBasis2("MISSING_RH_SOURCE")
+          };
+          if (component) {
+            const audits = await storage.getRunningHoursAudits(component.cuuid || component.id);
+            estimate = estimateRhDueDate2(
+              job.lastDoneDate,
+              job.intervalRunningHour,
+              audits
+            );
+          }
+          const db2 = await getDb();
+          const saved = await db2.update(jobs).set({
+            rhEstimatedDueDate: estimate.dueDate,
+            rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
+            rhEstimateBasis: estimate.basis,
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(and34(
+            eq39(jobs.juuid, job.juuid),
+            sql25`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+            sql25`${jobs.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
+            sql25`${jobs.rhEstimatedDueDate} IS NOT DISTINCT FROM ${job.rhEstimatedDueDate}`,
+            sql25`${jobs.rhEstimateBasis} IS NOT DISTINCT FROM ${job.rhEstimateBasis}`
+          )).returning({ juuid: jobs.juuid });
+          if (saved.length > 0) updatedRhEstimate++;
+        }
       }
-      if (updatedCalendar > 0 || updatedRH > 0) {
-        console.log(`\u2705 Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH)`);
+      if (updatedCalendar > 0 || updatedRH > 0 || updatedRhEstimate > 0) {
+        console.log(`\u2705 Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH), ${updatedRhEstimate} RH historical estimates`);
       } else {
         console.log("\u2705 Job backfill check complete - all jobs already have due dates/RH calculated");
       }
     } catch (err) {
       console.error("\u26A0\uFE0F Error during job nextDueDate/nextDueRH backfill:", err);
-    }
-  })();
-  (async () => {
-    try {
-      const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-      const allLinks = await storage.getAllJobComponentLinks();
-      let updatedCount = 0;
-      for (const link of allLinks) {
-        const maintenanceHistory = await storage.getMaintenanceHistoryByJobAndComponent(
-          link.jobId,
-          link.componentCode
-        );
-        if (!maintenanceHistory || maintenanceHistory.length === 0) {
-          continue;
-        }
-        const latestRecord = maintenanceHistory[0];
-        const historyDate = latestRecord.dateCompleted;
-        const historyRH = latestRecord.runningHoursAtCompletion;
-        const job = await storage.getJob(link.jobId);
-        if (!job) continue;
-        const updates = {};
-        let needsUpdate = false;
-        if (historyDate && link.lastDoneDate !== historyDate) {
-          updates.lastDoneDate = historyDate;
-          needsUpdate = true;
-          if (job.maintenanceBasis === "Calendar" && job.frequencyValue && job.frequencyUnit) {
-            const normalizedDate = normalizeDateToDDMMMYYYY2(historyDate);
-            if (normalizedDate) {
-              const nextDue = calculateNextDueDate2(normalizedDate, job.frequencyValue, job.frequencyUnit);
-              if (nextDue) {
-                updates.nextDueDate = nextDue;
-              }
-            }
-          }
-        }
-        if (historyRH && link.lastDoneRH !== historyRH) {
-          updates.lastDoneRH = historyRH;
-          needsUpdate = true;
-          if (job.maintenanceBasis === "Running Hours" && job.intervalRunningHour) {
-            const lastRH = parseFloat(historyRH);
-            const intervalRH = parseFloat(job.intervalRunningHour);
-            if (!isNaN(lastRH) && !isNaN(intervalRH) && intervalRH > 0) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-            }
-          }
-        }
-        if (needsUpdate && link.vesselId) {
-          updates.updatedAt = /* @__PURE__ */ new Date();
-          await storage.updateJobComponentLinkTracking(link.vesselId, link.jobId, link.componentId, updates);
-          updatedCount++;
-        }
-      }
-      if (updatedCount > 0) {
-        console.log(`\u2705 Remediated ${updatedCount} job-component links with component-specific tracking from maintenance history`);
-      } else {
-        console.log("\u2705 Component-specific tracking check complete - all data matches maintenance history");
-      }
-    } catch (err) {
-      console.error("\u26A0\uFE0F Error during component-specific tracking remediation:", err);
     }
   })();
   (async () => {
