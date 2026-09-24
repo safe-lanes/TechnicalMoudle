@@ -27,6 +27,7 @@ const SHIP_BASE = process.env.SHIP_BASE || '';
 const JWT_SECRET = process.env.JWT_SECRET || '';
 const SERVICE_SECRET = process.env.ASSISTANT_SERVICE_SECRET || '';
 const SIGNING_KEY = process.env.ASSISTANT_IDENTITY_SIGNING_KEY || '';
+const INSTANCE_ID = process.env.ASSISTANT_INSTANCE_ID || ''; // 24-Sep-2026: tokens name their issuing instance (`iss`)
 const DOMAIN_A = process.env.DOMAIN_A || 'pilot';
 const DOMAIN_B = process.env.DOMAIN_B || 'pilot-b';
 const VESSEL = process.env.VESSEL || '743ef9d1-841a-11ed-aa7c-7003bca91a86';
@@ -141,13 +142,13 @@ async function main() {
   r = await execute(BASE, SERVICE_SECRET, tampered, 'get_work_order_counts', { vesselId: VESSEL });
   record('execute: identity with tenantDomain flipped after signing → 401 bad-signature', r.status === 401 && /bad-signature/.test(r.text), `${r.status} ${r.body?.message ?? ''}`);
 
-  const noDomain = signIdentity({ userId: 'pilot-super-1', role: 'Sail Admin', userType: 'Office', vesselId: null, tenantDomain: null, tuid: null }, SIGNING_KEY, 60);
+  const noDomain = signIdentity({ userId: 'pilot-super-1', role: 'Sail Admin', userType: 'Office', vesselId: null, tenantDomain: null, tuid: null, iss: INSTANCE_ID }, SIGNING_KEY, 60);
   r = await execute(BASE, SERVICE_SECRET, noDomain, 'get_work_order_counts', { vesselId: VESSEL });
   record('execute: correctly signed identity WITHOUT tenant domain → 401 invalid_identity (fail closed)', r.status === 401 && r.body?.error === 'invalid_identity', `${r.status} ${r.body?.error ?? ''}`);
 
   const expired = (() => {
     const now = Math.floor(Date.now() / 1000) - 3600;
-    const payload = { userId: 'pilot-super-1', role: 'Sail Admin', userType: 'Office', tenantDomain: DOMAIN_A, iat: now, exp: now + 60 };
+    const payload = { userId: 'pilot-super-1', role: 'Sail Admin', userType: 'Office', tenantDomain: DOMAIN_A, iss: INSTANCE_ID, iat: now, exp: now + 60 };
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const mac = createHmac('sha256', SIGNING_KEY).update(body).digest('base64url');
     return `${body}.${mac}`;
@@ -168,9 +169,15 @@ async function main() {
   const shipTokenA = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-vesseluser', {}, JWT_SECRET, { role: 'Vessel User', userType: 'Ship' }), identityHeaders('u-vesseluser', 'Vessel User', 'Ship'));
   record("mint: verified Ship-type 'Vessel User' → 403 (role not permitted; ship users never reach the shore assistant)", shipTokenA.status === 403, `${shipTokenA.status} ${shipTokenA.body?.error ?? ''}`);
   // the vessel-scope rule itself, exercised with a Ship-type identity signed directly (as a permitted Ship role would be)
-  const shipIdentity = signIdentity({ userId: 'u-vesseluser', role: 'Vessel User', userType: 'Ship', vesselId: null, tenantDomain: DOMAIN_A, tuid: idA.tuid ?? null }, SIGNING_KEY, 60);
+  const shipIdentity = signIdentity({ userId: 'u-vesseluser', role: 'Vessel User', userType: 'Ship', vesselId: null, tenantDomain: DOMAIN_A, tuid: idA.tuid ?? null, iss: INSTANCE_ID }, SIGNING_KEY, 60);
   r = await execute(BASE, SERVICE_SECRET, shipIdentity, 'get_work_order_counts', { vesselId: VESSEL });
   record('execute: Ship-type identity with no assigned vessel → vessel refused', r.status === 200 && r.body?.ok === false && /access/.test(r.body?.error || ''), `${r.status} ok=${r.body?.ok} ${String(r.body?.error || '').slice(0, 60)}`);
+
+  // ── 24-Sep-2026: the Data API accepts only tokens minted by THIS instance ──
+  const otherInstance = signIdentity({ userId: 'pilot-super-1', role: 'Sail Admin', userType: 'Office', vesselId: null, tenantDomain: DOMAIN_A, tuid: idA.tuid ?? null, iss: 'technical-other' }, SIGNING_KEY, 60);
+  r = await execute(BASE, SERVICE_SECRET, otherInstance, 'get_work_order_counts', { vesselId: VESSEL });
+  record(`execute: correctly signed token naming another instance (iss≠${INSTANCE_ID || '-'}) → 401`, r.status === 401 && /issuer/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  record(`mint: token carries iss=${INSTANCE_ID || '(unset)'}`, !!INSTANCE_ID && idA.iss === INSTANCE_ID, `iss=${idA.iss}`);
 
   // ── shore-only: the ship refuses every assistant route before any credential is read ──
   if (SHIP_BASE) {

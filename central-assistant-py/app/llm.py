@@ -53,7 +53,9 @@ def http_client() -> Any:
 def module_client() -> Any:
     """Plain client for module Data API calls (manifest/execute) — deliberately NOT hooked,
     so llmCalls counts model requests only and the capture file is the OpenAI wire alone."""
-    return httpx.AsyncClient(timeout=settings().tool_timeout_ms / 1000.0 + 1.0)
+    # follow_redirects=False (explicit, 24-Sep-2026): a registered callback URL must answer itself — a redirect can
+    # never move the service secret or the user's token to another host.
+    return httpx.AsyncClient(timeout=settings().tool_timeout_ms / 1000.0 + 1.0, follow_redirects=False)
 
 
 @lru_cache(maxsize=1)

@@ -89,7 +89,13 @@ class Settings(BaseSettings):
 
     # embedding / module wiring
     assistant_cors_origins: str = ""                  # comma-separated, '*' for pilot
-    assistant_module_apis: str = "{}"                 # {"technical":{"url":"...","secret":"..."}}
+    assistant_module_apis: str = "{}"                 # RETIRED 24-Sep-2026 (module-keyed, one URL per module) — ignored; see module_instances
+    # Trusted registration of module INSTANCES (environment × module), keyed by the token's `iss` claim:
+    #   {"technical-dev":  {"module":"technical","env":"dev", "url":"https://dev.../technical/api","secret":"…","signingKey":"…"},
+    #    "technical-prod": {"module":"technical","env":"prod","url":"https://app.../technical/api","secret":"…","signingKey":"…"}}
+    # A token is verified with ITS issuer's signingKey and its live-data calls go ONLY to that issuer's registered url,
+    # with that issuer's secret. Tokens without `iss` verify with IDENTITY_SIGNING_KEY and are documentation-only.
+    assistant_module_instances: str = "{}"
     assistant_capture_outbound: str = ""              # test seam: file path; captures ACTUAL wire bodies
     assistant_admin_email: str = "ghazi.anwer@safe-lanes.com"
 
@@ -126,11 +132,29 @@ class Settings(BaseSettings):
 
     @property
     def module_apis(self) -> dict[str, dict[str, Any]]:
+        """RETIRED (24-Sep-2026): kept so old env files parse; never consulted for routing."""
         try:
             v = json.loads(self.assistant_module_apis or "{}")
             return v if isinstance(v, dict) else {}
         except json.JSONDecodeError:
             return {}
+
+    @property
+    def module_instances(self) -> dict[str, dict[str, Any]]:
+        """Registered module instances keyed by issuer id; entries missing module/url/secret/signingKey are dropped
+        (a half-registered instance must never be callable)."""
+        try:
+            v = json.loads(self.assistant_module_instances or "{}")
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(v, dict):
+            return {}
+        out: dict[str, dict[str, Any]] = {}
+        for iss, e in v.items():
+            if isinstance(e, dict) and all(isinstance(e.get(k), str) and e.get(k) for k in ("module", "url", "secret", "signingKey")):
+                out[str(iss)] = {"iss": str(iss), "module": e["module"].lower(), "env": str(e.get("env") or ""),
+                                 "url": e["url"].rstrip("/"), "secret": e["secret"], "signingKey": e["signingKey"]}
+        return out
 
 
 def _csv(s: str) -> set[str]:

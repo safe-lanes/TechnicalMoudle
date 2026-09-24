@@ -53,6 +53,23 @@ class Verified:
     reason: str | None = None  # missing | malformed | bad-signature | expired | future-dated
 
 
+def peek_issuer(token: str | None) -> str | None:
+    """The UNVERIFIED `iss` claim of a token — used only to choose which registered signing key to verify
+    it with (24-Sep-2026, environment routing). Never trusted for anything else: the signature check that
+    follows uses the key registered for that issuer, so a forged `iss` simply fails verification."""
+    if not token or not isinstance(token, str):
+        return None
+    dot = token.rfind(".")
+    if dot <= 0:
+        return None
+    try:
+        payload = json.loads(_b64url_decode(token[:dot]).decode("utf-8"))
+    except Exception:
+        return None
+    iss = payload.get("iss") if isinstance(payload, dict) else None
+    return iss.strip() if isinstance(iss, str) and iss.strip() else None
+
+
 def verify_identity(token: str | None, key: str, clock_leeway_sec: int = 90) -> Verified:
     if not token or not isinstance(token, str):
         return Verified(False, reason="missing")

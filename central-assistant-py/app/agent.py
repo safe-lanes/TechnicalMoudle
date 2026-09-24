@@ -63,6 +63,7 @@ class Deps:
     ui_module: str
     identity_token: str
     started_at: float
+    instance: dict[str, Any] | None = None   # the token issuer's REGISTERED instance (url/secret) — the only callback target
     partial: bool = False
     tools_used: list[str] = field(default_factory=list)
 
@@ -71,47 +72,56 @@ class Deps:
 _manifest_cache: dict[str, dict[str, Any]] = {}
 
 
-async def manifest_for(module: str) -> dict[str, Any] | None:
-    api = settings().module_apis.get(module)
-    if not api:
+async def manifest_for(instance: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Tool manifest of a REGISTERED module instance (24-Sep-2026: keyed by the issuer id, never by module
+    alone, so a dev and a production instance of the same module never share a cache entry)."""
+    if not instance:
         return None
-    cached = _manifest_cache.get(module)
+    key = instance["iss"]
+    cached = _manifest_cache.get(key)
     if cached and time.monotonic() - cached["at"] < settings().manifest_ttl_ms / 1000.0:
         return cached
     try:
-        r = await llm.module_client().get(f"{api['url']}/assistant/manifest", headers={"x-service-secret": api["secret"]}, timeout=8.0)
+        r = await llm.module_client().get(f"{instance['url']}/assistant/manifest", headers={"x-service-secret": instance["secret"]}, timeout=8.0)
+        if 300 <= r.status_code < 400:
+            raise RuntimeError(f"manifest redirect ({r.status_code}) refused — the registered URL must answer directly")
         if r.status_code != 200:
             raise RuntimeError(f"manifest HTTP {r.status_code}")
         j = r.json()
         if j.get("apiVersion") != 1:
             raise RuntimeError(f"unsupported manifest apiVersion {j.get('apiVersion')}")
+        if str(j.get("module") or "").lower() != instance["module"]:
+            raise RuntimeError(f"manifest module '{j.get('module')}' does not match the registration '{instance['module']}'")
         entry = {"at": time.monotonic(), "apiVersion": 1, "tools": j.get("tools") or []}
-        _manifest_cache[module] = entry
+        _manifest_cache[key] = entry
         return entry
     except Exception as e:
-        print(f"[assistant] manifest({module}) failed: {e}")
+        print(f"[assistant] manifest({key}) failed: {e}")
         return cached  # last-known-good if we ever had one
 
 
-async def execute_module_tool(module: str, tool: str, args: dict[str, Any], identity_token: str, request_id: str) -> dict[str, Any]:
-    api = settings().module_apis.get(module)
-    if not api:
-        return {"ok": False, "error": f"no data API configured for module {module}"}
+async def execute_module_tool(instance: dict[str, Any] | None, tool: str, args: dict[str, Any], identity_token: str, request_id: str) -> dict[str, Any]:
+    """Call ONE registered instance's /assistant/execute with THAT instance's secret; the user's token is forwarded
+    only there (24-Sep-2026). Redirects are never followed and are reported as failures."""
+    if not instance:
+        return {"ok": False, "error": "no registered data API for this token's issuer"}
     try:
         r = await llm.module_client().post(
-            f"{api['url']}/assistant/execute",
-            headers={"Content-Type": "application/json", "x-service-secret": api["secret"],
-                     "x-assistant-identity": identity_token},  # forwarded unmodified (§5.6)
+            f"{instance['url']}/assistant/execute",
+            headers={"Content-Type": "application/json", "x-service-secret": instance["secret"],
+                     "x-assistant-identity": identity_token},  # forwarded unmodified (§5.6), to the issuer only
             content=json.dumps({"tool": tool, "args": args, "requestId": request_id}),
             timeout=settings().tool_timeout_ms / 1000.0 + 1.0,  # the hard cut is wait_for in call_tool
         )
+        if 300 <= r.status_code < 400:
+            return {"ok": False, "error": "module API redirected — refused (the registered URL must answer directly)"}
         if r.status_code == 401:
             return {"ok": False, "error": "module rejected the forwarded identity"}
         if r.status_code != 200:
             return {"ok": False, "error": f"module API HTTP {r.status_code}"}
         return r.json()
     except Exception as e:
-        return {"ok": False, "error": f"{module}/{tool} failed: {e}"}
+        return {"ok": False, "error": f"{instance['iss']}/{tool} failed: {e}"}
 
 
 SEARCH_DOCS_TOOL = ToolDefinition(
@@ -155,7 +165,7 @@ class ManifestToolset(AbstractToolset[Deps]):
         else:
             try:
                 out = await asyncio.wait_for(
-                    execute_module_tool(deps.ui_module, name, args, deps.identity_token, f"{int(deps.started_at)}-{len(deps.tools_used)}"),
+                    execute_module_tool(deps.instance, name, args, deps.identity_token, f"{int(deps.started_at)}-{len(deps.tools_used)}"),
                     timeout=s.tool_timeout_ms / 1000.0)
             except TimeoutError:
                 out = {"ok": False, "error": f"{deps.ui_module}/{name} timed out"}  # G1: timeout as data
@@ -403,8 +413,8 @@ PARTIAL_NOTE = "\n\n(Note: answered from partial data — some lookups did not c
 
 
 async def run_tool_loop(message: str, ui_module: str, identity_token: str, masker: Masker | None, manifest_tools: list[dict[str, Any]],
-                        history: list[ModelMessage] | None = None) -> LoopResult:
-    deps = Deps(masker=masker, ui_module=ui_module, identity_token=identity_token, started_at=time.monotonic())
+                        history: list[ModelMessage] | None = None, instance: dict[str, Any] | None = None) -> LoopResult:
+    deps = Deps(masker=masker, ui_module=ui_module, identity_token=identity_token, started_at=time.monotonic(), instance=instance)
     token = current_masker.set(masker)
     try:
         agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=TOOL_LOOP_INSTRUCTIONS.format(module=ui_module),

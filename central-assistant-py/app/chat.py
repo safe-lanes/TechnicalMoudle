@@ -30,7 +30,8 @@ def _fire(coro: Any) -> None:
     t.add_done_callback(lambda f: f.exception() and print(f"[assistant] background task failed (non-fatal): {f.exception()}"))
 
 
-async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_token: str) -> tuple[int, dict[str, Any]]:
+async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_token: str,
+                      instance: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:
     s = settings()
     started = time.monotonic()
     message = str(body.get("message") or "").strip()
@@ -84,14 +85,17 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
 
     try:
         # ── Stage 3: module with a Data API → tool loop (data tools + search_module_docs) ──
-        manifest = None if body.get("routeOnly") is True else await agent.manifest_for(ui_module)
+        # 24-Sep-2026: live data ONLY for a token whose issuer is a registered instance of the module the widget
+        # says it is embedded in; any other token (no issuer, other module) gets documentation answers only.
+        live = instance if (instance and instance["module"] == ui_module) else None
+        manifest = None if body.get("routeOnly") is True else await agent.manifest_for(live)
         if manifest is not None:
             # the selected vessel travels as context in the message text (masked on the wire); the log keeps the
             # user's own question. Authorisation stays with the module's Data API.
             # the widget's earlier turns ride along as history (masked on the wire like everything else) so
             # follow-ups ('readable format', 'more') refer to the previous answer instead of restarting.
             r = await agent.run_tool_loop(agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker, manifest["tools"],
-                                          history=agent.build_history(body.get("conversationHistory")))
+                                          history=agent.build_history(body.get("conversationHistory")), instance=live)
             if masker and masker.warnings:
                 print("[assistant] unmask warnings:", masker.warnings)
             log("answer", r.text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used)
