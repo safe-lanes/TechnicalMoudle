@@ -9041,9 +9041,9 @@ __export(repository_exports, {
   upsertInstanceMetadata: () => upsertInstanceMetadata
 });
 import { eq, and, ne, desc, asc, inArray, isNull, sql as sql4 } from "drizzle-orm";
-async function getInstanceMetadata(instanceId) {
+async function getInstanceMetadata(instanceId2) {
   const db2 = await getDb();
-  const rows = await db2.select().from(syncMetadata).where(eq(syncMetadata.instanceId, instanceId)).limit(1);
+  const rows = await db2.select().from(syncMetadata).where(eq(syncMetadata.instanceId, instanceId2)).limit(1);
   return rows[0];
 }
 async function upsertInstanceMetadata(data) {
@@ -9088,7 +9088,7 @@ function retryDelayMs(attempts) {
   const tier = RETRY_LADDER.find((t) => t.attempts === attempts);
   return tier ? map[tier.interval] : 7 * D;
 }
-async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e3) {
+async function getUnsyncedFieldLogs(instanceId2, vesselId, vesselCode, limit = 1e3) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9110,7 +9110,7 @@ async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e
      JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
      WHERE s.instance_id = $1 AND s.vessel_id IN (${placeholders}) AND s.is_synced = false
      ORDER BY s.changed_at ASC, s.row_uuid, s.id`,
-    [instanceId, ...vesselValues]
+    [instanceId2, ...vesselValues]
   );
   return result.rows;
 }
@@ -9351,18 +9351,18 @@ async function getRecentBatches(vesselId, limit = 10) {
   const conditions = vesselId && vesselId !== "all" ? [eq(syncBatches.vesselId, vesselId)] : [];
   return db2.select().from(syncBatches).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(syncBatches.startedAt)).limit(limit);
 }
-async function getTableCheckpoints(instanceId) {
+async function getTableCheckpoints(instanceId2) {
   const pool4 = await getPool();
   const r = await pool4.query(
     `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
       WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
-    [instanceId]
+    [instanceId2]
   );
   const out = {};
   for (const row of r.rows) out[row.table_name] = new Date(row.last_checkpoint);
   return out;
 }
-async function setTableCheckpoints(instanceId, checkpoints) {
+async function setTableCheckpoints(instanceId2, checkpoints) {
   const entries = Object.entries(checkpoints || {});
   if (entries.length === 0) return 0;
   const pool4 = await getPool();
@@ -9380,14 +9380,14 @@ async function setTableCheckpoints(instanceId, checkpoints) {
              updated_at = NOW()
        WHERE sync_table_checkpoints.last_checkpoint IS NULL
           OR EXCLUDED.last_checkpoint > sync_table_checkpoints.last_checkpoint`,
-      [instanceId, tableName, ts instanceof Date ? ts.toISOString() : ts]
+      [instanceId2, tableName, ts instanceof Date ? ts.toISOString() : ts]
     );
     written += r.rowCount ?? 0;
   }
   return written;
 }
-async function getConservativeFloor(instanceId, knownTables) {
-  const perTable = await getTableCheckpoints(instanceId);
+async function getConservativeFloor(instanceId2, knownTables) {
+  const perTable = await getTableCheckpoints(instanceId2);
   let min = null;
   for (const t of knownTables) {
     const cp = perTable[t];
@@ -9475,7 +9475,7 @@ async function getConnectivityLogs(vesselId, limit = 100, sinceHoursAgo) {
   const result = await pool4.query(query, params);
   return result.rows;
 }
-async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
+async function getUnsyncedFieldLogCount(instanceId2, vesselId, vesselCode) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9485,11 +9485,11 @@ async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
      WHERE instance_id = $1
        AND vessel_id IN (${placeholders})
        AND is_synced = false`,
-    [instanceId, ...vesselValues]
+    [instanceId2, ...vesselValues]
   );
   return result.rows[0]?.c ?? 0;
 }
-async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
+async function getDueFieldLogCount(instanceId2, vesselId, vesselCode) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9500,7 +9500,7 @@ async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
        AND vessel_id IN (${placeholders})
        AND is_synced = false
        AND ${retryDuePredicate()}`,
-    [instanceId, ...vesselValues]
+    [instanceId2, ...vesselValues]
   );
   return result.rows[0]?.c ?? 0;
 }
@@ -9518,7 +9518,7 @@ async function getShorePullRemainingCount(vesselId, excludeInstanceId, vesselCod
   );
   return result.rows[0]?.c ?? 0;
 }
-async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
+async function hasDeliveredSyncHistory(vesselId, instanceId2, vesselCode) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9532,11 +9532,11 @@ async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
   const cp = await pool4.query(
     `SELECT 1 FROM sync_metadata
       WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL LIMIT 1`,
-    [instanceId]
+    [instanceId2]
   );
   return cp.rows.length > 0;
 }
-async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, vesselCode, opts) {
+async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId2, vesselCode, opts) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9545,7 +9545,7 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
   const tp = `$${vesselValues.length + 2}`;
   const batches = await pool4.query(
     `DELETE FROM sync_batches WHERE initiated_by_instance = $1`,
-    [instanceId]
+    [instanceId2]
   );
   const batchesDeleted = batches.rowCount ?? 0;
   const T = opts?.snapshotAt ?? null;
@@ -9553,15 +9553,15 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
     const fl = await pool4.query(
       `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
         WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
-      [...vesselValues, instanceId]
+      [...vesselValues, instanceId2]
     );
     await pool4.query(
       `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW() WHERE instance_id = $1`,
-      [instanceId]
+      [instanceId2]
     );
     const postSnapshotUnsynced2 = fl.rowCount ?? 0;
     syncDiag(
-      `PROVISION-REPROVISION-RESET (blunt) instance=${instanceId} vessel=${vesselId}: allUnsynced=${postSnapshotUnsynced2} batchesDeleted=${batchesDeleted}`
+      `PROVISION-REPROVISION-RESET (blunt) instance=${instanceId2} vessel=${vesselId}: allUnsynced=${postSnapshotUnsynced2} batchesDeleted=${batchesDeleted}`
     );
     return { mode: "blunt", baselineMarkedSynced: 0, postSnapshotUnsynced: postSnapshotUnsynced2, batchesDeleted, checkpoint: null };
   }
@@ -9569,22 +9569,22 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
     `UPDATE sync_field_log SET is_synced = true
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at <= ${tp} AND is_synced = false`,
-    [...vesselValues, instanceId, T]
+    [...vesselValues, instanceId2, T]
   );
   const a2 = await pool4.query(
     `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at > ${tp} AND is_synced = true`,
-    [...vesselValues, instanceId, T]
+    [...vesselValues, instanceId2, T]
   );
   await pool4.query(
     `UPDATE sync_metadata SET last_sync_checkpoint = $2, updated_at = NOW() WHERE instance_id = $1`,
-    [instanceId, T]
+    [instanceId2, T]
   );
   const baselineMarkedSynced = a1.rowCount ?? 0;
   const postSnapshotUnsynced = a2.rowCount ?? 0;
   syncDiag(
-    `PROVISION-REPROVISION-RESET (partition T=${T.toISOString()}) instance=${instanceId} vessel=${vesselId}: baselineMarkedSynced=${baselineMarkedSynced} postSnapshotUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
+    `PROVISION-REPROVISION-RESET (partition T=${T.toISOString()}) instance=${instanceId2} vessel=${vesselId}: baselineMarkedSynced=${baselineMarkedSynced} postSnapshotUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
   );
   return { mode: "partition", baselineMarkedSynced, postSnapshotUnsynced, batchesDeleted, checkpoint: T.toISOString() };
 }
@@ -9612,7 +9612,7 @@ function canonicaliseBooleanSettings(settings) {
   }
   return changed;
 }
-async function recordDeliveryAttempt(rowUuids, instanceId) {
+async function recordDeliveryAttempt(rowUuids, instanceId2) {
   if (!rowUuids.length) return 0;
   const pool4 = await getPool();
   if (!pool4) return 0;
@@ -9622,11 +9622,11 @@ async function recordDeliveryAttempt(rowUuids, instanceId) {
             last_attempt_at = now(),
             updated_at = now()
       WHERE instance_id = $1 AND row_uuid = ANY($2::text[]) AND is_synced = false`,
-    [instanceId, rowUuids]
+    [instanceId2, rowUuids]
   );
   return res.rowCount ?? 0;
 }
-async function getRetryBacklog(instanceId) {
+async function getRetryBacklog(instanceId2) {
   const pool4 = await getPool();
   if (!pool4) return { total: 0, stuck: 0, maxAttempts: 0 };
   const tailFrom = RETRY_LADDER.length + 1;
@@ -9636,7 +9636,7 @@ async function getRetryBacklog(instanceId) {
             COALESCE(max(sync_attempts), 0)::int AS max_attempts
        FROM sync_field_log
       WHERE instance_id = $1 AND is_synced = false`,
-    [instanceId, tailFrom]
+    [instanceId2, tailFrom]
   );
   return { total: r.rows[0].total, stuck: r.rows[0].stuck, maxAttempts: r.rows[0].max_attempts };
 }
@@ -9762,7 +9762,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
     return 0;
   }
   const db2 = txConn || await getDb();
-  const instanceId = await getInstanceId();
+  const instanceId2 = await getInstanceId();
   const changedAt = /* @__PURE__ */ new Date();
   let logCount = 0;
   let failedFields = 0;
@@ -9797,7 +9797,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
           changedAt,
           changedByUserId: resolvedUserId,
           changedByDisplay: resolvedDisplay,
-          instanceId,
+          instanceId: instanceId2,
           isSynced: false
         });
         logCount++;
@@ -9827,7 +9827,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
           changedAt,
           changedByUserId: resolvedUserId,
           changedByDisplay: resolvedDisplay,
-          instanceId,
+          instanceId: instanceId2,
           isSynced: false
         });
         logCount++;
@@ -9841,7 +9841,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
     console.warn(`[FieldLogger] Hard delete detected on ${tableName}.${rowUuid} \u2014 not logging`);
   }
   if (logCount > 0) {
-    syncDiag(`FIELD-LOGGER: ${tableName} row=${rowUuid} \u2014 ${logCount} fields changed, isInsert=${oldRow === null}, vesselId=${vesselId}, instanceId=${instanceId}`);
+    syncDiag(`FIELD-LOGGER: ${tableName} row=${rowUuid} \u2014 ${logCount} fields changed, isInsert=${oldRow === null}, vesselId=${vesselId}, instanceId=${instanceId2}`);
     console.log(`[FieldLogger] Logged ${logCount} field change(s) for ${tableName}.${rowUuid}`);
   }
   if (failedFields > 0 && !txConn) {
@@ -9852,7 +9852,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
 async function logFieldChangesBatch(entries, txOrDb) {
   if (entries.length === 0) return 0;
   const db2 = txOrDb || await getDb();
-  const instanceId = await getInstanceId();
+  const instanceId2 = await getInstanceId();
   const changedAt = /* @__PURE__ */ new Date();
   const ctx = getRequestContext();
   const allRows = [];
@@ -9889,7 +9889,7 @@ async function logFieldChangesBatch(entries, txOrDb) {
         changedAt,
         changedByUserId: resolvedUserId,
         changedByDisplay: resolvedDisplay,
-        instanceId,
+        instanceId: instanceId2,
         isSynced: false
       });
     }
@@ -9955,8 +9955,8 @@ __export(syncRole_exports, {
   isShipInstance: () => isShipInstance,
   isShipInstanceId: () => isShipInstanceId
 });
-function isShipInstanceId(instanceId) {
-  return instanceId.toUpperCase().startsWith("SHIP-");
+function isShipInstanceId(instanceId2) {
+  return instanceId2.toUpperCase().startsWith("SHIP-");
 }
 async function getEffectiveInstanceId() {
   let dbInstanceId = null;
@@ -10051,8 +10051,8 @@ var init_fileSyncProcessor = __esm({
       instanceId;
       shoreUrl;
       syncApiKey;
-      constructor(shoreUrl, instanceId, syncApiKey) {
-        this.instanceId = instanceId || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+      constructor(shoreUrl, instanceId2, syncApiKey) {
+        this.instanceId = instanceId2 || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
         this.syncApiKey = syncApiKey || process.env.SYNC_API_KEY || "";
         this.shoreUrl = shoreUrl || process.env.SYNC_SHORE_URL || "";
         if (!fs2.existsSync(TEMP_DIR)) {
@@ -10542,8 +10542,8 @@ var init_fileSyncProcessor = __esm({
        */
       static async queueFileForSync(tableName, rowUuid, fileKey, fileName, fileSizeBytes, vesselId) {
         try {
-          const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-          const direction = isShipInstanceId(instanceId) ? "ship_to_shore" : "shore_to_ship";
+          const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+          const direction = isShipInstanceId(instanceId2) ? "ship_to_shore" : "shore_to_ship";
           let priority = 0;
           if (fileSizeBytes) {
             if (fileSizeBytes < 100 * 1024) priority = 10;
@@ -10578,7 +10578,7 @@ var init_fileSyncProcessor = __esm({
             fileHash,
             direction,
             vesselId,
-            instanceId,
+            instanceId: instanceId2,
             totalChunks,
             priority,
             status,
@@ -12153,8 +12153,8 @@ var init_shipCompletionLearner = __esm({
 
 // server/modules/sync/conflictReviewRepository.ts
 async function runPostResolutionLearning(pool4, wouuid) {
-  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-  if (isShipInstanceId(instanceId)) return;
+  const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  if (isShipInstanceId(instanceId2)) return;
   const stillOpen = await findWouuidsWithOpenDualConflicts(pool4, [wouuid]);
   if (stillOpen.has(wouuid)) {
     syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING DEFERRED: wouuid=${wouuid} \u2014 sibling field conflicts still open`);
@@ -12237,15 +12237,15 @@ function getFieldDisplayName(fieldName) {
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   }).join(" ");
 }
-function getInstanceLabel(instanceId, vesselName) {
-  if (!instanceId) return "Unknown";
-  if (isShipInstanceId(instanceId)) {
-    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
+function getInstanceLabel(instanceId2, vesselName) {
+  if (!instanceId2) return "Unknown";
+  if (isShipInstanceId(instanceId2)) {
+    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId2})`;
   }
-  if (instanceId.toUpperCase().startsWith("SHORE")) {
+  if (instanceId2.toUpperCase().startsWith("SHORE")) {
     return "Shore \u2014 Office";
   }
-  return instanceId;
+  return instanceId2;
 }
 async function getRecordLabel(pool4, tableName, rowUuid) {
   const labelConfigs = {
@@ -12649,7 +12649,7 @@ async function getConflict2(id, source) {
 }
 async function resolveDualCompletionGroup(pool4, conflict, choice, userId) {
   const identityCol = getIdentityColumn(conflict.table_name) || "id";
-  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
   const resolvedAction = choice === "incoming" ? "APPLY_INCOMING" : "DISMISS";
   const client = await pool4.connect();
   try {
@@ -12695,7 +12695,7 @@ async function resolveDualCompletionGroup(pool4, conflict, choice, userId) {
           chosenValue,
           vesselId,
           RESOLUTION_ACTOR,
-          instanceId
+          instanceId2
         ]
       );
       await client.query(
@@ -12752,7 +12752,7 @@ async function applyIncomingConflict(id, source, userId) {
        WHERE "${identityCol}" = $2`,
       [conflict.incoming_new_value, conflict.row_uuid]
     );
-    const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+    const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
     await pool4.query(
       `INSERT INTO sync_field_log
         (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
@@ -12766,7 +12766,7 @@ async function applyIncomingConflict(id, source, userId) {
         conflict.incoming_new_value,
         vesselId,
         userId,
-        instanceId
+        instanceId2
       ]
     );
     await pool4.query(
@@ -13134,19 +13134,19 @@ async function getVesselCodeForUuid(vesselId) {
     return null;
   }
 }
-async function initiateSyncSession(instanceId, vesselId, lastCheckpoint) {
+async function initiateSyncSession(instanceId2, vesselId, lastCheckpoint) {
   await upsertInstanceMetadata({
-    instanceId,
+    instanceId: instanceId2,
     vesselId,
     lastSyncStatus: "in_progress",
     syncDirection: "bidirectional"
   });
   const batch = await createBatch({
-    initiatedByInstance: instanceId,
+    initiatedByInstance: instanceId2,
     vesselId,
     checkpointBefore: lastCheckpoint
   });
-  console.log(`[Sync] Initiated batch ${batch.batchUuid} for ${instanceId} / ${vesselId}`);
+  console.log(`[Sync] Initiated batch ${batch.batchUuid} for ${instanceId2} / ${vesselId}`);
   return {
     batchUuid: batch.batchUuid,
     serverTimestamp: (/* @__PURE__ */ new Date()).toISOString()
@@ -13954,7 +13954,7 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
   console.log(`[Sync Resolve] Conflict ${conflictUuid}: ${resolution} \u2192 "${winningValue}"`);
   return { resolved: true, resolution, resolvedValue: winningValue };
 }
-async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids, failedOneWayTables, appliedTableCheckpoints) {
+async function completeSyncSession(batchUuid, vesselId, instanceId2, appliedRowUuids, failedOneWayTables, appliedTableCheckpoints) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -13969,11 +13969,11 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
   const startedAt = batch.startedAt instanceof Date ? batch.startedAt : new Date(batch.startedAt);
   const durationMs = now.getTime() - startedAt.getTime();
   const vesselCode = await getVesselCodeForUuid(vesselId);
-  syncDiag(`COMPLETE-SESSION: marking shore logs synced for vessel=${vesselId} checkpointBefore=${batch.checkpointBefore?.toISOString?.() || batch.checkpointBefore || "NONE"} excludeInstance=${instanceId}`);
+  syncDiag(`COMPLETE-SESSION: marking shore logs synced for vessel=${vesselId} checkpointBefore=${batch.checkpointBefore?.toISOString?.() || batch.checkpointBefore || "NONE"} excludeInstance=${instanceId2}`);
   const shoreLogsRaw = await getFieldLogsSinceCheckpoint(
     vesselId,
     batch.checkpointBefore,
-    instanceId,
+    instanceId2,
     // exclude ship's own
     vesselCode
   );
@@ -13990,7 +13990,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
       batchUuid
     );
   }
-  const shipLogsRaw = await getUnsyncedFieldLogs(instanceId, vesselId, vesselCode);
+  const shipLogsRaw = await getUnsyncedFieldLogs(instanceId2, vesselId, vesselCode);
   const shipLogs = shipLogsRaw.map(normalizeFieldLog);
   syncDiag(`COMPLETE-SESSION: found ${shipLogs.length} ship logs to mark synced`);
   if (shipLogs.length > 0) {
@@ -14006,7 +14006,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     for (const [t, iso] of Object.entries(appliedTableCheckpoints)) {
       if (!failedSet.has(t) && iso) advance[t] = iso;
     }
-    perTableWritten = await setTableCheckpoints(instanceId, advance);
+    perTableWritten = await setTableCheckpoints(instanceId2, advance);
     if (failedSet.size > 0) {
       syncDiag(
         `COMPLETE-SESSION PER-TABLE: advanced ${perTableWritten} table(s); held [${Array.from(failedSet).join(",")}] \u2014 other tables unaffected`
@@ -14024,7 +14024,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     syncDiag(`COMPLETE-SESSION ONE-WAY HOLDBACK: tables=[${failedOneWayTables.join(",")}] checkpoint held at ${held}`);
   }
   await upsertInstanceMetadata({
-    instanceId,
+    instanceId: instanceId2,
     vesselId,
     lastSyncCheckpoint: effectiveCheckpoint,
     lastSyncStatus: "success",
@@ -14037,7 +14037,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     durationMs
   });
   console.log(`[Sync Complete] Batch ${batchUuid}: ${durationMs}ms, checkpoint ${oneWayHoldback ? "HELD at" : "advanced to"} ${effectiveCheckpoint ? effectiveCheckpoint.toISOString() : "NULL"}`);
-  const remainingPull = await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+  const remainingPull = await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
   return {
     completed: true,
     // The EFFECTIVE checkpoint (held back on one-way failures) — the ship saves this
@@ -14048,14 +14048,14 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     // these; its `lastCheckpoint` for the NEXT pull is the MINIMUM of them (see
     // repo.getConservativeFloor). Absent from an old shore's response ⇒ the ship keeps
     // using the single newCheckpoint for everything.
-    newTableCheckpoints: await getTableCheckpoints(instanceId),
+    newTableCheckpoints: await getTableCheckpoints(instanceId2),
     perTableAdvanced: perTableWritten,
     durationMs,
     remainingPull
   };
 }
-async function getSyncStatus(vesselId, instanceId) {
-  const metadata = await getInstanceMetadata(instanceId);
+async function getSyncStatus(vesselId, instanceId2) {
+  const metadata = await getInstanceMetadata(instanceId2);
   const pendingChanges = await getFieldLogCount(vesselId, false);
   const unresolvedConflicts = await getUnresolvedConflicts(vesselId);
   const pendingFiles = await getPendingFileCount(vesselId);
@@ -18798,9 +18798,9 @@ var init_tenantConnectionManager = __esm({
        * No-op when multi-tenant is disabled (single-tenant deploys have no master DB).
        * `syncApiKey` is omitted (left unchanged) when undefined.
        */
-      async upsertTenantInstance(instanceId, vesselId, domain, syncApiKey) {
+      async upsertTenantInstance(instanceId2, vesselId, domain, syncApiKey) {
         if (!this._isMultiTenantEnabled || !this.masterDb) return;
-        await this.masterDb.insert(tenantInstances).values({ instanceId, vesselId, domain, syncApiKey: syncApiKey ?? null }).onConflictDoUpdate({
+        await this.masterDb.insert(tenantInstances).values({ instanceId: instanceId2, vesselId, domain, syncApiKey: syncApiKey ?? null }).onConflictDoUpdate({
           target: tenantInstances.instanceId,
           set: {
             vesselId,
@@ -18815,9 +18815,9 @@ var init_tenantConnectionManager = __esm({
        * { domain, syncApiKey } from the master map, WITHOUT opening any tenant DB. Returns
        * null when the instance is not registered (=> shore rejects 403, never default-routes).
        */
-      async resolveInstanceDomain(instanceId) {
+      async resolveInstanceDomain(instanceId2) {
         if (!this._isMultiTenantEnabled || !this.masterDb) return null;
-        const rows = await this.masterDb.select({ domain: tenantInstances.domain, syncApiKey: tenantInstances.syncApiKey }).from(tenantInstances).where(eq2(tenantInstances.instanceId, instanceId)).limit(1);
+        const rows = await this.masterDb.select({ domain: tenantInstances.domain, syncApiKey: tenantInstances.syncApiKey }).from(tenantInstances).where(eq2(tenantInstances.instanceId, instanceId2)).limit(1);
         if (rows.length === 0) return null;
         return { domain: rows[0].domain, syncApiKey: rows[0].syncApiKey ?? null };
       }
@@ -20544,9 +20544,9 @@ async function importProvisioningBundle(bundle) {
     }
   }
   try {
-    const instanceId = resolvedInstanceId;
+    const instanceId2 = resolvedInstanceId;
     await upsertInstanceMetadata({
-      instanceId,
+      instanceId: instanceId2,
       vesselId: bundle.manifest.vesselId,
       lastSyncCheckpoint: new Date(bundle.manifest.generatedAt),
       lastSyncStatus: "provisioned",
@@ -20933,7 +20933,7 @@ var init_autoSyncScheduler = __esm({
       // tables; genuinely-delivered rows re-apply as idempotent no-op updates on the shore, while
       // stranded rows re-fail there and trigger the full-row self-heal (needsFullRows → next push
       // delivers the complete row → fragments apply). Bounded: 2 tables × 30-day window.
-      async maybeRunSelfHealReofferSweep(settings, instanceId) {
+      async maybeRunSelfHealReofferSweep(settings, instanceId2) {
         const MARKER = "selfheal_reoffer_v1";
         if ((settings[MARKER] || "") === "done") return;
         try {
@@ -20943,7 +20943,7 @@ var init_autoSyncScheduler = __esm({
           WHERE instance_id = $1 AND is_synced = true
             AND table_name IN ('work_orders','superintendent_notifications')
             AND changed_at >= NOW() - interval '30 days'`,
-            [instanceId]
+            [instanceId2]
           );
           const upd = await pool4.query(
             `UPDATE sync_settings SET setting_value = 'done', updated_at = NOW() WHERE setting_key = $1`,
@@ -20956,7 +20956,7 @@ var init_autoSyncScheduler = __esm({
             );
           }
           console.log(`[AutoSync] \u{1FA79} Self-heal re-offer sweep: ${r.rowCount ?? 0} log(s) re-offered (one-time, marker set).`);
-          syncDiag(`SELF-HEAL REOFFER SWEEP: ${r.rowCount ?? 0} log(s) re-offered for instance=${instanceId} (work_orders, superintendent_notifications, 30d window). Marker '${MARKER}' set.`);
+          syncDiag(`SELF-HEAL REOFFER SWEEP: ${r.rowCount ?? 0} log(s) re-offered for instance=${instanceId2} (work_orders, superintendent_notifications, 30d window). Marker '${MARKER}' set.`);
         } catch (err) {
           console.warn(`[AutoSync] Self-heal re-offer sweep failed (will retry next tick): ${err?.message || err}`);
         }
@@ -20981,20 +20981,20 @@ var init_autoSyncScheduler = __esm({
             console.log(`[AutoSync] Detected interval change in settings \u2192 applying live (${this.tickIntervalMs / 6e4}min \u2192 ${intervalMinutes}min)`);
             this.restartWithNewInterval(intervalMinutes);
           }
-          const instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
-          if (!instanceId) {
+          const instanceId2 = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
+          if (!instanceId2) {
             console.warn("[AutoSync] No instance_id configured \u2014 cannot determine vessel. Skipping.");
             return;
           }
-          await this.maybeRunSelfHealReofferSweep(settings, instanceId);
-          const metadata = await getInstanceMetadata(instanceId);
+          await this.maybeRunSelfHealReofferSweep(settings, instanceId2);
+          const metadata = await getInstanceMetadata(instanceId2);
           const vesselId = metadata?.vesselId;
           if (!vesselId) {
-            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId}. Skipping.`);
+            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId2}. Skipping.`);
             return;
           }
           const maxCatchUp = parseInt(settings["catch_up_max_cycles"] || String(DEFAULT_CATCH_UP_MAX_CYCLES), 10);
-          await this.runWithCatchUp(instanceId, vesselId, maxCatchUp);
+          await this.runWithCatchUp(instanceId2, vesselId, maxCatchUp);
         } catch (error) {
           console.error("[AutoSync] Tick failed:", error.message);
         }
@@ -21002,12 +21002,12 @@ var init_autoSyncScheduler = __esm({
       // ────────────────────────────────────────────────
       // Run sync + catch-up cycles
       // ────────────────────────────────────────────────
-      async runWithCatchUp(instanceId, vesselId, maxCatchUpCycles) {
+      async runWithCatchUp(instanceId2, vesselId, maxCatchUpCycles) {
         const engine = getSyncEngine();
         if (this.syncInProgress.get(vesselId) || !engine.tryAcquireVessel(vesselId)) {
           console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} \u2014 skipping`);
           await insertConnectivityLog({
-            instanceId,
+            instanceId: instanceId2,
             vesselId,
             outcome: "skipped_reentrant",
             triggerType: "auto"
@@ -21017,26 +21017,26 @@ var init_autoSyncScheduler = __esm({
         this.syncInProgress.set(vesselId, true);
         let cycleNumber = 0;
         try {
-          const primaryResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "auto");
+          const primaryResult = await this.executeSingleCycle(instanceId2, vesselId, cycleNumber, "auto");
           if (!primaryResult.success) {
             return;
           }
           if (maxCatchUpCycles <= 0) return;
           const vesselCode = await getVesselCode(vesselId);
-          let remaining = await getDueFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+          let remaining = await getDueFieldLogCount(instanceId2, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
           while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
             cycleNumber++;
             console.log(`[AutoSync] Catch-up cycle ${cycleNumber}/${maxCatchUpCycles} \u2014 ${remaining} unsynced records remain`);
             syncDiag(`[AutoSync] catch-up cycle=${cycleNumber}, remaining=${remaining}, cap=${maxCatchUpCycles}`);
-            const catchUpResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "catch_up");
+            const catchUpResult = await this.executeSingleCycle(instanceId2, vesselId, cycleNumber, "catch_up");
             if (!catchUpResult.success) {
               console.log(`[AutoSync] Catch-up cycle ${cycleNumber} failed \u2014 stopping catch-up`);
               break;
             }
-            remaining = await getDueFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+            remaining = await getDueFieldLogCount(instanceId2, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
           }
           if (cycleNumber > 0) {
-            const finalRemaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+            const finalRemaining = await getUnsyncedFieldLogCount(instanceId2, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
             const heldBack = finalRemaining - remaining;
             console.log(
               `[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced` + (heldBack > 0 ? ` (${heldBack} waiting on retry backoff \u2014 not an error)` : "")
@@ -21050,7 +21050,7 @@ var init_autoSyncScheduler = __esm({
       // ────────────────────────────────────────────────
       // Execute one sync cycle + log connectivity
       // ────────────────────────────────────────────────
-      async executeSingleCycle(instanceId, vesselId, cycleNumber, triggerType) {
+      async executeSingleCycle(instanceId2, vesselId, cycleNumber, triggerType) {
         const startMs = Date.now();
         let result;
         try {
@@ -21060,7 +21060,7 @@ var init_autoSyncScheduler = __esm({
           const latencyMs2 = Date.now() - startMs;
           const outcome2 = classifyError(error);
           await insertConnectivityLog({
-            instanceId,
+            instanceId: instanceId2,
             vesselId,
             outcome: outcome2,
             errorMessage: error.message?.substring(0, 500),
@@ -21090,7 +21090,7 @@ var init_autoSyncScheduler = __esm({
         const latencyMs = Date.now() - startMs;
         const outcome = result.success ? "success" : classifyError({ message: result.error || "" });
         await insertConnectivityLog({
-          instanceId,
+          instanceId: instanceId2,
           vesselId,
           outcome,
           errorMessage: result.error?.substring(0, 500) ?? null,
@@ -21896,12 +21896,12 @@ import * as fs5 from "fs";
 import * as path5 from "path";
 async function initiateSyncHandler(req, res) {
   try {
-    const { instanceId, vesselId, lastCheckpoint } = req.body;
-    if (!instanceId || !vesselId) {
+    const { instanceId: instanceId2, vesselId, lastCheckpoint } = req.body;
+    if (!instanceId2 || !vesselId) {
       return res.status(400).json({ error: "instanceId and vesselId are required" });
     }
     const result = await initiateSyncSession(
-      instanceId,
+      instanceId2,
       vesselId,
       lastCheckpoint ? new Date(lastCheckpoint) : null
     );
@@ -21934,8 +21934,8 @@ async function pushHandler(req, res) {
 }
 async function pullHandler(req, res) {
   try {
-    const { batchUuid, vesselId, instanceId, lastCheckpoint } = req.body;
-    if (!batchUuid || !vesselId || !instanceId) {
+    const { batchUuid, vesselId, instanceId: instanceId2, lastCheckpoint } = req.body;
+    if (!batchUuid || !vesselId || !instanceId2) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
     const rawTableCps = req.body.tableCheckpoints;
@@ -21952,7 +21952,7 @@ async function pullHandler(req, res) {
     const result = await preparePullData(
       batchUuid,
       vesselId,
-      instanceId,
+      instanceId2,
       lastCheckpoint ? new Date(lastCheckpoint) : null,
       tableCheckpoints
     );
@@ -21990,8 +21990,8 @@ async function resolveConflictHandler(req, res) {
 }
 async function completeSyncHandler(req, res) {
   try {
-    const { batchUuid, vesselId, instanceId, appliedRowUuids } = req.body;
-    if (!batchUuid || !vesselId || !instanceId) {
+    const { batchUuid, vesselId, instanceId: instanceId2, appliedRowUuids } = req.body;
+    if (!batchUuid || !vesselId || !instanceId2) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
     const failedOneWayTables = Array.isArray(req.body.failedOneWayTables) ? req.body.failedOneWayTables.filter((t) => typeof t === "string") : void 0;
@@ -22006,7 +22006,7 @@ async function completeSyncHandler(req, res) {
     const result = await completeSyncSession(
       batchUuid,
       vesselId,
-      instanceId,
+      instanceId2,
       Array.isArray(appliedRowUuids) ? appliedRowUuids : void 0,
       failedOneWayTables,
       appliedTableCheckpoints
@@ -22027,11 +22027,11 @@ async function completeSyncHandler(req, res) {
 async function statusHandler(req, res) {
   try {
     const vesselId = req.query.vesselId || "";
-    const instanceId = req.query.instanceId || "";
-    if (!vesselId || !instanceId) {
+    const instanceId2 = req.query.instanceId || "";
+    if (!vesselId || !instanceId2) {
       return res.status(400).json({ error: "vesselId and instanceId query params are required" });
     }
-    const result = await getSyncStatus(vesselId, instanceId);
+    const result = await getSyncStatus(vesselId, instanceId2);
     let fieldLogFailures = {
       session: getFieldLogFailureSessionCount(),
       unresolved: null
@@ -22045,7 +22045,7 @@ async function statusHandler(req, res) {
     const insertLogSkips = { session: getInsertLogSkipCount() };
     let retryBacklog = null;
     try {
-      retryBacklog = await getRetryBacklog(instanceId);
+      retryBacklog = await getRetryBacklog(instanceId2);
     } catch {
     }
     const build = getBuildInfo();
@@ -22104,8 +22104,8 @@ async function triggerSyncHandler(req, res) {
 }
 async function fetchRowsHandler(req, res) {
   try {
-    const { vesselId, instanceId, requests } = req.body || {};
-    if (!vesselId || !instanceId || !Array.isArray(requests)) {
+    const { vesselId, instanceId: instanceId2, requests } = req.body || {};
+    if (!vesselId || !instanceId2 || !Array.isArray(requests)) {
       return res.status(400).json({ error: "vesselId, instanceId, and requests[] are required" });
     }
     const tables = await fetchFullRowsForHeal(requests);
@@ -22684,7 +22684,7 @@ function header(req, name) {
   const v = Array.isArray(raw) ? raw[0] : raw;
   return typeof v === "string" ? v.trim() : "";
 }
-async function batchInstanceMatches(req, instanceId) {
+async function batchInstanceMatches(req, instanceId2) {
   const batchUuid = req.body && req.body.batchUuid;
   if (!batchUuid) return true;
   const pool4 = await getPool();
@@ -22693,17 +22693,17 @@ async function batchInstanceMatches(req, instanceId) {
     [batchUuid]
   );
   if (r.rows.length === 0) return true;
-  return r.rows[0].initiated_by_instance === instanceId;
+  return r.rows[0].initiated_by_instance === instanceId2;
 }
 function syncTenantGuard(req, res, next) {
   if (!tenantConnectionManager.isMultiTenantEnabled) return next();
-  const instanceId = header(req, "x-sync-instance-id");
+  const instanceId2 = header(req, "x-sync-instance-id");
   const apiKey = header(req, "x-sync-api-key");
-  if (!instanceId) {
+  if (!instanceId2) {
     res.status(401).json({ error: "missing_instance", message: "X-Sync-Instance-Id required" });
     return;
   }
-  tenantConnectionManager.resolveInstanceDomain(instanceId).then((entry) => {
+  tenantConnectionManager.resolveInstanceDomain(instanceId2).then((entry) => {
     if (!entry) {
       res.status(403).json({ error: "unknown_instance", message: "Instance not registered" });
       return;
@@ -22716,12 +22716,12 @@ function syncTenantGuard(req, res, next) {
     }
     if (!perTenantOk && legacyOk) {
       console.warn(
-        `[syncTenantGuard] LEGACY-KEY TOLERANCE: instance '${instanceId}' authenticated on the shared SYNC_API_KEY (per-tenant key not yet set). Migrate it, then disable SYNC_LEGACY_KEY_TOLERANCE.`
+        `[syncTenantGuard] LEGACY-KEY TOLERANCE: instance '${instanceId2}' authenticated on the shared SYNC_API_KEY (per-tenant key not yet set). Migrate it, then disable SYNC_LEGACY_KEY_TOLERANCE.`
       );
     }
     return tenantConnectionManager.resolveTenant(entry.domain).then(
       (tenant) => tenantConnectionManager.runInTenantContext(tenant.tuid, async () => {
-        const okBatch = await batchInstanceMatches(req, instanceId);
+        const okBatch = await batchInstanceMatches(req, instanceId2);
         if (!okBatch) {
           if (!res.headersSent) {
             res.status(403).json({ error: "instance_mismatch", message: "Batch belongs to a different instance" });
@@ -83521,6 +83521,7 @@ var API_VERSION = 1;
 var MODULE_ID = "technical";
 var serviceSecret = () => process.env.ASSISTANT_SERVICE_SECRET || "";
 var signingKey = () => process.env.ASSISTANT_IDENTITY_SIGNING_KEY || "";
+var instanceId = () => (process.env.ASSISTANT_INSTANCE_ID || "").trim();
 function requireServiceSecret(req, res) {
   const secret = serviceSecret();
   if (!secret || req.headers["x-service-secret"] !== secret) {
@@ -83541,6 +83542,9 @@ async function handleExecute(req, res) {
   if (!requireServiceSecret(req, res)) return;
   const v = verifyIdentity(req.headers["x-assistant-identity"], signingKey());
   if (!v.ok) return res.status(401).json({ error: `identity rejected: ${v.reason}` });
+  if (instanceId() && v.identity.iss !== instanceId()) {
+    return res.status(401).json({ error: `identity rejected: issuer '${v.identity.iss ?? ""}' is not this instance` });
+  }
   const { tool, args, requestId } = req.body || {};
   if (!tool || typeof tool !== "string") return res.status(400).json({ error: "tool is required" });
   if (!CHATBOT_TOOLS.some((t) => "function" in t && t.function.name === tool)) {
@@ -83564,6 +83568,7 @@ var allowedRoles = () => (process.env.ASSISTANT_ALLOWED_ROLES || "Sail Admin").s
 async function handleMintToken(req, res) {
   const key = signingKey();
   if (!key) return res.status(503).json({ error: "assistant identity signing not configured" });
+  if (!instanceId()) return res.status(503).json({ error: "assistant instance id not configured (ASSISTANT_INSTANCE_ID)" });
   const vu = req.verifiedUser;
   if (!vu) {
     return res.status(403).json({
@@ -83589,7 +83594,9 @@ async function handleMintToken(req, res) {
       // VERIFIED token claim — the vessel-scope decision key
       vesselId: req.user?.vesselId ?? null,
       tenantDomain: req.tenantDomain ?? null,
-      tuid: req.tenantTuid ?? null
+      tuid: req.tenantTuid ?? null,
+      iss: instanceId()
+      // which registered instance minted this — the assistant's routing key
     },
     key,
     60
