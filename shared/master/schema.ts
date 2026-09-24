@@ -1,4 +1,5 @@
-import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer, jsonb, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -21,12 +22,48 @@ export const tenants = pgTable("tenants", {
   tuid: text("tuid").notNull(),
   databaseName: text("database_name").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  // Chatbot (Stage A): per-tenant AI assistant on/off. Default true = current behavior
+  // preserved (chatbot works today); disable specific tenants as needed. Checked before
+  // any LLM call so a disabled tenant incurs no LLM cost.
+  aiEnabled: boolean("ai_enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;
+
+/**
+ * Central chatbot interaction log (Stage A). ONE Safe-Lanes ops table, tenant-tagged
+ * via `tuid`, so the internal admin (Stage C) gets a cross-tenant view + per-tenant
+ * cost roll-up (GROUP BY tuid) from a single place. In multi-tenant mode this lives in
+ * the MASTER database; in single-tenant mode (no master DB) the same table is created in
+ * the single/default database and `tuid` is null. NEVER written into individual tenant
+ * DBs. Rows are written fire-and-forget AFTER the chat response is sent — admin-only store.
+ */
+export const chatbotInteractions = pgTable("chatbot_interactions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tuid: text("tuid"),                       // tenant tag (null in single-tenant)
+  domain: text("domain"),
+  userId: text("user_id"),
+  userName: text("user_name"),
+  userRole: text("user_role"),
+  vesselId: text("vessel_id"),
+  conversationId: text("conversation_id"),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),         // FULL answer the user saw (admin-only store)
+  toolsUsed: jsonb("tools_used"),
+  docsRetrieved: jsonb("docs_retrieved"),   // null until RAG (Stage B)
+  tokensIn: integer("tokens_in"),
+  tokensOut: integer("tokens_out"),
+  latencyMs: integer("latency_ms"),
+  model: text("model"),
+  provider: text("provider"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ChatbotInteraction = typeof chatbotInteractions.$inferSelect;
+export type InsertChatbotInteraction = typeof chatbotInteractions.$inferInsert;
 
 /**
  * Ship-instance -> domain map (multi-tenant mode only). Lives in the MASTER database.

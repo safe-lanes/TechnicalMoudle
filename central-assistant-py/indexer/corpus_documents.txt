@@ -1,0 +1,30 @@
+Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf
+Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf
+Audit - History Manual_R1_30.06.2026.pdf
+Audit - Preparation Manual_Office_R1_30.06.2026.pdf
+Crewing - Crewing User Manual R2_10.06.2026.pdf
+Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf
+Incident - Incident User Manual R0_20.05.2026.pdf
+Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf
+Incident - Near Miss User Manual R1_30.05.2026.pdf
+Safety - Master Review Manual R1_10.06.2026.pdf
+Safety - MOC User Manual_Office_R0_31.03.2026.pdf
+Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf
+Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf
+Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf
+Safety - Safety Meeting User Manual_R1_31.05.2026.pdf
+Safety - SMS User Manual_Office_R0_31.01.2026.pdf
+Technical - Bulk Data Import (Operational) User Manual.docx
+Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf
+Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf
+Technical - KB pilot: Create an unplanned work order ('+ Unplanned W.O').md
+Technical - KB pilot: 'Generate WO' for one job — from the Components page.md
+Technical - KB pilot: How work orders are created — the three ways to create a work order.md
+Technical - KB pilot: Office 'Generate Now' — generate a vessel's due work orders from the office.md
+Technical - KB pilot: Planned work orders — generated automatically by the ship's daily job-due scan.md
+Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf
+Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf
+Technical - Recent Updates & Changed Behaviours (Operational) Notes.docx
+Technical - Roles & Permissions (Operational) User Manual.docx
+Technical - Ship-Side (Vessel Crew) Operational Notes.docx
+Technical - Sync (Operational) User Manual.docx
