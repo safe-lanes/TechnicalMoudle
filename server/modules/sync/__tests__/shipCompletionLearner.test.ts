@@ -291,6 +291,7 @@ describe('learnFromShipCompletions', () => {
     expect(update!.values).toContain('12500');
     expect(estimateWrite!.values?.[0]).toBe('job-1');
     expect(estimateWrite!.values?.[3]).toBe(`${RH_ESTIMATE_BASIS_VERSION}_HISTORICAL`);
+    expect(queries.find(q => q.text.includes('FROM components'))?.values).toEqual(['component-1']);
     expect(queries.some((q) => q.text.includes('job_component_links'))).toBe(false);
   });
 

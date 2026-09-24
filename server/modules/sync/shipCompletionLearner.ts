@@ -353,7 +353,6 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
       const woRes = await client.query(
         `SELECT wouuid, status, job_id, vessel_id, maintenance_basis,
                 date_completed, wo_completion_rh, completion_rh, current_reading,
-                component_id,
                 next_due_date, due_date, work_order_no
            FROM work_orders WHERE wouuid = $1 LIMIT 1`,
         [wouuid],
@@ -477,7 +476,7 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
              FROM components
             WHERE cuuid = $1 OR id::text = $1
             LIMIT 1`,
-          [wo.component_id || job.component_id],
+          [job.component_id],
         );
         const sourceComponent = await resolveAuthoritativeRhComponent(
           toRhComponent(componentRes.rows[0]),

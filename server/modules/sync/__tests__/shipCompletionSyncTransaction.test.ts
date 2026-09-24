@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { getTableColumns } from 'drizzle-orm';
+import { workOrders } from '@shared/schema';
 import { refreshRhEstimatesSafely } from '../service';
 import {
   collectCompletionWouuidsFromLogs,
@@ -6,7 +8,7 @@ import {
   refreshRhEstimatesFromAuditRows,
 } from '../shipCompletionLearner';
 
-type EstimateFailure = 'component' | 'auditLookup' | 'estimateWrite' | 'auditDiscovery' | 'auditRefresh';
+type EstimateFailure = 'component' | 'auditLookup' | 'estimateWrite' | 'auditDiscovery' | 'auditRefresh' | 'coreWrite';
 type Row = Record<string, any>;
 type ShoreState = { workOrder: Row; job: Row; unrelatedLog: string | null };
 
@@ -29,7 +31,7 @@ class ShoreTransaction {
       workOrder: {
         wouuid: 'wo-1', work_order_no: 'WO-1', status: 'Pending',
         job_id: 'job-1', vessel_id: 'vessel-1', maintenance_basis: basis,
-        date_completed: null, wo_completion_rh: null, component_id: 'component-1',
+        date_completed: null, wo_completion_rh: null,
         next_due_date: '01-Aug-2026',
       },
       job: {
@@ -110,6 +112,13 @@ class ShoreTransaction {
       return ok([], 1);
     }
     if (text.includes('FROM work_orders')) {
+      // The fake store must reject invalid SELECT columns just as PostgreSQL does.
+      const selected = text.match(/SELECT\s+([\s\S]+?)\s+FROM work_orders\b/i)?.[1];
+      if (!selected) return this.fail(`Unrecognized work_orders query: ${text}`);
+      const columns = new Set(Object.values(getTableColumns(workOrders)).map(column => column.name));
+      for (const name of selected.split(',').map(column => column.trim())) {
+        if (!columns.has(name)) return this.fail(`column work_orders.${name} does not exist`);
+      }
       return ok(this.state.workOrder.wouuid === values[0] ? [structuredClone(this.state.workOrder)] : []);
     }
     if (text.includes('FROM running_hours_audit a')) {
@@ -142,6 +151,7 @@ class ShoreTransaction {
     }
     if (text.startsWith('UPDATE jobs SET ')) {
       if (this.state.job.juuid !== values[0]) return ok([], 0);
+      if (this.failures.has('coreWrite')) return this.fail('core Job write unavailable');
       if (text.includes('SET rh_estimated_due_date') && this.failures.has('estimateWrite'))
         return this.fail('estimate write unavailable');
       const setClause = text.slice(text.indexOf('SET ') + 4, text.indexOf('WHERE'));
@@ -257,6 +267,43 @@ describe('shore completion transaction boundary', () => {
       expect(client.committed.job).toEqual(before);
       expect(client.committed.unrelatedLog).toBe('9');
     }
+  });
+
+  it('skips a pending Work Order without treating it as a core sync error', async () => {
+    const client = new ShoreTransaction('Dual Frequency');
+    const before = structuredClone(client.committed.job);
+    await client.query('BEGIN');
+    const result = await learnFromShipCompletions(client as any, ['wo-1']);
+    expect(result).toMatchObject({ jobsAdvanced: 0, skipped: 1, errors: 0, errorWouuids: [] });
+    await client.query('COMMIT');
+    expect(client.committed.job).toEqual(before);
+    expect(client.commands.some(text => text.includes('FROM jobs'))).toBe(false);
+  });
+
+  it('advances the persisted completed Work Order when its unacknowledged logs are re-offered', async () => {
+    const client = new ShoreTransaction('Dual Frequency', ['coreWrite']);
+    const before = structuredClone(client.committed.job);
+    const failed = await applyCompletedPush(client);
+    expect(failed).toMatchObject({ jobsAdvanced: 0, errors: 1, errorWouuids: ['wo-1'] });
+    await client.query('COMMIT');
+    expect(client.committed.workOrder.status).toBe('Completed');
+    expect(client.committed.job).toEqual(before);
+    expect(client.committed.unrelatedLog).toBe('9');
+
+    client.failures.delete('coreWrite');
+    await client.query('BEGIN');
+    // On retry, the incoming field logs may be stale; learning reads the persisted WO.
+    const retry = await learnFromShipCompletions(client as any, ['wo-1']);
+    expect(retry).toMatchObject({ jobsAdvanced: 1, errors: 0, errorWouuids: [] });
+    await client.query('COMMIT');
+    expect(client.committed.job).toMatchObject({
+      last_done_date: '2026-08-01', last_done_rh: '12000', next_due_rh: '12500',
+    });
+
+    await client.query('BEGIN');
+    const replay = await learnFromShipCompletions(client as any, ['wo-1']);
+    expect(replay).toMatchObject({ jobsAdvanced: 0, skipped: 1, errors: 0, errorWouuids: [] });
+    await client.query('COMMIT');
   });
 
   it('leaves an already-advanced Job unchanged on duplicate and older completion replays', async () => {
