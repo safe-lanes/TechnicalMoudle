@@ -119,3 +119,23 @@ async def test_manifest_cache_is_per_instance_not_per_module(monkeypatch):
     agent._manifest_cache.clear()
     monkeypatch.setattr(agent.llm, "module_client", lambda: httpx.AsyncClient(transport=httpx.MockTransport(wrong), follow_redirects=False))
     assert await agent.manifest_for(s.module_instances["technical-dev"]) is None
+
+
+def test_registry_rejects_reused_signing_keys_and_secrets(monkeypatch):
+    # instance ↔ instance signing-key reuse: BOTH dropped; the honest third instance survives
+    reg = {"technical-dev": {**DEV}, "technical-prod": {**PROD, "signingKey": DEV["signingKey"]},
+           "crewing-dev": {"module": "crewing", "env": "dev", "url": "https://dev.example/crewing/api", "secret": "crew-secret", "signingKey": "crew-key"}}
+    _, s = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=json.dumps(reg), **BASE_ENV)
+    assert set(s.module_instances) == {"crewing-dev"}
+    reasons = dict(s.registry_violations())
+    assert "signingKey reused" in reasons["technical-dev"] and "signingKey reused" in reasons["technical-prod"]
+    # instance signing key equal to the shared documentation key: dropped
+    _, s = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=json.dumps({"technical-dev": {**DEV, "signingKey": "shared-docs-key"}, "technical-prod": PROD}), **BASE_ENV)
+    assert set(s.module_instances) == {"technical-prod"}
+    assert any("documentation IDENTITY_SIGNING_KEY" in why for iss, why in s.registry_violations() if iss == "technical-dev")
+    # secret reuse between instances: both dropped
+    _, s = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=json.dumps({"technical-dev": DEV, "technical-prod": {**PROD, "secret": DEV["secret"]}}), **BASE_ENV)
+    assert s.module_instances == {}
+    # a clean registry has no violations and keeps every instance
+    _, s = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=REGISTRY, **BASE_ENV)
+    assert s.registry_violations() == [] and set(s.module_instances) == {"technical-dev", "technical-prod"}

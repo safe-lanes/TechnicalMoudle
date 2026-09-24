@@ -154,6 +154,33 @@ class Settings(BaseSettings):
             if isinstance(e, dict) and all(isinstance(e.get(k), str) and e.get(k) for k in ("module", "url", "secret", "signingKey")):
                 out[str(iss)] = {"iss": str(iss), "module": e["module"].lower(), "env": str(e.get("env") or ""),
                                  "url": e["url"].rstrip("/"), "secret": e["secret"], "signingKey": e["signingKey"]}
+        # Credential reuse is rejected (24-Sep-2026, reviewer requirement): a signing key or a service secret shared by
+        # two instances, or an instance signing key equal to the shared documentation key, would let one environment's
+        # token or secret pass as another's. Every instance involved in a reuse is DROPPED (fail closed); the reasons
+        # are listed by registry_violations() and printed at startup.
+        bad = {iss for iss, _ in self.registry_violations(out)}
+        return {iss: e for iss, e in out.items() if iss not in bad}
+
+    def registry_violations(self, parsed: dict[str, dict[str, Any]] | None = None) -> list[tuple[str, str]]:
+        """(issuer, reason) for every registration that reuses a credential. Pure; used by module_instances and startup."""
+        reg = parsed
+        if reg is None:  # parse without the reuse filter
+            try:
+                v = json.loads(self.assistant_module_instances or "{}")
+            except json.JSONDecodeError:
+                return []
+            reg = {str(i): e for i, e in v.items() if isinstance(v, dict) and isinstance(e, dict)}
+        out: list[tuple[str, str]] = []
+        items = list(reg.items())
+        for i, (iss, e) in enumerate(items):
+            key, sec = str(e.get("signingKey") or ""), str(e.get("secret") or "")
+            if key and key == self.identity_signing_key:
+                out.append((iss, "signingKey equals the shared documentation IDENTITY_SIGNING_KEY"))
+            for jss, f in items[i + 1:]:
+                if key and key == str(f.get("signingKey") or ""):
+                    out.append((iss, f"signingKey reused by '{jss}'")); out.append((jss, f"signingKey reused by '{iss}'"))
+                if sec and sec == str(f.get("secret") or ""):
+                    out.append((iss, f"secret reused by '{jss}'")); out.append((jss, f"secret reused by '{iss}'"))
         return out
 
 

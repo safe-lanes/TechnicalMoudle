@@ -28,6 +28,12 @@ def prompt_record() -> dict[str, str]:
 
 app = FastAPI(title="SAIL AI Assistant", docs_url=None, redoc_url=None, openapi_url=None)
 
+# 24-Sep-2026: module-instance registry hygiene, printed once at import/startup. Instances that reuse a signing key
+# or a secret, or whose signing key equals the shared documentation key, are REJECTED (dropped) by settings().
+for _iss, _why in settings().registry_violations():
+    print(f"[assistant] REGISTRY REJECTED instance '{_iss}': {_why}")
+print(f"[assistant] registered module instances: {sorted(settings().module_instances) or 'none (documentation only)'}")
+
 _cors = settings().cors_origins
 if _cors:
     app.add_middleware(CORSMiddleware, allow_origins=["*"] if "*" in _cors else _cors, allow_credentials=False,
@@ -82,7 +88,8 @@ async def health() -> dict[str, Any]:
     ms = agent._model_settings()
     return {"ok": True, "store": "pgvector", "indexSet": settings().assistant_index_set, "chunks": chunks,
             "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls, "prompt": prompt_record(),
-            "chatModel": settings().chat_model, "temperature": ms.get("temperature", "default")}
+            "chatModel": settings().chat_model, "temperature": ms.get("temperature", "default"),
+            "instances": sorted(settings().module_instances), "instancesRejected": sorted({i for i, _ in settings().registry_violations()})}
 
 
 # ── admin (nginx denies publicly; tunnel-only) ─────────────────────────────────────

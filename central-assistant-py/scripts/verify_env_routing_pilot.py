@@ -3,7 +3,8 @@ Runs from a workstation that hosts both pilot environments; every value comes fr
 Env overrides: PMS_ROOT (repo), ASSISTANT_URL (default http://127.0.0.1:8044), DEV_BASE/PROD_BASE (http://localhost:5000 / :5001),
 DEV_ENV/PROD_ENV/ASSISTANT_ENV (env file paths). Usage: python central-assistant-py/scripts/verify_env_routing_pilot.py
 DEV  = shore A :5000 (instance technical-dev,  master pms_master_pilot,      tenant 'pilot' -> pms_arch   : WKFV 142 overdue)
-PROD = shore B :5001 (instance technical-prod, master pms_master_pilot_prod, tenant 'pilot' -> pms_arch_b : no vessels)
+SIMULATED PRODUCTION = shore B :5001 (instance id technical-prod, master pms_master_pilot_prod, tenant 'pilot' -> pms_arch_b : no vessels).
+Actual production has NOT been tested or changed: "PROD" below means this simulated environment.
 Assistant = sail-assistant-py-pilot r6 on :8044 (tunnel) with both registered under separate keys/secrets."""
 import base64, json, subprocess, sys, urllib.error, urllib.request
 from pathlib import Path

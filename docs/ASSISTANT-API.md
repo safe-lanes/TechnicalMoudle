@@ -215,7 +215,9 @@ Configuration required (no "zero configuration": trusted registration is the poi
 
 `ASSISTANT_MODULE_APIS` (module-keyed, one URL per module) is retired and ignored.
 
-Pilot proof (24-Sep-2026, `sail-assistant-py:pilot-r6`, two Technical environments on one assistant, 17/17):
+Pilot proof (24-Sep-2026, `sail-assistant-py:pilot-r6`, two Technical environments on one assistant — dev = pilot shore,
+"prod" = a SIMULATED production shore on the same workstation with its own registry, keys and secret; actual production was
+not tested or changed — 17/17):
 dev token → dev data (142 overdue) and only the dev instance called; prod token → prod instance only (different
 registry, vessel unknown there); dev identity claiming prod, unregistered issuer, removed routing claim, injected
 callback address, instance-signed token without issuer → all 401; documentation-only token (shared key) answers
