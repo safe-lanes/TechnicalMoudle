@@ -116,7 +116,7 @@ caught, so Node exits. This code is replit_dev's own (fork commit `ec2ef72af`), 
 branch. Under PM2 the process restarts, but a slow or saturated database would produce a restart loop. Owner:
 Nilesh / Jeevan. Not fixed here (out of scope of this merge); recorded so it is not attributed to the assistant.
 
-## 10. Assistant rollout — SEPARATE deployment actions (prepared, NOT executed; each needs Ghazi's explicit go)
+## 10. Assistant rollout — SEPARATE deployment actions (A and B EXECUTED 24-Sep-2026 12:10 UTC after the dev deploy: shared assistant now `sail-assistant-py-v7` v7-r2 on :8046, `technical-dev` registered; rollback container `-cand2` :8041 kept; nginx backups `*.bak-8041-20260924121014`)
 
 These are not part of the code merge. Both are done on the AI server by Ghazi/support. The production assistant
 stays as it is until step A is executed.
