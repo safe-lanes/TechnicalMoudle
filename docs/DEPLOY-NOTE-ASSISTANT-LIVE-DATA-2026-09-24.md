@@ -2,7 +2,7 @@
 
 For: Nilesh (manual deployment). Branch: `replit_dev` after the merge of `chatbot-enterprise`
 (integration verification recorded in `docs/ASSISTANT-PILOT-HANDOFF-2026-09-24.md` and the merge
-report). **Nothing in this note touches production or the shared production assistant.**
+report). The assistant service itself is handled separately on the AI server (§4).
 
 ## 1. What ships in this merge (Technical module)
 
@@ -14,8 +14,7 @@ report). **Nothing in this note touches production or the shared production assi
 - Multi-tenant: assistant service calls select the tenant from the module-signed identity token; the
   token mint reads user id / role / user type from the VERIFIED SAILERP login token (Option A).
 - Central assistant service code (`central-assistant-py/`) — built and run as a container on the AI
-  server, NOT by PM2. Its deployment is a separate step (§4) and is NOT part of this dev deploy unless
-  live data is being switched on for dev.
+  server, NOT by PM2 — one shared service for all environments (§4).
 
 ## 2. Migrations
 
@@ -30,37 +29,36 @@ Verify after the first boot: `\d tenants` shows `ai_enabled`; `\d chatbot_intera
 
 | Variable | Required for | Value source |
 |---|---|---|
-| `ASSISTANT_SERVICE_SECRET` | Data API: locks manifest/execute to the dev assistant | Generate a new random value for DEV; the same value goes into the dev assistant's `ASSISTANT_MODULE_APIS` |
-| `ASSISTANT_IDENTITY_SIGNING_KEY` | Signs the identity token the widget carries to the assistant | MUST equal the DEV assistant's `IDENTITY_SIGNING_KEY`. Never the production assistant's key. |
+| `ASSISTANT_SERVICE_SECRET` | Data API: locks manifest/execute to the shared assistant | Value agreed with Ghazi/support; the same value is set in the shared assistant's `ASSISTANT_MODULE_APIS` |
+| `ASSISTANT_IDENTITY_SIGNING_KEY` | Signs the identity token the widget carries to the assistant | MUST equal the shared assistant's `IDENTITY_SIGNING_KEY` (handed over by Ghazi/support, never in chat or Git) |
 | `ASSISTANT_ALLOWED_ROLES` | Optional. Roles (verified token claim) allowed to use the assistant | Default `Sail Admin`. Comma-separated SAILERP role names to widen. |
 | `SAILERP_JWT_USER_CLAIMS` | Optional. Claim names for user id, role, user type in the SAILERP token | Default `id,role,userType`. Set ONLY if the genuine-session inspection (§6) shows different names. |
 | `MASTER_DATABASE_URL`, `JWT_SECRET` | Already set on dev (multi-tenant) — unchanged | — |
 
-Not needed on ships. Not needed on production for this deploy.
+Not needed on ships.
 
-## 4. Dev assistant configuration (AI server container) — separate from production
+## 4. The assistant is ONE shared service (decision: Ghazi, 24-Sep-2026)
 
-The dev shore must talk to a DEV assistant container, never to the production one
-(`sail-assistant-py-cand2`, `assistant.sl-sail.com`).
+There is a single central assistant, `https://assistant.sl-sail.com`, on the AI server, used by every
+environment (dev and production alike). **No separate dev assistant, no separate keys.** Two things happen on
+the AI server, both done by Ghazi/support, not by the deployer:
 
-- Build the assistant image from this merge's `central-assistant-py/` (the `pilot-r5` / `int-a35d409`
-  images on the AI server are built from this code).
-- Run it as its own container with its own env: `IDENTITY_SIGNING_KEY` (= dev module's
-  `ASSISTANT_IDENTITY_SIGNING_KEY`), `ASSISTANT_MODULE_APIS='{"technical":{"url":"https://<dev host>/technical/api","secret":"<dev ASSISTANT_SERVICE_SECRET>"}}'`,
-  `ASSISTANT_TOOL_REASONING_EFFORT=none`, `ASSISTANT_INDEX_SET=kb-xref-e`, **`ASSISTANT_DOCS_PROMPT=v5`** (the released prompt; health shows `v5-plain-coverage-2026-09-15`, docs prompt sha `ff9ee87141ac1362`),
-  `ASSISTANT_ROUTE_INTENT=on`, `ASSISTANT_HYBRID=rescue`, `ASSISTANT_CROSS_MODULE_GAP=0.25`,
-  `ASSISTANT_CROSS_MODULE_SLOTS=2`, `ROUTE_MARGIN=0.07`, `CHAT_MODEL=gpt-5.6-luna`, `OPENAI_API_KEY`,
-  `DATABASE_URL` (the assistant's own Postgres), `ASSISTANT_CORS_ORIGINS=https://<dev host>`.
-- Expose it on its own dev hostname/port; the client build's `VITE_ASSISTANT_CENTRAL_URL` (§5) points there.
-- **Do not add the dev module URL or secret to the production assistant's `ASSISTANT_MODULE_APIS`.**
+1. The shared assistant is switched to the image built from this merge's `central-assistant-py`
+   (`sail-assistant-py:v7-r1`; documentation behaviour identical to the current release, verified).
+2. After the dev shore is deployed, the shared assistant gets `ASSISTANT_MODULE_APIS` =
+   `{"technical":{"url":"<Technical URL>/technical/api","secret":"<ASSISTANT_SERVICE_SECRET>"}}` — the module
+   it calls back for live data. Its `IDENTITY_SIGNING_KEY` is the value the module must use as
+   `ASSISTANT_IDENTITY_SIGNING_KEY` (§3).
 
-Rollback of the assistant: stop the dev container; the widget then shows "assistant unavailable".
+Known limit: the assistant holds one Technical URL, so live-data questions from every environment go to that
+one module. Documentation answers are unaffected. If dev and production both run the widget, either the URL
+points at production or a small per-environment routing rule is added later.
 
 ## 5. Client build settings and build verification
 
 | Setting | Purpose |
 |---|---|
-| `VITE_ASSISTANT_CENTRAL_URL` | Base URL of the DEV assistant. If unset, the widget defaults to `https://assistant.sl-sail.com` (production, docs-only) — set it for dev so dev users do not hit the shared production assistant. |
+| `VITE_ASSISTANT_CENTRAL_URL` | Not needed: the widget defaults to the shared assistant `https://assistant.sl-sail.com`. Set only if the assistant ever moves. |
 | `VITE_STORAGE_SECRET` | Unchanged (existing) |
 
 **Target OS.** The shore server is **Windows** (`C:/GitHub/technical_build`, PM2 `SAIL-Technical-App` →
