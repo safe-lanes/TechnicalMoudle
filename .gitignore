@@ -51,3 +51,18 @@ attached_assets/*
 # client/src/assets/ so this list stops growing.
 !attached_assets/SAIL logo Transparent_1753957135582.png
 !attached_assets/component tree_1761646533252.csv
+
+# assistant API key files — never commit (owner rule: keys in files, never in chat or git)
+central-assistant/newchatbotkey.txt
+central-assistant/*key*.txt
+
+# private model-input captures and review packs stay out of the repository (23-Sep-2026)
+docs/assistant-experiments/**/*capture*.jsonl
+docs/assistant-experiments/**/*captured-input*.txt
+docs/assistant-experiments/**/ANSWERS-FULL-captured-run.txt
+docs/assistant-experiments/**/*.zip
+
+# assistant DATA lives on the indexing server (and in the assistant data folder), not in the app repo (23-Sep-2026)
+kb/
+central-assistant-py/generated-docs/**/*.docx
+docs/assistant-experiments/**/*.jsonl

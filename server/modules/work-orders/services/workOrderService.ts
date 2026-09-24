@@ -487,6 +487,7 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
       nextDueHour,
       rhEstimatedDueDate,
       currentRH: currentRH ?? null,
+      rhLeadTimeHours: rhLeadTimeHours ?? null, // additive (23-Sep-2026): the lead time the status was computed with, for consumers that explain a Due
       plannedDate
     };
   });

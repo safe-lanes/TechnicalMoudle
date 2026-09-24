@@ -1,22 +1,28 @@
-import { MessageSquare, AlertTriangle, Package, Calendar, Wrench, Clock, FileText, Target } from "lucide-react";
+import { MessageSquare, AlertTriangle, Package, Calendar, Wrench, Clock, FileText, Target, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SuggestedPromptsProps {
   onPromptClick: (prompt: string) => void;
 }
 
+// 23-Sep-2026: starter questions cover BOTH kinds of answer the assistant gives — live data for the selected
+// vessel and "How do I …" questions answered from the user manuals (each how-to below verified on the pilot).
 const primaryPrompts = [
   { text: "Show overdue work orders", icon: AlertTriangle },
-  { text: "Low stock spares", icon: Package },
-  { text: "PMS status summary", icon: FileText },
   { text: "What's due this week?", icon: Calendar },
+  { text: "How do I complete a work order?", icon: BookOpen },
+  { text: "How do I update running hours?", icon: BookOpen },
 ];
 
 const secondaryPrompts = [
+  { text: "Low stock spares", icon: Package },
+  { text: "PMS status summary", icon: FileText },
   { text: "Critical components", icon: Wrench },
   { text: "Running hours check", icon: Clock },
-  { text: "Draft maintenance briefing", icon: MessageSquare },
+  { text: "How do I create an unplanned work order?", icon: BookOpen },
+  { text: "How do I add a new spare part?", icon: BookOpen },
   { text: "What should I prioritize?", icon: Target },
+  { text: "Draft maintenance briefing", icon: MessageSquare },
 ];
 
 export function SuggestedPrompts({ onPromptClick }: SuggestedPromptsProps) {

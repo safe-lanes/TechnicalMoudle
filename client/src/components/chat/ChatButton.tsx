@@ -2,10 +2,16 @@ import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChat } from "@/hooks/useChat";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { ChatPanel } from "./ChatPanel";
 
 export function ChatButton() {
   const { isSailAdmin } = useUIRole();
+  // Shore-only (23-Sep-2026): the deployment mode (SYNC_INSTANCE_ID 'SHIP-…' → /sync/instance-info,
+  // the same signal the sync screens use) hides the assistant on a ship for EVERY role, Sail Admin
+  // included; the server refuses the assistant endpoints there too. Hidden until the mode is known so
+  // a ship never shows the button while the query is in flight.
+  const { isShip, isLoading: modeLoading } = useSyncInstanceInfo();
   const {
     messages,
     isLoading,
@@ -17,7 +23,7 @@ export function ChatButton() {
     clearMessages,
   } = useChat();
 
-  if (!isSailAdmin) return null;
+  if (modeLoading || isShip || !isSailAdmin) return null;
 
   return (
     <>

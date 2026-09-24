@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { tenantConnectionManager } from "../utils/tenantConnectionManager";
 import { isExemptPath } from "./exemptPaths";
+import { assistantServiceTenant } from "../modules/assistant-api/serviceTenant";
 
 /**
  * Phase 2 — tenant resolution from the verified SAILERP `domain` claim.
@@ -32,6 +33,38 @@ function extractBearer(req: Request): string | null {
   return m ? m[1].trim() : null;
 }
 
+/** The user identity carried by the VERIFIED SAILERP token (never by browser headers). */
+export interface VerifiedUser {
+  userId: string | null;
+  role: string | null;
+  userType: "Office" | "Ship" | null;
+  /** claim names that were looked up but absent/empty — a consumer can name them in its refusal */
+  missing: string[];
+}
+
+const USER_CLAIM_NAMES = (() => {
+  const raw = (process.env.SAILERP_JWT_USER_CLAIMS || "id,role,userType").split(",").map((s) => s.trim());
+  return { userId: raw[0] || "id", role: raw[1] || "role", userType: raw[2] || "userType" };
+})();
+
+function claimString(payload: jwt.JwtPayload, name: string): string | null {
+  const v = (payload as Record<string, unknown>)[name];
+  if (typeof v === "number") return String(v);
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+export function readVerifiedUser(payload: jwt.JwtPayload): VerifiedUser {
+  const userId = claimString(payload, USER_CLAIM_NAMES.userId);
+  const role = claimString(payload, USER_CLAIM_NAMES.role);
+  const ut = claimString(payload, USER_CLAIM_NAMES.userType);
+  const userType: VerifiedUser["userType"] = ut === "Office" || ut === "Ship" ? ut : null;
+  const missing: string[] = [];
+  if (!userId) missing.push(USER_CLAIM_NAMES.userId);
+  if (!role) missing.push(USER_CLAIM_NAMES.role);
+  if (!userType) missing.push(USER_CLAIM_NAMES.userType);
+  return { userId, role, userType, missing };
+}
+
 export function tenantMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Inert unless multi-tenant mode is on — preserves today's single-tenant path exactly.
   if (!tenantConnectionManager.isMultiTenantEnabled) return next();
@@ -40,36 +73,56 @@ export function tenantMiddleware(req: Request, res: Response, next: NextFunction
   // Server-to-server / public routes that legitimately carry no SAILERP browser token.
   if (isExemptPath(req.path)) return next();
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    // Defensive — boot already fails loud if this is missing in multi-tenant mode.
-    res.status(500).json({ error: "server_misconfigured", message: "JWT_SECRET not set in multi-tenant mode" });
+  // Assistant Data API, server-to-server (central assistant → this module): that hop carries no SAILERP
+  // Bearer. Its tenant is the module's OWN signed identity token's tenantDomain (copied from the verified
+  // JWT at mint time), accepted only together with the shared service secret — two verified credentials,
+  // no exemption, no browser header trusted. Everything else keeps the Bearer rule below. (23-Sep-2026)
+  let domain = "";
+  const svc = assistantServiceTenant(req);
+  if (svc.kind === "reject") {
+    res.status(svc.status).json({ error: svc.error, message: svc.message });
     return;
   }
-
-  const token = extractBearer(req);
-  if (!token) {
-    res.status(401).json({ error: "unauthorized", message: "Missing authorization token" });
-    return;
-  }
-
-  let payload: jwt.JwtPayload | string;
-  try {
-    payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
-  } catch (err: any) {
-    if (err && err.name === "TokenExpiredError") {
-      res.status(401).json({ error: "token_expired", message: "Authorization token has expired" });
+  if (svc.kind === "manifest") return next(); // static tool definitions — touches no tenant data
+  if (svc.kind === "domain") {
+    domain = svc.domain;
+  } else {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      // Defensive — boot already fails loud if this is missing in multi-tenant mode.
+      res.status(500).json({ error: "server_misconfigured", message: "JWT_SECRET not set in multi-tenant mode" });
       return;
     }
-    res.status(401).json({ error: "invalid_token", message: "Invalid authorization token" });
-    return;
-  }
 
-  const domain =
-    typeof payload === "object" && typeof payload.domain === "string" ? payload.domain.trim() : "";
-  if (!domain) {
-    res.status(401).json({ error: "invalid_token", message: "Token is missing the domain claim" });
-    return;
+    const token = extractBearer(req);
+    if (!token) {
+      res.status(401).json({ error: "unauthorized", message: "Missing authorization token" });
+      return;
+    }
+
+    let payload: jwt.JwtPayload | string;
+    try {
+      payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
+    } catch (err: any) {
+      if (err && err.name === "TokenExpiredError") {
+        res.status(401).json({ error: "token_expired", message: "Authorization token has expired" });
+        return;
+      }
+      res.status(401).json({ error: "invalid_token", message: "Invalid authorization token" });
+      return;
+    }
+
+    domain = typeof payload === "object" && typeof payload.domain === "string" ? payload.domain.trim() : "";
+    if (!domain) {
+      res.status(401).json({ error: "invalid_token", message: "Token is missing the domain claim" });
+      return;
+    }
+    // Option A (24-Sep-2026, pilot): expose the VERIFIED user claims of the same token — user id, role, user
+    // type — for consumers that must not trust the browser's x-user-* headers (the assistant token mint).
+    // Claim names default to the SAILERP shape and are configurable (SAILERP_JWT_USER_CLAIMS="id,role,userType")
+    // so the genuine-session inspection can correct them without code. Nothing is rejected HERE — every
+    // other route keeps its existing identity handling; a consumer decides whether missing claims are fatal.
+    (req as any).verifiedUser = readVerifiedUser(payload as jwt.JwtPayload);
   }
 
   // Expose the verified domain on req so downstream handlers that need it (e.g.
