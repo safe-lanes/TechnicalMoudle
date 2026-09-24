@@ -35,6 +35,11 @@ const MODULE_ID = 'technical';
 
 const serviceSecret = () => process.env.ASSISTANT_SERVICE_SECRET || '';
 const signingKey = () => process.env.ASSISTANT_IDENTITY_SIGNING_KEY || '';
+/** This module INSTANCE's id as registered on the central assistant (e.g. 'technical-dev', 'technical-prod').
+ *  24-Sep-2026: the token carries it as `iss`; the assistant verifies with the key registered for that id and
+ *  calls back ONLY that id's registered URL with that id's secret, so dev and production share one assistant
+ *  without ever crossing. Required for the assistant to be usable at all from this instance. */
+const instanceId = () => (process.env.ASSISTANT_INSTANCE_ID || '').trim();
 
 function requireServiceSecret(req: AuthenticatedRequest, res: Response): boolean {
   const secret = serviceSecret();
@@ -58,6 +63,11 @@ export async function handleExecute(req: AuthenticatedRequest, res: Response) {
   if (!requireServiceSecret(req, res)) return;
   const v = verifyIdentity(req.headers['x-assistant-identity'], signingKey());
   if (!v.ok) return res.status(401).json({ error: `identity rejected: ${v.reason}` });
+  // 24-Sep-2026: accept only tokens THIS instance minted — a token from another environment is refused even if
+  // a signing key were ever shared by mistake.
+  if (instanceId() && v.identity.iss !== instanceId()) {
+    return res.status(401).json({ error: `identity rejected: issuer '${v.identity.iss ?? ''}' is not this instance` });
+  }
 
   const { tool, args, requestId } = (req.body || {}) as { tool?: string; args?: any; requestId?: string };
   if (!tool || typeof tool !== 'string') return res.status(400).json({ error: 'tool is required' });
@@ -95,6 +105,7 @@ const allowedRoles = () =>
 export async function handleMintToken(req: AuthenticatedRequest, res: Response) {
   const key = signingKey();
   if (!key) return res.status(503).json({ error: 'assistant identity signing not configured' });
+  if (!instanceId()) return res.status(503).json({ error: 'assistant instance id not configured (ASSISTANT_INSTANCE_ID)' });
   // Option A (24-Sep-2026, pilot): the token's user id, role and user type come ONLY from the VERIFIED
   // SAILERP login token (tenantMiddleware → req.verifiedUser). Browser headers (x-user-*), the mock
   // session and req.rbac are NOT consulted — missing claims are refused, never filled from headers.
@@ -122,6 +133,8 @@ export async function handleMintToken(req: AuthenticatedRequest, res: Response) 
       vesselId: (req as any).user?.vesselId ?? null,
       tenantDomain: (req as any).tenantDomain ?? null,
       tuid: (req as any).tenantTuid ?? null,
+      iss: instanceId(), // which registered instance minted this — the assistant's routing key
+
     },
     key,
     60,

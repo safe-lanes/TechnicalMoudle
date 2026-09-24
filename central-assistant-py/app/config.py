@@ -89,7 +89,13 @@ class Settings(BaseSettings):
 
     # embedding / module wiring
     assistant_cors_origins: str = ""                  # comma-separated, '*' for pilot
-    assistant_module_apis: str = "{}"                 # {"technical":{"url":"...","secret":"..."}}
+    assistant_module_apis: str = "{}"                 # RETIRED 24-Sep-2026 (module-keyed, one URL per module) — ignored; see module_instances
+    # Trusted registration of module INSTANCES (environment × module), keyed by the token's `iss` claim:
+    #   {"technical-dev":  {"module":"technical","env":"dev", "url":"https://dev.../technical/api","secret":"…","signingKey":"…"},
+    #    "technical-prod": {"module":"technical","env":"prod","url":"https://app.../technical/api","secret":"…","signingKey":"…"}}
+    # A token is verified with ITS issuer's signingKey and its live-data calls go ONLY to that issuer's registered url,
+    # with that issuer's secret. Tokens without `iss` verify with IDENTITY_SIGNING_KEY and are documentation-only.
+    assistant_module_instances: str = "{}"
     assistant_capture_outbound: str = ""              # test seam: file path; captures ACTUAL wire bodies
     assistant_admin_email: str = "ghazi.anwer@safe-lanes.com"
 
@@ -126,11 +132,56 @@ class Settings(BaseSettings):
 
     @property
     def module_apis(self) -> dict[str, dict[str, Any]]:
+        """RETIRED (24-Sep-2026): kept so old env files parse; never consulted for routing."""
         try:
             v = json.loads(self.assistant_module_apis or "{}")
             return v if isinstance(v, dict) else {}
         except json.JSONDecodeError:
             return {}
+
+    @property
+    def module_instances(self) -> dict[str, dict[str, Any]]:
+        """Registered module instances keyed by issuer id; entries missing module/url/secret/signingKey are dropped
+        (a half-registered instance must never be callable)."""
+        try:
+            v = json.loads(self.assistant_module_instances or "{}")
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(v, dict):
+            return {}
+        out: dict[str, dict[str, Any]] = {}
+        for iss, e in v.items():
+            if isinstance(e, dict) and all(isinstance(e.get(k), str) and e.get(k) for k in ("module", "url", "secret", "signingKey")):
+                out[str(iss)] = {"iss": str(iss), "module": e["module"].lower(), "env": str(e.get("env") or ""),
+                                 "url": e["url"].rstrip("/"), "secret": e["secret"], "signingKey": e["signingKey"]}
+        # Credential reuse is rejected (24-Sep-2026, reviewer requirement): a signing key or a service secret shared by
+        # two instances, or an instance signing key equal to the shared documentation key, would let one environment's
+        # token or secret pass as another's. Every instance involved in a reuse is DROPPED (fail closed); the reasons
+        # are listed by registry_violations() and printed at startup.
+        bad = {iss for iss, _ in self.registry_violations(out)}
+        return {iss: e for iss, e in out.items() if iss not in bad}
+
+    def registry_violations(self, parsed: dict[str, dict[str, Any]] | None = None) -> list[tuple[str, str]]:
+        """(issuer, reason) for every registration that reuses a credential. Pure; used by module_instances and startup."""
+        reg = parsed
+        if reg is None:  # parse without the reuse filter
+            try:
+                v = json.loads(self.assistant_module_instances or "{}")
+            except json.JSONDecodeError:
+                return []
+            reg = {str(i): e for i, e in v.items() if isinstance(v, dict) and isinstance(e, dict)}
+        out: list[tuple[str, str]] = []
+        items = list(reg.items())
+        for i, (iss, e) in enumerate(items):
+            key, sec = str(e.get("signingKey") or ""), str(e.get("secret") or "")
+            if key and key == self.identity_signing_key:
+                out.append((iss, "signingKey equals the shared documentation IDENTITY_SIGNING_KEY"))
+            for jss, f in items[i + 1:]:
+                if key and key == str(f.get("signingKey") or ""):
+                    out.append((iss, f"signingKey reused by '{jss}'")); out.append((jss, f"signingKey reused by '{iss}'"))
+                if sec and sec == str(f.get("secret") or ""):
+                    out.append((iss, f"secret reused by '{jss}'")); out.append((jss, f"secret reused by '{iss}'"))
+        return out
 
 
 def _csv(s: str) -> set[str]:

@@ -16,6 +16,7 @@ export interface ForwardedIdentity {
   userName?: string;
   role: string;
   userType?: 'Office' | 'Ship' | null; // additive (23-Sep-2026): the vessel-scope decision key; absent on older tokens
+  iss?: string; // additive (24-Sep-2026): the minting module INSTANCE (ASSISTANT_INSTANCE_ID, e.g. 'technical-dev') — the assistant verifies with the key registered for it and calls back only its registered URL
   vesselId?: string | null;
   tenantDomain?: string | null;
   tuid?: string | null;

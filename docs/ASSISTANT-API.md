@@ -121,7 +121,10 @@ fallback can never be laundered into a signed token.
 ## 3. The signed identity token
 
 `base64url(JSON payload) + "." + base64url(HMAC-SHA256(payloadB64, shared key))`
-Payload: `{ userId, userName, role, vesselId?, tenantDomain?, tuid?, iat, exp }`, TTL 60 s.
+Payload: `{ userId, userName, role, userType?, vesselId?, tenantDomain?, tuid?, iss?, iat, exp }`, TTL 60 s.
+`iss` (24-Sep-2026) names the module INSTANCE that minted the token (its `ASSISTANT_INSTANCE_ID`, e.g.
+`technical-dev`, `technical-prod`); the assistant verifies the token with the key registered for that issuer
+and routes its live-data calls only to that issuer's registered URL (§3.5).
 Verification allows a bounded ±90 s clock-skew leeway (measured 62 s skew between our
 own hosts; clock mismatch has caused real incidents in this fleet) and rejects
 future-dated tokens beyond it. Implementations: `central-assistant/identity.mjs` (JS)
@@ -172,6 +175,55 @@ Harness (`scripts/verify-assistant-multitenant-auth.ts`, 24 checks + 3 ship chec
 user id or user type do not change the minted identity; a valid token mints with no headers at all; a token
 missing `role` or `userType` is refused; a verified `User` or `Vessel User` role is refused by the allow-list.
 
+### 3.5 One assistant, many environments — trusted instance registration (24-Sep-2026)
+
+One central assistant serves every module and every environment. Each **module instance** (environment ×
+module) is registered on the assistant with its own signing key, its own service secret and its exact
+callback URL, keyed by an issuer id:
+
+```
+ASSISTANT_MODULE_INSTANCES='{
+  "technical-dev":  {"module":"technical","env":"dev", "url":"https://dev.sl-sail.com/technical/api", "secret":"<dev service secret>",  "signingKey":"<dev signing key>"},
+  "technical-prod": {"module":"technical","env":"prod","url":"https://app.sl-sail.com/technical/api", "secret":"<prod service secret>", "signingKey":"<prod signing key>"}
+}'
+```
+
+Rules, all enforced in code (`app/main.py`, `app/agent.py`, `app/llm.py`; tests `tests/test_env_routing.py`):
+
+- A token's `iss` selects the registered signing key it is verified with. A token whose `iss` is not registered
+  is refused (`401 unknown-issuer`). A token re-labelled with another issuer, or with `iss` removed, fails the
+  signature check (`401 bad-signature`). **No callback URL travels in the token**; the URL comes only from the
+  registration.
+- Live-data calls (manifest, execute) go **only** to the issuer's registered URL, with the issuer's own secret;
+  the user's token is forwarded only there. Redirects are never followed (`follow_redirects=False`) and a 3xx is
+  reported as a failure, so neither the secret nor the token can be moved to another host. The manifest cache is
+  keyed by issuer, never by module alone, so dev and production never share tools or state. A manifest whose
+  `module` differs from the registration is refused.
+- Live data is offered only when the widget's `context.module` equals the issuer's registered module.
+- A token **without** `iss` is verified with the shared `IDENTITY_SIGNING_KEY` and gets documentation answers
+  only, never tools. **That shared key must differ from every instance signing key** (PROVEN on the pilot: with
+  the keys equal, an instance-signed token without `iss` was accepted as a documentation token).
+- The module side mirrors this: `ASSISTANT_INSTANCE_ID` is required to mint, the mint writes it as `iss`, and the
+  Data API refuses tokens naming another instance even when signed with a valid key.
+
+Configuration required (no "zero configuration": trusted registration is the point):
+
+| Where | Setting |
+|---|---|
+| Assistant (AI server), once per instance | one entry in `ASSISTANT_MODULE_INSTANCES` (issuer id, module, env, exact URL, secret, signing key); `IDENTITY_SIGNING_KEY` = shared documentation key, distinct from every instance key |
+| Module instance (PM2 env) | `ASSISTANT_INSTANCE_ID` (= its issuer id), `ASSISTANT_IDENTITY_SIGNING_KEY` (= that entry's signing key), `ASSISTANT_SERVICE_SECRET` (= that entry's secret) |
+
+`ASSISTANT_MODULE_APIS` (module-keyed, one URL per module) is retired and ignored.
+
+Pilot proof (24-Sep-2026, `sail-assistant-py:pilot-r6`, two Technical environments on one assistant — dev = pilot shore,
+"prod" = a SIMULATED production shore on the same workstation with its own registry, keys and secret; actual production was
+not tested or changed — 17/17):
+dev token → dev data (142 overdue) and only the dev instance called; prod token → prod instance only (different
+registry, vessel unknown there); dev identity claiming prod, unregistered issuer, removed routing claim, injected
+callback address, instance-signed token without issuer → all 401; documentation-only token (shared key) answers
+from the manuals with no tools and cannot obtain live data; cross-environment tokens and secrets refused by the
+Data APIs themselves; tenant isolation, verified roles and shore-only unchanged (module harness 29/29).
+
 ### 3.3 Remaining production check — genuine SAILERP session (NOT done; pilot cannot do it)
 
 The pilot has no SAILERP login. Everything above was verified with a test-minted JWT and an emulated
@@ -221,12 +273,13 @@ module's other screens keep their existing header-based RBAC until the hardening
 |---|---|---|
 | Central service (`assistant.env` on the AI server) | `OPENAI_API_KEY` | The assistant's key (embeddings `text-embedding-3-large`; chat `CHAT_MODEL`, released value `gpt-5.6-luna`) |
 | | `DATABASE_URL`, `ASSISTANT_INDEX_SET` | Its own Postgres (pgvector) holds the knowledge store; the index set names the released index (`kb-xref-e`). `CHROMA_URL` is a leftover of the retired Node service — unused by the Python service |
-| | `IDENTITY_SIGNING_KEY` | Shared with each module backend |
+| | `IDENTITY_SIGNING_KEY` | Shared DOCUMENTATION key for tokens without an issuer — must differ from every instance signing key (§3.5) |
 | | `ADMIN_TOKEN` | Admin surface auth (tunnel-only anyway) |
 | | `ASSISTANT_CORS_ORIGINS` | The app origins allowed to embed (e.g. `https://dev.sl-sail.com`) |
-| | `ASSISTANT_MODULE_APIS` | `{"technical":{"url":"https://dev.sl-sail.com/technical/api","secret":"…"}}` — per-module data APIs; omit a module → docs-only for it |
-| Module backend (PM2 env, e.g. Technical dev) | `ASSISTANT_SERVICE_SECRET` | Locks manifest/execute to the central service |
-| | `ASSISTANT_IDENTITY_SIGNING_KEY` | SAME value as the service's signing key |
+| | `ASSISTANT_MODULE_INSTANCES` | Trusted registration of module instances (§3.5): issuer id → module, env, exact URL, secret, signing key. Replaces `ASSISTANT_MODULE_APIS` (retired). |
+| Module backend (PM2 env, e.g. Technical dev) | `ASSISTANT_INSTANCE_ID` | This instance's issuer id as registered on the assistant (e.g. `technical-dev`) |
+| | `ASSISTANT_SERVICE_SECRET` | This instance's registered secret — locks manifest/execute to the central service |
+| | `ASSISTANT_IDENTITY_SIGNING_KEY` | This instance's registered signing key |
 | App client build | `VITE_ASSISTANT_CENTRAL_URL` | The assistant base URL (optional — defaults to `https://assistant.sl-sail.com`) |
 
 | Module backend | `ASSISTANT_ALLOWED_ROLES` | Roles (verified token claim) allowed to obtain an assistant token; default `Sail Admin` |

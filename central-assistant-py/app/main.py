@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from . import agent, chat, db, llm, retrieval
 from .config import settings
-from .identity import verify_identity
+from .identity import peek_issuer, verify_identity
 
 
 def prompt_record() -> dict[str, str]:
@@ -27,6 +27,12 @@ def prompt_record() -> dict[str, str]:
     return {"version": agent.PROMPT_VERSION, "docsPromptSha": h1, "toolLoopPromptSha": h2, "combined": hashlib.sha256((h1 + h2).encode()).hexdigest()[:16]}
 
 app = FastAPI(title="SAIL AI Assistant", docs_url=None, redoc_url=None, openapi_url=None)
+
+# 24-Sep-2026: module-instance registry hygiene, printed once at import/startup. Instances that reuse a signing key
+# or a secret, or whose signing key equals the shared documentation key, are REJECTED (dropped) by settings().
+for _iss, _why in settings().registry_violations():
+    print(f"[assistant] REGISTRY REJECTED instance '{_iss}': {_why}")
+print(f"[assistant] registered module instances: {sorted(settings().module_instances) or 'none (documentation only)'}")
 
 _cors = settings().cors_origins
 if _cors:
@@ -82,7 +88,8 @@ async def health() -> dict[str, Any]:
     ms = agent._model_settings()
     return {"ok": True, "store": "pgvector", "indexSet": settings().assistant_index_set, "chunks": chunks,
             "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls, "prompt": prompt_record(),
-            "chatModel": settings().chat_model, "temperature": ms.get("temperature", "default")}
+            "chatModel": settings().chat_model, "temperature": ms.get("temperature", "default"),
+            "instances": sorted(settings().module_instances), "instancesRejected": sorted({i for i, _ in settings().registry_violations()})}
 
 
 # ── admin (nginx denies publicly; tunnel-only) ─────────────────────────────────────
@@ -126,11 +133,18 @@ async def admin_conv_count(request: Request) -> Any:
 async def post_chat(request: Request) -> Any:
     s = settings()
     tok = request.headers.get("x-assistant-identity")
-    v = verify_identity(tok, s.identity_signing_key, s.identity_clock_leeway_sec)  # §5.3: before anything else
+    # 24-Sep-2026 environment routing: a token names its issuer (`iss` = a registered module instance); it is
+    # verified with THAT instance's signing key and its live-data calls go only to that instance's registered URL.
+    # No issuer → the shared IDENTITY_SIGNING_KEY, documentation only. Unregistered issuer → refused.
+    iss = peek_issuer(tok)
+    instance = s.module_instances.get(iss) if iss else None
+    if iss and not instance:
+        return JSONResponse({"error": "identity rejected: unknown-issuer"}, status_code=401)
+    v = verify_identity(tok, instance["signingKey"] if instance else s.identity_signing_key, s.identity_clock_leeway_sec)  # §5.3: before anything else
     if not v.ok or v.identity is None:
         return JSONResponse({"error": f"identity rejected: {v.reason}"}, status_code=401)
     try:
-        status, payload = await chat.handle_chat(await _json_body(request), v.identity, tok or "")
+        status, payload = await chat.handle_chat(await _json_body(request), v.identity, tok or "", instance)
         return JSONResponse(payload, status_code=status)
     except Exception as e:
         print(f"[assistant] {e}")
@@ -140,7 +154,12 @@ async def post_chat(request: Request) -> Any:
 @app.post("/rate")
 async def post_rate(request: Request) -> Any:
     s = settings()
-    v = verify_identity(request.headers.get("x-assistant-identity"), s.identity_signing_key, s.identity_clock_leeway_sec)
+    rtok = request.headers.get("x-assistant-identity")
+    riss = peek_issuer(rtok)
+    rinst = s.module_instances.get(riss) if riss else None
+    if riss and not rinst:
+        return JSONResponse({"error": "identity rejected: unknown-issuer"}, status_code=401)
+    v = verify_identity(rtok, rinst["signingKey"] if rinst else s.identity_signing_key, s.identity_clock_leeway_sec)
     if not v.ok or v.identity is None:
         return JSONResponse({"error": f"identity rejected: {v.reason}"}, status_code=401)
     b = await _json_body(request)
