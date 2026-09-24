@@ -29,30 +29,27 @@ Verify after the first boot: `\d tenants` shows `ai_enabled`; `\d chatbot_intera
 
 | Variable | Required for | Value source |
 |---|---|---|
-| `ASSISTANT_SERVICE_SECRET` | Data API: locks manifest/execute to the shared assistant | Value agreed with Ghazi/support; the same value is set in the shared assistant's `ASSISTANT_MODULE_APIS` |
-| `ASSISTANT_IDENTITY_SIGNING_KEY` | Signs the identity token the widget carries to the assistant | MUST equal the shared assistant's `IDENTITY_SIGNING_KEY` (handed over by Ghazi/support, never in chat or Git) |
+| `ASSISTANT_INSTANCE_ID` | Names this Technical instance to the shared assistant (`technical-dev` on dev, `technical-prod` on production) | Fixed per environment; must match the entry registered on the assistant |
+| `ASSISTANT_SERVICE_SECRET` | Data API: locks manifest/execute to the shared assistant | This environment's own value, handed over by Ghazi/support; registered on the assistant under the same instance id |
+| `ASSISTANT_IDENTITY_SIGNING_KEY` | Signs the identity token the widget carries to the assistant | This environment's own key, registered on the assistant under the same instance id (handed over by Ghazi/support, never in chat or Git). Dev and production keys are different. |
 | `ASSISTANT_ALLOWED_ROLES` | Optional. Roles (verified token claim) allowed to use the assistant | Default `Sail Admin`. Comma-separated SAILERP role names to widen. |
 | `SAILERP_JWT_USER_CLAIMS` | Optional. Claim names for user id, role, user type in the SAILERP token | Default `id,role,userType`. Set ONLY if the genuine-session inspection (§6) shows different names. |
 | `MASTER_DATABASE_URL`, `JWT_SECRET` | Already set on dev (multi-tenant) — unchanged | — |
 
 Not needed on ships.
 
-## 4. The assistant is ONE shared service (decision: Ghazi, 24-Sep-2026)
+## 4. The assistant is ONE shared service for every environment (decision: Ghazi, 24-Sep-2026)
 
-There is a single central assistant, `https://assistant.sl-sail.com`, on the AI server, used by every
-environment (dev and production alike). **No separate dev assistant, no separate keys.** Two things happen on
-the AI server, both done by Ghazi/support, not by the deployer:
+A single central assistant, `https://assistant.sl-sail.com`, serves dev and production. Each Technical
+environment is **registered** on it as an instance with its own signing key, secret and exact callback URL
+(`docs/ASSISTANT-API.md` §3.5). Done on the AI server by Ghazi/support, not by the deployer:
 
-1. The shared assistant is switched to the image built from this merge's `central-assistant-py`
-   (`sail-assistant-py:v7-r1`; documentation behaviour identical to the current release, verified).
-2. After the dev shore is deployed, the shared assistant gets `ASSISTANT_MODULE_APIS` =
-   `{"technical":{"url":"<Technical URL>/technical/api","secret":"<ASSISTANT_SERVICE_SECRET>"}}` — the module
-   it calls back for live data. Its `IDENTITY_SIGNING_KEY` is the value the module must use as
-   `ASSISTANT_IDENTITY_SIGNING_KEY` (§3).
+1. Switch the shared assistant to the image built from this code (`central-assistant-py`).
+2. Register the instance: add `technical-dev` (and later `technical-prod`) to `ASSISTANT_MODULE_INSTANCES`
+   with that environment's URL, secret and signing key. The three module values of §3 are the same values.
 
-Known limit: the assistant holds one Technical URL, so live-data questions from every environment go to that
-one module. Documentation answers are unaffected. If dev and production both run the widget, either the URL
-points at production or a small per-environment routing rule is added later.
+Each environment's token reaches only its own registered endpoint; a dev token can never obtain production
+data and vice versa. Documentation answers are unaffected.
 
 ## 5. Client build settings and build verification
 
