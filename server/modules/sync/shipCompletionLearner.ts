@@ -42,6 +42,7 @@ export interface LearnResult {
   jobsAdvanced: number;
   skipped: number;
   errors: number;
+  errorWouuids: string[];
 }
 
 /**
@@ -105,7 +106,11 @@ export async function refreshRhEstimatesFromAuditRows(
   );
 
   let refreshed = 0;
-  for (const job of jobsRes.rows) {
+  for (let i = 0; i < jobsRes.rows.length; i++) {
+    const job = jobsRes.rows[i];
+    const sp = `rh_refresh_${i}`;
+    await client.query(`SAVEPOINT ${sp}`);
+    try {
     // Serialize audit-driven refreshes for the same Job. After waiting for this
     // lock, the transaction sees all audit rows committed by the prior
     // refresher, so an older audit batch cannot overwrite a newer calculation.
@@ -210,6 +215,12 @@ export async function refreshRhEstimatesFromAuditRows(
       ],
     );
     refreshed += update.rowCount ?? 0;
+    await client.query(`RELEASE SAVEPOINT ${sp}`);
+    } catch (err: any) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+      await client.query(`RELEASE SAVEPOINT ${sp}`);
+      syncDiag(`RH-ESTIMATE REFRESH ERROR: job=${job.juuid}: ${String(err?.message || err).substring(0, 160)}`);
+    }
   }
   return refreshed;
 }
@@ -329,7 +340,7 @@ function buildSet(updates: Record<string, any>, startIdx: number): { sql: string
  * MUST be called with the same client/transaction as the field-log apply.
  */
 export async function learnFromShipCompletions(client: PoolClient, wouuids: string[]): Promise<LearnResult> {
-  const result: LearnResult = { candidates: wouuids.length, jobsAdvanced: 0, skipped: 0, errors: 0 };
+  const result: LearnResult = { candidates: wouuids.length, jobsAdvanced: 0, skipped: 0, errors: 0, errorWouuids: [] };
   // Every caller owns the surrounding transaction, but keep this guard local to the
   // learner as well so a future caller cannot field-log the derived Job projection
   // back to the vessel and create a sync loop.
@@ -370,7 +381,7 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
       // Row-lock the job against concurrent shore edits within this transaction.
       const jobRes = await client.query(
         `SELECT juuid, job_no, vessel_id, component_id, frequency_value, frequency_unit, interval_running_hour,
-                last_done_date, last_done_rh, next_due_rh, rh_estimated_due_date
+                last_done_date, last_done_rh, next_due_rh
            FROM jobs WHERE juuid = $1 FOR UPDATE`,
         [wo.job_id],
       );
@@ -405,14 +416,34 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
         },
       });
 
-      if (
-        jobUpdates.lastDoneRH !== undefined
+      const rhAdvance = jobUpdates.lastDoneRH !== undefined
         && completionRH != null
-        && (wo.maintenance_basis === 'Running Hours' || wo.maintenance_basis === 'Dual Frequency')
-      ) {
-        jobUpdates.rhEstimatedDueDate = null;
-        jobUpdates.rhAveragePerDay = null;
-        jobUpdates.rhEstimateBasis = rhEstimateBasis('MISSING_RH_SOURCE');
+        && (wo.maintenance_basis === 'Running Hours' || wo.maintenance_basis === 'Dual Frequency');
+      const filtered = filterAdvanceOnly(job, jobUpdates);
+      if (!filtered) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} does not advance shore Job ${job.job_no}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+
+      // Never retain an estimate from the preceding RH cycle. Clearing the tuple
+      // belongs to the core write; recalculating it is optional.
+      if (rhAdvance && filtered.lastDoneRH !== undefined) {
+        filtered.rhEstimatedDueDate = null;
+        filtered.rhAveragePerDay = null;
+        filtered.rhEstimateBasis = rhEstimateBasis('MISSING_RH_SOURCE');
+      }
+      const jobSet = buildSet(filtered, 2);
+      const coreWrite = await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
+      if (coreWrite.rowCount === 0) throw new Error(`Job ${job.juuid} disappeared before core update`);
+      result.jobsAdvanced++;
+      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} → ${JSON.stringify(filtered)}`);
+
+      if (rhAdvance && filtered.lastDoneRH !== undefined) {
+        const estimateSp = `learn_estimate_${i}`;
+        await client.query(`SAVEPOINT ${estimateSp}`);
+        try {
         const toRhComponent = (row: any) => row ? ({
           id: row.id,
           cuuid: row.cuuid,
@@ -480,28 +511,26 @@ export async function learnFromShipCompletions(client: PoolClient, wouuids: stri
               isDeleted: row.is_deleted,
             })),
           );
-          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
-          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
-          jobUpdates.rhEstimateBasis = estimate.basis;
+          await client.query(
+            `UPDATE jobs SET rh_estimated_due_date = $2, rh_average_per_day = $3, rh_estimate_basis = $4, updated_at = NOW()
+              WHERE juuid = $1 AND last_done_rh IS NOT DISTINCT FROM $5
+                AND last_done_date IS NOT DISTINCT FROM $6 AND next_due_rh IS NOT DISTINCT FROM $7`,
+            [job.juuid, estimate.dueDate, estimate.averagePerDay, estimate.basis,
+              String(filtered.lastDoneRH), filtered.lastDoneDate ?? job.last_done_date,
+              String(filtered.nextDueRH ?? job.next_due_rh)],
+          );
+        }
+        await client.query(`RELEASE SAVEPOINT ${estimateSp}`);
+        } catch (estimateErr: any) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${estimateSp}`);
+          await client.query(`RELEASE SAVEPOINT ${estimateSp}`);
+          syncDiag(`COMPLETION-LEARN ESTIMATE ERROR: WO ${wouuid} job=${job.juuid}: ${String(estimateErr?.message || estimateErr).substring(0, 160)}`);
         }
       }
-
-      const filtered = filterAdvanceOnly(job, jobUpdates);
-      if (!filtered) {
-        result.skipped++;
-        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} does not advance shore Job ${job.job_no}`);
-        await client.query(`RELEASE SAVEPOINT ${sp}`);
-        continue;
-      }
-
-      const jobSet = buildSet(filtered, 2);
-      await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
-      result.jobsAdvanced++;
-
-      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} → ${JSON.stringify(filtered)}`);
       await client.query(`RELEASE SAVEPOINT ${sp}`);
     } catch (err: any) {
       result.errors++;
+      result.errorWouuids.push(wouuid);
       try {
         await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);

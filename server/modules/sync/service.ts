@@ -23,6 +23,7 @@ import { syncDiag } from './syncDiagLogger';
 import * as alertsRepo from '../alerts/repositories/alertsRepository';
 import { getFieldDisplayName } from './conflictReviewRepository';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
+import type { PoolClient } from 'pg';
 import { shouldRetryUnknownSyncColumn } from './unknownColumnRetryPolicy';
 import {
   COMPLETED_DATE_SYNC_ERROR,
@@ -92,6 +93,28 @@ export async function initiateSyncSession(
 // ═══════════════════════════════════════════════════════════════
 // 2. PUSH (Ship sends its changes to Shore)
 // ═══════════════════════════════════════════════════════════════
+
+/** Optional estimate work must never abort the required WO + Job transaction. */
+export async function refreshRhEstimatesSafely(
+  client: PoolClient,
+  auditIds: string[],
+  batchUuid: string,
+  refresh: (client: PoolClient, ids: string[]) => Promise<number>,
+): Promise<number> {
+  if (!auditIds.length) return 0;
+  await client.query('SAVEPOINT rh_refresh_batch');
+  try {
+    const count = await refresh(client, auditIds);
+    await client.query('RELEASE SAVEPOINT rh_refresh_batch');
+    syncDiag(`RH-ESTIMATE REFRESH: audits=${auditIds.length} jobs=${count}`);
+    return count;
+  } catch (err: any) {
+    await client.query('ROLLBACK TO SAVEPOINT rh_refresh_batch');
+    await client.query('RELEASE SAVEPOINT rh_refresh_batch');
+    syncDiag(`RH-ESTIMATE REFRESH ERROR: batch=${batchUuid}: ${String(err?.message || err).substring(0, 160)}`);
+    return 0;
+  }
+}
 
 export async function receivePushData(
   batchUuid: string,
@@ -842,6 +865,13 @@ export async function receivePushData(
         //     updated shore jobs, and the shore sweep generated phantom overdue WOs).
         {
           const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+          // A previous core projection failure leaves the WO committed but its
+          // field logs unacknowledged. On retry the insert-origin/stale guard may
+          // skip those logs; still recheck the persisted completed WO. Conflict
+          // holdback and the learner's advance-only checks apply as usual.
+          acceptedLogs
+            .filter(log => log.tableName === 'work_orders' && !droppedRowUuids.has(log.rowUuid))
+            .forEach(log => completionWouuids.add(log.rowUuid));
           // Task #399: WOs with an OPEN dual-completion conflict are held out of learning —
           // job tracking must not advance from an interim value; the user's resolution log
           // re-enters this path and triggers learning with the final chosen values.
@@ -853,17 +883,23 @@ export async function receivePushData(
             const stillOpen = await findWouuidsWithOpenDualConflicts(client, Array.from(completionWouuids));
             stillOpen.forEach((w) => completionWouuids.delete(w));
           }
-          // completionWouuids was populated ONLY from changes that actually APPLIED
-          // (insert-groups that landed + update logs that passed the stale/conflict
-          // guards) plus self-heal fullRows — never from merely-accepted logs.
+          // Candidates include applied WO changes, self-heal rows, and re-offered
+          // WO logs. The learner always reads the persisted row, so re-offered
+          // logs cannot project uncommitted incoming field values.
           if (completionWouuids.size > 0) {
-            await learnFromShipCompletions(client, Array.from(completionWouuids));
+            const learned = await learnFromShipCompletions(client, Array.from(completionWouuids));
+            if (learned.errors > 0) {
+              syncDiag(`COMPLETION-LEARN CORE ERRORS: batch=${batchUuid} count=${learned.errors} — retaining affected WO logs for retry`);
+              // A completed WO must not be positively acknowledged while its
+              // linked Job projection failed. The persisted WO remains available
+              // and its logs are re-offered on the next push.
+              learned.errorWouuids.forEach(w => droppedRowUuids.add(w));
+            }
             completionWouuids.clear(); // consumed inside this transaction
           }
           if (rhAuditRowUuids.size > 0) {
             const { refreshRhEstimatesFromAuditRows } = await import('./shipCompletionLearner');
-            const refreshed = await refreshRhEstimatesFromAuditRows(client, Array.from(rhAuditRowUuids));
-            syncDiag(`RH-ESTIMATE REFRESH: audits=${rhAuditRowUuids.size} jobs=${refreshed}`);
+            await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows);
             rhAuditRowUuids.clear();
           }
         }
@@ -899,10 +935,11 @@ export async function receivePushData(
         const stillOpen = await findWouuidsWithOpenDualConflicts(client, Array.from(completionWouuids));
         stillOpen.forEach((w) => completionWouuids.delete(w));
         if (completionWouuids.size > 0) {
-          await learnFromShipCompletions(client, Array.from(completionWouuids));
+          const learned = await learnFromShipCompletions(client, Array.from(completionWouuids));
+          learned.errorWouuids.forEach(w => droppedRowUuids.add(w));
         }
         if (rhAuditRowUuids.size > 0) {
-          await refreshRhEstimatesFromAuditRows(client, Array.from(rhAuditRowUuids));
+          await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows);
         }
         await client.query('COMMIT');
       } catch (learnErr: any) {

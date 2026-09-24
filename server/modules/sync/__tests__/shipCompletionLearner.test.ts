@@ -93,7 +93,10 @@ describe('filterAdvanceOnly (advance-only per leg)', () => {
 });
 
 describe('learnFromShipCompletions', () => {
-  function makeClient(options?: { failJobId?: string }) {
+  function makeClient(options?: {
+    failJobId?: string; failComponent?: boolean; failAudit?: boolean;
+    failEstimateWrite?: boolean; missingComponent?: boolean; emptyAudit?: boolean;
+  }) {
     const queries: Array<{ text: string; values?: any[] }> = [];
     const workOrders: Record<string, Record<string, any>> = {
       'wo-1': {
@@ -137,6 +140,18 @@ describe('learnFromShipCompletions', () => {
         next_due_date: null,
         due_date: null,
         work_order_no: 'WO-RH',
+      },
+      'wo-dual-no-rh': {
+        wouuid: 'wo-dual-no-rh',
+        status: 'Completed',
+        job_id: 'job-1',
+        vessel_id: 'vessel-1',
+        maintenance_basis: 'Dual Frequency',
+        date_completed: '05-Aug-2026',
+        wo_completion_rh: null,
+        completion_rh: null,
+        current_reading: null,
+        work_order_no: 'WO-DUAL',
       },
       'wo-no-job': {
         wouuid: 'wo-no-job',
@@ -204,6 +219,8 @@ describe('learnFromShipCompletions', () => {
           return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
         }
         if (text.includes('FROM components')) {
+          if (options?.failComponent) throw new Error('simulated component lookup failure');
+          if (options?.missingComponent) return { rows: [], rowCount: 0 };
           return {
             rows: [{
               cuuid: 'component-1',
@@ -217,6 +234,8 @@ describe('learnFromShipCompletions', () => {
           };
         }
         if (text.includes('FROM running_hours_audit')) {
+          if (options?.failAudit) throw new Error('simulated audit lookup failure');
+          if (options?.emptyAudit) return { rows: [], rowCount: 0 };
           return {
             rows: [
               {
@@ -237,6 +256,7 @@ describe('learnFromShipCompletions', () => {
         }
         if (text.startsWith('UPDATE jobs')) {
           if (values?.[0] === options?.failJobId) throw new Error('simulated Job write failure');
+          if (options?.failEstimateWrite && text.includes('SET rh_estimated_due_date')) throw new Error('simulated estimate write failure');
           return { rows: [], rowCount: 1 };
         }
         return { rows: [], rowCount: 0 };
@@ -250,11 +270,13 @@ describe('learnFromShipCompletions', () => {
     const { client, queries } = makeClient();
     const result = await learnFromShipCompletions(client, ['wo-1']);
 
-    expect(result).toEqual({ candidates: 1, jobsAdvanced: 1, skipped: 0, errors: 0 });
+    expect(result).toEqual({ candidates: 1, jobsAdvanced: 1, skipped: 0, errors: 0, errorWouuids: [] });
     expect(queries[0].text).toContain(`SET LOCAL sync.bypass_trigger = 'true'`);
 
     const update = queries.find((q) => q.text.startsWith('UPDATE jobs'));
+    const estimateWrite = queries.find(q => q.text.includes('SET rh_estimated_due_date'));
     expect(update).toBeTruthy();
+    expect(estimateWrite).toBeTruthy();
     expect(update!.text).toContain('"last_done_date"');
     expect(update!.text).toContain('"next_due_date"');
     expect(update!.text).toContain('"last_done_rh"');
@@ -267,6 +289,8 @@ describe('learnFromShipCompletions', () => {
     expect(update!.text).not.toContain('job_component_links');
     expect(update!.values).toContain('12000');
     expect(update!.values).toContain('12500');
+    expect(estimateWrite!.values?.[0]).toBe('job-1');
+    expect(estimateWrite!.values?.[3]).toBe(`${RH_ESTIMATE_BASIS_VERSION}_HISTORICAL`);
     expect(queries.some((q) => q.text.includes('job_component_links'))).toBe(false);
   });
 
@@ -274,7 +298,7 @@ describe('learnFromShipCompletions', () => {
     const { client, queries } = makeClient();
     const result = await learnFromShipCompletions(client, ['wo-no-job']);
 
-    expect(result).toEqual({ candidates: 1, jobsAdvanced: 0, skipped: 1, errors: 0 });
+    expect(result).toEqual({ candidates: 1, jobsAdvanced: 0, skipped: 1, errors: 0, errorWouuids: [] });
     expect(queries.some((q) => q.text.includes('FROM jobs'))).toBe(false);
     expect(queries.some((q) => q.text.startsWith('UPDATE jobs'))).toBe(false);
   });
@@ -283,7 +307,7 @@ describe('learnFromShipCompletions', () => {
     const { client, queries } = makeClient();
     const result = await learnFromShipCompletions(client, ['wo-rh']);
 
-    expect(result).toEqual({ candidates: 1, jobsAdvanced: 1, skipped: 0, errors: 0 });
+    expect(result).toEqual({ candidates: 1, jobsAdvanced: 1, skipped: 0, errors: 0, errorWouuids: [] });
     const update = queries.find((q) => q.text.startsWith('UPDATE jobs'));
     expect(update).toBeTruthy();
     expect(update!.text).toContain('"last_done_date"');
@@ -294,27 +318,118 @@ describe('learnFromShipCompletions', () => {
     expect(update!.values).toContain('14500');
   });
 
+  it('advances the Calendar leg of a Dual Frequency Job without RH or estimate lookups', async () => {
+    const { client, queries } = makeClient({ failComponent: true });
+    const result = await learnFromShipCompletions(client, ['wo-dual-no-rh']);
+    expect(result.jobsAdvanced).toBe(1);
+    expect(result.errors).toBe(0);
+    const update = queries.find(q => q.text.startsWith('UPDATE jobs'));
+    expect(update?.text).toContain('"next_due_date"');
+    expect(update?.text).not.toContain('"next_due_rh"');
+    expect(queries.some(q => q.text.includes('FROM components'))).toBe(false);
+  });
+
+  it.each(['failComponent', 'failAudit', 'failEstimateWrite'] as const)(
+    'commits core RH projection when %s occurs in optional enrichment',
+    async (failure) => {
+      const { client, queries } = makeClient({ [failure]: true });
+      const result = await learnFromShipCompletions(client, ['wo-1', 'wo-2']);
+      expect(result.jobsAdvanced).toBe(2);
+      expect(result.errors).toBe(0);
+      const updates = queries.filter(q => q.text.startsWith('UPDATE jobs'));
+      expect(updates[0].text).toContain('"last_done_rh"');
+      expect(updates[0].text).toContain('"next_due_rh"');
+      expect(updates[0].text).toContain('"last_done_date"');
+      expect(updates[0].values).toContain(null); // old estimate cleared atomically
+      expect(updates.some(q => q.values?.[0] === 'job-2' && q.text.includes('"next_due_date"'))).toBe(true);
+      expect(queries.some(q => q.text.includes('ROLLBACK TO SAVEPOINT learn_wo_0'))).toBe(false);
+    },
+  );
+
+  it.each(['missingComponent', 'emptyAudit'] as const)(
+    'advances the RH cycle when %s prevents a historical estimate',
+    async (condition) => {
+      const { client, queries } = makeClient({ [condition]: true });
+      const result = await learnFromShipCompletions(client, ['wo-rh']);
+      expect(result).toMatchObject({ jobsAdvanced: 1, errors: 0 });
+      const core = queries.find(q => q.text.startsWith('UPDATE jobs'));
+      expect(core?.values).toContain('14500');
+      expect(core?.values).toContain(null);
+      if (condition === 'missingComponent')
+        expect(queries.some(q => q.text.includes('FROM running_hours_audit'))).toBe(false);
+    },
+  );
+
   it('rolls back only the failed Work Order savepoint and continues the batch', async () => {
     const { client, queries } = makeClient({ failJobId: 'job-1' });
     const result = await learnFromShipCompletions(client, ['wo-1', 'wo-2']);
 
-    expect(result).toEqual({ candidates: 2, jobsAdvanced: 1, skipped: 0, errors: 1 });
+    expect(result).toEqual({ candidates: 2, jobsAdvanced: 1, skipped: 0, errors: 1, errorWouuids: ['wo-1'] });
     expect(queries.some((q) => q.text.includes('ROLLBACK TO SAVEPOINT learn_wo_0'))).toBe(true);
     expect(queries.some((q) => q.text.includes('RELEASE SAVEPOINT learn_wo_0'))).toBe(true);
     expect(queries.some((q) => q.text.includes('SAVEPOINT learn_wo_1'))).toBe(true);
     expect(queries.filter((q) => q.text.startsWith('UPDATE jobs'))).toHaveLength(2);
   });
 
+  it('reports a zero-row core write as retryable instead of acknowledging success', async () => {
+    const { client, queries } = makeClient();
+    const statements: string[] = [];
+    const originalQuery = client.query.bind(client);
+    client.query = async (text: string, values?: any[]) => {
+      statements.push(text);
+      return text.startsWith('UPDATE jobs') ? { rows: [], rowCount: 0 } : originalQuery(text, values);
+    };
+    const result = await learnFromShipCompletions(client, ['wo-2']);
+    expect(result).toMatchObject({ jobsAdvanced: 0, errors: 1, errorWouuids: ['wo-2'] });
+    expect(statements).toContain('ROLLBACK TO SAVEPOINT learn_wo_0');
+    expect(queries.some(q => q.text.includes('FROM work_orders'))).toBe(true);
+  });
+
   it('does not update a Job from another vessel', async () => {
     const { client, queries } = makeClient();
     const result = await learnFromShipCompletions(client, ['wo-wrong-vessel']);
 
-    expect(result).toEqual({ candidates: 1, jobsAdvanced: 0, skipped: 1, errors: 0 });
+    expect(result).toEqual({ candidates: 1, jobsAdvanced: 0, skipped: 1, errors: 0, errorWouuids: [] });
     expect(queries.some((q) => q.text.startsWith('UPDATE jobs'))).toBe(false);
   });
 });
 
 describe('refreshRhEstimatesFromAuditRows', () => {
+  it('rolls back one failed Job estimate without losing the next Job refresh', async () => {
+    const statements: string[] = [];
+    const firstJob = {
+      juuid: 'job-1', vessel_id: 'vessel-1', component_id: 'master-1',
+      maintenance_basis: 'Running Hours', interval_running_hour: 200,
+      last_done_date: '20-Sep-2026', last_done_rh: '1000', next_due_rh: '1200',
+      component_cuuid: 'master-1', component_legacy_id: '1', component_vessel_id: 'vessel-1',
+      rh_counter_type: 'MASTER', rh_master_component_id: null, rh_counter_source: null,
+    };
+    const client = {
+      async query(text: string, values?: any[]) {
+        statements.push(text);
+        if (text.includes('FROM running_hours_audit a'))
+          return { rows: [{ component_id: 'master-1', component_cuuid: 'master-1' }], rowCount: 1 };
+        if (text.includes('FROM jobs j'))
+          return { rows: [firstJob, { ...firstJob, juuid: 'job-2', component_cuuid: 'master-2' }], rowCount: 2 };
+        if (text.includes('FROM jobs') && text.includes('FOR UPDATE'))
+          return { rows: [firstJob], rowCount: 1 };
+        if (text.includes('FROM running_hours_audit')) {
+          if (values?.[0] === 'master-1') throw new Error('simulated failed audit query');
+          return { rows: [
+            { cumulative_rh: '1000', date_updated_local: '22-Sep-2026' },
+            { cumulative_rh: '100', date_updated_local: '21-Jan-2026' },
+          ] };
+        }
+        if (text.startsWith('UPDATE jobs')) return { rows: [], rowCount: 1 };
+        return { rows: [], rowCount: 0 };
+      },
+    };
+    expect(await refreshRhEstimatesFromAuditRows(client as any, ['audit-1'])).toBe(1);
+    expect(statements).toContain('ROLLBACK TO SAVEPOINT rh_refresh_0');
+    expect(statements).toContain('RELEASE SAVEPOINT rh_refresh_1');
+    expect(statements.filter(text => text.startsWith('UPDATE jobs'))).toHaveLength(1);
+  });
+
   it('converges an insufficient estimate when RH history arrives in a later push', async () => {
     const queries: Array<{ text: string; values?: any[] }> = [];
     const client = {
