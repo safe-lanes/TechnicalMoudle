@@ -163,6 +163,19 @@ async function main() {
     record('ship: token mint → 403 shore-only', r.status === 403, `${r.status} ${r.body?.error ?? ''}`);
   }
 
+  // ── optional: a GENUINE SAILERP session (docs/ASSISTANT-API.md §3.3) — prints claim NAMES only, never the token ──
+  const genuine = process.env.GENUINE_BEARER || '';
+  if (genuine) {
+    const claims = (() => { try { return JSON.parse(Buffer.from(genuine.split('.')[1], 'base64url').toString('utf8')); } catch { return null; } })();
+    const names = claims ? Object.keys(claims).sort().join(',') : 'undecodable';
+    const expectDomain = process.env.GENUINE_DOMAIN || '';
+    r = await mint(BASE, genuine, office);
+    const gid = r.body?.token ? decodeIdentity(r.body.token) : {};
+    record(`genuine session: mint → 200 and tenantDomain=${expectDomain || '(any)'} [claims present: ${names}]`,
+      r.status === 200 && (!expectDomain || gid.tenantDomain === expectDomain),
+      `${r.status} ${r.body?.error ?? ''} tenantDomain=${gid.tenantDomain ?? '-'} has(userType)=${claims ? 'userType' in claims : '?'} has(id)=${claims ? ('id' in claims || 'userId' in claims) : '?'} has(role)=${claims ? 'role' in claims : '?'}`);
+  }
+
   const failed = results.filter((c) => !c.pass);
   console.log(`\n${results.length - failed.length}/${results.length} passed${failed.length ? ` — FAILED: ${failed.map((c) => c.name).join(' | ')}` : ''}`);
   process.exit(failed.length ? 1 : 0);

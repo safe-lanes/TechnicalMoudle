@@ -127,24 +127,85 @@ own hosts; clock mismatch has caused real incidents in this fleet) and rejects
 future-dated tokens beyond it. Implementations: `central-assistant/identity.mjs` (JS)
 and `server/modules/assistant-api/identityToken.ts` (TS) — same wire format.
 
-### 3.1 Multi-tenant modules: which tenant does `/assistant/execute` run in? (23-Sep-2026)
+### 3.1 Multi-tenant modules: which tenant does `/assistant/execute` run in? (23/24-Sep-2026)
 
 The central service's call to `POST {moduleApi}/assistant/execute` carries **no SAILERP Bearer** — the
 browser's JWT never leaves the browser↔module hop. A multi-tenant module therefore selects the tenant
 from the **identity token's `tenantDomain`**, which the module itself copied from the JWT-verified domain
 when it minted the token (`GET /assistant/token` runs under the module's tenant middleware). The module
 accepts that only together with the shared service secret: **two verified credentials, no exemption, no
-browser header trusted**. A token without `tenantDomain` (minted by a single-tenant instance) is refused
-by a multi-tenant module (`401 invalid_identity`, fail closed). `GET /assistant/manifest` is static tool
-metadata and needs the service secret only. Technical's implementation:
+browser header trusted for the tenant**. A token without `tenantDomain` (minted by a single-tenant
+instance) is refused by a multi-tenant module (`401 invalid_identity`, fail closed). `GET /assistant/manifest`
+is static tool metadata and needs the service secret only. Technical's implementation:
 `server/modules/assistant-api/serviceTenant.ts`, consulted by `server/middleware/tenantMiddleware.ts`;
 regression harness `scripts/verify-assistant-multitenant-auth.ts` (21 checks: mint and execute hops,
 tenant/database selection, cross-tenant refusal, missing/expired/tampered credentials, ship shore-only).
 
-What that harness does **not** prove: that a production SAILERP JWT carries the claims the module reads
-(`domain`, `userType`); the test mints its own HS256 JWT with the module's `JWT_SECRET`, exactly as
-`scripts/verify-mt-parity.ts` does. Role and user id in the identity token are still the browser-forwarded
-`x-user-*` headers (Phase 0 audit identity) — the same trust level as the module's own RBAC guards.
+### 3.2 What is verified, and by what — the two identities in the token (24-Sep-2026)
+
+The identity token carries two DIFFERENT kinds of fact. Do not describe them as one "verified identity".
+
+| Field(s) | Source | Verified by | Trust |
+|---|---|---|---|
+| `tenantDomain`, `tuid` | SAILERP Bearer JWT, `domain` claim | HS256 signature with the shared `JWT_SECRET` (tenantMiddleware) | **Server-verified.** Cannot be set by the browser. |
+| `userId`, `role`, `userType`, `vesselId` | Browser headers `x-user-id`, `x-user-role`, `x-user-type` (…) — the client's fetch interceptor forwards them from the decrypted `userProfile` that SAILERP handed to the browser at login | Nothing server-side. Only the token's OWN signature protects them after minting | **Browser-supplied.** Whoever controls the browser session can send any value. This is the Phase 0 "audit identity", exactly what Technical's own RBAC guards (`permissions.ts`, controllers) use today — the assistant is no weaker and no stronger than the module. |
+
+Consequently the assistant's vessel-scope decision (Office = any vessel of the tenant, Ship = the assigned
+vessel) and the module's role guards rest on browser-supplied values. **They are access rules applied to a
+claimed identity, not verified permissions.** The tenant boundary IS verified: a user can never reach
+another tenant's database whatever they put in the headers.
+
+**`userType` — exactly where it comes from.** The module reads `userType` from the `x-user-type` header
+(→ `req.rbac.userType`) — NEVER from the JWT. tenantMiddleware reads exactly one claim from the JWT,
+`domain`; no other claim is read anywhere on the server (grep `payload.` — one hit). The pilot harness
+signs `{ id, domain, userType, userId }` because the committed multi-tenant tests do, but `id`, `userType`
+and `userId` in that JWT are ignored by the code. **What the current code requires from SAILERP:**
+(1) a Bearer JWT, HS256, signed with the shared `JWT_SECRET`, carrying `domain` — mandatory in multi-tenant
+mode, nothing else in it is used; (2) the encrypted `userProfile` handoff in the browser (`userUuid`,
+`userType`, `role`, …) and the `credentials.token` blob, which the client forwards as headers.
+
+**Widget gate.** The chat button is shown only to the `Sail_Admin` view mode, decided client-side from the
+same profile. The server mint does not enforce a role: any forwarded role can mint a token. Shore-only IS
+server-enforced (deployment mode, §3.1 harness).
+
+### 3.3 Remaining production check — genuine SAILERP session (NOT done; pilot cannot do it)
+
+The pilot has no SAILERP login. Everything above was verified with a test-minted JWT and an emulated
+profile. Before live data is enabled in any environment that real users reach, run this once, in that
+environment, with a genuine SAILERP login:
+
+1. Log in to SAILERP normally, open the Technical module, open DevTools → Network, pick any
+   `/technical/api/...` request. **Do not copy the token anywhere** — not into chat, a report, a ticket or Git.
+2. In that same browser console, decode the JWT payload locally and note ONLY the claim NAMES, the `domain`
+   value and the expiry (the payload is base64url; the signature is not needed and must not be shared):
+   `JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))` where `t` is the Bearer. Record which of
+   `domain`, `id`/`userId`, `userType`, `role` are present.
+3. Confirm the chat widget mints a token (`GET /technical/api/assistant/token` → 200) on that session and
+   that one live-data question answers for a vessel of that tenant. Optionally run the harness's genuine-session
+   check on a workstation that already holds the session: `GENUINE_BEARER=<pasted locally, never stored>`
+   `GENUINE_DOMAIN=<expected domain>` — it prints claim names only, never the token.
+4. Record the outcome in the deployment note (claim names, domain matched yes/no, mint 200 yes/no).
+
+### 3.4 Decision required before production live-data enablement — user identity trust
+
+Today the assistant answers as whoever the browser claims to be (within the verified tenant). Two options
+make `userId` / `role` / `userType` server-verified WITHOUT a new authentication architecture; either is a
+product/platform decision, not a pilot task:
+
+- **A. Trusted token claims.** If the genuine SAILERP JWT already carries user id, user type and/or role
+  (the Crewing-validated shape was `{ id, domain, userType }`), the module reads those from the verified
+  payload in tenantMiddleware and the mint uses them, ignoring the headers for those fields. Needs §3.3 to
+  confirm the claims exist; then a small, additive server change.
+- **B. Server-side identity lookup.** The tenant database already holds SAILERP's user and role tables:
+  `master_users` (columns include `role`, `userType`, `designation`, `department`), `users` (`role`,
+  `vesselId`), `admn_role_master` (`assignedRole`), `master_user_vessels` (user ↔ vessel). The mint (and, if
+  wanted, the module's guards) can resolve role / user type / assigned vessels by the user id from those
+  tables instead of trusting the headers — provided the user id itself is taken from a verified JWT claim
+  (option A for the id alone) or matched server-side. Needs a decision on which table is authoritative and
+  how fresh it is on the shore (they are synced master data).
+
+Until one is chosen and verified with a genuine session, live-data enablement in production means: tenant
+isolation verified; user-level permissions are the module's existing browser-trusted RBAC.
 
 ## 4. Deployment configuration (who sets what)
 
