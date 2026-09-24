@@ -148,21 +148,22 @@ The identity token carries two DIFFERENT kinds of fact. Do not describe them as 
 | Field(s) | Source | Verified by | Trust |
 |---|---|---|---|
 | `tenantDomain`, `tuid` | SAILERP Bearer JWT, `domain` claim | HS256 signature with the shared `JWT_SECRET` (tenantMiddleware) | **Server-verified.** Cannot be set by the browser. |
-| `userId`, `role`, `userType`, `vesselId` | Browser headers `x-user-id`, `x-user-role`, `x-user-type` (…) — the client's fetch interceptor forwards them from the decrypted `userProfile` that SAILERP handed to the browser at login | Nothing server-side. Only the token's OWN signature protects them after minting | **Browser-supplied.** Whoever controls the browser session can send any value. This is the Phase 0 "audit identity", exactly what Technical's own RBAC guards (`permissions.ts`, controllers) use today — the assistant is no weaker and no stronger than the module. |
+| `userId`, `role`, `userType`, `vesselId` | Browser headers `x-user-id`, `x-user-role`, `x-user-type` (…) — the client's fetch interceptor forwards them from the decrypted `userProfile` that SAILERP handed to the browser at login. **The SAILERP login token itself also carries user id, role and userType (Ghazi, 24-Sep-2026) — the module simply does not read them from the token yet.** | Nothing server-side today. Only the identity token's OWN signature protects them after minting | **Browser-supplied as used today.** Whoever controls the browser session can send any header value. This is the Phase 0 "audit identity", exactly what Technical's own RBAC guards (`permissions.ts`, controllers) use — the assistant is no weaker and no stronger than the module. |
 
 Consequently the assistant's vessel-scope decision (Office = any vessel of the tenant, Ship = the assigned
 vessel) and the module's role guards rest on browser-supplied values. **They are access rules applied to a
 claimed identity, not verified permissions.** The tenant boundary IS verified: a user can never reach
 another tenant's database whatever they put in the headers.
 
-**`userType` — exactly where it comes from.** The module reads `userType` from the `x-user-type` header
-(→ `req.rbac.userType`) — NEVER from the JWT. tenantMiddleware reads exactly one claim from the JWT,
-`domain`; no other claim is read anywhere on the server (grep `payload.` — one hit). The pilot harness
-signs `{ id, domain, userType, userId }` because the committed multi-tenant tests do, but `id`, `userType`
-and `userId` in that JWT are ignored by the code. **What the current code requires from SAILERP:**
-(1) a Bearer JWT, HS256, signed with the shared `JWT_SECRET`, carrying `domain` — mandatory in multi-tenant
-mode, nothing else in it is used; (2) the encrypted `userProfile` handoff in the browser (`userUuid`,
-`userType`, `role`, …) and the `credentials.token` blob, which the client forwards as headers.
+**`userType` — exactly where it comes from.** SAILERP supplies it twice: as a claim in the signed login
+token AND as a field of the encrypted `userProfile` in local storage (Ghazi, 24-Sep-2026; the Crewing-validated
+token shape is `{ id, domain, userType, … }`). **The module reads it from the `x-user-type` header** (the
+profile) → `req.rbac.userType` — never from the token. tenantMiddleware reads exactly one token claim, `domain`;
+no other claim is read anywhere on the server (grep `payload.` — one hit). **What the current code requires
+from SAILERP:** (1) a Bearer JWT, HS256, signed with the shared `JWT_SECRET`, carrying `domain` — mandatory in
+multi-tenant mode; the user claims it also carries are present but unused; (2) the encrypted `userProfile`
+handoff in the browser (`userUuid`, `userType`, `role`, …) and the `credentials.token` blob, which the client
+forwards as headers. Closing the gap = reading id / role / userType from the verified token (§3.4 option A).
 
 **Widget gate.** The chat button is shown only to the `Sail_Admin` view mode, decided client-side from the
 same profile. The server mint does not enforce a role: any forwarded role can mint a token. Shore-only IS
@@ -180,6 +181,8 @@ environment, with a genuine SAILERP login:
    value and the expiry (the payload is base64url; the signature is not needed and must not be shared):
    `JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))` where `t` is the Bearer. Record which of
    `domain`, `id`/`userId`, `userType`, `role` are present.
+   Expected (Ghazi, 24-Sep): `domain`, user id, `role`, `userType` are all present — the inspection confirms the
+   exact names the code will read.
 3. Confirm the chat widget mints a token (`GET /technical/api/assistant/token` → 200) on that session and
    that one live-data question answers for a vessel of that tenant. Optionally run the harness's genuine-session
    check on a workstation that already holds the session: `GENUINE_BEARER=<pasted locally, never stored>`
@@ -192,10 +195,11 @@ Today the assistant answers as whoever the browser claims to be (within the veri
 make `userId` / `role` / `userType` server-verified WITHOUT a new authentication architecture; either is a
 product/platform decision, not a pilot task:
 
-- **A. Trusted token claims.** If the genuine SAILERP JWT already carries user id, user type and/or role
-  (the Crewing-validated shape was `{ id, domain, userType }`), the module reads those from the verified
-  payload in tenantMiddleware and the mint uses them, ignoring the headers for those fields. Needs §3.3 to
-  confirm the claims exist; then a small, additive server change.
+- **A. Trusted token claims — the expected path.** The genuine SAILERP JWT carries user id, role and
+  userType (Ghazi, 24-Sep-2026; §3.3 is the recorded inspection that confirms the exact claim names). The module
+  reads those from the verified payload in tenantMiddleware and the mint (and, if wanted, the RBAC guards) use
+  them, ignoring the headers for those fields. A small, additive server change — NOT started; functional
+  changes are frozen pending approval.
 - **B. Server-side identity lookup.** The tenant database already holds SAILERP's user and role tables:
   `master_users` (columns include `role`, `userType`, `designation`, `department`), `users` (`role`,
   `vesselId`), `admn_role_master` (`assignedRole`), `master_user_vessels` (user ↔ vessel). The mint (and, if

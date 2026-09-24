@@ -35,8 +35,10 @@ Details and the exact field-by-field trust table: `docs/ASSISTANT-API.md` §3.2.
 
 ## 3. `userType` — resolved statement
 
-`userType` (and `role`, `userId`) come from the **browser profile headers** (`x-user-type` → `req.rbac.userType`),
-never from the JWT. The server reads exactly one JWT claim: `domain`. The current code requires from SAILERP:
+SAILERP supplies user id, role and `userType` twice: in the signed login token and in the encrypted `userProfile`
+in local storage (Ghazi, 24-Sep-2026). **The module today reads them from the profile headers** (`x-user-type` →
+`req.rbac.userType`), not from the token. The server reads exactly one JWT claim: `domain`. So the token already
+holds what is needed for server-verified user identity; the code does not use it yet. The current code requires from SAILERP:
 (1) an HS256 Bearer signed with the shared `JWT_SECRET` carrying `domain`; (2) the encrypted `userProfile`
 handoff (`userUuid`, `userType`, `role`) the client forwards as headers. The pilot's test JWT also carried
 `id`, `userType`, `userId` — those claims are ignored by the code.
@@ -53,8 +55,9 @@ tickets or Git.** The harness's optional `GENUINE_BEARER` check prints claim nam
 User-level permissions are currently the module's browser-trusted RBAC. Two ways to make user identity
 server-verified without a new authentication design (`docs/ASSISTANT-API.md` §3.4):
 
-- **A. Trusted token claims** — if the genuine SAILERP JWT carries user id / user type / role, read them from
-  the verified payload (needs §4 to confirm; small additive change).
+- **A. Trusted token claims — expected path.** The genuine SAILERP JWT carries user id / role / user type
+  (Ghazi, 24-Sep); read them from the verified payload instead of the headers. Small additive change, not
+  started (frozen). §4 records the exact claim names.
 - **B. Server-side identity lookup** — resolve role / user type / vessels from the tenant's synced SAILERP
   user tables (`master_users.role/userType`, `users`, `admn_role_master`, `master_user_vessels`) by a verified
   user id.
