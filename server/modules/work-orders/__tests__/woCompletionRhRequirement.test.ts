@@ -12,6 +12,7 @@ describe('requiresWoCompletionRh', () => {
 
   it.each([
     ['Running Hours', 'NOT_RH_DRIVEN'],
+    ['Running Hours', 'NOT RH DRIVEN'],
     ['Running Hours', ''],
     ['Calendar', 'MASTER'],
     ['Condition', 'INHERITED'],

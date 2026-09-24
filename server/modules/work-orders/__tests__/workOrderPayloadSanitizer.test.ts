@@ -3,6 +3,7 @@ import {
   SERVER_MANAGED_WORK_ORDER_RH_FIELDS,
   WORK_ORDER_B3_FIELDS,
   isWorkOrderB3Applicable,
+  normalizeRhCounterType,
   sanitizeWorkOrderB3Fields,
   stripServerManagedWorkOrderRhFields,
 } from '@shared/workOrderPayload';
@@ -58,13 +59,22 @@ describe('Work Order B3 applicability', () => {
     ['master', true],
     ['INHERITED', true],
     ['NOT_RH_DRIVEN', false],
+    ['NOT RH DRIVEN', false],
     ['', false],
     [undefined, false],
   ])('maps counter type %s to applicability %s', (counterType, expected) => {
     expect(isWorkOrderB3Applicable(counterType)).toBe(expected);
   });
 
-  it('removes every B3 field for a Not Driven component without removing Completion RH', () => {
+  it('canonicalizes only the legacy spaced not-driven spelling without defaulting unknown values to Master', () => {
+    expect(normalizeRhCounterType('NOT RH DRIVEN')).toBe('NOT_RH_DRIVEN');
+    expect(normalizeRhCounterType('NOT_RH_DRIVEN')).toBe('NOT_RH_DRIVEN');
+    expect(normalizeRhCounterType(' master ')).toBe('MASTER');
+    expect(normalizeRhCounterType(null)).toBe('');
+    expect(normalizeRhCounterType('')).toBe('');
+  });
+
+  it.each(['NOT_RH_DRIVEN', 'NOT RH DRIVEN'])('removes every B3 field for %s without removing Completion RH', counterType => {
     const input = {
       runningHours: '700',
       previousReading: '650',
@@ -76,7 +86,7 @@ describe('Work Order B3 applicability', () => {
       workCarriedOut: 'Completed planned maintenance safely.',
     };
 
-    const result = sanitizeWorkOrderB3Fields(input, 'NOT_RH_DRIVEN');
+    const result = sanitizeWorkOrderB3Fields(input, counterType);
 
     for (const field of WORK_ORDER_B3_FIELDS) {
       expect(result).not.toHaveProperty(field);

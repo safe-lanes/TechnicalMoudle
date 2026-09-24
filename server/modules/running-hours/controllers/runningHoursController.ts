@@ -4,6 +4,7 @@ import * as rhTimelineValidation from '../services/rhTimelineValidationService';
 import { ValidationError } from '../../shared/errors';
 import { ForbiddenError } from '../../shared/errors';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
+import { normalizeRhCounterType } from '@shared/workOrderPayload';
 
 const PLACEHOLDER_USER_IDS = ['admin', 'system', 'User', 'user', ''];
 
@@ -235,7 +236,7 @@ export async function validateRHEntry(req: Request, res: Response) {
     try {
       const currentRHData = await rhTimelineValidation.getCurrentRH(machineryId);
       componentActualRH = currentRHData.currentRH;
-      rhCounterType = (currentRHData.rhCounterType || 'MASTER').toUpperCase();
+      rhCounterType = normalizeRhCounterType(currentRHData.rhCounterType || 'MASTER');
       hasRealRhBaseline = currentRHData.hasRealRhBaseline;
     } catch {}
 

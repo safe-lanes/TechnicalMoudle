@@ -9,7 +9,7 @@ import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
-import { isWorkOrderB3Applicable } from '@shared/workOrderPayload';
+import { isWorkOrderB3Applicable, normalizeRhCounterType } from '@shared/workOrderPayload';
 import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 import {
   ensureCompletedWorkOrderDate,
@@ -163,7 +163,7 @@ export async function completeWorkOrder(
 
   // Enforce running hours requirement only for RH-driven completions (Task #245):
   // NOT_RH_DRIVEN components treat running hours as not applicable — never required, never blocking.
-  const counterType = (component.rhCounterType || '').toUpperCase();
+  const counterType = normalizeRhCounterType(component.rhCounterType);
   const isB3Applicable = isWorkOrderB3Applicable(counterType);
   if (workOrder.maintenanceBasis === 'Running Hours' && counterType !== 'NOT_RH_DRIVEN' && !runningHours) {
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');

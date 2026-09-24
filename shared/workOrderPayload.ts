@@ -16,10 +16,16 @@ export const WORK_ORDER_B3_FIELDS = [
   'currentReading',
 ] as const;
 
+export function normalizeRhCounterType(rhCounterType: string | null | undefined): string {
+  const value = String(rhCounterType || '').trim().toUpperCase();
+  // Legacy component rows store the same not-driven type with spaces.
+  return value === 'NOT RH DRIVEN' ? 'NOT_RH_DRIVEN' : value;
+}
+
 export function isWorkOrderB3Applicable(
   rhCounterType: string | null | undefined,
 ): boolean {
-  const normalizedCounterType = String(rhCounterType || '').trim().toUpperCase();
+  const normalizedCounterType = normalizeRhCounterType(rhCounterType);
   return normalizedCounterType === 'MASTER' || normalizedCounterType === 'INHERITED';
 }
 
