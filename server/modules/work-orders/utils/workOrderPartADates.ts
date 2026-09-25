@@ -217,3 +217,11 @@ export function resolveWorkOrderPartADates(
       : '',
   };
 }
+
+/** Numeric list value for the same Work Order-owned RH due shown in Part A. */
+export function getWorkOrderListDueHour(workOrder: WorkOrderPartADateSource): number | null {
+  const dueRH = resolveWorkOrderPartADates(workOrder).nextDueRH;
+  if (!dueRH) return null;
+  const value = Number(dueRH);
+  return Number.isFinite(value) ? value : null;
+}

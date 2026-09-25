@@ -34,6 +34,7 @@ import {
   buildHydrationJobIndexes,
   resolveWorkOrderHydrationJob,
 } from '../utils/workOrderListHydration';
+import { getWorkOrderListDueHour } from '../utils/workOrderPartADates';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -396,11 +397,10 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[], pr
         }
       }
     }
-    const nextDueHour = maintenanceBasis === 'Running Hours'
-      ? (dueRH ?? null)
-      : maintenanceBasis === 'Dual Frequency'
-        ? (parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading) ?? null)
-        : null;
+    // Match the existing Work Order form's Part A due RH: immutable WO snapshots
+    // first, then the WO's next_due_reading. The current Job belongs to its
+    // latest cycle and must not change the due hour of an existing WO.
+    const nextDueHour = getWorkOrderListDueHour({ ...wo, maintenanceBasis });
     const rhEstimatedDueDate = isRhBased ? (job?.rhEstimatedDueDate ?? null) : null;
     const currentRH = isRhBased
       ? (parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading))
