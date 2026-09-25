@@ -161,6 +161,12 @@ export async function refuseDirectDecision(screenId: string, classification: str
   throw new AppError(400, approvalNotReadyMessage(screenId, classification, readiness), { code: 'APPROVAL_NOT_SET_UP', readiness });
 }
 
+/** Read-only: every pending engine request with slots (all modules). [] when the engine is off. */
+export async function listPendingEngineRequests(): Promise<Array<RequestRow & { slots: RequestSlotRow[] }>> {
+  if (!engine) return [];
+  return engine.pendingRequests(engineCtx(null));
+}
+
 /** Read-only workflow existence check for module routing decisions. */
 export async function activeWorkflowExistsScoped(scope: Scope, classification: string): Promise<boolean> {
   if (!engine) return false;

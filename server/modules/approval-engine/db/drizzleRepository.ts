@@ -165,6 +165,10 @@ export class DrizzleApprovalRepository implements ApprovalRepository {
       .where(and(scopeEq(apprvRequests, scope), eq(apprvRequests.subjectRef, subjectRef), eq(apprvRequests.status, 'pending'))).limit(1);
     return rows[0] ? this.toRequestRow(rows[0]) : null;
   }
+  async listPending(): Promise<RequestRow[]> {
+    const rows = await this.db.select().from(apprvRequests).where(eq(apprvRequests.status, 'pending'));
+    return rows.map((r) => this.toRequestRow(r));
+  }
   async listBySubject(scope: Scope, subjectRef: string): Promise<RequestRow[]> {
     const rows = await this.db.select().from(apprvRequests)
       .where(and(scopeEq(apprvRequests, scope), eq(apprvRequests.subjectRef, subjectRef)))

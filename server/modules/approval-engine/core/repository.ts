@@ -26,6 +26,8 @@ export interface ApprovalRepository {
   createRequest(row: RequestRow, slots: RequestSlotRow[]): Promise<void>;
   getRequest(requuid: string): Promise<RequestRow | null>;
   findPendingBySubject(scope: Scope, subjectRef: string): Promise<RequestRow | null>;
+  /** Every request still 'pending' (any scope) — read-only, for host-side health checks. */
+  listPending(): Promise<RequestRow[]>;
   /** Any order — the engine sorts (status() contract: newest submittedAt first). */
   listBySubject(scope: Scope, subjectRef: string): Promise<RequestRow[]>;
   getSlots(requuid: string): Promise<RequestSlotRow[]>;

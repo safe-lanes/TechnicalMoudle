@@ -264,6 +264,12 @@ export class ApprovalEngine {
     const rows = orderRequestsNewestFirst(await repo.listBySubject(scope, subjectRef));
     return Promise.all(rows.map(async (r) => ({ ...r, slots: await repo.getSlots(r.requuid) })));
   }
+  /** Read-only: every pending request with its slots (host health checks / diagnostics). */
+  async pendingRequests(ctx: EngineCtx): Promise<Array<RequestRow & { slots: RequestSlotRow[] }>> {
+    const repo = this.repo(ctx);
+    const rows = orderRequestsNewestFirst(await repo.listPending());
+    return Promise.all(rows.map(async (r) => ({ ...r, slots: await repo.getSlots(r.requuid) })));
+  }
   async pendingForUser(ctx: EngineCtx, userId: string): Promise<PendingItem[]> {
     return this.repo(ctx).pendingSlotsForUser(userId);
   }

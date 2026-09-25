@@ -57,6 +57,9 @@ export class InMemoryApprovalRepository implements ApprovalRepository {
     }
     return null;
   }
+  async listPending(): Promise<RequestRow[]> {
+    return Array.from(this.requests.values()).filter((r) => r.status === 'pending').map((r) => structuredClone(r));
+  }
   async listBySubject(scope: Scope, subjectRef: string): Promise<RequestRow[]> {
     return Array.from(this.requests.values())
       .filter((r) => sk(r.scope) === sk(scope) && r.subjectRef === subjectRef)

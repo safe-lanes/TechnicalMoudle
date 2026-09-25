@@ -65,7 +65,7 @@ export function emailConfigStatus(): { configured: boolean; mode: 'live' | 'json
   return { configured: true, mode: cfg.mode, from: cfg.from };
 }
 
-async function subjectLine(scope: Scope, subjectRef: string, vesselId: string | null): Promise<string> {
+export async function subjectLine(scope: Scope, subjectRef: string, vesselId: string | null): Promise<string> {
   let name = '';
   try {
     if (scope.screenId.endsWith('-cr')) {
@@ -88,9 +88,9 @@ async function subjectLine(scope: Scope, subjectRef: string, vesselId: string | 
 }
 
 /** Insert in-app rows + email the recipients. Returns nothing; logs + stores email status. */
-async function notifyUsers(userIds: string[], base: {
+export async function notifyUsers(userIds: string[], base: {
   requuid: string; scope: Scope; subjectRef: string; vesselId: string | null;
-  kind: 'pending-approval' | 'approved' | 'returned'; title: string; message: string;
+  kind: 'pending-approval' | 'approved' | 'returned' | 'stalled-no-approver'; title: string; message: string;
 }): Promise<void> {
   const unique = Array.from(new Set(userIds.filter(Boolean)));
   if (unique.length === 0) return;

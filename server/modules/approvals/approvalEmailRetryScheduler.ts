@@ -35,6 +35,7 @@ import { approvalNotifications } from './notificationSchema';
 import { masterUsers } from '@shared/schema';
 import { sesEmailConfig, sendApprovalEmail, isValidEmailAddress } from './sesEmailTransport';
 import { approvalEmailToggleEnabled } from './approvalNotifier';
+import { runStalledApprovalWarningPass } from './stalledApprovalWarning';
 
 const DEFAULT_INTERVAL_MS = 60 * 60 * 1000;   // hourly (accepted cadence)
 const DEFAULT_BOOT_DELAY_MS = 5 * 60 * 1000;  // let migrations/boot settle first
@@ -146,15 +147,25 @@ export class ApprovalEmailRetryScheduler {
     this.inProgress = true;
     try {
       if (await isShipInstance()) return; // role can flip at runtime (RoleWatchdog discipline)
+      // 25-Sep-2026 (Sahil E5): the stalled-approval warning rides the same hourly, per-tenant
+      // tick. Isolated: a failure in one never stops the other.
+      const warn = async (tenant: string) => {
+        try {
+          const w = await runStalledApprovalWarningPass();
+          if (w.warned) console.log(`[approvals] ${tenant}: warned Sail Admin about ${w.warned} stalled approval step(s)`);
+        } catch (e: any) { console.error(`[approvals] ${tenant}: stalled-approval warning failed: ${e?.message || e}`); }
+      };
       if (!tenantConnectionManager.isMultiTenantEnabled) {
         const s = await runApprovalEmailRetryPass(batch);
         this.log('single', s);
+        await warn('single');
         return;
       }
       const tenants = await tenantConnectionManager.getActiveTenants();
       for (const t of tenants) {
         const s = await tenantConnectionManager.runInTenantContext(t.tuid, () => runApprovalEmailRetryPass(batch));
         this.log(t.tuid, s);
+        await tenantConnectionManager.runInTenantContext(t.tuid, () => warn(t.tuid));
       }
     } catch (err: any) {
       // Never let email retry take anything down.
