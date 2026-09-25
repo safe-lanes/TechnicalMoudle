@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
+import { ApprovalChainProgress, ApprovalNotStartedNote, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
+import { useSyncInstanceInfo } from '@/hooks/useSyncInstanceInfo';
 import { anyLevelMatches } from '@shared/approvals/level';
 import { useApprovalScopeConfig } from '@/hooks/useApprovalScopeConfig';
 import { useQuery } from "@tanstack/react-query";
@@ -124,7 +125,10 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
         ? (!isVessel && !isHeadOfDept)
         : !!activeStep && anyLevelMatches(userApproverLevels, activeStep.approvalLevel)
   );
+  // 25-Sep-2026: WO postponement is engine-only — no running chain, no approve/reject.
   const userCanAct = resolveCanAct(engineChain, legacyUserCanAct);
+  const { isShore: ppIsShore } = useSyncInstanceInfo();
+  const ppAwaitingNoChain = isOpen && !!workOrder?.wouuid && !chainPost.hasChain && !chainRePost.hasChain && !chainPost.isLoading && !chainRePost.isLoading;
   const engineScreenId = chainPost.hasChain ? 'pms-wo-postponement' : chainRePost.hasChain ? 'pms-wo-re-postponement' : null;
 
   useEffect(() => {
@@ -164,6 +168,7 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
             Review Postponement Request
           </DialogTitle>
           {engineScreenId && <ApprovalChainProgress screenId={engineScreenId} subjectRef={workOrder?.wouuid ?? null} />}
+          <ApprovalNotStartedNote show={ppAwaitingNoChain} isShip={!ppIsShore} />
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-1">
@@ -277,8 +282,8 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
               ) : (
                 <div className="flex items-center gap-2 text-sm text-gray-500 italic" data-testid="text-postpone-not-approver">
                   <Info className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                  {activeStep
-                    ? `Awaiting ${pendingLevelLabel} approval — you are not the designated approver for this step.`
+                  {engineChain.hasChain
+                    ? 'You are not an approver for the current step of this postponement.'
                     : 'This postponement is pending approval.'}
                 </div>
               )}

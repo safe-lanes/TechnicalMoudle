@@ -83,7 +83,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useApprovalChain, resolveCanAct } from "@/components/approvals/ApprovalChainProgress";
+import { useApprovalChain, resolveCanAct, ApprovalNotStartedNote } from "@/components/approvals/ApprovalChainProgress";
 import { anyLevelMatches } from "@shared/approvals/level";
 import { useApprovalScopeConfig } from "@/hooks/useApprovalScopeConfig";
 
@@ -879,7 +879,9 @@ const Dashboard = () => {
     crEngineScreenId ?? 'none',
     crEngineScreenId && opDetailChangeRequest?.status?.toLowerCase() === 'submitted' ? (opDetailChangeRequest as any)?.cruuid : null,
   );
-  const crUserCanActFinal = resolveCanAct(crEngineChain, crUserCanAct);
+  // 25-Sep-2026: engine-only for engine-governed CR targets; Work-Order-target CRs keep the legacy gate.
+  const crUserCanActFinal = resolveCanAct(crEngineChain, crUserCanAct, !!crEngineScreenId);
+  const crAwaitingNoChain = !!crEngineScreenId && opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && !crEngineChain.hasChain && !crEngineChain.isLoading;
 
   // Gate logic for the postponement decision dialog
   const postponeUserApproverLevels: string[] = localApprovers
@@ -3589,11 +3591,14 @@ const Dashboard = () => {
                               )}
                             </>
                           ) : (
-                            <div className="flex items-center gap-2 text-sm text-gray-500 italic" data-testid="text-postpone-dashboard-not-approver">
-                              <Info className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                              {postponeActiveStep
-                                ? `Awaiting ${postponeActiveStep.approvalLevel === 'Level2' ? 'Level 2' : 'Level 1'} approval — you are not the designated approver for this step.`
-                                : 'This postponement is pending approval.'}
+                            <div className="text-sm text-gray-500 italic" data-testid="text-postpone-dashboard-not-approver">
+                              <div className="flex items-center gap-2">
+                                <Info className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                {postponeEngineChain.hasChain
+                                  ? 'You are not an approver for the current step of this postponement.'
+                                  : 'This postponement is pending approval.'}
+                              </div>
+                              <ApprovalNotStartedNote show={!postponeEngineChain.hasChain && !postponeChainPost.isLoading && !postponeChainRePost.isLoading} isShip={false} />
                             </div>
                           )}
                         </div>
@@ -4718,6 +4723,7 @@ const Dashboard = () => {
                   <Eye className="h-4 w-4 mr-1" />
                   View Changes
                 </Button>
+                <ApprovalNotStartedNote show={crAwaitingNoChain} isShip={false} />
                 {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && crUserCanActFinal && (
                   <>
                     <Button

@@ -151,18 +151,22 @@ export function useApprovalChain(screenId: string, subjectRef: string | null | u
   };
 }
 
+export { resolveCanAct } from './approvalGate';
+
 /**
- * The SINGLE source of truth for "can this user act on this request".
- * When the engine owns a pending chain, the engine's canDecide is authoritative; otherwise
- * the caller's legacy gate stands (fallback contract). EVERY screen that renders a CR or
- * postponement approve/reject button must gate on this — never re-derive the rule inline
- * (that divergence was the AE-10 dashboard leak).
+ * Plain note for an engine-governed request that is awaiting approval but has NO running
+ * chain: on a ship, approval happens in the office; on shore, the chain has not started
+ * (not set up yet, or starting after the next sync). Renders nothing otherwise.
  */
-export function resolveCanAct(
-  engine: { hasChain: boolean; canDecide: boolean },
-  legacyCanAct: boolean,
-): boolean {
-  return engine.hasChain ? engine.canDecide : legacyCanAct;
+export function ApprovalNotStartedNote({ show, isShip }: { show: boolean; isShip: boolean }) {
+  if (!show) return null;
+  return (
+    <p data-testid="text-approval-not-started" className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
+      {isShip
+        ? "Approval happens in the office. The decision will reach this vessel by sync."
+        : "This request is waiting for its approval workflow. It starts automatically once an administrator has set up the approval chain for it (Admin → Approval Workflow)."}
+    </p>
+  );
 }
 
 const DOT: Record<string, string> = {

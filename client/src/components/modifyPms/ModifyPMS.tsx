@@ -25,7 +25,8 @@ import { useUIRole } from '@/contexts/UIRoleContext';
 import { useVessels } from '@/hooks/useVessels';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalApprovers } from '@/hooks/useExternalMasterData';
-import { ApprovalChainProgress, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
+import { ApprovalChainProgress, ApprovalNotStartedNote, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
+import { useSyncInstanceInfo } from '@/hooks/useSyncInstanceInfo';
 import { anyLevelMatches } from '@shared/approvals/level';
 import { useApprovalScopeConfig } from '@/hooks/useApprovalScopeConfig';
 import {
@@ -194,7 +195,10 @@ export function ModifyPMS() {
         ? (!isVessel && !isHeadOfDept)
         : userIsApproverForActiveStep
   );
-  const userCanAct = resolveCanAct(engineChain, legacyUserCanAct);
+  // 25-Sep-2026: engine-only for engine-governed CR targets; Work-Order-target CRs keep the legacy gate.
+  const userCanAct = resolveCanAct(engineChain, legacyUserCanAct, !!engineScreenId);
+  const { isShore: crIsShore } = useSyncInstanceInfo();
+  const crAwaitingNoChain = !!engineScreenId && viewingRequest?.status === 'submitted' && !engineChain.hasChain && !engineChain.isLoading;
 
   // Reviewer decision modal — approve OR reject. Both go through ApproveRejectModal so the
   // reviewer enters a real comment (the reject reason is shown to the requester). (E2E-2 fix)
@@ -574,6 +578,7 @@ export function ModifyPMS() {
           {viewingRequest && engineScreenId && (
             <ApprovalChainProgress screenId={engineScreenId} subjectRef={(viewingRequest as any)?.cruuid ?? null} />
           )}
+          <ApprovalNotStartedNote show={crAwaitingNoChain} isShip={!crIsShore} />
           {viewingRequest && viewingRequest.status === 'submitted' && userCanAct && (
             <>
               <Button
