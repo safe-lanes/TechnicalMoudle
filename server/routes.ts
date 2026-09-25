@@ -5,7 +5,6 @@ import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
 import { mockAuthMiddleware, initMockAuthRankId, requireRole, type AuthenticatedRequest } from "./middleware/auth";
-import { devTestUsersGuard } from "./modules/dev-test-users/devTestUsersGuard";
 import { z } from "zod";
 import { tenantMiddleware } from "./middleware/tenantMiddleware";
 import { requestContextMiddleware } from "./middleware/requestContext";
@@ -45,9 +44,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // MASTER_DATABASE_URL is unset (returns next() immediately) so the mock chain
   // below is byte-identical to today. Does NOT touch req.user/role — that stays
   // with mockAuthMiddleware. Mounted BEFORE it so the whole chain runs in-context.
-  // Disabled development impersonation endpoints must return 404 before tenant/auth
-  // middleware can reveal or challenge anything about the route.
-  app.use('/technical/api/dev/test-users', devTestUsersGuard);
   app.use('/technical/api', tenantMiddleware);
   app.use('/technical/api', mockAuthMiddleware);
   app.use('/technical/api', requestContextMiddleware);

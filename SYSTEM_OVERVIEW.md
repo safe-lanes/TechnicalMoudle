@@ -8,7 +8,7 @@ Factual reference for the Seafarer Technical Management System (maritime PMS) as
 
 | Layer | Technology |
 |---|---|
-| Language | TypeScript (ESM), strict mode; acknowledged tsc error baseline of 294 |
+| Language | TypeScript (ESM), strict mode; acknowledged tsc error baseline of 290 |
 | Frontend | React 18, Vite, Wouter (routing), TanStack React Query v5, React Context |
 | UI | shadcn/ui (Radix primitives), Tailwind CSS, lucide-react icons, Framer Motion |
 | Tables | AG Grid Enterprise **34.1.0 (pinned — license-capped, do not upgrade)** via shared `AgGridTable` components |
@@ -20,7 +20,7 @@ Factual reference for the Seafarer Technical Management System (maritime PMS) as
 | Exports | ExcelJS, jspdf, JSZip, xlsx (bulk import parsing) |
 | Testing | Playwright E2E (`tests/`, targets localhost:5000), Vitest unit (`server/**/__tests__`) |
 
-The 294-error figure is the measured count as at September 16, 2026; any change to it must be stated explicitly in a task report rather than absorbed silently.
+The 290-error figure is the measured count as at September 25, 2026 (approval-engine-phase2 after the Defects merge); any change to it must be stated explicitly in a task report rather than absorbed silently.
 
 ### Folder structure
 ```
@@ -475,7 +475,7 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - AG Grid family pinned exactly (enterprise/community/react 34.1.0, ag-charts 12.3.0) — license-capped, no `^`/`~`.
 
 ### Pre-commit
-- `npx tsc --noEmit` must not exceed the 294-error baseline; re-run new migrations for idempotency; verify edited files are on the live code path.
+- `npx tsc --noEmit` must not exceed the 290-error baseline; re-run new migrations for idempotency; verify edited files are on the live code path.
 
 ---
 
@@ -518,7 +518,7 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - **Verified:** `isDeferred` is interpreted inconsistently. The Defects list and shared dashboard status helper present deferred defects as Extended and suppress Overdue; server reports group raw status and can count an Open deferred defect as overdue; the alert evaluator does not receive `isDeferred` and alerts on any past-due non-Closed/non-Cancelled defect (`client/src/lib/defectStatusUtils.ts`, `server/modules/defects/services/defectsService.ts`, `server/modules/alerts/evaluators/defectEvaluators.ts`).
 - **Verified:** `closure_files` stores caller-supplied strings without URL validation and closure history renders them directly as links. No retention/reference protection prevents a referenced object from being deleted (`shared/schema.ts`, `client/src/pages/defects/DefectFormWizard.tsx`).
 - **Verified environment gap:** the approval SES variables are unset in this environment, so email delivery is unavailable while in-app notifications continue (`server/modules/approvals/sesEmailTransport.ts`).
-- **Verified deployment requirement:** a Replit-only test identity switcher exists. It is guarded by both client and server environment checks, but any non-Replit deployment must confirm `/technical/api/dev/test-users` returns 404 and that the controls/banner are inert, or remove the mechanism (`docs/DEV_TEAM_TEST_IDENTITY_SWITCHER.md`).
+- **Removed (25-Sep-2026):** the Replit-only test identity switcher (`server/modules/dev-test-users/`, RoleSwitcher / AuthContext impersonation) was removed from the repository before merge; it is kept locally only, never committed.
 
 **Data / runtime issues observed**
 - Component tree logs "Parent not found" warnings for orphan SFI codes (e.g. `554.001.x`, `652.001.12`).
@@ -526,6 +526,6 @@ All module routers (including Shipskart) are mounted flat on **`/technical/api`*
 - AG Grid warns about `data-replit-metadata` / `data-component-name` passed into gridOptions (dev-tooling props leaking into AG Grid config).
 
 **Technical debt**
-- Accepted tsc baseline of 294 errors (must not grow).
+- Accepted tsc baseline of 290 errors (must not grow).
 - `server/postgresStorage.ts` is a ~9.7k-line monolith implementing all of `IStorage`; module repositories wrap it rather than replacing it.
 - Legacy JS migration array (entries 001–081) in `server/migrations.ts` is frozen; two SQL naming tracks (4-digit drizzle vs 3-digit hand-written) intentionally sort auto-generated files first.
