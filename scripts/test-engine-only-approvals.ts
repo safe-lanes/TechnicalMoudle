@@ -65,6 +65,18 @@ async function cleanup() {
     await sql(`DELETE FROM apprv_request_slots WHERE requuid IN (SELECT requuid FROM apprv_requests WHERE subject_ref = ANY($1))`, [refs]);
     await sql(`DELETE FROM apprv_requests WHERE subject_ref = ANY($1)`, [refs]);
   }
+  // Rows deleted below must not leave sync_field_log entries behind — a ship can never pull a
+  // change for a row that no longer exists (it would sit in 'remaining to pull' forever).
+  if (created.crIds.length) {
+    await sql(`DELETE FROM sync_field_log WHERE row_uuid IN (SELECT crauuid FROM change_request_approval WHERE change_request_id = ANY($1))`, [created.crIds]);
+    await sql(`DELETE FROM sync_field_log WHERE row_uuid IN (SELECT cruuid FROM change_request WHERE id = ANY($1))`, [created.crIds]);
+  }
+  if (wos.length) {
+    const u = wos.map((r: any) => r.wouuid);
+    await sql(`DELETE FROM sync_field_log WHERE row_uuid IN (SELECT wpauuid FROM wo_postponement_approvals WHERE work_order_id = ANY($1))`, [u]);
+    await sql(`DELETE FROM sync_field_log WHERE row_uuid IN (SELECT id::text FROM work_order_postponements WHERE work_order_id = ANY($1))`, [u]);
+    await sql(`DELETE FROM sync_field_log WHERE row_uuid = ANY($1)`, [u]);
+  }
   if (created.crIds.length) {
     await sql(`DELETE FROM change_request_approval WHERE change_request_id = ANY($1)`, [created.crIds]);
     await sql(`DELETE FROM change_request WHERE id = ANY($1)`, [created.crIds]);
