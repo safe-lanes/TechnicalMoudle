@@ -92,7 +92,7 @@ async function cleanupShore() {
   check('baseline sync succeeds', base.success === true);
 
   const spare = (await shoreSql(`SELECT suuid, remarks FROM spares WHERE vessel_id=$1 AND is_deleted=false
-    AND (critical IS NULL OR critical NOT IN ('Critical','Yes')) ORDER BY suuid LIMIT 1`, [V]))[0];
+    AND (critical IS NULL OR critical NOT IN ('Critical','Yes')) ORDER BY suuid DESC LIMIT 1`, [V]))[0]; // DESC: never the shore harness's spare (ASC) — they must not share a row
   const job = (await shoreSql(`SELECT j.id, j.job_title, c.cuuid comp_id, c.name comp_name, c.component_code comp_code FROM jobs j JOIN components c ON c.cuuid = j.component_id
     WHERE j.vessel_id=$1 AND j.is_deleted=false AND (j.criticality IS NULL OR j.criticality <> 'Yes') AND (c.critical IS NOT TRUE) ORDER BY j.id LIMIT 1`, [V]))[0];
   check('shore has a normal spare and a normal job; both exist on the ship',

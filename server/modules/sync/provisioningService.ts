@@ -144,8 +144,12 @@ export async function generateProvisioningBundle(
   }
 
   // Phase 2: Vessel-scoped ONE_WAY tables
+  // 25-Sep-2026: a ONE_WAY table whose rows reference a BOTH_EDITABLE parent must be exported
+  // AFTER that parent, or a fresh ship's import fails the FK (defect_closure_history → defects:
+  // PROVEN on the pilot — 5 rows refused, provisioning success=false). Deferred to the end.
+  const ONE_WAY_AFTER_BOTH_EDITABLE = new Set(['defect_closure_history']);
   const vesselRefTables = getTablesByCategory('ONE_WAY_SHORE_TO_SHIP').filter(
-    (t) => !t.isGlobal
+    (t) => !t.isGlobal && !ONE_WAY_AFTER_BOTH_EDITABLE.has(t.tableName)
   );
   for (const tc of vesselRefTables) {
     await exportAndAdd(
@@ -205,6 +209,13 @@ export async function generateProvisioningBundle(
       });
       bundle.manifest.totalRows += rows.length;
     }
+  }
+
+  // Phase 5: ONE_WAY tables that depend on BOTH_EDITABLE parents (see Phase 2 note)
+  for (const tableName of Array.from(ONE_WAY_AFTER_BOTH_EDITABLE)) {
+    const tc = getTableSyncConfig(tableName);
+    if (!tc) continue;
+    await exportAndAdd(pool, bundle, tc, vesselId, vesselCode, tc.vesselScopeColumn, 'ONE_WAY (vessel, after parents)');
   }
 
   console.log(
@@ -632,7 +643,11 @@ export async function importProvisioningBundle(
           const colNames = columns.map((c) => `"${c}"`).join(', ');
 
           let query: string;
-          if (identityCol && row[identityCol] && hasUniqueIdentity) {
+          if (config?.immutable && identityCol && row[identityCol] && hasUniqueIdentity) {
+            // 25-Sep-2026 — immutable table (e.g. defect_closure_history, trigger refuses
+            // UPDATE/DELETE): INSERT-ONLY on re-provision; an existing row is kept as is.
+            query = `INSERT INTO "${tableData.tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT ("${identityCol}") DO NOTHING`;
+          } else if (identityCol && row[identityCol] && hasUniqueIdentity) {
             // Upsert by identity column (only if unique constraint exists)
             const updateSet = columns
               .filter((c) => c !== identityCol)
@@ -653,6 +668,7 @@ export async function importProvisioningBundle(
           // data takes precedence.
           if (
             rowError.message.includes('duplicate key') &&
+            !config?.immutable && // never delete a row of an immutable table (trigger refuses it)
             identityCol &&
             row[identityCol] &&
             row.id !== undefined

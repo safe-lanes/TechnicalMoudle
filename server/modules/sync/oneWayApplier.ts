@@ -413,6 +413,13 @@ export async function applyOneWayRows(
         );
       }
 
+      if (existCheck.rows.length > 0 && config.immutable) {
+        // 25-Sep-2026 — INSERT-ONLY for immutable tables (defect_closure_history: a DB trigger
+        // refuses every UPDATE/DELETE). A re-delivered row is already present and identical by
+        // contract: acknowledge it without writing, so the table never fails the cycle.
+        syncDiag(`ONE-WAY-APPLY IMMUTABLE: ${tableName} row already present — acknowledged, not updated`);
+        continue;
+      }
       if (existCheck.rows.length > 0) {
         if (isDeleted) {
           // Soft-delete: Jobs must also be inactive so the receiving instance

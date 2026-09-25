@@ -13,7 +13,8 @@
  *   RP repeat extension → defects-repeat-extension scope; reject → Rejected, date unchanged → ship
  *   V  approver verifies → verified with the DECIDER's identity → reaches ship
  *   RJ verification rejected → transactional reopen: status Open, C1 cleared, one immutable
- *      closure-history row (UPDATE refused by trigger) → reopened state reaches ship
+ *      closure-history row (UPDATE refused by trigger) → reopened state AND the history row reach
+ *      the ship; a forced re-delivery is acknowledged (insert-only), the table does not fail
  * Refuses a shore DB not ending in _test; cleans up shore rows it creates.
  *   npx tsx scripts/test-defects-approvals-ship.ts
  */
@@ -206,8 +207,18 @@ async function cleanup() {
   check('closure-history endpoint returns the attempt', hc.status === 200 && JSON.stringify(hc.json).includes('closure evidence missing'));
   await sync('RJ');
   check('SHIP: d3 reopened (Open, not completed)', shipDefect(d3.duuid, 'status') === 'Open' && shipDefect(d3.duuid, 'confirm_completed') !== 't');
-  const shipHist = shipSql(`SELECT count(*) FROM defect_closure_history WHERE defect_duuid='${d3.duuid}'`);
-  console.log(`   INFO  ship closure-history rows = ${shipHist} (no sync registry entry yet — plan item B4, Sahil: shore → ship)`);
+  // B4 (25-Sep-2026): closure history is ONE_WAY shore → ship, INSERT-ONLY (immutable).
+  check('SHIP: the closure-history row arrived (shore → ship)',
+    shipSql(`SELECT count(*) FROM defect_closure_history WHERE defect_duuid='${d3.duuid}'`) === '1'
+    && shipSql(`SELECT rejection_reason FROM defect_closure_history WHERE defect_duuid='${d3.duuid}'`) === 'closure evidence missing');
+  // Force a genuine RE-DELIVERY: rewind the shore's per-table checkpoint for this ship.
+  await shoreSql(`UPDATE sync_table_checkpoints SET last_checkpoint = '2000-01-01' WHERE instance_id = 'SHIP-WKFV' AND table_name = 'defect_closure_history'`);
+  const redo = await sync('RJ-redeliver');
+  check('re-delivered history row is ACKNOWLEDGED (sync ok, nothing left, no apply error)',
+    redo.success === true && redo.remainingPull === 0 && !(redo.errors ?? []).some((e: string) => /defect_closure_history/.test(e)));
+  const cp = (await shoreSql(`SELECT last_checkpoint FROM sync_table_checkpoints WHERE instance_id = 'SHIP-WKFV' AND table_name = 'defect_closure_history'`))[0];
+  check('the table checkpoint advanced again (table did not fail the cycle)', !!cp && new Date(cp.last_checkpoint).getFullYear() > 2000, JSON.stringify(cp));
+  check('SHIP: still exactly one, unchanged row', shipSql(`SELECT count(*) FROM defect_closure_history WHERE defect_duuid='${d3.duuid}'`) === '1');
 
   hr('cleanup (shore approval rows, users, chains)');
   await cleanup();
