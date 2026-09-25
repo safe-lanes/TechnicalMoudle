@@ -124,5 +124,6 @@ export const defectsApprovalCard: ApprovalCard = {
 export async function deciderIdentity(userUuid: string): Promise<{ name: string; roleLabel: string }> {
   const u = (await db().select({ name: masterUsers.fullName, role: masterUsers.role })
     .from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1))[0];
-  return { name: u?.name || userUuid, roleLabel: u?.role || 'Office' };
+  // Trimmed (D1): the decider identity is copied into immutable closure history.
+  return { name: u?.name?.trim() || userUuid, roleLabel: u?.role?.trim() || 'Office' };
 }

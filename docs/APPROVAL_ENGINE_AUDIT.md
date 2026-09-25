@@ -1,5 +1,26 @@
 # Approval Engine Audit
 
+> **Status update — 25-Sep-2026 (after merging this work into `feature/approval-engine-phase2`).**
+> This audit is a snapshot taken before the changes below; the body is kept unchanged as that
+> record. Read these corrections first:
+> 1. **`SYSTEM_OVERVIEW.md` now exists** (added at the end of the Defects build) and documents the
+>    engine — the "NOT FOUND" statement below is stale.
+> 2. **`engine.status()` ordering is now contractual:** newest `submittedAt` first, ties by
+>    `requuid` descending, enforced in the engine core (`orderRequestsNewestFirst`, unit-tested),
+>    not left to the repository adapter.
+> 3. **Technical is no longer dual-wired.** The old Level 1 / Level 2 ticks
+>    (`approval_workflow_config`) are retired: Change Requests (component / job / spare / store)
+>    and WO postponement / re-postponement are approved on the engine only; with no active chain
+>    (or the action switched off) a shore submit is blocked with a message; direct decisions are
+>    refused; old Pending step rows are marked Superseded when the engine decides. Every
+>    "dual-wired" / "creates Level 1/2 rows" / "dual-gating remains possible" statement below
+>    describes the earlier state. Work-Order-target change requests have no engine action by
+>    decision.
+> 4. **One combined Admin → Approval Workflow screen** replaces the old matrix screen and the
+>    separate "Approval Engine" menu entry; access follows Access Control.
+> 5. **Defects extensions with no chain are blocked** on shore (the legacy self-approve fallback
+>    is gone), matching Technical.
+
 Scope: read-only analysis of the newer Approval Engine, its Defects integrations, and its relationship to the older Approval Workflow configuration. No application code, schema, migration, package, or runtime data was changed.
 
 `SYSTEM_OVERVIEW.md` is **NOT FOUND**. I searched the repository for both `SYSTEM_OVERVIEW.md` and `system_overview.md`; neither exists. Therefore the requested comparison against that file is necessarily a list of content that a future system overview would need to add, rather than a line-by-line critique of an existing document.

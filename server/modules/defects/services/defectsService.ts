@@ -634,7 +634,31 @@ export async function createDefect(body: any, _actor?: import('./defectsApproval
   return defectsRepo.createDefect(defectWithId);
 }
 
+/**
+ * 25-Sep-2026 (Sahil D1): closure / verification identity is stored trimmed — "Peter " with a
+ * trailing space was being saved, and once copied into the immutable defect_closure_history it
+ * could never be corrected. Applied before the approval gate so change detection sees the
+ * trimmed values too. Non-string values pass through untouched.
+ */
+export const IDENTITY_TEXT_FIELDS = [
+  'closedByName', 'closedByRank', 'closedOutByName', 'closedOutByRank',
+  'verifiedByName', 'verifiedByOfficePosition',
+] as const;
+export function trimDefectIdentityFields<T extends Record<string, any>>(body: T): T {
+  if (!body || typeof body !== 'object') return body;
+  let out: Record<string, any> | null = null;
+  for (const f of IDENTITY_TEXT_FIELDS) {
+    const v = body[f];
+    if (typeof v === 'string' && v !== v.trim()) {
+      out = out ?? { ...body };
+      out[f] = v.trim();
+    }
+  }
+  return (out ?? body) as T;
+}
+
 export async function updateDefect(id: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor) {
+  body = trimDefectIdentityFields(body);
   // Approval gate (B2a, 03-Sep-2026): the generic PATCH is Defects' ONLY live write path,
   // so extension/verification approval writes are detected and routed engine-first HERE,
   // and Part C1 closeout writes enforce the Master-only rule. With no chain configured the

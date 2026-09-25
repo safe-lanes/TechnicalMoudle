@@ -256,12 +256,24 @@ export class ApprovalEngine {
   }
 
   // ── reads ──────────────────────────────────────────────────────────────────
+  /** CONTRACT (25-Sep-2026, Sahil E7): requests for the subject, NEWEST FIRST by submittedAt
+   *  (ties: requuid descending, so the order is total and stable). Enforced here, not left to
+   *  the repository adapter — consumers may rely on rows[0] being the latest request. */
   async status(ctx: EngineCtx, scope: Scope, subjectRef: string): Promise<Array<RequestRow & { slots: RequestSlotRow[] }>> {
     const repo = this.repo(ctx);
-    const rows = await repo.listBySubject(scope, subjectRef);
+    const rows = orderRequestsNewestFirst(await repo.listBySubject(scope, subjectRef));
     return Promise.all(rows.map(async (r) => ({ ...r, slots: await repo.getSlots(r.requuid) })));
   }
   async pendingForUser(ctx: EngineCtx, userId: string): Promise<PendingItem[]> {
     return this.repo(ctx).pendingSlotsForUser(userId);
   }
+}
+
+/** Engine status() ordering contract: newest submittedAt first; ties by requuid descending. */
+export function orderRequestsNewestFirst<T extends { submittedAt: string; requuid: string }>(rows: readonly T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const ta = Date.parse(a.submittedAt); const tb = Date.parse(b.submittedAt);
+    if (tb !== ta) return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
+    return a.requuid < b.requuid ? 1 : a.requuid > b.requuid ? -1 : 0;
+  });
 }

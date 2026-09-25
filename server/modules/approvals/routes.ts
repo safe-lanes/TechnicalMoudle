@@ -13,7 +13,7 @@ import { requireRole } from '../../middleware/auth';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
-import { companyApprovalSettings } from '@shared/schema';
+import { setApprovalEmailEnabled } from './companyApprovalSettingsRepository';
 import { emailConfigStatus, approvalEmailToggleEnabled } from './approvalNotifier';
 import { resolveApproverNames } from './approvalCard';
 import { isVesselScopeStrict } from './vesselScopeFlag';
@@ -74,15 +74,7 @@ router.put('/approvals/email-config',
       return res.status(400).json({ error: 'Body must be { enabled: boolean }' });
     }
     const actor = (req as AuthenticatedRequest).user?.userUuid ?? null;
-    const existing = (await db().select({ id: companyApprovalSettings.id }).from(companyApprovalSettings).limit(1))[0];
-    if (existing) {
-      await db().update(companyApprovalSettings)
-        .set({ approvalEmailEnabled: enabled, updatedBy: actor, updatedAt: new Date() })
-        .where(eq(companyApprovalSettings.id, existing.id));
-    } else {
-      // Insert keeps every other column at its default — the retired lock column is untouched.
-      await db().insert(companyApprovalSettings).values({ singletonKey: 'ACTIVE', approvalEmailEnabled: enabled, updatedBy: actor });
-    }
+    await setApprovalEmailEnabled(enabled, actor); // repository write + field log (Sahil E4)
     res.json({ ...emailConfigStatus(), emailEnabled: enabled });
   }));
 

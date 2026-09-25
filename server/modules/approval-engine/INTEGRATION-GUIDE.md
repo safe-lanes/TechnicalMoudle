@@ -113,6 +113,10 @@ it fires next to the existing post-sync reconciler trigger in the sync complete 
 ### 3d. Cutover rule when replacing an old per-module approval config
 
 While the old config still drives step creation in your module, an active engine workflow AND
+> **25-Sep-2026 — cutover COMPLETE for Technical:** the old levels are retired; the host no longer
+> reads them and blocks a submit when no chain is active (see `assertTechnicalApprovalReady` in
+> `server/modules/approvals/engineGateway.ts`). The rule below is kept as history for other modules.
+
 enabled old-config levels would double-gate. The rule is **workflow XOR old levels** per scope:
 enable the generated workflow and disable the old level flags in the same support action (the
 Technical submit hooks log a loud warning when both are active). Keep the old config table —
