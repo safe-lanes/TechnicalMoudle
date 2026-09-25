@@ -12954,6 +12954,7 @@ __export(workOrderPartADates_exports, {
   IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS: () => IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS,
   buildRunningHoursWorkOrderSnapshots: () => buildRunningHoursWorkOrderSnapshots,
   findAttemptedWorkOrderSnapshotFields: () => findAttemptedWorkOrderSnapshotFields,
+  getWorkOrderListDueHour: () => getWorkOrderListDueHour,
   isImmutableWorkOrderSnapshotField: () => isImmutableWorkOrderSnapshotField,
   normalizePartADateForInput: () => normalizePartADateForInput,
   normalizePartARunningHours: () => normalizePartARunningHours,
@@ -13055,6 +13056,12 @@ function resolveWorkOrderPartADates(workOrder) {
       )
     ) : ""
   };
+}
+function getWorkOrderListDueHour(workOrder) {
+  const dueRH = resolveWorkOrderPartADates(workOrder).nextDueRH;
+  if (!dueRH) return null;
+  const value = Number(dueRH);
+  return Number.isFinite(value) ? value : null;
 }
 var IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS, IMMUTABLE_WORK_ORDER_SNAPSHOT_COLUMNS, MONTH_NUMBER2;
 var init_workOrderPartADates = __esm({
@@ -38388,7 +38395,7 @@ async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
         }
       }
     }
-    const nextDueHour = maintenanceBasis === "Running Hours" ? dueRH ?? null : maintenanceBasis === "Dual Frequency" ? parseRH3(job?.nextDueRH) ?? parseRH3(wo.nextDueReading) ?? null : null;
+    const nextDueHour = getWorkOrderListDueHour({ ...wo, maintenanceBasis });
     const rhEstimatedDueDate = isRhBased ? job?.rhEstimatedDueDate ?? null : null;
     const currentRH = isRhBased ? parseRH3(component?.currentCumulativeRH) ?? parseRH3(wo.currentReading) : void 0;
     const isJobCritical3 = job?.jobPriority === "Critical" || job?.classRelated === "true" || job?.classRelated === true;
@@ -41148,6 +41155,7 @@ var init_workOrderService2 = __esm({
     init_workOrderB2Validation();
     init_completedWorkOrderDate();
     init_workOrderListHydration();
+    init_workOrderPartADates();
   }
 });
 
@@ -42635,14 +42643,14 @@ var init_identityGuard = __esm({
 });
 
 // server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
-import { eq as eq30 } from "drizzle-orm";
+import { eq as eq31 } from "drizzle-orm";
 async function getAllMappings() {
   const db2 = await getDb();
   return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
 }
 async function getMappingForSailRole(sailRole) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartRoleMappings).where(eq30(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  const rows = await db2.select().from(shipskartRoleMappings).where(eq31(shipskartRoleMappings.sailRole, sailRole)).limit(1);
   return rows[0];
 }
 async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartRoleId) {
@@ -42654,7 +42662,7 @@ async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartR
 }
 async function deleteMapping(sailRole) {
   const db2 = await getDb();
-  await db2.delete(shipskartRoleMappings).where(eq30(shipskartRoleMappings.sailRole, sailRole));
+  await db2.delete(shipskartRoleMappings).where(eq31(shipskartRoleMappings.sailRole, sailRole));
 }
 var init_shipskartRoleMappingRepository = __esm({
   "server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts"() {
@@ -42683,10 +42691,10 @@ __export(shipskartB2bRepository_exports, {
   upsertUserLink: () => upsertUserLink,
   upsertVesselLink: () => upsertVesselLink
 });
-import { and as and27, eq as eq31, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
+import { and as and28, eq as eq32, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
 async function getTenantConfig(tenantId) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartTenantConfig).where(eq31(shipskartTenantConfig.tenantId, tenantId)).limit(1);
+  const rows = await db2.select().from(shipskartTenantConfig).where(eq32(shipskartTenantConfig.tenantId, tenantId)).limit(1);
   return rows[0];
 }
 async function upsertTokenState(tenantId, state) {
@@ -42721,7 +42729,7 @@ async function setReconcilerEnabled(tenantId, enabled) {
 }
 async function getUserLink(userUuid) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartUserLinks).where(eq31(shipskartUserLinks.userUuid, userUuid)).limit(1);
+  const rows = await db2.select().from(shipskartUserLinks).where(eq32(shipskartUserLinks.userUuid, userUuid)).limit(1);
   return rows[0];
 }
 async function upsertUserLink(userUuid, patch) {
@@ -42751,7 +42759,7 @@ async function upsertUserLink(userUuid, patch) {
 }
 async function getVesselLink(vesselVuuid) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartVesselLinks).where(eq31(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
+  const rows = await db2.select().from(shipskartVesselLinks).where(eq32(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
   return rows[0];
 }
 async function upsertVesselLink(vesselVuuid, patch) {
@@ -42779,7 +42787,7 @@ async function upsertVesselLink(vesselVuuid, patch) {
 }
 async function getAssignment(userUuid, vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select().from(masterUserVessels).where(and27(eq31(masterUserVessels.userUuid, userUuid), eq31(masterUserVessels.vesselId, vesselId))).limit(1);
+  const rows = await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.userUuid, userUuid), eq32(masterUserVessels.vesselId, vesselId))).limit(1);
   return rows[0];
 }
 async function upsertAssignment(userUuid, vesselId, patch) {
@@ -42824,21 +42832,21 @@ async function replaceAssignmentsForUser(userUuid, vesselVuuids) {
     activated++;
   }
   const keep = vesselVuuids.length > 0 ? vesselVuuids : ["__none__"];
-  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and27(
-    eq31(masterUserVessels.userUuid, userUuid),
-    eq31(masterUserVessels.isActive, true),
+  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and28(
+    eq32(masterUserVessels.userUuid, userUuid),
+    eq32(masterUserVessels.isActive, true),
     notInArray3(masterUserVessels.vesselId, keep)
   )).returning({ id: masterUserVessels.id });
   return { activated, deactivated: deactivatedRows.length };
 }
 async function getActiveVesselIdsForUser(userUuid) {
   const db2 = await getDb();
-  const rows = await db2.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and27(eq31(masterUserVessels.userUuid, userUuid), eq31(masterUserVessels.isActive, true)));
+  const rows = await db2.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and28(eq32(masterUserVessels.userUuid, userUuid), eq32(masterUserVessels.isActive, true)));
   return rows.map((r) => r.v);
 }
 async function getPendingAssignmentWork(userUuid) {
   const db2 = await getDb();
-  const rows = await db2.select().from(masterUserVessels).where(eq31(masterUserVessels.userUuid, userUuid));
+  const rows = await db2.select().from(masterUserVessels).where(eq32(masterUserVessels.userUuid, userUuid));
   return {
     // 'error' is IN this list on purpose (migration 164): a transient failure — rate
     // limit, 5xx, network — used to strand the row forever, because NO retry path
@@ -42868,7 +42876,7 @@ async function failingRows(limit = 100) {
     vesselId: masterUserVessels.vesselId,
     mapStatus: masterUserVessels.mapStatus,
     lastError: masterUserVessels.lastError
-  }).from(masterUserVessels).where(and27(eq31(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
+  }).from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
   return { users: users2, vessels: vessels2, assignments };
 }
 async function resetForRetry(kind, id) {
@@ -42877,13 +42885,13 @@ async function resetForRetry(kind, id) {
     const existing2 = await getUserLink(id);
     if (!existing2) return { reset: false, reason: "no link row" };
     if (existing2.shipskartUserId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
-    await db2.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(shipskartUserLinks.userUuid, id));
+    await db2.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq32(shipskartUserLinks.userUuid, id));
     return { reset: true };
   }
   const existing = await getVesselLink(id);
   if (!existing) return { reset: false, reason: "no link row" };
   if (existing.shipskartVesselId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
-  await db2.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(shipskartVesselLinks.vesselVuuid, id));
+  await db2.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq32(shipskartVesselLinks.vesselVuuid, id));
   return { reset: true };
 }
 async function linkStatusCounts() {
@@ -43256,7 +43264,7 @@ __export(shipskartReconcilerService_exports, {
   settleAssignmentChanges: () => settleAssignmentChanges
 });
 import crypto6 from "crypto";
-import { inArray as inArray8, eq as eq32, and as and28 } from "drizzle-orm";
+import { inArray as inArray8, eq as eq33, and as and29 } from "drizzle-orm";
 function resolveCallSign(v) {
   return v.imoNumber;
 }
@@ -43382,7 +43390,7 @@ async function diagnoseUserBlock(userUuid, sailRole) {
       email: masterUsers.email,
       role: masterUsers.role,
       fullName: masterUsers.fullName
-    }).from(masterUsers).where(eq32(masterUsers.id, userUuid)).limit(1);
+    }).from(masterUsers).where(eq33(masterUsers.id, userUuid)).limit(1);
     const mu = rows[0];
     if (!mu) {
       return {
@@ -43616,7 +43624,7 @@ async function ensureUserPushed(userUuid, sailRole) {
     email: masterUsers.email,
     role: masterUsers.role,
     designation: masterUsers.designation
-  }).from(masterUsers).where(eq32(masterUsers.id, userUuid)).limit(1);
+  }).from(masterUsers).where(eq33(masterUsers.id, userUuid)).limit(1);
   const mu = rows[0];
   if (!mu) {
     await upsertUserLink(userUuid, {
@@ -43679,14 +43687,14 @@ async function runReconciliationInner(opts = {}) {
   }
   summary.ran = true;
   const db2 = await getDb();
-  const pushedVessels = await db2.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq32(shipskartVesselLinks.pushStatus, "pushed"));
+  const pushedVessels = await db2.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq33(shipskartVesselLinks.pushStatus, "pushed"));
   const pushedVesselSet = new Set(pushedVessels.map((r) => r.v));
   const vesselRows = await db2.select({
     vuuid: vessels.vuuid,
     name: vessels.name,
     imoNumber: vessels.imoNumber,
     vesselType: vessels.vesselType
-  }).from(vessels).where(eq32(vessels.isActive, true));
+  }).from(vessels).where(eq33(vessels.isActive, true));
   for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
     const st = (await pushVessel(v)).status;
     tally(summary.vessels, st);
@@ -43701,7 +43709,7 @@ async function runReconciliationInner(opts = {}) {
     email: masterUsers.email,
     role: masterUsers.role,
     designation: masterUsers.designation
-  }).from(masterUsers).where(eq32(masterUsers.isDeleted, false));
+  }).from(masterUsers).where(eq33(masterUsers.isDeleted, false));
   for (const mu of userRows.filter((r) => retryUuids.has(r.id)).slice(0, limit)) {
     const st = (await pushUser(mu)).status;
     if (st === "pushed" || st === "already_pushed") clearJitAttempts(mu.id);
@@ -43716,7 +43724,7 @@ async function runReconciliationInner(opts = {}) {
   const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
   const now = /* @__PURE__ */ new Date();
   const pendingAssignments = orderAssignmentsForRetry(
-    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
+    (await db2.select().from(masterUserVessels).where(and29(eq33(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
   );
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
@@ -43724,7 +43732,7 @@ async function runReconciliationInner(opts = {}) {
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
   const revokedAssignments = orderAssignmentsForRetry(
-    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, false), eq32(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
+    (await db2.select().from(masterUserVessels).where(and29(eq33(masterUserVessels.isActive, false), eq33(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
   );
   for (const a of revokedAssignments.slice(0, limit)) {
     if (!a.shipskartMappingId) {
@@ -44841,7 +44849,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq35, and as and30, isNull as isNull4, ne as ne3, desc as desc7, inArray as inArray10 } from "drizzle-orm";
+import { eq as eq36, and as and31, isNull as isNull4, ne as ne3, desc as desc7, inArray as inArray10 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -44863,7 +44871,7 @@ async function ruleConsumptionSpike(report) {
   const db2 = await getDb();
   const todayTotal = (toNum2(report.hfoConsumption) ?? 0) + (toNum2(report.lsmgoConsumption) ?? 0) + (toNum2(report.mgoConsumption) ?? 0) + (toNum2(report.vlsfoConsumption) ?? 0) + (toNum2(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq36(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -44893,7 +44901,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq36(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum2(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -44926,9 +44934,9 @@ async function ruleAeHoursSpike(report) {
   const db2 = await getDb();
   const currentAeHours = toNum2(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
-  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and30(
-    eq35(nrNoonReports.vesselId, report.vesselId),
-    eq35(nrNoonReports.status, "submitted"),
+  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and31(
+    eq36(nrNoonReports.vesselId, report.vesselId),
+    eq36(nrNoonReports.status, "submitted"),
     ne3(nrNoonReports.id, report.id)
   )).orderBy(desc7(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum2(r.aeRunningHours)).filter((v) => v !== null && v > 0);
@@ -44951,7 +44959,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db2 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and30(eq35(nrCiiTracking.vesselId, report.vesselId), eq35(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and31(eq36(nrCiiTracking.vesselId, report.vesselId), eq36(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -44995,7 +45003,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq36(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum2(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -45018,25 +45026,25 @@ async function autoResolveCleared(report) {
   await db2.update(nrAlerts).set({
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
-  }).where(and30(
-    eq35(nrAlerts.vesselId, report.vesselId),
+  }).where(and31(
+    eq36(nrAlerts.vesselId, report.vesselId),
     isNull4(nrAlerts.acknowledgedAt),
     inArray10(nrAlerts.alertType, toResolve)
   ));
 }
 async function resolveOpenAlert(vesselId, alertType) {
   const db2 = await getDb();
-  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and30(
-    eq35(nrAlerts.vesselId, vesselId),
-    eq35(nrAlerts.alertType, alertType),
+  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and31(
+    eq36(nrAlerts.vesselId, vesselId),
+    eq36(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and30(
-    eq35(nrAlerts.vesselId, vesselId),
-    eq35(nrAlerts.alertType, alertType),
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and31(
+    eq36(nrAlerts.vesselId, vesselId),
+    eq36(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -45046,7 +45054,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq35(nrAlerts.id, existing[0].id));
+    }).where(eq36(nrAlerts.id, existing[0].id));
   } else {
     await db2.insert(nrAlerts).values({
       vesselId,
@@ -81092,12 +81100,31 @@ init_auth();
 init_middleware();
 import { Router as Router17 } from "express";
 
+// server/modules/assistant-api/controller.ts
+init_auth();
+
+// server/modules/assistant-api/masterUserRepository.ts
+init_schema();
+init_db();
+import { and as and24, eq as eq27 } from "drizzle-orm";
+async function findMasterUserById(userId) {
+  const db2 = await getDb();
+  if (!db2) return null;
+  const rows = await db2.select({ role: masterUsers.role, userType: masterUsers.userType }).from(masterUsers).where(and24(eq27(masterUsers.id, userId), eq27(masterUsers.isDeleted, false))).limit(1);
+  if (!rows.length) return null;
+  const ut = (rows[0].userType || "").trim();
+  return {
+    role: (rows[0].role || "").trim() || null,
+    userType: ut === "Office" || ut === "Ship" ? ut : null
+  };
+}
+
 // server/services/chatbotService.ts
 init_db();
 init_schema();
 init_auth();
 import OpenAI from "openai";
-import { eq as eq27, and as and24 } from "drizzle-orm";
+import { eq as eq28, and as and25 } from "drizzle-orm";
 async function loadWorkOrders(vesselId) {
   const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
   return getWorkOrdersWithComputedStatus2(vesselId);
@@ -83197,7 +83224,7 @@ async function executeTool(toolName, args, storage2, access) {
         let surveyAlerts = [];
         try {
           const db2 = await getDb();
-          const certData = await db2.select().from(vesselCertificateData).where(eq27(vesselCertificateData.vesselId, args.vesselId));
+          const certData = await db2.select().from(vesselCertificateData).where(eq28(vesselCertificateData.vesselId, args.vesselId));
           const certMasters = await db2.select().from(shipCertificatesMaster);
           const certMasterMap = new Map(certMasters.map((m) => [m.masterId, m]));
           for (const cert of certData) {
@@ -83225,8 +83252,8 @@ async function executeTool(toolName, args, storage2, access) {
               });
             }
           }
-          const surveyData = await db2.select().from(vesselSurveyData).where(eq27(vesselSurveyData.vesselId, args.vesselId));
-          const surveyMasters = await db2.select().from(shipSurveysMaster).where(and24(eq27(shipSurveysMaster.isDeleted, false), eq27(shipSurveysMaster.isActive, true)));
+          const surveyData = await db2.select().from(vesselSurveyData).where(eq28(vesselSurveyData.vesselId, args.vesselId));
+          const surveyMasters = await db2.select().from(shipSurveysMaster).where(and25(eq28(shipSurveysMaster.isDeleted, false), eq28(shipSurveysMaster.isActive, true)));
           const surveyMasterMap = new Map(surveyMasters.map((m) => [m.masterId, m]));
           for (const survey of surveyData) {
             if (!survey.dueDate) continue;
@@ -83517,6 +83544,8 @@ function verifyIdentity(token, key) {
 }
 
 // server/modules/assistant-api/controller.ts
+var roleFallbackFromProfile = () => (process.env.ASSISTANT_ROLE_FALLBACK || "").trim().toLowerCase() === "profile";
+var ROLE_CLAIM = ((process.env.SAILERP_JWT_USER_CLAIMS || "id,role,userType").split(",")[1] || "role").trim();
 var API_VERSION = 1;
 var MODULE_ID = "technical";
 var serviceSecret = () => process.env.ASSISTANT_SERVICE_SECRET || "";
@@ -83575,21 +83604,43 @@ async function handleMintToken(req, res) {
       error: "cannot mint: no verified login identity on this request (multi-tenant mode with a SAILERP token is required)"
     });
   }
-  if (vu.missing.length) {
+  const hardMissing = vu.missing.filter((c) => c !== ROLE_CLAIM);
+  if (hardMissing.length) {
     return res.status(403).json({
-      error: `cannot mint: the login token is missing required claim(s): ${vu.missing.join(", ")}`
+      error: `cannot mint: the login token is missing required claim(s): ${hardMissing.join(", ")}`
     });
   }
-  if (!allowedRoles().includes(vu.role)) {
-    return res.status(403).json({ error: `cannot mint: role '${vu.role}' is not permitted to use the assistant` });
+  let role = vu.role;
+  let roleSource = "token";
+  if (!role) {
+    const mu = await findMasterUserById(vu.userId);
+    if (mu?.role) {
+      role = mu.role;
+      roleSource = "master_users";
+    } else if (roleFallbackFromProfile()) {
+      const fwd = getRbacIdentity(req);
+      if (fwd.source === "forwarded" && fwd.role) {
+        role = fwd.role;
+        roleSource = "profile-header";
+      }
+    }
+    if (!role) {
+      return res.status(403).json({
+        error: `cannot mint: the login token carries no role and user '${vu.userId}' has no role in the synced master data (master_users)`
+      });
+    }
   }
+  if (!allowedRoles().includes(role)) {
+    return res.status(403).json({ error: `cannot mint: role '${role}' is not permitted to use the assistant` });
+  }
+  console.log(`[assistant-api] mint user=${vu.userId} role=${role} (${roleSource}) userType=${vu.userType} iss=${instanceId()}`);
   const token = signIdentity(
     {
       userId: vu.userId,
       userName: req.user?.fullName,
       // display/masking only (from the profile) — never used for authorisation
-      role: vu.role,
-      // VERIFIED token claim
+      role,
+      // VERIFIED: token claim, or the synced master-data role for the verified user id
       userType: vu.userType,
       // VERIFIED token claim — the vessel-scope decision key
       vesselId: req.user?.vesselId ?? null,
@@ -83684,7 +83735,7 @@ init_externalApi();
 init_sync();
 init_completedWorkOrderDate();
 init_schema();
-import { sql as sql23, eq as eq28 } from "drizzle-orm";
+import { sql as sql23, eq as eq29 } from "drizzle-orm";
 function normalizeSourceDeletionState(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
@@ -83701,7 +83752,7 @@ function getSourceDeletionState(entry) {
   return normalizeSourceDeletionState(entry?.is_deleted);
 }
 async function upsertMasterRecord(db2, table, id, insertValues, updateValues, isDeleted, stats) {
-  const existing = await db2.select({ id: table.id }).from(table).where(eq28(table.id, id)).limit(1);
+  const existing = await db2.select({ id: table.id }).from(table).where(eq29(table.id, id)).limit(1);
   await db2.insert(table).values(insertValues).onConflictDoUpdate({
     target: table.id,
     set: updateValues
@@ -84620,7 +84671,7 @@ async function repairRhTracking(req, res) {
         const storedNextDueReading = parseFloat(wo.nextDueReading || "0");
         if (storedNextDueReading !== correctNextDue) {
           if (!dryRun2) {
-            await db2.update(workOrders).set({ nextDueReading: correctNextDue.toString() }).where(eq28(workOrders.id, wo.id));
+            await db2.update(workOrders).set({ nextDueReading: correctNextDue.toString() }).where(eq29(workOrders.id, wo.id));
           }
           wosRepaired++;
           repairs.push({
@@ -84659,7 +84710,7 @@ async function repairRhTracking(req, res) {
         const storedNextDueReading = parseFloat(wo.nextDueReading || "0");
         if (storedNextDueReading !== jobLevelNextDue) {
           if (!dryRun2) {
-            await db2.update(workOrders).set({ nextDueReading: jobLevelNextDue.toString() }).where(eq28(workOrders.id, wo.id));
+            await db2.update(workOrders).set({ nextDueReading: jobLevelNextDue.toString() }).where(eq29(workOrders.id, wo.id));
           }
           wosRepaired++;
           repairs.push({
@@ -84680,7 +84731,7 @@ async function repairRhTracking(req, res) {
           await db2.update(jobs).set({
             lastDoneRH: jobLevelLastDone.toString(),
             nextDueRH: jobLevelNextDue.toString()
-          }).where(eq28(jobs.juuid, job.juuid));
+          }).where(eq29(jobs.juuid, job.juuid));
         }
         jobsRepaired++;
         repairs.push({
@@ -84737,10 +84788,10 @@ init_syncRole();
 // server/modules/access-control/repositories/viewModeRepository.ts
 init_db();
 init_schema();
-import { eq as eq29, and as and26, asc as asc6, sql as sql24 } from "drizzle-orm";
+import { eq as eq30, and as and27, asc as asc6, sql as sql24 } from "drizzle-orm";
 async function getActiveViewModes() {
   const db2 = await getDb();
-  return db2.select().from(viewModesMaster).where(and26(eq29(viewModesMaster.isDeleted, false), eq29(viewModesMaster.isActive, true))).orderBy(asc6(viewModesMaster.sortOrder), asc6(viewModesMaster.code));
+  return db2.select().from(viewModesMaster).where(and27(eq30(viewModesMaster.isDeleted, false), eq30(viewModesMaster.isActive, true))).orderBy(asc6(viewModesMaster.sortOrder), asc6(viewModesMaster.code));
 }
 async function getRolesWithMappings() {
   const db2 = await getDb();
@@ -84751,11 +84802,11 @@ async function getRolesWithMappings() {
     viewModeCode: roleViewModeMapping.viewModeCode
   }).from(admnRoleMaster).leftJoin(
     roleViewModeMapping,
-    and26(
+    and27(
       sql24`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
-      eq29(roleViewModeMapping.isDeleted, false)
+      eq30(roleViewModeMapping.isDeleted, false)
     )
-  ).where(and26(eq29(admnRoleMaster.isActive, true), eq29(admnRoleMaster.isDeleted, false))).orderBy(asc6(admnRoleMaster.roletype), asc6(admnRoleMaster.assignedRole));
+  ).where(and27(eq30(admnRoleMaster.isActive, true), eq30(admnRoleMaster.isDeleted, false))).orderBy(asc6(admnRoleMaster.roletype), asc6(admnRoleMaster.assignedRole));
   return rows;
 }
 async function getActiveRoleByTypeAndName(roletype, assignedRole) {
@@ -84765,11 +84816,11 @@ async function getActiveRoleByTypeAndName(roletype, assignedRole) {
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
-    and26(
-      eq29(admnRoleMaster.roletype, roletype),
-      eq29(admnRoleMaster.assignedRole, assignedRole),
-      eq29(admnRoleMaster.isActive, true),
-      eq29(admnRoleMaster.isDeleted, false)
+    and27(
+      eq30(admnRoleMaster.roletype, roletype),
+      eq30(admnRoleMaster.assignedRole, assignedRole),
+      eq30(admnRoleMaster.isActive, true),
+      eq30(admnRoleMaster.isDeleted, false)
     )
   ).limit(1);
   return rows[0];
@@ -84781,10 +84832,10 @@ async function getActiveRoleByRuid(roleRuid) {
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
-    and26(
+    and27(
       sql24`${admnRoleMaster.ruid}::text = ${roleRuid}`,
-      eq29(admnRoleMaster.isActive, true),
-      eq29(admnRoleMaster.isDeleted, false)
+      eq30(admnRoleMaster.isActive, true),
+      eq30(admnRoleMaster.isDeleted, false)
     )
   ).limit(1);
   return rows[0];
@@ -84792,7 +84843,7 @@ async function getActiveRoleByRuid(roleRuid) {
 async function getMappingByRoleRuid(roleRuid) {
   const db2 = await getDb();
   const rows = await db2.select().from(roleViewModeMapping).where(
-    and26(eq29(roleViewModeMapping.roleRuid, roleRuid), eq29(roleViewModeMapping.isDeleted, false))
+    and27(eq30(roleViewModeMapping.roleRuid, roleRuid), eq30(roleViewModeMapping.isDeleted, false))
   ).limit(1);
   return rows[0];
 }
@@ -84810,7 +84861,7 @@ async function upsertMapping(roleRuid, viewModeCode, updatedByUuid) {
 }
 async function softDeleteMapping(roleRuid, updatedByUuid) {
   const db2 = await getDb();
-  await db2.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(roleViewModeMapping.roleRuid, roleRuid));
+  await db2.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq30(roleViewModeMapping.roleRuid, roleRuid));
 }
 
 // server/modules/access-control/services/viewModeService.ts
@@ -87225,21 +87276,21 @@ init_permissions();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq33, and as and29, desc as desc6 } from "drizzle-orm";
+import { eq as eq34, and as and30, desc as desc6 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db2 = await getDb();
   let query = db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq33(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq33(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq34(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq34(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
-    return db2.select().from(nrNoonReports).where(and29(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
+    return db2.select().from(nrNoonReports).where(and30(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
   return db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
 }
 async function getNoonReportById(id) {
   const db2 = await getDb();
-  const result = await db2.select().from(nrNoonReports).where(eq33(nrNoonReports.id, id)).limit(1);
+  const result = await db2.select().from(nrNoonReports).where(eq34(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -87252,7 +87303,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq33(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -87262,27 +87313,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq33(nrNoonReports.id, id)).returning();
+  }).where(eq34(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db2 = await getDb();
-  await db2.delete(nrNoonReports).where(and29(eq33(nrNoonReports.id, id), eq33(nrNoonReports.status, "draft")));
+  await db2.delete(nrNoonReports).where(and30(eq34(nrNoonReports.id, id), eq34(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq33(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
+  return db2.select().from(nrFuelRob).where(eq34(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db2 = await getDb();
-  const existing = await db2.select().from(nrFuelRob).where(and29(eq33(nrFuelRob.vesselId, vesselId), eq33(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db2.select().from(nrFuelRob).where(and30(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and29(eq33(nrFuelRob.vesselId, vesselId), eq33(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and30(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType)));
   } else {
     await db2.insert(nrFuelRob).values({
       vesselId,
@@ -87294,23 +87345,23 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and29(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and30(eq34(nrNoonReports.vesselId, vesselId), eq34(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq37, and as and32, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
+import { eq as eq38, and as and33, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq36, and as and31, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq37, and as and32, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq34, sql as sql26 } from "drizzle-orm";
+import { eq as eq35, sql as sql26 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
@@ -87340,7 +87391,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrFuelRob).where(and31(eq36(nrFuelRob.vesselId, vesselId), eq36(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db2.select().from(nrFuelRob).where(and32(eq37(nrFuelRob.vesselId, vesselId), eq37(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db2.insert(nrFuelRob).values({
@@ -87352,7 +87403,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and31(eq36(nrFuelRob.vesselId, vesselId), eq36(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and32(eq37(nrFuelRob.vesselId, vesselId), eq37(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -87397,7 +87448,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db2.select().from(nrFuelRob).where(and31(eq36(nrFuelRob.vesselId, report.vesselId), eq36(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db2.select().from(nrFuelRob).where(and32(eq37(nrFuelRob.vesselId, report.vesselId), eq37(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum3(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -87413,7 +87464,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and31(eq36(nrFuelRob.vesselId, report.vesselId), eq36(nrFuelRob.fuelType, fuelType)));
+      }).where(and32(eq37(nrFuelRob.vesselId, report.vesselId), eq37(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db2.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -87434,9 +87485,9 @@ async function computeCiiTracking(report) {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const yearReports = await db2.select().from(nrNoonReports).where(
-    and31(
-      eq36(nrNoonReports.vesselId, report.vesselId),
-      eq36(nrNoonReports.status, "submitted"),
+    and32(
+      eq37(nrNoonReports.vesselId, report.vesselId),
+      eq37(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -87463,7 +87514,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db2.select().from(nrCiiTracking).where(and31(eq36(nrCiiTracking.vesselId, report.vesselId), eq36(nrCiiTracking.year, year))).limit(1);
+  const existing = await db2.select().from(nrCiiTracking).where(and32(eq37(nrCiiTracking.vesselId, report.vesselId), eq37(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db2.update(nrCiiTracking).set({
@@ -87474,7 +87525,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and31(eq36(nrCiiTracking.vesselId, report.vesselId), eq36(nrCiiTracking.year, year)));
+    }).where(and32(eq37(nrCiiTracking.vesselId, report.vesselId), eq37(nrCiiTracking.year, year)));
   } else {
     await db2.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -87505,9 +87556,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db2.select().from(nrVoyageLegs).where(and31(eq36(nrVoyageLegs.vesselId, report.vesselId), eq36(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db2.select().from(nrVoyageLegs).where(and32(eq37(nrVoyageLegs.vesselId, report.vesselId), eq37(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq36(nrVoyageLegs.id, existing[0].id));
+    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq37(nrVoyageLegs.id, existing[0].id));
   } else {
     await db2.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -87534,7 +87585,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and31(eq36(nrNoonReports.vesselId, vesselId), eq36(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 function toNum3(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -87607,7 +87658,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db2 = await getDb();
-  const robRecords = await db2.select().from(nrFuelRob).where(eq37(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db2.select().from(nrFuelRob).where(eq38(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -87638,11 +87689,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and32(eq37(nrCiiTracking.vesselId, vesselId), eq37(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and33(eq38(nrCiiTracking.vesselId, vesselId), eq38(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db2.select().from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db2.select().from(nrNoonReports).where(and33(eq38(nrNoonReports.vesselId, vesselId), eq38(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum4(r.hfoConsumption) ?? 0;
     const lsmgo = toNum4(r.lsmgoConsumption) ?? 0;
@@ -87672,7 +87723,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and33(eq38(nrNoonReports.vesselId, vesselId), eq38(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum4(r.speed);
     if (speed === null) return [];
@@ -87706,7 +87757,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrAlerts).where(and32(eq37(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
+  return db2.select().from(nrAlerts).where(and33(eq38(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db2 = await getDb();
@@ -87714,8 +87765,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db2.select().from(nrAlerts).where(eq37(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db2.select({ total: count() }).from(nrAlerts).where(eq37(nrAlerts.vesselId, vesselId))
+    db2.select().from(nrAlerts).where(eq38(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db2.select({ total: count() }).from(nrAlerts).where(eq38(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -87728,28 +87779,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and32(eq37(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and33(eq38(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq37(nrAlerts.id, alertId)).limit(1);
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq38(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq37(nrAlerts.id, alertId)).returning();
+  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq38(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db2 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db2.select().from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db2.select().from(nrNoonReports).where(and33(eq38(nrNoonReports.vesselId, vesselId), eq38(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db2.select().from(nrNoonReports).where(eq37(nrNoonReports.vesselId, vesselId));
+    const allReports = await db2.select().from(nrNoonReports).where(eq38(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and32(eq37(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and33(eq38(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db2.select().from(nrFuelRob).where(eq37(nrFuelRob.vesselId, vesselId));
+    const robRows = await db2.select().from(nrFuelRob).where(eq38(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum4(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum4(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum4(r.avg7Day) ?? 0), 0) || null;
@@ -87788,16 +87839,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq38, and as and33, desc as desc10, sum } from "drizzle-orm";
+import { eq as eq39, and as and34, desc as desc10, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db2 = await getDb();
-  const conditions = [eq38(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq38(nrBunkerRecords.voyageNo, filters.voyageNo));
-  return db2.select().from(nrBunkerRecords).where(and33(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
+  const conditions = [eq39(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq39(nrBunkerRecords.voyageNo, filters.voyageNo));
+  return db2.select().from(nrBunkerRecords).where(and34(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrBunkerRecords).where(eq38(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db2.select().from(nrBunkerRecords).where(eq39(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -87807,22 +87858,22 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db2 = await getDb();
-  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq38(nrBunkerRecords.id, id)).returning();
+  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq39(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db2 = await getDb();
-  await db2.delete(nrBunkerRecords).where(eq38(nrBunkerRecords.id, id));
+  await db2.delete(nrBunkerRecords).where(eq39(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db2 = await getDb();
-  const conditions = [eq38(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq38(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq39(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq39(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db2.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
     totalCost: sum(nrBunkerRecords.totalCost)
-  }).from(nrBunkerRecords).where(and33(...conditions)).groupBy(nrBunkerRecords.fuelType);
+  }).from(nrBunkerRecords).where(and34(...conditions)).groupBy(nrBunkerRecords.fuelType);
   return rows.map((r) => ({
     fuelType: r.fuelType,
     totalQuantityMt: r.totalQuantityMt ?? "0",
@@ -88884,7 +88935,7 @@ var ALL_SEED_IDS = [
 // server/routes.ts
 init_db();
 init_schema();
-import { and as and34, eq as eq39, isNull as isNull6, sql as sql27 } from "drizzle-orm";
+import { and as and35, eq as eq40, isNull as isNull6, sql as sql27 } from "drizzle-orm";
 async function registerRoutes(app2) {
   try {
     await ensureMaintenanceHistoryImmutability();
@@ -89252,8 +89303,8 @@ async function registerRoutes(app2) {
               const repaired = await db2.update(jobs).set({
                 nextDueRH: derivedNextDueRh,
                 updatedAt: /* @__PURE__ */ new Date()
-              }).where(and34(
-                eq39(jobs.juuid, job.juuid),
+              }).where(and35(
+                eq40(jobs.juuid, job.juuid),
                 isNull6(jobs.nextDueRH),
                 sql27`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`
               )).returning({ nextDueRH: jobs.nextDueRH });
@@ -89299,8 +89350,8 @@ async function registerRoutes(app2) {
             rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
             rhEstimateBasis: estimate.basis,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(and34(
-            eq39(jobs.juuid, job.juuid),
+          }).where(and35(
+            eq40(jobs.juuid, job.juuid),
             sql27`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
             sql27`${jobs.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
             sql27`${jobs.rhEstimatedDueDate} IS NOT DISTINCT FROM ${job.rhEstimatedDueDate}`,
