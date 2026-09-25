@@ -24599,6 +24599,7 @@ var init_postgresStorage = __esm({
     init_rhValidation();
     init_errors();
     init_requestContext();
+    init_rhDueDateService();
     _woNumericFields = null;
     PostgresStorage = class {
       async insertWithSequenceRepair(tableName, insertFn) {
@@ -26138,7 +26139,126 @@ var init_postgresStorage = __esm({
         } catch (e) {
           console.error("[FieldLogger] rha create:", e);
         }
+        if (auditWithActor.originSide === "ship") {
+          try {
+            await this.refreshRhJobEstimatesForMaster(result[0].componentId);
+          } catch (err) {
+            console.error("[RH estimate] Local audit refresh failed:", err);
+          }
+        }
         return result[0];
+      }
+      async refreshRhJobEstimatesForMaster(componentId) {
+        const db2 = await getDb();
+        const [master] = await db2.select().from(components).where(or(eq7(components.cuuid, componentId), eq7(components.id, componentId))).limit(1);
+        if (!master || master.rhCounterType !== "MASTER" || !master.vesselId) return;
+        const candidateColumns = {
+          juuid: jobs.juuid,
+          componentId: components.id,
+          componentUuid: components.cuuid,
+          vesselId: components.vesselId,
+          counterType: components.rhCounterType,
+          masterId: components.rhMasterComponentId,
+          counterSource: components.rhCounterSource
+        };
+        const masterMatches = or(
+          eq7(components.cuuid, master.cuuid),
+          eq7(components.rhMasterComponentId, master.cuuid),
+          eq7(components.rhMasterComponentId, master.id),
+          master.componentCode ? eq7(components.rhCounterSource, master.componentCode) : sql11`false`
+        );
+        const candidates = await db2.select(candidateColumns).from(jobs).innerJoin(components, and6(
+          eq7(components.vesselId, jobs.vesselId),
+          or(
+            eq7(components.cuuid, jobs.componentId),
+            eq7(components.id, jobs.componentId)
+          )
+        )).where(and6(
+          eq7(jobs.vesselId, master.vesselId),
+          inArray2(jobs.maintenanceBasis, ["Running Hours", "Dual Frequency"]),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted)),
+          masterMatches
+        ));
+        const linkedCandidates = await db2.select(candidateColumns).from(jobComponentLinks).innerJoin(jobs, eq7(jobComponentLinks.jobId, jobs.juuid)).innerJoin(components, and6(
+          eq7(jobComponentLinks.componentId, components.cuuid),
+          eq7(components.vesselId, jobs.vesselId)
+        )).where(and6(
+          eq7(jobs.vesselId, master.vesselId),
+          eq7(jobComponentLinks.vesselId, master.vesselId),
+          inArray2(jobs.maintenanceBasis, ["Running Hours", "Dual Frequency"]),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted)),
+          or(eq7(jobComponentLinks.isDeleted, false), isNull2(jobComponentLinks.isDeleted)),
+          masterMatches
+        ));
+        const codeOnlyCandidates = await db2.select(candidateColumns).from(jobs).innerJoin(components, and6(
+          eq7(components.vesselId, jobs.vesselId),
+          eq7(components.componentCode, jobs.componentCode),
+          or(eq7(components.isDeleted, false), isNull2(components.isDeleted))
+        )).where(and6(
+          eq7(jobs.vesselId, master.vesselId),
+          isNull2(jobs.componentId),
+          inArray2(jobs.maintenanceBasis, ["Running Hours", "Dual Frequency"]),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted)),
+          masterMatches,
+          sql11`NOT EXISTS (
+          SELECT 1 FROM job_component_links jcl
+          WHERE jcl.job_id = ${jobs.juuid} AND COALESCE(jcl.is_deleted, false) = false
+        )`,
+          sql11`(
+          SELECT count(*) FROM components c2
+          WHERE c2.vessel_id = ${jobs.vesselId}
+            AND c2.component_code = ${jobs.componentCode}
+            AND COALESCE(c2.is_deleted, false) = false
+        ) = 1`
+        ));
+        const eligibleJobIds = /* @__PURE__ */ new Set();
+        const asRhRef = (component) => component ? {
+          id: component.id,
+          cuuid: component.cuuid,
+          vesselId: component.vesselId,
+          rhCounterType: component.rhCounterType,
+          rhMasterComponentId: component.rhMasterComponentId,
+          rhCounterSource: component.rhCounterSource
+        } : null;
+        for (const candidate of [...candidates, ...linkedCandidates, ...codeOnlyCandidates]) {
+          const source = await resolveAuthoritativeRhComponent(
+            {
+              id: candidate.componentId,
+              cuuid: candidate.componentUuid,
+              vesselId: candidate.vesselId,
+              rhCounterType: candidate.counterType,
+              rhMasterComponentId: candidate.masterId,
+              rhCounterSource: candidate.counterSource
+            },
+            async (id) => asRhRef(await this.getComponent(id)),
+            async (code, vesselId) => asRhRef(await this.getComponentByCode(code, vesselId)),
+            master.vesselId
+          );
+          if (source?.cuuid === master.cuuid) eligibleJobIds.add(candidate.juuid);
+        }
+        for (const juuid of Array.from(eligibleJobIds)) {
+          try {
+            await db2.transaction(async (tx) => {
+              const [job] = await tx.select().from(jobs).where(eq7(jobs.juuid, juuid)).for("update");
+              if (!job?.lastDoneDate || job.lastDoneRH == null || job.nextDueRH == null) return;
+              const audits = await tx.select().from(runningHoursAudit).where(and6(
+                eq7(runningHoursAudit.componentId, master.cuuid),
+                or(eq7(runningHoursAudit.isDeleted, false), isNull2(runningHoursAudit.isDeleted))
+              ));
+              const estimate = estimateRhDueDate(job.lastDoneDate, job.intervalRunningHour, audits);
+              const rate = estimate.averagePerDay == null ? null : String(estimate.averagePerDay);
+              if (job.rhEstimatedDueDate === estimate.dueDate && job.rhEstimateBasis === estimate.basis && (job.rhAveragePerDay == null ? null : Number(job.rhAveragePerDay)) === (rate == null ? null : Number(Number(rate).toFixed(6)))) return;
+              await tx.update(jobs).set({
+                rhEstimatedDueDate: estimate.dueDate,
+                rhAveragePerDay: rate,
+                rhEstimateBasis: estimate.basis,
+                updatedAt: /* @__PURE__ */ new Date()
+              }).where(eq7(jobs.juuid, juuid));
+            });
+          } catch (err) {
+            console.error(`[RH estimate] Could not refresh Job ${juuid}:`, err);
+          }
+        }
       }
       async getEarliestAuditTimestamp(vesselId) {
         const db2 = await getDb();
@@ -26305,6 +26425,21 @@ var init_postgresStorage = __esm({
           throw new Error(`Job ${id} not found`);
         }
         return result[0];
+      }
+      /** Atomic cycle-and-estimate write; retry against a fresh Job on a failed CAS. */
+      async updateJobIfRhCycleUnchanged(id, previous, data) {
+        const db2 = await getDb();
+        const result = await db2.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and6(
+          eq7(jobs.juuid, id),
+          or(eq7(jobs.isDeleted, false), isNull2(jobs.isDeleted)),
+          sql11`${jobs.lastDoneDate} IS NOT DISTINCT FROM ${previous.lastDoneDate ?? null}`,
+          sql11`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${previous.lastDoneRH ?? null}`,
+          sql11`${jobs.nextDueRH} IS NOT DISTINCT FROM ${previous.nextDueRH ?? null}`,
+          sql11`${jobs.rhEstimatedDueDate} IS NOT DISTINCT FROM ${previous.rhEstimatedDueDate ?? null}`,
+          sql11`${jobs.rhAveragePerDay} IS NOT DISTINCT FROM ${previous.rhAveragePerDay ?? null}`,
+          sql11`${jobs.rhEstimateBasis} IS NOT DISTINCT FROM ${previous.rhEstimateBasis ?? null}`
+        )).returning();
+        return result[0] ?? null;
       }
       async deleteJob(id) {
         const db2 = await getDb();
@@ -38124,6 +38259,7 @@ __export(workOrderService_exports, {
   applyAssignmentSync: () => applyAssignmentSync,
   approvePostponement: () => approvePostponement,
   approveRePostponement: () => approveRePostponement,
+  buildApprovedRhJobUpdates: () => buildApprovedRhJobUpdates,
   calculateApprovalTier: () => calculateApprovalTier,
   createSuperintendentNotificationForWO: () => createSuperintendentNotificationForWO,
   createWorkOrder: () => createWorkOrder,
@@ -38138,6 +38274,7 @@ __export(workOrderService_exports, {
   isSuperintendentLockEnabled: () => isSuperintendentLockEnabled,
   listWorkOrders: () => listWorkOrders,
   listWorkOrdersPaged: () => listWorkOrdersPaged,
+  persistApprovedRhJobCycle: () => persistApprovedRhJobCycle,
   rejectCompletedWorkOrder: () => rejectCompletedWorkOrder,
   rejectPostponement: () => rejectPostponement,
   rejectRePostponement: () => rejectRePostponement,
@@ -38148,6 +38285,71 @@ __export(workOrderService_exports, {
   updateWorkOrder: () => updateWorkOrder
 });
 import { eq as eq12 } from "drizzle-orm";
+async function buildApprovedRhJobUpdates(job, workOrder, component, completionDate, completionRH) {
+  const { computeJobCycleUpdates: computeJobCycleUpdates2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+  const { estimateRhDueDate: estimateRhDueDate2, rhEstimateBasis: rhEstimateBasis2, resolveAuthoritativeRhComponent: resolveAuthoritativeRhComponent2 } = await Promise.resolve().then(() => (init_rhDueDateService(), rhDueDateService_exports));
+  const { jobUpdates } = computeJobCycleUpdates2({
+    maintenanceBasis: workOrder.maintenanceBasis,
+    dateOfCompletion: completionDate,
+    completionRH: completionRH != null ? String(completionRH) : null,
+    originalDueDate: workOrder.nextDueDate || workOrder.dueDate,
+    job
+  });
+  const previousDate = parseWorkOrderDate(job.lastDoneDate);
+  const incomingDate = parseWorkOrderDate(completionDate);
+  if (jobUpdates.lastDoneRH !== void 0 && previousDate && incomingDate && incomingDate < previousDate) {
+    delete jobUpdates.lastDoneRH;
+    delete jobUpdates.nextDueRH;
+  }
+  if (jobUpdates.lastDoneRH !== void 0 && job.nextDueRH != null && jobUpdates.nextDueRH === void 0) {
+    delete jobUpdates.lastDoneRH;
+  }
+  if (jobUpdates.lastDoneRH !== void 0) {
+    jobUpdates.rhEstimatedDueDate = null;
+    jobUpdates.rhAveragePerDay = null;
+    jobUpdates.rhEstimateBasis = rhEstimateBasis2("MISSING_RH_SOURCE");
+    try {
+      const source = await resolveAuthoritativeRhComponent2(
+        component,
+        findComponent2,
+        findComponentByCode2,
+        workOrder.vesselId
+      );
+      if (source) {
+        const audits = await findRunningHoursAudits(source.cuuid || source.id);
+        const estimate = estimateRhDueDate2(
+          jobUpdates.lastDoneDate ?? job.lastDoneDate,
+          job.intervalRunningHour,
+          audits
+        );
+        jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+        jobUpdates.rhAveragePerDay = estimate.averagePerDay == null ? null : String(estimate.averagePerDay);
+        jobUpdates.rhEstimateBasis = estimate.basis;
+      }
+    } catch (estimateError) {
+      console.error(`[RH estimate] Approval of ${workOrder.workOrderNo} has no estimate:`, estimateError);
+    }
+  }
+  return jobUpdates;
+}
+async function persistApprovedRhJobCycle(initialJob, workOrder, component, completionDate, completionRH) {
+  let job = initialJob;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const updates = await buildApprovedRhJobUpdates(
+      job,
+      workOrder,
+      component,
+      completionDate,
+      completionRH
+    );
+    if (!Object.keys(updates).length) return;
+    const saved = await getStorage2().updateJobIfRhCycleUnchanged(job.juuid, job, updates);
+    if (saved) return;
+    job = await findJob(job.juuid);
+    if (!job) throw new Error(`Job disappeared during RH cycle completion`);
+  }
+  throw new Error(`Job ${job.juuid} changed repeatedly during RH cycle completion`);
+}
 async function resolveRankIdFromLabel(assignedTo) {
   if (!assignedTo) return null;
   const { getAllRanks: getAllRanks3 } = await Promise.resolve().then(() => (init_service2(), service_exports2));
@@ -40031,58 +40233,14 @@ async function updateWorkOrder(id, body) {
               }
               await updateJob3(job.juuid, calendarUpdates);
             }
-            if (freshWorkOrder.maintenanceBasis === "Running Hours" && dateOfCompletionNorm) {
-              await updateJob3(job.juuid, { lastDoneDate: dateOfCompletionNorm });
-            }
-            if (freshWorkOrder.maintenanceBasis === "Running Hours" && runningHours) {
-              const currentRH = parseInt(runningHours);
-              if (!isNaN(currentRH)) {
-                const rhUpdates = { lastDoneRH: currentRH };
-                if (dateOfCompletionNorm) {
-                  rhUpdates.lastDoneDate = dateOfCompletionNorm;
-                }
-                const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-                if (rhInterval && !isNaN(rhInterval)) {
-                  rhUpdates.nextDueRH = currentRH + rhInterval;
-                  console.log(`\u2705 Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
-                }
-                const { preserveNewerJobRhState: preserveNewerJobRhState2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
-                const guardedRhUpdates = preserveNewerJobRhState2(job, rhUpdates);
-                if (Object.keys(guardedRhUpdates).length > 0) {
-                  await updateJob3(job.juuid, guardedRhUpdates);
-                }
-                console.log(`\u{1F4CB} [Layer 7] RH snapshot ${currentRH} recorded for WO ${freshWorkOrder.workOrderNo || freshWorkOrder.id}. Component RH NOT modified (isolation).`);
-              }
-            }
-            if (freshWorkOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletionNorm) {
-              const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-              const dualUpdates = { lastDoneDate: dateOfCompletionNorm };
-              if (job.frequencyValue && job.frequencyUnit) {
-                const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
-                if (nextDue) {
-                  dualUpdates.nextDueDate = nextDue;
-                  console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
-                }
-              }
-              if (runningHours) {
-                const dualCurrentRH = parseInt(runningHours);
-                if (!isNaN(dualCurrentRH)) {
-                  dualUpdates.lastDoneRH = dualCurrentRH;
-                  const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-                  if (dualRhInterval && !isNaN(dualRhInterval)) {
-                    dualUpdates.nextDueRH = dualCurrentRH + dualRhInterval;
-                    console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueRH: ${dualUpdates.nextDueRH}`);
-                  }
-                }
-              } else {
-                console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
-              }
-              const { preserveNewerJobRhState: preserveNewerJobRhState2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
-              const guardedDualUpdates = preserveNewerJobRhState2(job, dualUpdates);
-              if (Object.keys(guardedDualUpdates).length > 0) {
-                await updateJob3(job.juuid, guardedDualUpdates);
-              }
-              console.log(`\u2705 [Dual] Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletionNorm}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
+            if (freshWorkOrder.maintenanceBasis === "Running Hours" || freshWorkOrder.maintenanceBasis === "Dual Frequency") {
+              await persistApprovedRhJobCycle(
+                job,
+                freshWorkOrder,
+                component,
+                dateOfCompletionNorm,
+                runningHours
+              );
             }
           }
         } catch (jobError) {
@@ -49528,11 +49686,19 @@ init_rhTimelineValidationService();
 init_sync();
 init_syncRole();
 init_workOrderStatus();
+init_dateParse();
 init_woCompletionRhRequirement();
 init_workOrderPayload();
 init_workOrderB2Validation();
 init_completedWorkOrderDate();
-init_rhDueDateService();
+function rejectRhFromOlderCompletion(jobUpdates, lastDoneDate, completionDate) {
+  const previous = parseWorkOrderDate(lastDoneDate);
+  const incoming = parseWorkOrderDate(completionDate);
+  if (jobUpdates.lastDoneRH !== void 0 && previous && incoming && incoming < previous) {
+    delete jobUpdates.lastDoneRH;
+    delete jobUpdates.nextDueRH;
+  }
+}
 async function completeWorkOrder(workOrderId, body) {
   const {
     runningHours,
@@ -50152,32 +50318,17 @@ async function completeWorkOrder(workOrderId, body) {
         originalDueDate,
         job
       });
-      if (jobUpdates.lastDoneRH !== void 0 && cycleRH && (workOrder.maintenanceBasis === "Running Hours" || workOrder.maintenanceBasis === "Dual Frequency")) {
-        jobUpdates.rhEstimatedDueDate = null;
-        jobUpdates.rhAveragePerDay = null;
-        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
-        const rhComponent = await resolveAuthoritativeRhComponent(
-          component,
-          findComponent2,
-          findComponentByCode2,
-          workOrder.vesselId
-        );
-        if (rhComponent) {
-          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
-          const estimate = estimateRhDueDate(
-            jobCompletionDate,
-            job.intervalRunningHour,
-            audits
-          );
-          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
-          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
-          jobUpdates.rhEstimateBasis = estimate.basis;
-        }
-      }
+      rejectRhFromOlderCompletion(jobUpdates, job.lastDoneDate, jobCompletionDate);
       if (workOrder.maintenanceBasis === "Dual Frequency" && jobCompletionDate && !cycleRH) {
         console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
       }
-      if (Object.keys(jobUpdates).length > 0) {
+      if (jobUpdates.lastDoneRH !== void 0 && (workOrder.maintenanceBasis === "Running Hours" || workOrder.maintenanceBasis === "Dual Frequency")) {
+        const { persistApprovedRhJobCycle: persistApprovedRhJobCycle2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
+        await persistApprovedRhJobCycle2(job, {
+          ...workOrder,
+          nextDueDate: originalDueDate
+        }, component, jobCompletionDate, cycleRH);
+      } else if (Object.keys(jobUpdates).length > 0) {
         await updateJob3(job.juuid, jobUpdates);
         console.log(`\u2705 Updated ${workOrder.maintenanceBasis} job ${job.jobNo} cycle fields: ${JSON.stringify(jobUpdates)}`);
       }
@@ -50360,29 +50511,14 @@ async function finalizeWorkOrderCompletion(workOrderId) {
         originalDueDate,
         job
       });
+      rejectRhFromOlderCompletion(jobUpdates, job.lastDoneDate, jobCompletionDate);
       if (jobUpdates.lastDoneRH !== void 0 && (basis === "Running Hours" || basis === "Dual Frequency")) {
-        jobUpdates.rhEstimatedDueDate = null;
-        jobUpdates.rhAveragePerDay = null;
-        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
-        const rhComponent = await resolveAuthoritativeRhComponent(
-          component,
-          findComponent2,
-          findComponentByCode2,
-          workOrder.vesselId
-        );
-        if (rhComponent) {
-          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
-          const estimate = estimateRhDueDate(
-            jobCompletionDate,
-            job.intervalRunningHour,
-            audits
-          );
-          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
-          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
-          jobUpdates.rhEstimateBasis = estimate.basis;
-        }
-      }
-      if (Object.keys(jobUpdates).length > 0) {
+        const { persistApprovedRhJobCycle: persistApprovedRhJobCycle2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
+        await persistApprovedRhJobCycle2(job, {
+          ...workOrder,
+          nextDueDate: originalDueDate
+        }, component, jobCompletionDate, finalizeCycleRH);
+      } else if (Object.keys(jobUpdates).length > 0) {
         await updateJob3(job.juuid, jobUpdates);
         console.log(`\u2705 [Finalize] Updated ${basis} job ${job.jobNo} cycle fields without reducing newer RH state`);
       }
