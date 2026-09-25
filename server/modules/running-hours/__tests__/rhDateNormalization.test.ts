@@ -398,3 +398,100 @@ describe.runIf(hasDb)('Task #427 — RH date normalization & winner hardening', 
     }
   });
 });
+
+// Run independently with -t 'local RH estimate refresh' to avoid the date
+// normalization suite's migration setup when testing this behavior alone.
+describe.runIf(hasDb)('local RH estimate refresh', () => {
+  it('fills a first-cycle estimate after a later MASTER reading, including inherited Jobs', async () => {
+    const { getDb } = await import('../../../db');
+    const { PostgresStorage } = await import('../../../postgresStorage');
+    const schema = await import('@shared/schema');
+    const { eq } = await import('drizzle-orm');
+    const db = await getDb();
+    const storage = new PostgresStorage();
+    const vesselId = randomUUID();
+    const masterId = randomUUID();
+    const childId = randomUUID();
+    const jobId = randomUUID();
+    const codeOnlyJobId = randomUUID();
+    const auditIds: string[] = [];
+    await db.insert(schema.vessels).values({
+      id: vesselId, vuuid: vesselId, name: 'RH refresh fixture', code: `RH-${vesselId.slice(0, 8)}`,
+    });
+    try {
+      await db.insert(schema.components).values({
+        id: masterId, cuuid: masterId, vesselId, name: 'RH master',
+        componentCode: 'T571-M', rhCounterType: 'MASTER',
+      } as any);
+      await db.insert(schema.components).values({
+        id: childId, cuuid: childId, vesselId, name: 'RH child',
+        componentCode: 'T571-C', rhCounterType: 'INHERITED',
+        rhMasterComponentId: masterId,
+      } as any);
+      await db.insert(schema.jobs).values({
+        id: jobId, juuid: jobId, jobNo: `T571-${jobId.slice(0, 8)}`,
+        jobTitle: 'RH estimate fixture', vesselId, componentId: null,
+        componentCode: 'T571-C', maintenanceBasis: 'Running Hours',
+        intervalRunningHour: 200, lastDoneDate: '2026-02-12',
+        lastDoneRH: '1200', nextDueRH: '1400',
+        rhEstimateBasis: 'RH_COMPLETION_FIRST_LATEST_V2_INSUFFICIENT_HISTORY',
+      } as any);
+      await db.insert(schema.jobComponentLinks).values({
+        vesselId, jobId, componentId: childId, linkedBy: 'fixture',
+      });
+      await db.insert(schema.jobs).values({
+        id: codeOnlyJobId, juuid: codeOnlyJobId,
+        jobNo: `T571-C-${codeOnlyJobId.slice(0, 8)}`,
+        jobTitle: 'Legacy code-only RH fixture', vesselId,
+        componentId: null, componentCode: 'T571-C',
+        maintenanceBasis: 'Running Hours', intervalRunningHour: 200,
+        lastDoneDate: '2026-02-12', lastDoneRH: '1200',
+        nextDueRH: '1400',
+        rhEstimateBasis: 'RH_COMPLETION_FIRST_LATEST_V2_INSUFFICIENT_HISTORY',
+      } as any);
+      const addReading = async (dateUpdatedLocal: string, cumulativeRH: string) => {
+        const saved = await storage.createRunningHoursAudit({
+          componentId: masterId, vesselId, previousRH: '0', newRH: cumulativeRH,
+          cumulativeRH, dateUpdatedLocal, dateUpdatedTZ: 'UTC',
+          enteredAtUTC: new Date(), userId: 'fixture', source: 'single',
+          originSide: 'ship',
+        } as any);
+        auditIds.push(saved.rhauuid);
+      };
+      await addReading('2026-02-01', '1000');
+      let [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.juuid, jobId));
+      expect(job.rhEstimatedDueDate).toBeNull();
+      expect(job.rhEstimateBasis).toBe('RH_COMPLETION_FIRST_LATEST_V2_INSUFFICIENT_HISTORY');
+      const [codeOnlyBefore] = await db.select().from(schema.jobs)
+        .where(eq(schema.jobs.juuid, codeOnlyJobId));
+      expect(codeOnlyBefore.rhEstimatedDueDate).toBeNull();
+
+      await addReading('2026-02-11', '1100');
+      [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.juuid, jobId));
+      expect(job.rhEstimatedDueDate).toBe('2026-03-04');
+      expect(Number(job.rhAveragePerDay)).toBe(10);
+      expect(job.lastDoneDate).toBe('2026-02-12');
+      expect(job.nextDueRH).toBe('1400');
+      const [codeOnlyAfter] = await db.select().from(schema.jobs)
+        .where(eq(schema.jobs.juuid, codeOnlyJobId));
+      expect(codeOnlyAfter.rhEstimatedDueDate).toBe('2026-03-04');
+      expect(Number(codeOnlyAfter.rhAveragePerDay)).toBe(10);
+
+      // An obsolete cycle snapshot cannot replace an audit-refreshed estimate.
+      const stale = await storage.updateJobIfRhCycleUnchanged(jobId, {
+        lastDoneDate: '2026-02-12', lastDoneRH: '1200', nextDueRH: '1400',
+        rhEstimatedDueDate: null, rhAveragePerDay: null,
+        rhEstimateBasis: 'RH_COMPLETION_FIRST_LATEST_V2_INSUFFICIENT_HISTORY',
+      }, { rhEstimatedDueDate: '2026-02-22' });
+      expect(stale).toBeNull();
+    } finally {
+      await db.delete(schema.jobComponentLinks).where(eq(schema.jobComponentLinks.jobId, jobId));
+      await db.delete(schema.jobs).where(eq(schema.jobs.juuid, jobId));
+      await db.delete(schema.jobs).where(eq(schema.jobs.juuid, codeOnlyJobId));
+      await db.delete(schema.runningHoursAudit).where(eq(schema.runningHoursAudit.componentId, masterId));
+      await db.delete(schema.components).where(eq(schema.components.cuuid, childId));
+      await db.delete(schema.components).where(eq(schema.components.cuuid, masterId));
+      await db.delete(schema.vessels).where(eq(schema.vessels.vuuid, vesselId));
+    }
+  });
+});
