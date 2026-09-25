@@ -227,6 +227,7 @@ import { canonicalizeReadingDateInput, requireReadingDayInput, parseReadingDaySt
 import { validateRHMonotonicity } from './modules/running-hours/utils/rhValidation';
 import { ValidationError } from './modules/shared/errors';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
+import { estimateRhDueDate, resolveAuthoritativeRhComponent } from './services/rhDueDateService';
 
 function enforceFreshRHMonotonicity(input: {
   currentRH: number;
@@ -2390,7 +2391,145 @@ export class PostgresStorage {
     const result = await db.insert(runningHoursAudit).values(auditWithActor).returning();
     // Sync field logging — INSERT
     try { await logFieldChanges('running_hours_audit', result[0].rhauuid, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] rha create:', e); }
+    // Local ship readings (including those created by a WO) may make a previously
+    // unavailable Job estimate calculable. Sync applies rows directly and already
+    // has its own guarded Office refresh; do not run a second sync-side writer.
+    if (auditWithActor.originSide === 'ship') {
+      try {
+        await this.refreshRhJobEstimatesForMaster(result[0].componentId);
+      } catch (err) {
+        // A planning estimate must not undo a successfully saved RH reading.
+        console.error('[RH estimate] Local audit refresh failed:', err);
+      }
+    }
     return result[0];
+  }
+
+  private async refreshRhJobEstimatesForMaster(componentId: string): Promise<void> {
+    const db = await getDb();
+    const [master] = await db.select().from(components)
+      .where(or(eq(components.cuuid, componentId), eq(components.id, componentId))).limit(1);
+    if (!master || master.rhCounterType !== 'MASTER' || !master.vesselId) return;
+
+    const candidateColumns = {
+      juuid: jobs.juuid,
+      componentId: components.id,
+      componentUuid: components.cuuid,
+      vesselId: components.vesselId,
+      counterType: components.rhCounterType,
+      masterId: components.rhMasterComponentId,
+      counterSource: components.rhCounterSource,
+    };
+    const masterMatches = or(eq(components.cuuid, master.cuuid),
+      eq(components.rhMasterComponentId, master.cuuid),
+      eq(components.rhMasterComponentId, master.id),
+      master.componentCode ? eq(components.rhCounterSource, master.componentCode) : sql`false`);
+    const candidates = await db.select(candidateColumns).from(jobs)
+      .innerJoin(components, and(
+        eq(components.vesselId, jobs.vesselId),
+        or(eq(components.cuuid, jobs.componentId),
+          eq(components.id, jobs.componentId)),
+      ))
+      .where(and(
+        eq(jobs.vesselId, master.vesselId),
+        inArray(jobs.maintenanceBasis, ['Running Hours', 'Dual Frequency']),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+        masterMatches,
+      ));
+    const linkedCandidates = await db.select(candidateColumns).from(jobComponentLinks)
+      .innerJoin(jobs, eq(jobComponentLinks.jobId, jobs.juuid))
+      .innerJoin(components, and(
+        eq(jobComponentLinks.componentId, components.cuuid),
+        eq(components.vesselId, jobs.vesselId),
+      ))
+      .where(and(
+        eq(jobs.vesselId, master.vesselId),
+        eq(jobComponentLinks.vesselId, master.vesselId),
+        inArray(jobs.maintenanceBasis, ['Running Hours', 'Dual Frequency']),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+        or(eq(jobComponentLinks.isDeleted, false), isNull(jobComponentLinks.isDeleted)),
+        masterMatches,
+      ));
+    // Legacy code-only Jobs are still supported by completion lookup. Use the
+    // code only when there is no explicit ID or active link, and only when it
+    // identifies a single live component on this vessel.
+    const codeOnlyCandidates = await db.select(candidateColumns).from(jobs)
+      .innerJoin(components, and(
+        eq(components.vesselId, jobs.vesselId),
+        eq(components.componentCode, jobs.componentCode),
+        or(eq(components.isDeleted, false), isNull(components.isDeleted)),
+      ))
+      .where(and(
+        eq(jobs.vesselId, master.vesselId),
+        isNull(jobs.componentId),
+        inArray(jobs.maintenanceBasis, ['Running Hours', 'Dual Frequency']),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+        masterMatches,
+        sql`NOT EXISTS (
+          SELECT 1 FROM job_component_links jcl
+          WHERE jcl.job_id = ${jobs.juuid} AND COALESCE(jcl.is_deleted, false) = false
+        )`,
+        sql`(
+          SELECT count(*) FROM components c2
+          WHERE c2.vessel_id = ${jobs.vesselId}
+            AND c2.component_code = ${jobs.componentCode}
+            AND COALESCE(c2.is_deleted, false) = false
+        ) = 1`,
+      ));
+    const eligibleJobIds = new Set<string>();
+    const asRhRef = (component: Component | undefined) => component ? ({
+      id: component.id,
+      cuuid: component.cuuid,
+      vesselId: component.vesselId,
+      rhCounterType: component.rhCounterType,
+      rhMasterComponentId: component.rhMasterComponentId,
+      rhCounterSource: component.rhCounterSource,
+    }) : null;
+    for (const candidate of [...candidates, ...linkedCandidates, ...codeOnlyCandidates]) {
+      // A stale counter-source code can coexist with a valid link to another
+      // MASTER. Use the same resolver as completion before selecting audits.
+      const source = await resolveAuthoritativeRhComponent(
+        {
+          id: candidate.componentId,
+          cuuid: candidate.componentUuid,
+          vesselId: candidate.vesselId,
+          rhCounterType: candidate.counterType,
+          rhMasterComponentId: candidate.masterId,
+          rhCounterSource: candidate.counterSource,
+        },
+        async id => asRhRef(await this.getComponent(id)),
+        async (code, vesselId) => asRhRef(await this.getComponentByCode(code, vesselId)),
+        master.vesselId,
+      );
+      if (source?.cuuid === master.cuuid) eligibleJobIds.add(candidate.juuid);
+    }
+    for (const juuid of Array.from(eligibleJobIds)) {
+      try {
+        await db.transaction(async tx => {
+          const [job] = await tx.select().from(jobs).where(eq(jobs.juuid, juuid)).for('update');
+          if (!job?.lastDoneDate || job.lastDoneRH == null || job.nextDueRH == null) return;
+          // Read after obtaining the Job lock so concurrent audit refreshers
+          // cannot finish with an older snapshot than the preceding refresher.
+          const audits = await tx.select().from(runningHoursAudit)
+            .where(and(eq(runningHoursAudit.componentId, master.cuuid),
+              or(eq(runningHoursAudit.isDeleted, false), isNull(runningHoursAudit.isDeleted))));
+          const estimate = estimateRhDueDate(job.lastDoneDate, job.intervalRunningHour, audits);
+          const rate = estimate.averagePerDay == null ? null : String(estimate.averagePerDay);
+          if (job.rhEstimatedDueDate === estimate.dueDate
+            && job.rhEstimateBasis === estimate.basis
+            && (job.rhAveragePerDay == null ? null : Number(job.rhAveragePerDay))
+              === (rate == null ? null : Number(Number(rate).toFixed(6)))) return;
+          await tx.update(jobs).set({
+            rhEstimatedDueDate: estimate.dueDate,
+            rhAveragePerDay: rate,
+            rhEstimateBasis: estimate.basis,
+            updatedAt: new Date(),
+          }).where(eq(jobs.juuid, juuid));
+        });
+      } catch (err) {
+        console.error(`[RH estimate] Could not refresh Job ${juuid}:`, err);
+      }
+    }
   }
 
   async getEarliestAuditTimestamp(vesselId: string): Promise<Date | null> {
@@ -2631,6 +2770,28 @@ export class PostgresStorage {
       throw new Error(`Job ${id} not found`);
     }
     return result[0];
+  }
+
+  /** Atomic cycle-and-estimate write; retry against a fresh Job on a failed CAS. */
+  async updateJobIfRhCycleUnchanged(
+    id: string,
+    previous: Pick<Job, 'lastDoneDate' | 'lastDoneRH' | 'nextDueRH' | 'rhEstimatedDueDate' | 'rhAveragePerDay' | 'rhEstimateBasis'>,
+    data: Partial<InsertJob>,
+  ): Promise<Job | null> {
+    const db = await getDb();
+    const result = await db.update(jobs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(
+        eq(jobs.juuid, id),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+        sql`${jobs.lastDoneDate} IS NOT DISTINCT FROM ${previous.lastDoneDate ?? null}`,
+        sql`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${previous.lastDoneRH ?? null}`,
+        sql`${jobs.nextDueRH} IS NOT DISTINCT FROM ${previous.nextDueRH ?? null}`,
+        sql`${jobs.rhEstimatedDueDate} IS NOT DISTINCT FROM ${previous.rhEstimatedDueDate ?? null}`,
+        sql`${jobs.rhAveragePerDay} IS NOT DISTINCT FROM ${previous.rhAveragePerDay ?? null}`,
+        sql`${jobs.rhEstimateBasis} IS NOT DISTINCT FROM ${previous.rhEstimateBasis ?? null}`,
+      )).returning();
+    return result[0] ?? null;
   }
 
   async deleteJob(id: string): Promise<void> {
