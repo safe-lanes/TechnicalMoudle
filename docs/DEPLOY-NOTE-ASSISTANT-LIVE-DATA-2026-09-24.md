@@ -33,7 +33,7 @@ Verify after the first boot: `\d tenants` shows `ai_enabled`; `\d chatbot_intera
 | `ASSISTANT_SERVICE_SECRET` | Data API: locks manifest/execute to the shared assistant | This environment's own value, handed over by Ghazi/support; registered on the assistant under the same instance id |
 | `ASSISTANT_IDENTITY_SIGNING_KEY` | Signs the identity token the widget carries to the assistant | This environment's own key, registered on the assistant under the same instance id (handed over by Ghazi/support, never in chat or Git). Dev and production keys are different. |
 | `ASSISTANT_ALLOWED_ROLES` | Optional. Roles (verified token claim) allowed to use the assistant | Default `Sail Admin`. Comma-separated SAILERP role names to widen. |
-| `SAILERP_JWT_USER_CLAIMS` | Optional. Claim names for user id, role, user type in the SAILERP token | Default `id,role,userType`. Set ONLY if the genuine-session inspection (§6) shows different names. |
+| `SAILERP_JWT_USER_CLAIMS` | Optional. Claim names for user id, role, user type in the SAILERP token | Default `id,role,userType`. Dev inspection 25-Sep: the token has `id` and `userType` but NO role — the role is taken from `master_users` (synced SAILERP master data) by the verified user id. **Every assistant user must exist in `master_users` with a role**; check `select id, role, user_type from master_users where id='<user id>'`. |
 | `MASTER_DATABASE_URL`, `JWT_SECRET` | Already set on dev (multi-tenant) — unchanged | — |
 
 Not needed on ships.
@@ -77,7 +77,7 @@ container — installs, `remark-gfm` 4.0.1 and `jspdf` 4.2.1 resolve. New depend
 
 1. Log in to SAILERP (Sail Admin), open Technical. The chat button appears bottom-right. For a
    non-Sail-Admin user it does not appear, and a direct call to `/technical/api/assistant/token` returns 403.
-2. **Genuine-session inspection (owed since the pilot):** in DevTools → Network, pick any
+2. **Genuine-session inspection — DONE on dev 25-Sep-2026** (token claims: `id`, `userType`, `domain`; no `role` → role resolved from `master_users`). Kept for reference: in DevTools → Network, pick any
    `/technical/api/...` request, decode the Bearer payload locally in the console
    (`JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))`) and record ONLY the claim
    names, the `domain` and the expiry. Expected present: `domain`, user id, `role`, `userType`. Never paste
