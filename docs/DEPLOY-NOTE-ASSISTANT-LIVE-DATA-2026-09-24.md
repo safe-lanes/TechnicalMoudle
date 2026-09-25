@@ -34,6 +34,7 @@ Verify after the first boot: `\d tenants` shows `ai_enabled`; `\d chatbot_intera
 | `ASSISTANT_IDENTITY_SIGNING_KEY` | Signs the identity token the widget carries to the assistant | This environment's own key, registered on the assistant under the same instance id (handed over by Ghazi/support, never in chat or Git). Dev and production keys are different. |
 | `ASSISTANT_ALLOWED_ROLES` | Optional. Roles (verified token claim) allowed to use the assistant | Default `Sail Admin`. Comma-separated SAILERP role names to widen. |
 | `SAILERP_JWT_USER_CLAIMS` | Optional. Claim names for user id, role, user type in the SAILERP token | Default `id,role,userType`. Dev inspection 25-Sep: the token has `id` and `userType` but NO role — the role is taken from `master_users` (synced SAILERP master data) by the verified user id. **Every assistant user must exist in `master_users` with a role**; check `select id, role, user_type from master_users where id='<user id>'`. |
+| `ASSISTANT_ROLE_FALLBACK` | Optional. `profile` = when the login token has no role AND the user is not in `master_users`, accept the role from the browser profile (browser-trusted, same as the rest of the module) | Set `profile` on DEV for now (Ghazi, 25-Sep). Leave unset on production until master data is confirmed populated. |
 | `MASTER_DATABASE_URL`, `JWT_SECRET` | Already set on dev (multi-tenant) — unchanged | — |
 
 Not needed on ships.
