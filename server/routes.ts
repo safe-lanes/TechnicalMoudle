@@ -370,40 +370,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Phase 0 / P0.4 (defect D4): the approval matrix is office-owned config, synced shore→ship
-  // (ONE_WAY). Writes: office role (same guard as the other approval surfaces), shore instance
-  // only (a ship edit could never reach shore), zod-validated body, author stamped from the
-  // authenticated request. GET stays open: the matrix is read on ships too (Vessel Admin has the
-  // admin-approval-workflow view permission in the dev data).
-  const awcRowSchema = z.object({
-    moduleId: z.string().min(1),
-    subModuleId: z.string().min(1),
-    functionId: z.string().min(1),
-    variableName: z.string().min(1),
-    level1Enabled: z.boolean(),
-    level2Enabled: z.boolean(),
-  }).passthrough();
-  const awcPutSchema = z.object({ rows: z.array(awcRowSchema).min(1) });
-  app.put('/technical/api/admin/approval-workflow-config',
-    requireRole(['Office', 'PMS Admin', 'Sail Admin']),
-    async (req, res) => {
-      try {
-        const { isShipInstance } = await import("./modules/sync/syncRole");
-        if (await isShipInstance()) {
-          return res.status(403).json({ success: false, error: 'shore_only', message: 'The approval workflow matrix is configured on the shore server and synced to ships.' });
-        }
-        const parsed = awcPutSchema.safeParse(req.body);
-        if (!parsed.success) {
-          return res.status(400).json({ success: false, error: 'Invalid approval workflow config payload', details: parsed.error.errors });
-        }
-        const actor = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
-        const updated = await storage.upsertApprovalWorkflowConfig(parsed.data.rows, actor);
-        res.json({ success: true, data: updated });
-      } catch (err) {
-        console.error('[ApprovalWorkflowConfig] PUT error:', err);
-        res.status(500).json({ success: false, error: 'Failed to save approval workflow config' });
-      }
-    });
+  // 25-Sep-2026: RETIRED. The old Level 1 / Level 2 ticks no longer drive any approval —
+  // Technical and Defects approvals run on the approval engine only (Admin → Approval Workflow).
+  app.put('/technical/api/admin/approval-workflow-config', (_req, res) => {
+    res.status(410).json({ success: false, error: 'retired', message: 'The Level 1 / Level 2 approval settings are retired. Set up approval chains in Admin → Approval Workflow.' });
+  });
 
   const httpServer = createServer(app);
 

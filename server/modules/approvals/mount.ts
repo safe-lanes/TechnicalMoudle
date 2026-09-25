@@ -23,9 +23,21 @@ export async function mountTechnicalApprovals(app: Express): Promise<void> {
     console.log('🔏 Approval engine NOT mounted (ship instance — engine is shore-only, D-4)');
     return;
   }
-  // F6 (Q2): the Approval Engine builder is ADMIN-ONLY — config writes require an admin role
-  // (not any Office-typed user). Same role set as the menu + page guard (no three-way divergence).
-  const configGuard = requireRole([...APPROVAL_ADMIN_ROLES]);
+  // 25-Sep-2026 (Sahil: "as per Access Control"): config writes (save a chain, switch an action
+  // on/off) follow the Access Control EDIT permission of the module's Approval Workflow menu —
+  // technical → 'approval-workflow-pms', defects → 'approval-workflow-defects'. Roles with no
+  // Access Control rows are REFUSED (sensitive config); RBAC bypass roles (Sail Admin, PMS Admin)
+  // pass as everywhere else. Replaces the F6 fixed admin-role list.
+  const { requirePermission } = await import('../../middleware/permissions');
+  const MENU_FOR_MODULE: Record<string, string> = { technical: 'approval-workflow-pms', defects: 'approval-workflow-defects' };
+  const guards = new Map(Object.entries(MENU_FOR_MODULE).map(([mod, menu]) =>
+    [mod, requirePermission(menu, 'edit', { enforce: true, unconfigured: 'deny' })]));
+  const configGuard = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const moduleId = (req.body as any)?.scope?.moduleId;
+    const guard = typeof moduleId === 'string' ? guards.get(moduleId) : undefined;
+    if (!guard) return res.status(400).json({ error: `Unknown approval module '${String(moduleId)}'` });
+    return guard(req, res, next);
+  };
   const engine = startEmbedded(app, {
     cards: [technicalApprovalCard, defectsApprovalCard],  // broken card = refuse to start (fail-loud)
     provider: new AlsTenantRepositoryProvider(),

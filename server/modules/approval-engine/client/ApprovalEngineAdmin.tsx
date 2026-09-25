@@ -9,7 +9,14 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-interface Props { basePath?: string; }
+interface Props {
+  basePath?: string;
+  /** Host-controlled scope: when given, the builder edits exactly this scope and hides its own
+   *  Modules / Screens picker (the host renders its own tree). */
+  scope?: { moduleId: string; screenId: string; actionId?: string } | null;
+  /** View only: no add/save, and the enable switch is disabled (host permission = view). */
+  readOnly?: boolean;
+}
 type Tree = { modules: Array<{ moduleId: string; label: string; scopes: Array<{ screenId: string; actionId: string; label: string; classifications: { id: string; label: string }[] }> }> };
 type Role = { roleId: string; roleLabel: string };
 type StepRow = { roles: Role[]; rule: 'all' | 'any' };
@@ -30,7 +37,7 @@ const S: Record<string, React.CSSProperties> = {
   ok: { color: '#067647', marginTop: 8 },
 };
 
-export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: Props) {
+export default function ApprovalEngineAdmin({ basePath = '/approval-engine', scope: hostScope = null, readOnly = false }: Props) {
   const api = useCallback(async (method: string, path: string, body?: unknown) => {
     const res = await fetch(`${basePath}${path}`, {
       method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
@@ -57,6 +64,13 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
   const [approverNames, setApproverNames] = useState<Record<string, { names: string[]; vesselScoped: boolean }>>({});
 
   useEffect(() => { api('GET', '/registry').then(setTree).catch((e) => setMsg({ err: String(e.message) })); }, [api]);
+  const hostKey = hostScope ? `${hostScope.moduleId}|${hostScope.screenId}/${hostScope.actionId ?? ''}` : '';
+  useEffect(() => {
+    if (!hostScope) return;
+    setModuleId(hostScope.moduleId);
+    setScopeKeySel(`${hostScope.screenId}/${hostScope.actionId ?? ''}`);
+    setClassification('');
+  }, [hostKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mod = useMemo(() => tree?.modules.find((m) => m.moduleId === moduleId), [tree, moduleId]);
   const scope = useMemo(() => mod?.scopes.find((s) => `${s.screenId}/${s.actionId}` === scopeKeySel), [mod, scopeKeySel]);
@@ -135,8 +149,9 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
   };
 
   return (
-    <div style={S.page}>
-      <div style={S.col}>
+    <div style={hostScope ? { ...S.page, padding: 0 } : S.page}>
+      {hostScope && !scope && tree && <div style={S.err}>This approval action is not registered with the approval engine.</div>}
+      {!hostScope && <div style={S.col}>
         <div style={S.h}>Modules</div>
         {tree?.modules.map((m) => (
           <div key={m.moduleId} style={{ ...S.item, ...(m.moduleId === moduleId ? S.sel : {}) }}
@@ -155,14 +170,14 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
             );
           })}
         </>)}
-      </div>
+      </div>}
 
       {scope && (
         <div style={{ ...S.col, flex: 1 }}>
           <div style={S.row}>
             <div style={S.h}>{scope.label}</div>
             <label style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input type="checkbox" checked={enabled} onChange={toggleEnabled} /> Enabled for this tenant
+              <input type="checkbox" checked={enabled} onChange={toggleEnabled} disabled={readOnly} /> Enabled for this tenant
             </label>
           </div>
           <div style={S.row}>
@@ -195,7 +210,7 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
                 </>)}
               </div>
             ))}
-            <div style={S.row}>
+            {!readOnly && <div style={S.row}>
               <button style={S.btn} onClick={addRow}>+ Add step</button>
               <button
                 style={{ ...S.btn, ...S.primary, ...(rows.some((r) => r.roles.length > 0) ? {} : S.disabled) }}
@@ -203,7 +218,8 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine' }: P
                 onClick={save}
                 title="Save as a new active version"
               >✓ Save workflow</button>
-            </div>
+            </div>}
+            {readOnly && <div style={{ color: '#667085', fontSize: 13, marginBottom: 8 }}>View only — you do not have permission to change this approval workflow.</div>}
             {msg.err && <div style={S.err}>{msg.err}</div>}
             {msg.ok && <div style={S.ok}>{msg.ok}</div>}
 

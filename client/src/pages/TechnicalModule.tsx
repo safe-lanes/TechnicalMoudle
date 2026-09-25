@@ -43,7 +43,6 @@ import SyncConflictReview from "./admin/SyncConflictReview";
 import SyncProvisioning from "./admin/SyncProvisioning";
 import SyncFleetOverview from "./admin/SyncFleetOverview";
 import ApprovalWorkflow from "./admin/ApprovalWorkflow";
-import ApprovalEngineAdminPage from "./admin/ApprovalEngineAdminPage";
 // ====== NOON REPORT MODULE — START (remove to disable) ======
 import NoonEntryForm from "./noon-report/NoonEntryForm";
 import ReportHistory from "./noon-report/ReportHistory";
@@ -60,7 +59,6 @@ export const TechnicalModule = () => {
   const { isSailAdmin, isVessel } = useUIRole();
   const { currentUser } = useAuth();
   // F6 (Q2): the Approval Engine builder is ADMIN-only — same role set as the menu + API guard.
-  const isApprovalEngineAdmin = ["PMS Admin", "Sail Admin", "Super Admin"].includes(currentUser?.role ?? "");
   const { canViewSidebarItem, status: permissionStatus } = usePermissions();
   
   // Derive state from URL
@@ -203,7 +201,7 @@ export const TechnicalModule = () => {
           ref={mainContentRef}
           className={`flex-1 min-h-0 ${isComponentsPage ? "overflow-hidden" : "overflow-auto"} ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}
         >
-          {(selectedMenuItem === "approval-engine" && !isApprovalEngineAdmin) || ((permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && !(selectedMenuItem === "approval-engine" && isApprovalEngineAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem)) ? (
+          {((permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem === "approval-engine" ? "approval-workflow" : selectedMenuItem)) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
                 <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
@@ -311,10 +309,9 @@ export const TechnicalModule = () => {
             <SyncFleetOverview />
           ) : selectedSubModule === "admin" && selectedMenuItem === "shipskart-catalogue" ? (
             <ShipskartCatalogue />
-          ) : selectedSubModule === "admin" && selectedMenuItem === "approval-workflow" ? (
+          ) : selectedSubModule === "admin" && (selectedMenuItem === "approval-workflow" || selectedMenuItem === "approval-engine") ? (
+            // 25-Sep-2026: "approval-engine" (retired menu entry) opens the combined screen for old links.
             <ApprovalWorkflow />
-          ) : selectedSubModule === "admin" && selectedMenuItem === "approval-engine" ? (
-            <ApprovalEngineAdminPage />
           ) : selectedSubModule === "admin" && selectedMenuItem === "fleet-component-editor" ? (
             <AddEditFleetComponent />
           ) : selectedSubModule === "admin" ? (

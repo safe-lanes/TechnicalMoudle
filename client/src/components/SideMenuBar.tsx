@@ -3,9 +3,6 @@ import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
-import { useAuth } from "@/contexts/AuthContext";
-// F6 (Q2): Approval Engine builder is ADMIN-ONLY — same role set as the page + API guard.
-const APPROVAL_ENGINE_ADMIN_ROLES = ["PMS Admin", "Sail Admin", "Super Admin"];
 import { VesselContext } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -122,8 +119,6 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   const [, setLocation] = useLocation();
   const { canViewSidebarItem } = usePermissions();
   const { isSailAdmin, isVessel } = useUIRole();
-  const { currentUser } = useAuth();
-  const isApprovalEngineAdmin = APPROVAL_ENGINE_ADMIN_ROLES.includes(currentUser?.role ?? "");
   const vesselCtx = useContext(VesselContext);
   const vesselId = vesselCtx?.vesselId ?? "";
   const { isShore } = useSyncInstanceInfo();
@@ -151,20 +146,12 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   if (subModule === "admin") {
     allMenuItems = [...allMenuItems, { id: "approval-workflow", label: "Approval Workflow", icon: Workflow }];
   }
-  // Phase 2 / W4 — the generic engine builder, ADMIN-only (F6/Q2: PMS/Sail/Super Admin), SHORE-only
-  // (the engine does not mount on ships). The legacy Approval Workflow screen stays until cutover.
-  if (subModule === "admin" && isShore && isApprovalEngineAdmin) {
-    allMenuItems = [...allMenuItems, { id: "approval-engine", label: "Approval Engine", icon: Workflow }];
-  }
+  // 25-Sep-2026: the separate "Approval Engine" entry is retired — its builder lives inside
+  // Admin → Approval Workflow (Sahil's combined screen), gated by Access Control like other menus.
   const menuItems = allMenuItems.filter((item) => {
     if (item.id === "access-control") return isSailAdmin;
     if (item.id === "audit-trail") return isSailAdmin;
     if (item.id === "retention-settings") return isSailAdmin;
-    // Approval Engine builder is ADMIN-only + shore-only — already enforced at add time above
-    // (isShore && isApprovalEngineAdmin). It has no adm_role_menu_access registry row, so the
-    // generic permission-map lookup below would resolve to no menu and hide it even from admins.
-    // Bypass it here; the add-condition is the gate. (E2E-1 fix; F6/Q2 tightened to admin-only)
-    if (item.id === "approval-engine") return true;
     return canViewSidebarItem(subModule, item.id);
   });
 

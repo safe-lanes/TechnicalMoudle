@@ -1,4 +1,13 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+/**
+ * Admin → Approval Workflow — ONE combined screen (25-Sep-2026, Sahil's "Technical – Approval
+ * Workflow UI" PDF). Left: the approval tree (PMS + Defects incl. Repeat Extension). Right top:
+ * the approval engine's chain editor for the selected action. Right bottom: approval
+ * diagnostics (always shown). Top: the approval-email status banner. The old Level 1 / Level 2
+ * ticks and the separate "Approval Engine" menu entry are retired. Access follows Access
+ * Control: view = the module's Approval Workflow menu, edit = its Edit permission (the server
+ * enforces the same on every save).
+ */
+import { useState, useMemo } from "react";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   ClipboardList,
@@ -11,23 +20,18 @@ import {
   ChevronRight,
   ChevronDown,
   FileText,
-  Pencil,
   Expand,
   Minimize2,
   Workflow,
   Bug,
   Search,
   CheckCircle2,
-  Loader2,
-  Save,
-  X,
+  Repeat,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
+import ApprovalEngineAdmin from "../../../../server/modules/approval-engine/client/ApprovalEngineAdmin";
+import { DefectApprovalDiagnosticsPanel, DefectApprovalSettingsPanel, EmailStatusBanner } from "./ApprovalAdminPanels";
 
 interface ApprovalFunctionNode {
   id: string;
@@ -43,6 +47,8 @@ interface SubModuleNode {
 
 interface ModuleNode {
   id: string;
+  /** The approval engine's module id for this tree module. */
+  engineModuleId: string;
   title: string;
   icon: React.ElementType;
   twoLevel?: boolean;
@@ -52,6 +58,7 @@ interface ModuleNode {
 const APPROVAL_MODULES: ModuleNode[] = [
   {
     id: "pms",
+    engineModuleId: "technical",
     title: "PMS",
     icon: Workflow,
     subModules: [
@@ -92,6 +99,7 @@ const APPROVAL_MODULES: ModuleNode[] = [
   },
   {
     id: "defects",
+    engineModuleId: "defects",
     title: "Defects",
     icon: Bug,
     twoLevel: true,
@@ -101,6 +109,12 @@ const APPROVAL_MODULES: ModuleNode[] = [
         title: "Extension",
         icon: AlertTriangle,
         functions: [{ id: "defects-extension", name: "Extension" }],
+      },
+      {
+        id: "defects-repeat-extension",
+        title: "Repeat Extension",
+        icon: Repeat,
+        functions: [{ id: "defects-repeat-extension", name: "Repeat Extension" }],
       },
       // Closure (Part C1) was REMOVED from the approval workflow (product decision,
       // 03-Sep-2026): it is a plain Master-only permission rule, not an approval chain.
@@ -116,19 +130,6 @@ const APPROVAL_MODULES: ModuleNode[] = [
   },
 ];
 
-const CONFIG_ROWS: Record<string, string[]> = {
-  "pms-components-cr":    ["Critical Equipment", "Normal Equipment"],
-  "pms-jobs-cr":          ["Critical Jobs", "Critical Equipment Jobs", "Normal Jobs"],
-  "pms-spares-cr":        ["Critical Spares", "Normal Spares"],
-  "pms-stores-cr":        ["Store Items"],
-  "pms-wo-postponement":     ["Critical WO", "Normal WO", "Critical Equipment WO"],
-  "pms-wo-re-postponement":  ["Critical WO", "Normal WO", "Critical Equipment WO"],
-  // Two-bucket model (product decision, 03-Sep-2026) — ids match the Defects card's
-  // classification ids exactly (component Criticality OR defect COC flag → first bucket).
-  "defects-extension":    ["Critical Equipment / COC Related", "Normal"],
-  "defects-verification": ["Critical Equipment / COC Related", "Normal"],
-};
-
 interface SelectedLeaf {
   moduleId: string;
   subModuleId: string;
@@ -136,82 +137,13 @@ interface SelectedLeaf {
 }
 
 export default function ApprovalWorkflow() {
-  const { toast } = useToast();
   const { canViewMenu, canEdit: canEditMenu, isConfigured } = usePermissions();
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set(["pms"]));
   const [expandedSubModules, setExpandedSubModules] = useState<Set<string>>(new Set());
   const [activeModuleId, setActiveModuleId] = useState<string>("pms");
   const [selected, setSelected] = useState<SelectedLeaf | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [checkboxState, setCheckboxState] = useState<Record<string, { level1: boolean; level2: boolean }>>({});
-  const savedCheckboxStateRef = useRef<Record<string, { level1: boolean; level2: boolean }>>({}); 
-
-  // Load config from server on mount
-  const { data: configData } = useQuery<{ success: boolean; data: Array<{
-    functionId: string;
-    variableName: string;
-    level1Enabled: boolean;
-    level2Enabled: boolean;
-  }> }>({
-    queryKey: ['/technical/api/admin/approval-workflow-config'],
-    staleTime: 30 * 60 * 1000,
-    retry: 2,
-  });
-
-  // Seed checkboxState from server data when it arrives
-  useEffect(() => {
-    if (!configData?.data) return;
-    const stateMap: Record<string, { level1: boolean; level2: boolean }> = {};
-    for (const row of configData.data) {
-      stateMap[`${row.functionId}:${row.variableName}`] = {
-        level1: row.level1Enabled,
-        level2: row.level2Enabled,
-      };
-    }
-    setCheckboxState(stateMap);
-  }, [configData]);
-
-  // Save mutation — sends all 20 rows in one batch PUT
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const rows: Array<{
-        moduleId: string;
-        subModuleId: string;
-        functionId: string;
-        variableName: string;
-        level1Enabled: boolean;
-        level2Enabled: boolean;
-      }> = [];
-      for (const mod of visibleModules) {
-        for (const sub of mod.subModules) {
-          for (const fn of sub.functions) {
-            for (const variableName of (CONFIG_ROWS[fn.id] || [])) {
-              const key = `${fn.id}:${variableName}`;
-              rows.push({
-                moduleId: mod.id,
-                subModuleId: sub.id,
-                functionId: fn.id,
-                variableName,
-                level1Enabled: checkboxState[key]?.level1 ?? false,
-                level2Enabled: checkboxState[key]?.level2 ?? false,
-              });
-            }
-          }
-        }
-      }
-      return apiRequest('PUT', '/technical/api/admin/approval-workflow-config', { rows });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/approval-workflow-config'] });
-      savedCheckboxStateRef.current = structuredClone(checkboxState);
-      setIsEditMode(false);
-      toast({ title: 'Saved', description: 'Approval workflow configuration saved.' });
-    },
-    onError: () => {
-      toast({ title: 'Error', description: 'Failed to save configuration.', variant: 'destructive' });
-    },
-  });
+  const { isShore } = useSyncInstanceInfo();
 
   // Permission-filtered module list. When RBAC is not yet configured
   // (isConfigured=false) all modules remain visible (no restriction).
@@ -317,23 +249,6 @@ export default function ApprovalWorkflow() {
     return { module: mod, subModule: sub, fn };
   }, [selected, visibleModules]);
 
-  const toggleCheckbox = (leafId: string, rowLabel: string, level: "level1" | "level2") => {
-    if (!isEditMode) return;
-    const key = `${leafId}:${rowLabel}`;
-    setCheckboxState((prev) => ({
-      ...prev,
-      [key]: {
-        level1: prev[key]?.level1 ?? false,
-        level2: prev[key]?.level2 ?? false,
-        [level]: !(prev[key]?.[level] ?? false),
-      },
-    }));
-  };
-
-  const getCheckbox = (leafId: string, rowLabel: string, level: "level1" | "level2"): boolean => {
-    return checkboxState[`${leafId}:${rowLabel}`]?.[level] ?? false;
-  };
-
   return (
     <div className="flex flex-col" style={{ height: "calc(100vh - 120px)" }}>
       {/* Title + Search */}
@@ -346,6 +261,7 @@ export default function ApprovalWorkflow() {
             Approval Workflow
           </h1>
         </div>
+        {isShore && <div className="mb-3"><EmailStatusBanner /></div>}
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -528,162 +444,57 @@ export default function ApprovalWorkflow() {
           </div>
         </div>
 
-        {/* ── RIGHT PANEL ── */}
+        {/* ── RIGHT PANEL: chain editor (top) + diagnostics (bottom, always shown) ── */}
         <div
-          className="flex-1 overflow-y-auto bg-white dark:bg-background border border-l-0 border-gray-200 dark:border-gray-700 rounded-r-lg"
+          className="flex-1 overflow-y-auto bg-white dark:bg-background border border-l-0 border-gray-200 dark:border-gray-700 rounded-r-lg flex flex-col"
           data-testid="approval-viewer-panel"
         >
-          {selectedDetails ? (
-            <div className="h-full flex flex-col">
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0 flex items-start justify-between gap-4">
-                <div>
-                  <h2
-                    className="text-lg font-semibold text-gray-900 dark:text-foreground"
-                    data-testid="text-selected-function-name"
-                  >
+          <div className="flex-shrink-0 min-h-[280px]">
+            {selectedDetails ? (
+              <div className="flex flex-col">
+                <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-foreground" data-testid="text-selected-function-name">
                     {selectedDetails.fn.name}
                   </h2>
-                  <p
-                    className="text-xs text-gray-500 dark:text-muted-foreground mt-0.5"
-                    data-testid="text-selected-submodule-name"
-                  >
-                    {selectedDetails.subModule.title}
+                  <p className="text-xs text-gray-500 dark:text-muted-foreground mt-0.5" data-testid="text-selected-submodule-name">
+                    {selectedDetails.module.title} — {selectedDetails.subModule.title}
                   </p>
                 </div>
-                {!isEditMode ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-shrink-0"
-                    onClick={() => {
-                      savedCheckboxStateRef.current = structuredClone(checkboxState);
-                      setIsEditMode(true);
-                    }}
-                    disabled={!canEditActiveModule}
-                    title={!canEditActiveModule ? "You do not have permission to edit this module's approval workflow" : undefined}
-                    data-testid="button-edit-approval-config"
-                  >
-                    <Pencil className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                ) : (
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setCheckboxState(structuredClone(savedCheckboxStateRef.current));
-                        setIsEditMode(false);
-                      }}
-                      disabled={saveMutation.isPending}
-                      data-testid="button-cancel-approval-config"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => saveMutation.mutate()}
-                      disabled={saveMutation.isPending}
-                      data-testid="button-save-approval-config"
-                    >
-                      {saveMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-1" />
-                      )}
-                      Save
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Checkbox grid */}
-              <div
-                className="flex-1 overflow-y-auto p-5"
-                data-testid="container-approval-function-body"
-              >
-                {(() => {
-                  const rows = CONFIG_ROWS[selectedDetails.fn.id];
-                  if (!rows || rows.length === 0) {
-                    return (
-                      <p className="text-sm text-gray-400" data-testid="text-no-config">
-                        No configuration available.
-                      </p>
-                    );
-                  }
-                  const leafId = selectedDetails.fn.id;
-                  return (
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide border-b border-r border-gray-200 dark:border-gray-700 w-[60%]">
-                            Variables
-                          </th>
-                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide border-b border-r border-gray-200 dark:border-gray-700 w-[20%]">
-                            Level 1
-                          </th>
-                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 w-[20%]">
-                            Level 2
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((rowLabel, idx) => (
-                          <tr
-                            key={rowLabel}
-                            className={`border border-gray-200 dark:border-gray-700 ${
-                              idx % 2 === 0
-                                ? "bg-white dark:bg-background"
-                                : "bg-gray-50/60 dark:bg-gray-900/20"
-                            }`}
-                            data-testid={`row-config-${leafId}-${idx}`}
-                          >
-                            <td className="px-4 py-3 text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
-                              {rowLabel}
-                            </td>
-                            <td className="px-4 py-3 text-center border-r border-gray-200 dark:border-gray-700">
-                              <div className="flex justify-center">
-                                <Checkbox
-                                  checked={getCheckbox(leafId, rowLabel, "level1")}
-                                  onCheckedChange={() => toggleCheckbox(leafId, rowLabel, "level1")}
-                                  disabled={!isEditMode}
-                                  data-testid={`checkbox-level1-${leafId}-${idx}`}
-                                />
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <div className="flex justify-center">
-                                <Checkbox
-                                  checked={getCheckbox(leafId, rowLabel, "level2")}
-                                  onCheckedChange={() => toggleCheckbox(leafId, rowLabel, "level2")}
-                                  disabled={!isEditMode}
-                                  data-testid={`checkbox-level2-${leafId}-${idx}`}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  );
-                })()}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full bg-gray-50/30 dark:bg-gray-900/20">
-              <div className="text-center px-6" data-testid="approval-placeholder">
-                <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mx-auto mb-5">
-                  <Workflow className="h-8 w-8 text-[#52baf3]" />
+                <div className="p-4" data-testid="container-approval-function-body">
+                  {isShore && selectedDetails.module.id === "defects" && (
+                    <DefectApprovalSettingsPanel readOnly={!canEditActiveModule} />
+                  )}
+                  {isShore ? (
+                    <ApprovalEngineAdmin
+                      basePath="/technical/api/approval-engine"
+                      scope={{ moduleId: selectedDetails.module.engineModuleId, screenId: selectedDetails.fn.id, actionId: "" }}
+                      readOnly={!canEditActiveModule}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-500" data-testid="text-approval-shore-only">
+                      Approval workflows are set up in the office. Requests raised on this vessel are approved ashore
+                      and the result reaches the vessel by sync.
+                    </p>
+                  )}
                 </div>
-                <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                  Select an Approval Function
-                </h3>
-                <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs leading-relaxed">
-                  Select an approval function from the tree on the left.
-                </p>
               </div>
+            ) : (
+              <div className="flex items-center justify-center h-full py-12 bg-gray-50/30 dark:bg-gray-900/20">
+                <div className="text-center px-6" data-testid="approval-placeholder">
+                  <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mx-auto mb-5">
+                    <Workflow className="h-8 w-8 text-[#52baf3]" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">Select an Approval Function</h3>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs leading-relaxed">
+                    Select an approval function from the tree on the left.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          {isShore && (
+            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4" data-testid="approval-diagnostics-section">
+              <DefectApprovalDiagnosticsPanel />
             </div>
           )}
         </div>

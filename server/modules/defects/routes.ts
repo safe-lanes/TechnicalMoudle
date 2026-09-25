@@ -37,16 +37,15 @@ router.get('/defects/count', asyncHandler(defectsCtrl.getDefectsCount));
 // GET  /defects/count/recurring — recurring defects count
 router.get('/defects/count/recurring', asyncHandler(defectsCtrl.getRecurringDefectsCount));
 
-// GET/PUT /defects/approval-settings — shore-side routing configuration
-router.get('/defects/approval-settings',
-  requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']),
-  asyncHandler(defectsCtrl.getDefectApprovalSettings));
-router.put('/defects/approval-settings',
-  requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']),
-  asyncHandler(defectsCtrl.updateDefectApprovalSettings));
-router.get('/defects/approval-diagnostics',
-  requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']),
-  asyncHandler(defectsCtrl.getDefectApprovalDiagnostics));
+// GET/PUT /defects/approval-settings — shore-side routing configuration.
+// 25-Sep-2026 (Sahil: "as per Access Control"): view/edit follow the Access Control permission of
+// Admin → Approval Workflow → Defects; roles with no Access Control rows are refused; bypass roles
+// (Sail Admin, PMS Admin) pass. Replaces the fixed admin-role list.
+const defectsApprovalView = requirePermission('approval-workflow-defects', 'view', { enforce: true, unconfigured: 'deny' });
+const defectsApprovalEdit = requirePermission('approval-workflow-defects', 'edit', { enforce: true, unconfigured: 'deny' });
+router.get('/defects/approval-settings', defectsApprovalView, asyncHandler(defectsCtrl.getDefectApprovalSettings));
+router.put('/defects/approval-settings', defectsApprovalEdit, asyncHandler(defectsCtrl.updateDefectApprovalSettings));
+router.get('/defects/approval-diagnostics', defectsApprovalView, asyncHandler(defectsCtrl.getDefectApprovalDiagnostics));
 
 // POST /defects — create new defect
 router.post('/defects', asyncHandler(defectsCtrl.createDefect));

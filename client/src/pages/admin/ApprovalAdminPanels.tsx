@@ -1,13 +1,13 @@
 /**
- * Phase 2 / W4 — routes the GENERIC engine admin screen (Sahil's builder) into Technical's
- * admin area. Office-only (menu hides it for vessel roles; the API refuses config writes for
- * non-office callers) and shore-only (the engine does not mount on ships). The legacy
- * ApprovalWorkflow screen stays untouched and reachable until cutover.
+ * Shared panels of the combined Admin → Approval Workflow screen (25-Sep-2026, Sahil's PDF):
+ * the approval-email status banner and the approval diagnostics panel. Formerly the separate
+ * "Approval Engine" admin page, which is removed — its builder now opens inside the
+ * Approval Workflow tree (ApprovalWorkflow.tsx).
  */
 import React from "react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ApprovalEngineAdmin from "../../../../server/modules/approval-engine/client/ApprovalEngineAdmin";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -50,10 +50,14 @@ type DefectApprovalDiagnostics = {
   returnedVerificationStillVerified: Array<{ requestUuid: string; defectId: string; defectReportId: string; vesselId: string; vesselName: string; finalizedAt: string; consequence: string }>;
 };
 
-function DefectApprovalDiagnosticsPanel() {
+export function DefectApprovalDiagnosticsPanel() {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Wait for the signed-in identity: the endpoint is permission-checked, and a request sent
+  // before the identity headers exist is refused (and not retried).
+  const { currentUser } = useAuth();
   const { data, isLoading, error } = useQuery<DefectApprovalDiagnostics>({
     queryKey: ["/technical/api/defects/approval-diagnostics"],
+    enabled: !!currentUser,
     staleTime: 60_000,
     retry: false,
   });
@@ -193,7 +197,7 @@ function UnresolvedApproversGroup({ rows }: { rows: DefectApprovalDiagnostics["u
 // F4: admin-visible email delivery status + the per-tenant ON/OFF toggle (mig 172). When
 // SES is unconfigured the notifier sends in-app only; this banner is the least-intrusive
 // place an admin actually looks (the Approval Engine screen) to see and control email.
-function EmailStatusBanner() {
+export function EmailStatusBanner() {
   const queryClient = useQueryClient();
   const { data } = useQuery<{ configured: boolean; mode: string; from: string | null; emailEnabled: boolean }>({
     queryKey: ["/technical/api/approvals/email-config"],
@@ -255,12 +259,68 @@ function EmailStatusBanner() {
   );
 }
 
-export default function ApprovalEngineAdminPage() {
+// 25-Sep-2026 — Sahil built the Defects approval settings API (0065/0066) with no screen. Shown on
+// the combined Approval Workflow screen when a Defects action is selected. Edit follows Access
+// Control (Approval Workflow → Defects); the server enforces the same.
+export function DefectApprovalSettingsPanel({ readOnly }: { readOnly: boolean }) {
+  const queryClient = useQueryClient();
+  const { currentUser } = useAuth();
+  const key = ["/technical/api/defects/approval-settings"];
+  const { data, error } = useQuery<{ longExtensionDays: number; showRejectedClosuresOnReport: boolean }>({
+    queryKey: key,
+    enabled: !!currentUser,
+    queryFn: async () => {
+      const res = await fetch("/technical/api/defects/approval-settings");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    retry: false,
+  });
+  const [days, setDays] = useState<string>("");
+  const [showRejected, setShowRejected] = useState<boolean | null>(null);
+  const effDays = days !== "" ? days : String(data?.longExtensionDays ?? "");
+  const effShow = showRejected ?? data?.showRejectedClosuresOnReport ?? false;
+  const save = useMutation({
+    mutationFn: async () => {
+      const n = Number(effDays);
+      if (!Number.isInteger(n) || n < 1 || n > 3650) throw new Error("Enter whole days between 1 and 3650.");
+      const res = await fetch("/technical/api/defects/approval-settings", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ long_extension_days: n, show_rejected_closures_on_report: effShow }),
+      });
+      if (!res.ok) throw new Error(res.status === 403 ? "You do not have permission to change these settings." : `Save failed (HTTP ${res.status})`);
+      return res.json();
+    },
+    onSuccess: () => { setDays(""); setShowRejected(null); queryClient.invalidateQueries({ queryKey: key }); },
+  });
+  if (error) return null; // no view permission → the box is simply not shown
+  if (!data) return null;
+  const dirty = effDays !== String(data.longExtensionDays) || effShow !== data.showRejectedClosuresOnReport;
   return (
-    <div>
-      <EmailStatusBanner />
-      <DefectApprovalDiagnosticsPanel />
-      <ApprovalEngineAdmin basePath="/technical/api/approval-engine" />
-    </div>
+    <section data-testid="defects-approval-settings"
+      style={{ margin: "12px 0", padding: "12px 14px", border: "1px solid #d0d5dd", borderRadius: 8, background: "#fff", fontSize: 13 }}>
+      <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#1e3a5f" }}>Defects approval settings</h3>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        An extension longer than
+        <input type="number" min={1} max={3650} value={effDays} disabled={readOnly}
+          onChange={(e) => setDays(e.target.value)} style={{ width: 80, padding: "2px 6px", border: "1px solid #d0d5dd", borderRadius: 4 }}
+          data-testid="input-long-extension-days" />
+        days (from the current target date) is treated as Critical Equipment / COC Related.
+      </label>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <input type="checkbox" checked={effShow} disabled={readOnly} onChange={(e) => setShowRejected(e.target.checked)}
+          data-testid="checkbox-show-rejected-closures" />
+        Show rejected closure attempts on the printed defect report
+      </label>
+      {!readOnly && (
+        <button onClick={() => save.mutate()} disabled={!dirty || save.isPending}
+          style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #2e90fa", background: dirty ? "#2e90fa" : "#fff", color: dirty ? "#fff" : "#667085", cursor: dirty ? "pointer" : "not-allowed" }}
+          data-testid="button-save-defect-approval-settings">
+          {save.isPending ? "Saving…" : "Save settings"}
+        </button>
+      )}
+      {save.isError && <span style={{ color: "#b42318", marginLeft: 8 }}>{(save.error as Error).message}</span>}
+      {save.isSuccess && !dirty && <span style={{ color: "#067647", marginLeft: 8 }}>Saved.</span>}
+    </section>
   );
 }

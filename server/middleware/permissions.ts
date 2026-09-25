@@ -33,7 +33,7 @@ import type { Response, NextFunction } from "express";
 import { getRbacIdentity, RBAC_BYPASS_ROLES, type AuthenticatedRequest } from "./auth";
 import { storage } from "../storage";
 
-export type PermissionAction = "create" | "edit" | "delete";
+export type PermissionAction = "view" | "create" | "edit" | "delete";
 
 export interface RequirePermissionOptions {
   /** false (default) = pass-through (pre-Phase-0 runtime behaviour); true = evaluate the forwarded role. */
@@ -42,7 +42,8 @@ export interface RequirePermissionOptions {
   unconfigured?: "allow" | "deny";
 }
 
-const ACTION_FLAG: Record<PermissionAction, "canCreate" | "canEdit" | "canDelete"> = {
+const ACTION_FLAG: Record<PermissionAction, "canView" | "canCreate" | "canEdit" | "canDelete"> = {
+  view: "canView", // 25-Sep-2026: additive — read endpoints gated by the menu's view flag
   create: "canCreate",
   edit: "canEdit",
   delete: "canDelete",

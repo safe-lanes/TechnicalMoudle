@@ -212,16 +212,15 @@ describe('Defects approval API controllers', () => {
 });
 
 describe('Defects approval API route guards', () => {
-  it('registers admin role guards and vessel access on diagnostics', async () => {
+  it('registers Access Control guards (25-Sep-2026) and vessel access on diagnostics', async () => {
     vi.resetModules();
     vi.doMock('../../../middleware/auth', () => ({
       requireRole: mocks.requireRole,
       requireVesselAccess: mocks.requireVesselAccess,
     }));
     vi.doMock('../../shared/middleware', () => ({ asyncHandler: (handler: any) => handler }));
-    vi.doMock('../../../middleware/permissions', () => ({
-      requirePermission: vi.fn(() => (_req: any, _res: any, next: () => void) => next()),
-    }));
+    const requirePermission = vi.fn(() => (_req: any, _res: any, next: () => void) => next());
+    vi.doMock('../../../middleware/permissions', () => ({ requirePermission }));
 
     const { default: router } = await import('../routes');
     const stack = (router as any).stack;
@@ -244,8 +243,11 @@ describe('Defects approval API route guards', () => {
     expect(chain).toBeDefined();
     expect(diagnostics).toBeDefined();
     expect(closureHistory).toBeDefined();
-    expect(mocks.requireRole).toHaveBeenCalledTimes(3);
-    expect(mocks.requireRole).toHaveBeenCalledWith(['PMS Admin', 'Sail Admin', 'Super Admin']);
+    // Settings + diagnostics follow Access Control of Admin → Approval Workflow → Defects
+    // (view for reads, edit for the settings save), refusing roles with no Access Control rows.
+    expect(mocks.requireRole).not.toHaveBeenCalledWith(['PMS Admin', 'Sail Admin', 'Super Admin']);
+    expect(requirePermission).toHaveBeenCalledWith('approval-workflow-defects', 'view', { enforce: true, unconfigured: 'deny' });
+    expect(requirePermission).toHaveBeenCalledWith('approval-workflow-defects', 'edit', { enforce: true, unconfigured: 'deny' });
     expect(diagnostic.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
     expect(chain.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
     expect(closureHistory.route.stack.some((layer: any) => layer.handle === mocks.requireVesselAccess)).toBe(true);
