@@ -5,7 +5,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch --clear-screen=false server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "npm run check:filenames && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "check:filenames": "node scripts/check-tracked-filenames.cjs",
     "build:micro-frontend": "vite build --mode micro-frontend",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",

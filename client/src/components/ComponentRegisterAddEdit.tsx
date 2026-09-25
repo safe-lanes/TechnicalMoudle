@@ -1563,7 +1563,16 @@ export default function ComponentRegisterAddEdit({
                       <option value="Yes">Yes</option>
                     </select>
                   </div>
-                  <div className="sm:col-span-1 lg:col-span-2 xl:col-span-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Serial No.</label>
+                    <Input
+                      value={componentData.serialNo}
+                      onChange={(e) => handleFieldChange('serialNo', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-serial-no"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Notes / Technical Information</label>
                     <Textarea
                       value={componentData.notes}
@@ -1605,10 +1614,6 @@ export default function ComponentRegisterAddEdit({
                     <div>
                       <label className="text-xs font-medium text-gray-600 mb-1 block">Model Code</label>
                       <Input value={componentData.modelCode} onChange={(e) => handleFieldChange('modelCode', e.target.value)} className="h-8 text-sm" data-testid="input-model-code" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 mb-1 block">Serial No</label>
-                      <Input value={componentData.serialNo} onChange={(e) => handleFieldChange('serialNo', e.target.value)} className="h-8 text-sm" data-testid="input-serial-no" />
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 mb-1 block">Is Active<span className="text-red-500 ml-0.5">*</span></label>

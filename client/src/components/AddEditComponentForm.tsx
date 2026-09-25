@@ -1274,7 +1274,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                           </div>
 
-                          {/* Row 6: Class Item and Notes / Technical Information */}
+                          {/* Row 6: Class Item, Serial No., and Notes / Technical Information */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Class Item</label>
@@ -1289,7 +1289,17 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 <option value="No">No</option>
                               </select>
                             </div>
-                            <div className="sm:col-span-1 lg:col-span-3">
+                            <div>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Serial No.</label>
+                              <input
+                                type="text"
+                                value={componentData.serialNo}
+                                onChange={(e) => handleFieldChange('serialNo', e.target.value)}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                data-testid="input-serial-no"
+                              />
+                            </div>
+                            <div className="sm:col-span-2 lg:col-span-2">
                               <label className="text-xs font-medium text-gray-600 block mb-1">Notes / Technical Information</label>
                               <textarea
                                 value={componentData.notes}
@@ -1311,7 +1321,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             ["fleetEquipmentName", "Fleet Component Name", "input-fleet-equipment-name"],
                             ["makerCode", "Maker Code", "input-maker-code"],
                             ["modelCode", "Model Code", "input-model-code"],
-                            ["serialNo", "Serial No.", "input-serial-no"],
                           ].map(([key, label, testId]) => (
                             <div key={key}>
                               <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>

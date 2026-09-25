@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRunningHoursWorkOrderSnapshots,
   findAttemptedWorkOrderSnapshotFields,
+  getWorkOrderListDueHour,
   isImmutableWorkOrderSnapshotField,
   resolveWorkOrderPartADates,
   shouldApplySyncedWorkOrderSnapshot,
@@ -181,6 +182,27 @@ describe('Work Order Part A snapshot dates', () => {
       cycleDueRhSnapshot: null,
       nextDueReading: '9700',
     }).nextDueRH).toBe('9700');
+  });
+
+  it('uses the form snapshot order for the Work Orders list Due Hour', () => {
+    const workOrder = {
+      maintenanceBasis: 'Running Hours',
+      dueRhSnapshot: '1000.00',
+      cycleDueRhSnapshot: '1100.00',
+      nextDueReading: '1200',
+    };
+    expect(getWorkOrderListDueHour(workOrder)).toBe(1000);
+    expect(getWorkOrderListDueHour({ ...workOrder, dueRhSnapshot: null })).toBe(1100);
+    expect(getWorkOrderListDueHour({
+      ...workOrder, dueRhSnapshot: null, cycleDueRhSnapshot: null,
+    })).toBe(1200);
+    expect(getWorkOrderListDueHour({
+      ...workOrder, dueRhSnapshot: null, cycleDueRhSnapshot: null, nextDueReading: null,
+    })).toBeNull();
+    expect(getWorkOrderListDueHour({ ...workOrder, dueRhSnapshot: 'not a reading' })).toBeNull();
+    expect(getWorkOrderListDueHour({ ...workOrder, dueRhSnapshot: '0' })).toBe(0);
+    expect(getWorkOrderListDueHour({ ...workOrder, maintenanceBasis: 'Calendar' })).toBeNull();
+    expect(getWorkOrderListDueHour({ ...workOrder, maintenanceBasis: 'Dual Frequency' })).toBe(1000);
   });
 
   it('freezes a linked Job cycle for bulk-created RH Work Orders', () => {

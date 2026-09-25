@@ -302,6 +302,8 @@ These rules exist because past agent runs damaged the repository. Follow them ex
 ## 2. Files you must not create or commit
 
 - No stray files in the repository root. Only commit files the task actually needs.
+- Never create or commit zero-byte placeholder files or a file named after a function instead of editing the function's actual source module. Confirm the intended file path before creating a file.
+- Never create or commit filenames with leading or trailing whitespace. An invisible trailing space in a tracked filename can prevent Windows checkout.
 - Never commit `.env`, secrets, tokens, or API keys.
 - Never commit build output (`dist/`), `node_modules/`, screenshots, or scratch files.
 - The jspdf stub files (`client/src/lib/stubs/jspdf*.ts` and the matching alias in `vite.config.ts`) exist ONLY to make this workspace build. They are removed when code is merged to the main branch. Do not extend, rely on, or reference them in new code.
@@ -321,7 +323,7 @@ These rules exist because past agent runs damaged the repository. Follow them ex
 ## 5. Before every commit
 
 1. Run `npx tsc --noEmit` — the error count must not increase (current baseline: 290).
-2. Run `git status` — confirm ONLY the files your task touched are staged. Unstage anything else, especially package files.
+2. Run `git status` — confirm ONLY the files your task touched are staged. Inspect new/staged filenames and sizes for stray empty files and invisible whitespace (use `ls -lb` to reveal spaces). Unstage anything else, especially package files.
 3. Write a commit message that states WHAT changed and WHY, and lists any migration number used.
 
 ## 6. When unsure

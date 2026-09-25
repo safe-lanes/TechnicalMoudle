@@ -676,8 +676,26 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {/* Notes / Technical Information uses the remaining three columns beside Class Item. */}
-        <div className="sm:col-span-1 lg:col-span-3">
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.41"><Marker id="B7.A.41" /> Serial No.</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.serialNo}
+              onChange={(e) => handleFieldChange('serialNo', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('serialNo') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="B7.A.42"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="B7.A.42">
+              <Marker id="B7.A.42" /> {componentData.serialNo}
+            </div>
+          )}
+        </div>
+        {/* Notes / Technical Information follows Class Item and Serial No. */}
+        <div className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.47"><Marker id="B7.A.47" /> Notes / Technical Information</label>
           {isChangeMode ? (
             <textarea
@@ -722,7 +740,7 @@ const FleetComponentInformationSection: React.FC<{ selectedComponent: ComponentN
     const c: any = selectedComponent || {};
     setData({
       fleetEquipmentCode: c.fleetEquipmentCode || "", fleetEquipmentName: c.fleetEquipmentName || "",
-      makerCode: c.makerCode || "", modelCode: c.modelCode || "", serialNo: c.serialNo || "",
+      makerCode: c.makerCode || "", modelCode: c.modelCode || "",
       isActive: toYesNo(c.isActive, "Yes"), isParent: toYesNo(c.isParent),
       vesselName: vessels.find(v => v.id === (c.vesselId || c.vesselCode) || v.code === (c.vesselId || c.vesselCode))?.name || "",
     });
@@ -742,7 +760,6 @@ const FleetComponentInformationSection: React.FC<{ selectedComponent: ComponentN
       {field("fleetEquipmentName", "Fleet Component Name", "B7.B.2", { restricted: true })}
       {field("makerCode", "Maker Code", "B7.B.3", { restricted: true, readOnly: true })}
       {field("modelCode", "Model Code", "B7.B.4", { restricted: true })}
-      {field("serialNo", "Serial No.", "B7.B.5")}
       {field("isActive", "Is Active", "B7.B.6")}
       {field("isParent", "Is Parent", "B7.B.7", { restricted: true })}
       {field("vesselName", "Vessel Name", "B7.B.8", { restricted: true })}
