@@ -113,8 +113,14 @@ async function main() {
     r.status === 200 && idH.userId === 'pilot-super-1' && idH.userType === 'Office', `${r.status} userId=${idH.userId} userType=${idH.userType} role=${idH.role}`);
   r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1'), {});
   record('optionA: no x-user-* headers at all, valid JWT → 200 (headers not needed)', r.status === 200, `${r.status}`);
-  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1', {}, JWT_SECRET, { userType: 'Office' }), office);
-  record('optionA: JWT without role claim, headers carry a role → 403, no header fallback', r.status === 403 && /missing required claim/.test(r.text) && /role/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  // Option B (25-Sep-2026): the GENUINE SAILERP token has no role claim → role from the tenant's synced master data by verified id
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1', {}, JWT_SECRET, { userType: 'Office' }), identityHeaders('pilot-super-1', 'Sail Admin', 'Office'));
+  const idM = r.body?.token ? decodeIdentity(r.body.token) : {};
+  record('optionB: JWT without role claim, user present in master_users → 200, role from master data', r.status === 200 && idM.role === 'Sail Admin', `${r.status} role=${idM.role ?? r.body?.error}`);
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-user-1', {}, JWT_SECRET, { userType: 'Office' }), identityHeaders('u-user-1', 'Sail Admin', 'Office'));
+  record("optionB: JWT without role, master data says 'User' although the header says Sail Admin → 403 not permitted", r.status === 403 && /not permitted/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  r = await mint(BASE, sailerpJwt(DOMAIN_A, 'nobody-9', {}, JWT_SECRET, { userType: 'Office' }), identityHeaders('nobody-9', 'Sail Admin', 'Office'));
+  record('optionB: JWT without role, user NOT in master data, header claims Sail Admin → 403 (no header fallback)', r.status === 403 && /master data/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
   r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1', {}, JWT_SECRET, { role: 'Sail Admin' }), office);
   record('optionA: JWT without userType claim → 403', r.status === 403 && /userType/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
   r = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-user-1', {}, JWT_SECRET, { role: 'User', userType: 'Office' }), identityHeaders('u-user-1', 'Sail Admin', 'Office'));
