@@ -104,7 +104,7 @@ type RejectedClosureAttempt = {
   approvalRequestUuid?: string | null;
 };
 
-function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt[] }) {
+function RejectedClosureHistory({ attempts, attachmentNames = {} }: { attempts: RejectedClosureAttempt[]; attachmentNames?: Record<string, string> }) {
   const historyProjection = projectRejectedClosureHistory(attempts);
   const orderedAttempts = historyProjection.attempts;
   const [expanded, setExpanded] = useState<Set<string>>(
@@ -185,7 +185,14 @@ function RejectedClosureHistory({ attempts }: { attempts: RejectedClosureAttempt
                       <span className="text-xs text-slate-500">Closure files</span>
                       <ul className="mt-1 list-inside list-disc">
                         {fields.closureFiles.map((file, fileIndex) => (
-                          <li key={`${file}-${fileIndex}`}><a className="break-all text-blue-700 underline" href={file} target="_blank" rel="noreferrer">{file}</a></li>
+                          <li key={`${file}-${fileIndex}`}>
+                            {/* 25-Sep-2026 (Sahil E10): never render a stored string straight into href.
+                                Closure files are attachment ids → show the attachment name; only an
+                                http(s) address is a link. */}
+                            {/^https?:\/\//i.test(file)
+                              ? <a className="break-all text-blue-700 underline" href={file} target="_blank" rel="noopener noreferrer">{file}</a>
+                              : <span className="break-all">{attachmentNames[file] ?? file}</span>}
+                          </li>
                         ))}
                       </ul>
                     </div>
@@ -2565,7 +2572,7 @@ export default function DefectFormWizard({
                   <div className="space-y-6">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C1. Closeout</h3>
                     {closureHistory.data && closureHistory.data.length > 0 && (
-                      <RejectedClosureHistory attempts={closureHistory.data} />
+                      <RejectedClosureHistory attempts={closureHistory.data} attachmentNames={Object.fromEntries(fileAttachments.map((a) => [a.id, a.name]))} />
                     )}
                     {hasPendingExtensionRequest && isMasterRank && (
                       <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c1-extension-pending-warning">

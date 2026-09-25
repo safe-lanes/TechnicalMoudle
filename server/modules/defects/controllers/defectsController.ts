@@ -451,6 +451,7 @@ export async function deleteDefectAttachment(req: Request, res: Response) {
     if (error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
     }
+    if (error.statusCode === 409) return res.status(409).json({ error: error.message, code: error.code });
     res.status(500).json({ error: "Failed to delete defect attachment" });
   }
 }
@@ -485,13 +486,11 @@ export async function linkDefects(req: Request, res: Response) {
 
 // ── PATCH /defects/:id/close ──
 
-export async function closeDefect(req: Request, res: Response) {
-  try {
-    const defect = await defectsService.closeDefect(req.params.id, req.body, defectActor(req));
-    res.json(defect);
-  } catch (error: any) {
-    return sendDefectError(res, error, 'Failed to close defect');
-  }
+// 25-Sep-2026 (Sahil E11 / Q12): RETIRED. It wrote the legacy closedBy/closedOn pair and set
+// status 'Closed' directly — bypassing Part C1 closeout and the C2 verification approval. No
+// screen calls it (the '/defects/close/:id' page uses the defect form → PATCH /defects/:id).
+export async function closeDefect(_req: Request, res: Response) {
+  res.status(410).json({ error: 'retired', message: 'Close a defect through the defect form (Part C1 Closeout by the Master), which starts the verification approval.' });
 }
 
 // ── POST /defects/reports/:reportKey ──

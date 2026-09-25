@@ -220,6 +220,33 @@ async function cleanup() {
   check('the table checkpoint advanced again (table did not fail the cycle)', !!cp && new Date(cp.last_checkpoint).getFullYear() > 2000, JSON.stringify(cp));
   check('SHIP: still exactly one, unchanged row', shipSql(`SELECT count(*) FROM defect_closure_history WHERE defect_duuid='${d3.duuid}'`) === '1');
 
+  hr('EV. closure evidence (Sahil E10/E11, 25-Sep): uploaded files only, protected once closed');
+  const att = (id: string, name: string) => ({ id, name, type: 'image/png', size: 3, data: 'data:image/png;base64,AAA', uploadedAt: new Date().toISOString() });
+  const dEv = await newShipDefect('evidence', T0);
+  await sync('EV-create');
+  const sEv = await shoreId(dEv.duuid);
+  check('shore: attachments added before closure', (await call(SHORE, 'PATCH', `/defects/${sEv}`, { attachments: [att('ev-1', 'rectified.png'), att('ev-2', 'old.png')] }, OFFICER)).status < 300);
+  const badRef = await call(SHORE, 'PATCH', `/defects/${sEv}`, { closureFiles: ['https://example.com/x.png'] }, MASTER);
+  check('closure file that is not an uploaded attachment → 400', badRef.status === 400 && /uploaded to this defect/.test(badRef.json?.error ?? ''));
+  check('shore: before closure an attachment can still be removed', (await call(SHORE, 'PATCH', `/defects/${sEv}`, { attachments: [att('ev-1', 'rectified.png')] }, OFFICER)).status < 300);
+  check('shore: Master closes the defect (C1), closure file = uploaded attachment id',
+    (await call(SHORE, 'PATCH', `/defects/${sEv}`, { ...c1, closureFiles: ['ev-1'] }, MASTER)).status < 300);
+  const rm = await call(SHORE, 'PATCH', `/defects/${sEv}`, { attachments: [] }, OFFICER);
+  check('closed defect: removing its evidence → 409 CLOSURE_EVIDENCE_PROTECTED', rm.status === 409 && /cannot be removed/.test(rm.json?.error ?? ''));
+  const reqEv = (await engineReqs(dEv.duuid)).find((r: any) => r.screen_id === 'defects-verification' && r.status === 'pending');
+  check('verification chain started by the shore closure', !!reqEv);
+  await call(SHORE, 'POST', `/approval-engine/requests/${reqEv?.requuid}/decide`, { decision: 'reject', remarks: 'photo unclear' }, APPROVER);
+  const histEv = await shoreSql(`SELECT closure_files FROM defect_closure_history WHERE defect_duuid=$1`, [dEv.duuid]);
+  check('rejection history records the evidence ids', histEv.length === 1 && JSON.stringify(histEv[0].closure_files) === '["ev-1"]', JSON.stringify(histEv));
+  const rm2 = await call(SHORE, 'PATCH', `/defects/${sEv}`, { attachments: [att('ev-3', 'new.png')] }, OFFICER);
+  check('reopened defect: evidence referenced by the rejection still cannot be removed → 409', rm2.status === 409);
+  check('reopened defect: new evidence can be added alongside', (await call(SHORE, 'PATCH', `/defects/${sEv}`, { attachments: [att('ev-1', 'rectified.png'), att('ev-3', 'new.png')] }, OFFICER)).status < 300);
+  const old = await call(SHORE, 'PATCH', `/defects/${sEv}`, { closedOn: '2020-01-01', closedBy: 'someone' }, MASTER);
+  const oldRow = (await shoreSql(`SELECT closed_on, closed_by FROM defects WHERE duuid=$1`, [dEv.duuid]))[0];
+  check('old closedBy/closedOn are no longer written', old.status < 300 && oldRow.closed_on !== '2020-01-01' && oldRow.closed_by !== 'someone', JSON.stringify(oldRow));
+  const legacy = await call(SHORE, 'PATCH', `/defects/${sEv}/close`, { closureComment: 'x', actionTakenRequested: 'y', targetCloseDate: T0, dateCompleted: iso(-1) }, MASTER);
+  check('legacy close route retired → 410', legacy.status === 410);
+
   hr('cleanup (shore approval rows, users, chains)');
   await cleanup();
   console.log(`\nRESULT: ${passes} passed, ${fails} failed`);

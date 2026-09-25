@@ -675,6 +675,7 @@ export interface IStorage {
   
   // Defect Attachments methods
   getDefectAttachments(defectId: string): Promise<DefectAttachment[]>;
+  getDefectAttachmentById(id: number): Promise<DefectAttachment | undefined>;
   createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment>;
   deleteDefectAttachment(id: number): Promise<void>;
   
@@ -685,7 +686,6 @@ export interface IStorage {
   linkDefects(defectId: string, linkedDefectIds: string[]): Promise<Defect>;
   
   // Defect Closure methods
-  closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect>;
   
   // Recurring Defects methods
   getRecurringDefects(filters?: { windowMonths?: number; minOccurrences?: number; hasCoc?: boolean; equipmentKey?: string }): Promise<RecurringDefect[]>;

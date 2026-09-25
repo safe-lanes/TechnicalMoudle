@@ -359,7 +359,12 @@ export async function reopenDefectAfterVerificationReturnTx(
     closureComment: current.closureComment,
     closedBy: current.closedBy,
     closedOn: current.closedOn,
-    closureFiles: current.closureFiles,
+    // 25-Sep-2026 (Sahil E10): the live form keeps C1 evidence in defects.attachments (not
+    // closure_files), so a rejected closure recorded an empty file list. Record the ids of the
+    // C1 attachments the office rejected; those ids are then protected from deletion.
+    closureFiles: (Array.isArray(current.closureFiles) && current.closureFiles.length > 0)
+      ? current.closureFiles
+      : (Array.isArray(current.attachments) ? (current.attachments as any[]).map((a: any) => a?.id).filter((id: any) => typeof id === 'string' && id.length > 0) : []),
     rejectedByUserUuid: input.rejectedByUserUuid,
     rejectedByName: input.rejectedByName,
     rejectedByPosition: input.rejectedByPosition,
@@ -5349,41 +5354,6 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async closeDefect(defectId: string, closure: {
-    closedBy: string;
-    closureComment?: string;
-    closureFiles?: string[];
-  }): Promise<Defect> {
-    const db = await getDb();
-    // Fetch existing row for old values (needed for future sync field logging)
-    const existingDefect = await this.getDefect(defectId);
-    if (!existingDefect) {
-      throw new Error(`Defect ${defectId} not found`);
-    }
-
-    const result = await db.update(defects)
-      .set({
-        status: 'Closed',
-        closedBy: closure.closedBy,
-        closedOn: new Date().toISOString(),
-        closureComment: closure.closureComment,
-        closureFiles: closure.closureFiles,
-        dateCompleted: new Date().toISOString().split('T')[0],
-        updatedAt: new Date(),
-      })
-      .where(eq(defects.duuid, existingDefect.duuid))
-      .returning();
-
-    if (!result[0]) {
-      throw new Error(`Defect ${defectId} not found`);
-    }
-
-    // Sync field logging — close UPDATE
-    try { await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, existingDefect, result[0], closure.closedBy); } catch (e) { console.error('[FieldLogger] defect close:', e); }
-
-    return result[0];
-  }
-
   // ============= MODULE 9: DEFECT ACTIONS =============
 
   async getDefectActions(defectId: string): Promise<DefectAction[]> {
@@ -5462,6 +5432,11 @@ export class PostgresStorage {
       try { await FileSyncProcessor.queueFileForSync('defect_attachments', created.datuuid, created.url, created.filename, null, null); } catch (e) { console.error('[FileSyncQueue] defectAttachment:', e); }
     }
     return created;
+  }
+
+  async getDefectAttachmentById(id: number): Promise<DefectAttachment | undefined> {
+    const db = await getDb();
+    return (await db.select().from(defectAttachments).where(eq(defectAttachments.id, id)).limit(1))[0];
   }
 
   async deleteDefectAttachment(id: number): Promise<void> {

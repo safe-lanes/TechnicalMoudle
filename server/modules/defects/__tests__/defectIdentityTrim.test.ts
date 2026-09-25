@@ -19,3 +19,16 @@ describe('trimDefectIdentityFields', () => {
     expect(trimDefectIdentityFields(body)).toBe(body);
   });
 });
+
+// Sahil E11 / Q12 (25-Sep-2026): the older closure fields are no longer written.
+import { dropRetiredClosureFields } from '../services/defectsService';
+describe('dropRetiredClosureFields', () => {
+  it('drops closedOutByName/Rank and closedBy/closedOn, keeps the authoritative pair', () => {
+    const out = dropRetiredClosureFields({ closedByName: 'Peter', closedByRank: 'Master', closedOutByName: 'x', closedOutByRank: 'y', closedBy: 'z', closedOn: '2026-01-01', status: 'Open' });
+    expect(out).toEqual({ closedByName: 'Peter', closedByRank: 'Master', status: 'Open' });
+  });
+  it('returns the same object when none are present', () => {
+    const body = { closedByName: 'Peter' };
+    expect(dropRetiredClosureFields(body)).toBe(body);
+  });
+});

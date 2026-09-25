@@ -97,6 +97,10 @@ export async function createDefectAttachment(attachment: InsertDefectAttachment)
   return storage.createDefectAttachment(attachment);
 }
 
+export async function getDefectAttachmentById(id: number): Promise<DefectAttachment | undefined> {
+  return storage.getDefectAttachmentById(id);
+}
+
 export async function deleteDefectAttachment(id: number): Promise<void> {
   return storage.deleteDefectAttachment(id);
 }
@@ -111,9 +115,6 @@ export async function linkDefects(defectId: string, linkedDefectIds: string[]): 
   return storage.linkDefects(defectId, linkedDefectIds);
 }
 
-export async function closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect> {
-  return storage.closeDefect(defectId, closure);
-}
 
 // ── Recurring Defects ──
 

@@ -657,8 +657,64 @@ export function trimDefectIdentityFields<T extends Record<string, any>>(body: T)
   return (out ?? body) as T;
 }
 
+/** 25-Sep-2026 (Sahil E11 / Q12): the C1 pair closed_by_name / closed_by_rank is authoritative.
+ *  The older compatibility fields are no longer written (kept readable for old records). */
+export const RETIRED_CLOSURE_FIELDS = ['closedOutByName', 'closedOutByRank', 'closedBy', 'closedOn'] as const;
+export function dropRetiredClosureFields<T extends Record<string, any>>(body: T): T {
+  if (!body || typeof body !== 'object' || !RETIRED_CLOSURE_FIELDS.some((f) => f in body)) return body;
+  const out: Record<string, any> = { ...body };
+  for (const f of RETIRED_CLOSURE_FIELDS) delete out[f];
+  return out as T;
+}
+
+/**
+ * 25-Sep-2026 (Sahil E10 / Q11: "uploaded files only; restriction applies only after the record
+ * is closed"). C1 evidence lives in defects.attachments (uploaded through the form, each with an
+ * id). Rules:
+ *  - closureFiles, when sent, may only reference ids of the defect's own uploaded attachments
+ *    (defects.attachments[].id) or its defect_attachments rows (datuuid) — no free-text URLs.
+ *  - once the defect is CLOSED (C1 confirmed / closed status), its attachments cannot be removed;
+ *    attachments referenced by a rejected-closure history row can never be removed.
+ */
+const isClosedDefect = (d: any): boolean =>
+  d?.confirmCompleted === true || ['closed', 'resolved', 'completed'].includes(String(d?.status ?? '').trim().toLowerCase());
+const attachmentIds = (list: unknown): string[] =>
+  Array.isArray(list) ? list.map((a: any) => a?.id).filter((x: any): x is string => typeof x === 'string' && x.length > 0) : [];
+
+export async function protectedEvidenceIds(current: any): Promise<Set<string>> {
+  const ids = new Set<string>();
+  if (isClosedDefect(current)) attachmentIds(current.attachments).forEach((x) => ids.add(x));
+  for (const h of await defectsRepo.getDefectClosureHistory(current.duuid)) {
+    for (const f of (h.closureFiles ?? [])) if (typeof f === 'string' && f) ids.add(f);
+  }
+  return ids;
+}
+
+export async function assertDefectEvidenceRules(current: any, body: any): Promise<void> {
+  if (Array.isArray(body?.closureFiles) && body.closureFiles.length > 0) {
+    const allowed = new Set<string>([
+      ...attachmentIds(body.attachments ?? current.attachments),
+      ...(await defectsRepo.getDefectAttachments(current.duuid)).map((a: any) => a.datuuid).filter(Boolean),
+    ]);
+    const bad = body.closureFiles.filter((f: unknown) => typeof f !== 'string' || !allowed.has(f));
+    if (bad.length > 0) {
+      throw Object.assign(new Error('Closure files must be files uploaded to this defect.'), { statusCode: 400, code: 'CLOSURE_FILE_NOT_UPLOADED' });
+    }
+  }
+  if (Array.isArray(body?.attachments)) {
+    const protectedIds = await protectedEvidenceIds(current);
+    if (protectedIds.size > 0) {
+      const kept = new Set(attachmentIds(body.attachments));
+      const removed = Array.from(protectedIds).filter((x) => attachmentIds(current.attachments).includes(x) && !kept.has(x));
+      if (removed.length > 0) {
+        throw Object.assign(new Error('Closure evidence cannot be removed once the defect is closed, or after a closure was rejected with it.'), { statusCode: 409, code: 'CLOSURE_EVIDENCE_PROTECTED' });
+      }
+    }
+  }
+}
+
 export async function updateDefect(id: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor) {
-  body = trimDefectIdentityFields(body);
+  body = dropRetiredClosureFields(trimDefectIdentityFields(body));
   // Approval gate (B2a, 03-Sep-2026): the generic PATCH is Defects' ONLY live write path,
   // so extension/verification approval writes are detected and routed engine-first HERE,
   // and Part C1 closeout writes enforce the Master-only rule. With no chain configured the
@@ -668,6 +724,7 @@ export async function updateDefect(id: string, body: any, actor?: import('./defe
   if (!current) {
     throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
   }
+  await assertDefectEvidenceRules(current, body);
   const { gateDefectUpdate, afterDefectUpdate } = await import('./defectsApprovalHooks');
   const gated = await gateDefectUpdate(current, body, actor ?? {});
   const partialDefectSchema = insertDefectSchema.partial();
@@ -765,6 +822,17 @@ export async function createDefectAttachment(defectId: string, body: any) {
 }
 
 export async function deleteDefectAttachment(attachmentId: number) {
+  // 25-Sep-2026 (E10): closure evidence is protected once the defect is closed / referenced.
+  const att = await defectsRepo.getDefectAttachmentById(attachmentId);
+  if (att) {
+    const defect = await defectsRepo.getDefect(att.defectId);
+    if (defect) {
+      const protectedIds = await protectedEvidenceIds(defect);
+      if (isClosedDefect(defect) || protectedIds.has(att.datuuid)) {
+        throw Object.assign(new Error('Closure evidence cannot be deleted once the defect is closed, or after a closure was rejected with it.'), { statusCode: 409, code: 'CLOSURE_EVIDENCE_PROTECTED' });
+      }
+    }
+  }
   return defectsRepo.deleteDefectAttachment(attachmentId);
 }
 
@@ -796,40 +864,6 @@ export async function linkDefects(defectId: string, body: any) {
   }
 
   return defectsRepo.linkDefects(defectId, linkedDefects);
-}
-
-export async function closeDefect(defectId: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor) {
-  // Master-only closure rule (03-Sep-2026). This route has no live UI caller (Phase A:
-  // DefectsActive/DefectsLog are not rendered) but stays HTTP-reachable — an ungated
-  // side door around the PATCH gate is not acceptable, so the same rule applies here.
-  const current = await defectsRepo.getDefect(defectId);
-  if (!current) throw Object.assign(new Error(`Defect ${defectId} not found`), { statusCode: 404 });
-  const { assertDefectCloseoutAllowed } = await import('./defectsApprovalHooks');
-  await assertDefectCloseoutAllowed(current, actor ?? {});
-  const { closedBy, closureComment, closureFiles, actionTakenRequested, targetCloseDate, dateCompleted } = body;
-
-  // Validate all required fields
-  if (!closureComment || closureComment.trim().length === 0) {
-    throw Object.assign(new Error("Closure comment is required"), { statusCode: 400 });
-  }
-
-  if (!actionTakenRequested || actionTakenRequested.trim().length === 0) {
-    throw Object.assign(new Error("Action taken is required to close the defect"), { statusCode: 400 });
-  }
-
-  if (!targetCloseDate) {
-    throw Object.assign(new Error("Target date is required"), { statusCode: 400 });
-  }
-
-  if (!dateCompleted) {
-    throw Object.assign(new Error("Completion date is required"), { statusCode: 400 });
-  }
-
-  return defectsRepo.closeDefect(defectId, {
-    closedBy: closedBy || 'System',
-    closureComment,
-    closureFiles: closureFiles || []
-  });
 }
 
 // ── Defect Reports ──
