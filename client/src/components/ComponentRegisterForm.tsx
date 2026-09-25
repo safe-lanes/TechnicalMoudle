@@ -337,7 +337,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       equipmentDepartment: (node as any).equipmentDepartment || (node as any).eqptSystemDept || '',
       parentComponent: (node as any).parentComponent || '',
       critical: (node as any).critical ? 'Yes' : 'No',
-      classItem: (node as any).classItem || 'No',
+      classItem: (node as any).classItem === true || (node as any).classItem === 'Yes' ? 'Yes' : 'No',
       conditionBased: (node as any).conditionBased || 'No',
       dimensionsSize: (node as any).dimensionsSize || '',
       notes: (node as any).notes || '',
@@ -1769,7 +1769,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                 </div>
 
                 {/* G. Classification & Regulatory Data */}
-                {(componentData.classItem === "Yes" || componentData.classItem === true) && <div>
+                {componentData.classItem === "Yes" && <div>
                   <Collapsible open={!collapsedSections.G} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, G: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center gap-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">

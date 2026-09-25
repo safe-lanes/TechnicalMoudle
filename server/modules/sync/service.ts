@@ -23,7 +23,16 @@ import { syncDiag } from './syncDiagLogger';
 import * as alertsRepo from '../alerts/repositories/alertsRepository';
 import { getFieldDisplayName } from './conflictReviewRepository';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
+import type { PoolClient } from 'pg';
 import { shouldRetryUnknownSyncColumn } from './unknownColumnRetryPolicy';
+import {
+  COMPLETED_DATE_SYNC_ERROR,
+  ensureDateBeforeSyncedCompletedStatus,
+} from './completedWorkOrderDateSync';
+import {
+  isImmutableWorkOrderSnapshotField,
+  shouldApplySyncedWorkOrderSnapshot,
+} from '../work-orders/utils/workOrderPartADates';
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER — Vessel UUID ↔ vessel_code lookup
@@ -84,6 +93,28 @@ export async function initiateSyncSession(
 // ═══════════════════════════════════════════════════════════════
 // 2. PUSH (Ship sends its changes to Shore)
 // ═══════════════════════════════════════════════════════════════
+
+/** Optional estimate work must never abort the required WO + Job transaction. */
+export async function refreshRhEstimatesSafely(
+  client: PoolClient,
+  auditIds: string[],
+  batchUuid: string,
+  refresh: (client: PoolClient, ids: string[]) => Promise<number>,
+): Promise<number> {
+  if (!auditIds.length) return 0;
+  await client.query('SAVEPOINT rh_refresh_batch');
+  try {
+    const count = await refresh(client, auditIds);
+    await client.query('RELEASE SAVEPOINT rh_refresh_batch');
+    syncDiag(`RH-ESTIMATE REFRESH: audits=${auditIds.length} jobs=${count}`);
+    return count;
+  } catch (err: any) {
+    await client.query('ROLLBACK TO SAVEPOINT rh_refresh_batch');
+    await client.query('RELEASE SAVEPOINT rh_refresh_batch');
+    syncDiag(`RH-ESTIMATE REFRESH ERROR: batch=${batchUuid}: ${String(err?.message || err).substring(0, 160)}`);
+    return 0;
+  }
+}
 
 export async function receivePushData(
   batchUuid: string,
@@ -184,6 +215,7 @@ export async function receivePushData(
   //     construction (applyFullRowsIfAbsent) — cannot overwrite anything.
   // Completion-learning candidates (shore learns ship WO completions → job tracking).
   const completionWouuids = new Set<string>();
+  const rhAuditRowUuids = new Set<string>();
 
   let selfHealInserted = 0;
   if (payload.fullRows && payload.fullRows.length > 0) {
@@ -195,6 +227,12 @@ export async function receivePushData(
         continue;
       }
       collectCompletionWouuidsFromFullRows(t.tableName, t.rows).forEach(w => completionWouuids.add(w));
+      if (t.tableName === 'running_hours_audit') {
+        t.rows.forEach(row => {
+          const id = row.rhauuid ?? row.Rhauuid;
+          if (id) rhAuditRowUuids.add(String(id));
+        });
+      }
       const r = await applyFullRowsIfAbsent(t.tableName, t.rows);
       selfHealInserted += r.inserted;
       if (r.errors.length > 0) r.errors.slice(0, 3).forEach(e => syncDiag(`SELF-HEAL APPLY ERROR: ${e.substring(0, 150)}`));
@@ -279,6 +317,9 @@ export async function receivePushData(
           const appliedInsertLogs = acceptedLogs.filter(l =>
             (l.oldValue === null || l.oldValue === undefined) && !deferred.has(l as any) && !dropped.has(l.rowUuid));
           collectCompletionWouuidsFromLogs(appliedInsertLogs).forEach(w => completionWouuids.add(w));
+          appliedInsertLogs
+            .filter(log => log.tableName === 'running_hours_audit')
+            .forEach(log => rhAuditRowUuids.add(log.rowUuid));
         }
         fieldLogApplyErrors += insertResult.errors.length;
         (insertResult.failedRowUuids || []).forEach(r => droppedRowUuids.add(r));
@@ -506,6 +547,31 @@ export async function receivePushData(
               fieldLogsApplied++;
               continue;
             }
+
+            if (
+              log.tableName === 'work_orders'
+              && isImmutableWorkOrderSnapshotField(log.fieldName)
+            ) {
+              const currentResult = await client.query(
+                `SELECT "${fieldNameSnake}" AS value FROM "work_orders" WHERE "${identityCol}" = $1 LIMIT 1`,
+                [log.rowUuid],
+              );
+              if (
+                currentResult.rows.length > 0
+                && !shouldApplySyncedWorkOrderSnapshot(
+                  currentResult.rows[0]?.value,
+                  log.oldValue,
+                )
+              ) {
+                fieldLogsApplied++;
+                syncDiag(
+                  `RECEIVE UPDATE SNAPSHOT-ACK immutable work_orders.${fieldNameSnake} row=${log.rowUuid}`,
+                );
+                try { await client.query(`RELEASE SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
+                continue;
+              }
+            }
+
             let valueToApply: any = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
               try {
@@ -516,6 +582,12 @@ export async function receivePushData(
                 valueToApply = '[]';
               }
             }
+
+            await ensureDateBeforeSyncedCompletedStatus(
+              client,
+              log,
+              dualCtxPush.incomingCompletionDateByRow.get(log.rowUuid) ?? null,
+            );
 
             // Use the log's changedAt for updated_at — trigger bypass ensures it sticks.
             const updateResult = await client.query(
@@ -534,6 +606,8 @@ export async function receivePushData(
               droppedRowUuids.add(log.rowUuid); // Fix 2/3: keep unsynced so the ship retries once its INSERT lands
               console.warn(`[Sync Push] UPDATE skipped — row missing on receiver: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} (change dropped; see FIELD-LOG-INSERT RECOVERY)`);
               syncDiag(`UPDATE-MISS: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — row not found, UPDATE had no effect`);
+            } else if (log.tableName === 'running_hours_audit') {
+              rhAuditRowUuids.add(log.rowUuid);
             }
 
             // ── Derived RH update — propagate running_hours_audit field changes to components current state ──
@@ -612,6 +686,9 @@ export async function receivePushData(
               syncDiag(`RECEIVE UPDATE IMMUTABLE-ACK (terminal): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — ${(err.message || '').substring(0, 120)}`);
               console.warn(`[Sync Push] Immutable-table UPDATE rejected — acked as terminal (not retried): ${log.tableName}.${log.fieldName} row=${log.rowUuid}`);
             } else {
+              if (err.code === COMPLETED_DATE_SYNC_ERROR) {
+                droppedRowUuids.add(log.rowUuid);
+              }
               console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
             }
           }
@@ -788,6 +865,13 @@ export async function receivePushData(
         //     updated shore jobs, and the shore sweep generated phantom overdue WOs).
         {
           const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+          // A previous core projection failure leaves the WO committed but its
+          // field logs unacknowledged. On retry the insert-origin/stale guard may
+          // skip those logs; still recheck the persisted completed WO. Conflict
+          // holdback and the learner's advance-only checks apply as usual.
+          acceptedLogs
+            .filter(log => log.tableName === 'work_orders' && !droppedRowUuids.has(log.rowUuid))
+            .forEach(log => completionWouuids.add(log.rowUuid));
           // Task #399: WOs with an OPEN dual-completion conflict are held out of learning —
           // job tracking must not advance from an interim value; the user's resolution log
           // re-enters this path and triggers learning with the final chosen values.
@@ -799,12 +883,24 @@ export async function receivePushData(
             const stillOpen = await findWouuidsWithOpenDualConflicts(client, Array.from(completionWouuids));
             stillOpen.forEach((w) => completionWouuids.delete(w));
           }
-          // completionWouuids was populated ONLY from changes that actually APPLIED
-          // (insert-groups that landed + update logs that passed the stale/conflict
-          // guards) plus self-heal fullRows — never from merely-accepted logs.
+          // Candidates include applied WO changes, self-heal rows, and re-offered
+          // WO logs. The learner always reads the persisted row, so re-offered
+          // logs cannot project uncommitted incoming field values.
           if (completionWouuids.size > 0) {
-            await learnFromShipCompletions(client, Array.from(completionWouuids));
+            const learned = await learnFromShipCompletions(client, Array.from(completionWouuids));
+            if (learned.errors > 0) {
+              syncDiag(`COMPLETION-LEARN CORE ERRORS: batch=${batchUuid} count=${learned.errors} — retaining affected WO logs for retry`);
+              // A completed WO must not be positively acknowledged while its
+              // linked Job projection failed. The persisted WO remains available
+              // and its logs are re-offered on the next push.
+              learned.errorWouuids.forEach(w => droppedRowUuids.add(w));
+            }
             completionWouuids.clear(); // consumed inside this transaction
+          }
+          if (rhAuditRowUuids.size > 0) {
+            const { refreshRhEstimatesFromAuditRows } = await import('./shipCompletionLearner');
+            await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows);
+            rhAuditRowUuids.clear();
           }
         }
 
@@ -823,9 +919,12 @@ export async function receivePushData(
   // Completion learning for pushes that carried completed WOs ONLY as self-heal full
   // rows (no accepted field logs → the shared transaction above never ran). Same
   // learner, its own short transaction. No-op when the set was already consumed.
-  if (completionWouuids.size > 0) {
+  if (completionWouuids.size > 0 || rhAuditRowUuids.size > 0) {
     try {
-      const { learnFromShipCompletions } = await import('./shipCompletionLearner');
+      const {
+        learnFromShipCompletions,
+        refreshRhEstimatesFromAuditRows,
+      } = await import('./shipCompletionLearner');
       const pool = await getPool();
       const client = await pool.connect();
       try {
@@ -836,7 +935,11 @@ export async function receivePushData(
         const stillOpen = await findWouuidsWithOpenDualConflicts(client, Array.from(completionWouuids));
         stillOpen.forEach((w) => completionWouuids.delete(w));
         if (completionWouuids.size > 0) {
-          await learnFromShipCompletions(client, Array.from(completionWouuids));
+          const learned = await learnFromShipCompletions(client, Array.from(completionWouuids));
+          learned.errorWouuids.forEach(w => droppedRowUuids.add(w));
+        }
+        if (rhAuditRowUuids.size > 0) {
+          await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows);
         }
         await client.query('COMMIT');
       } catch (learnErr: any) {
@@ -846,6 +949,7 @@ export async function receivePushData(
         client.release();
       }
       completionWouuids.clear();
+      rhAuditRowUuids.clear();
     } catch (learnOuterErr: any) {
       syncDiag(`COMPLETION-LEARN (fullRows-only) setup failed: ${String(learnOuterErr?.message || learnOuterErr).substring(0, 160)}`);
     }

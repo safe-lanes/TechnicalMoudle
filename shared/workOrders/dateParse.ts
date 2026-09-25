@@ -76,3 +76,50 @@ export function parseWorkOrderDate(value: string | Date | number | null | undefi
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
+
+/**
+ * Normalize a Work Order calendar value to UTC midnight without changing its
+ * calendar day. Generation snapshots are date-only business values, not
+ * instants, so local setters followed by toISOString() must not be used.
+ */
+export function normalizeWorkOrderCalendarDate(
+  value: string | Date | number | null | undefined,
+): Date | null {
+  const parsed = parseWorkOrderDate(value);
+  if (!parsed) return null;
+  return new Date(Date.UTC(
+    parsed.getUTCFullYear(),
+    parsed.getUTCMonth(),
+    parsed.getUTCDate(),
+  ));
+}
+
+export function formatWorkOrderCalendarDate(
+  value: string | Date | number | null | undefined,
+): string | null {
+  const date = normalizeWorkOrderCalendarDate(value);
+  return date ? date.toISOString().slice(0, 10) : null;
+}
+
+export function addWorkOrderCalendarDays(
+  value: string | Date | number | null | undefined,
+  days: number,
+): Date | null {
+  const date = normalizeWorkOrderCalendarDate(value);
+  if (!date) return null;
+  date.setUTCDate(date.getUTCDate() + days);
+  return date;
+}
+
+/**
+ * Represent the host's current calendar day as UTC midnight. This preserves
+ * the existing host-local "today" boundary while making comparisons against
+ * date-only Work Order values timezone-neutral.
+ */
+export function currentWorkOrderCalendarDate(now: Date = new Date()): Date {
+  return new Date(Date.UTC(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ));
+}

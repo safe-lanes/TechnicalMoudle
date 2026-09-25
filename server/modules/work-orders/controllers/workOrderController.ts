@@ -11,6 +11,7 @@ import * as superintendentNotificationService from '../services/superintendentNo
 import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
 import { getRbacIdentity, rbacMatches, type AuthenticatedRequest } from '../../../middleware/auth';
+import { enrichWorkOrderUpdateWithActor } from '../utils/updateActorIdentity';
 import type {
   WorkOrderPeriodFilter,
   WorkOrderSortField,
@@ -241,12 +242,10 @@ export async function updateWorkOrder(req: Request, res: Response) {
     // superintendent-acknowledgment controllers, which call the service
     // directly. Generic PATCH callers cannot opt into that internal path.
     delete body.superintendentAck;
-    if (actor) {
-      // Prefer caller-supplied userId, but fall back to the authenticated user
-      // so audit entries (e.g. rejections) capture a real identity.
-      if (!body.userId || body.userId === 'system') body.userId = actor;
-      if (!body.performedBy || body.performedBy === 'system') body.performedBy = actor;
-    }
+    // Keep workflow/audit identity separate from submitted execution identity.
+    // In particular, approving or rejecting a WO must never turn the HOD into
+    // the person recorded as having performed the work.
+    enrichWorkOrderUpdateWithActor(body, actor);
     // Authorize the running-hours cap override from the session role (Task #240). The role is taken
     // ONLY from the authenticated session and overwrites any client-supplied value — a caller must
     // not be able to spoof "Sail Admin" via the request body. adminOverride (the intent) still comes

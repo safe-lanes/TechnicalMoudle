@@ -12,6 +12,10 @@ import { getPool } from '../../db';
 import { getTableSyncConfig, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
+import {
+  isCompletedWorkOrderStatus,
+  isValidCompletedWorkOrderDate,
+} from '../work-orders/utils/completedWorkOrderDate';
 
 interface ApplyResult {
   inserted: number;
@@ -236,8 +240,16 @@ export async function applyRotationToComponent(conn: any, rowData: Record<string
  * @param rows - Array of row objects to upsert
  * @returns Counts of inserts, updates, soft-deletes, and any per-row errors
  */
-/** Ship-owned tracking columns on jobs / job_component_links (snake_case, DB names). */
-export const JOB_TRACKING_COLUMNS = ['last_done_date', 'next_due_date', 'last_done_rh', 'next_due_rh'] as const;
+/** Ship-owned tracking columns on jobs (snake_case, DB names). */
+export const JOB_TRACKING_COLUMNS = [
+  'last_done_date',
+  'next_due_date',
+  'last_done_rh',
+  'next_due_rh',
+  'rh_estimated_due_date',
+  'rh_average_per_day',
+  'rh_estimate_basis',
+] as const;
 
 function toTimeOrNull(v: any): number | null {
   if (v === null || v === undefined || v === '') return null;
@@ -265,6 +277,19 @@ export function evaluateJobTrackingGuard(localRow: Record<string, any>, incoming
     const localVal = localRow[col];
     if (localVal !== null && localVal !== undefined && localVal !== '') {
       strip.push(col);
+    }
+  }
+  const estimateColumns = ['rh_estimated_due_date', 'rh_average_per_day', 'rh_estimate_basis'] as const;
+  const localRhCycleInitialized = [
+    'last_done_rh',
+    ...estimateColumns,
+  ].some(col => {
+    const value = localRow[col];
+    return value !== null && value !== undefined && value !== '';
+  });
+  if (localRhCycleInitialized) {
+    for (const col of estimateColumns) {
+      if (!strip.includes(col)) strip.push(col);
     }
   }
   // Without a newer authorized stamp, never let an incoming stamp overwrite the local one.
@@ -400,13 +425,13 @@ export async function applyOneWayRows(
         } else {
           let rowToApply = row;
           // ── Job tracking-column guard (migration 161) ─────────────────────
-          // jobs / job_component_links are ONE_WAY shore→ship full-row applies with no
+          // jobs are ONE_WAY shore→ship full-row applies with no
           // protected columns: any shore job edit would overwrite the SHIP's fresher
           // last-done/next-due tracking (ship completions never sync into shore jobs, so
           // shore tracking is chronically stale). Preserve local non-NULL tracking values
           // unless the incoming row carries a NEWER tracking_rebaselined_at stamp (the
           // authorized admin rebaseline escape hatch). Definition fields flow unchanged.
-          if (tableName === 'jobs' || tableName === 'job_component_links') {
+          if (tableName === 'jobs') {
             try {
               const localRes = await pool.query(
                 `SELECT last_done_date, next_due_date, last_done_rh, next_due_rh, tracking_rebaselined_at
@@ -992,6 +1017,27 @@ export async function applyFieldLogInserts(
         rowData['id'] = `WO-SYNC-${rowUuid}`;
       }
 
+      // A complete-row sync insert must never introduce Completed without a
+      // reliable final date. Preserve the sender's final date; only fall back
+      // to its existing execution timestamp when date_completed is absent.
+      if (tableName === 'work_orders' && isCompletedWorkOrderStatus(rowData['status'])) {
+        if (!isValidCompletedWorkOrderDate(rowData['date_completed'])) {
+          if (isValidCompletedWorkOrderDate(rowData['completion_date_time'])) {
+            rowData['date_completed'] = rowData['completion_date_time'];
+          } else {
+            const msg = `${tableName}.${rowUuid}: Completed row has no valid date_completed or completion_date_time`;
+            errors.push(msg);
+            needsFullRows.push({ tableName, rowUuid });
+            failedRowUuids.push(rowUuid);
+            syncDiag(`FIELD-LOG-INSERT DEFER COMPLETED: ${msg}`);
+            if (externalClient) {
+              try { await pool.query(`RELEASE SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+            }
+            continue;
+          }
+        }
+      }
+
       // ── NOT-NULL guard + full-row self-heal trigger (ALL row-absent INSERT builds) ──
       // Every path that reaches this INSERT build has already proven the row is ABSENT on the
       // receiver (exist-checks above). If the fabricated rowData is missing (or explicitly null
@@ -1425,7 +1471,8 @@ export async function applyFullRowsIfAbsent(
   const pool = await getPool();
   const meta = await getColumnMeta(pool, tableName);
 
-  for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+  for (const incomingRow of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+    let row = incomingRow;
     const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
     if (!identity) { out.errors.push(`${tableName}: row missing identity ${identityCol}`); continue; }
     try {
@@ -1437,6 +1484,17 @@ export async function applyFullRowsIfAbsent(
         out.skipped++;
         syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
         continue;
+      }
+      if (tableName === 'work_orders' && isCompletedWorkOrderStatus(row.status)) {
+        if (!isValidCompletedWorkOrderDate(row.date_completed ?? row.dateCompleted)) {
+          const executionDate = row.completion_date_time ?? row.completionDateTime;
+          if (!isValidCompletedWorkOrderDate(executionDate)) {
+            out.errors.push(`${tableName}.${identity}: Completed full row has no valid completion date`);
+            syncDiag(`SELF-HEAL DEFER COMPLETED: ${tableName}.${identity} has no valid completion date`);
+            continue;
+          }
+          row = { ...row, date_completed: executionDate };
+        }
       }
       // Build the INSERT column-name-mapped (order-safe); skip serial/identity integer PKs so
       // the receiver assigns its own (buildInsertParts also coerces json/array values).

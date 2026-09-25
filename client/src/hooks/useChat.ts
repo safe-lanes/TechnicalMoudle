@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { sendToAssistant, ASSISTANT_UNAVAILABLE_MESSAGE } from "@/assistant-widget/assistantClient";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -23,6 +24,17 @@ export function useChat() {
   const { currentUser } = useAuth();
 
   const currentVessel = vessels.find((v) => v.id === vesselId);
+
+  // 23-Sep-2026: a change of the selected vessel starts a fresh conversation — the earlier turns were about
+  // the previous vessel and are sent to the assistant as history, so they must not carry over.
+  const lastVesselRef = useRef(vesselId);
+  useEffect(() => {
+    if (lastVesselRef.current !== vesselId) {
+      lastVesselRef.current = vesselId;
+      setMessages([]);
+      setError(null);
+    }
+  }, [vesselId]);
 
   const toggleChat = useCallback(() => {
     setIsOpen((prev) => !prev);
@@ -67,30 +79,22 @@ export function useChat() {
           role: m.role,
           content: m.content,
         }));
+        const context = {
+          module: "technical",
+          vesselId,
+          vesselName: currentVessel?.name || "Unknown Vessel",
+          currentPage: window.location.pathname,
+        };
 
-        const response = await fetch("/technical/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: messageText.trim(),
-            conversationHistory,
-            context: {
-              vesselId,
-              vesselName: currentVessel?.name || "Unknown Vessel",
-              currentPage: window.location.pathname,
-            },
-          }),
-          signal: abortControllerRef.current.signal,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(
-            errorData?.message || `Request failed with status ${response.status}`
-          );
-        }
-
-        const data = await response.json();
+        // Central assistant only — the legacy embedded chatbot was removed
+        // (never tested/grounded; product decision 10-Sep-2026). Failures show
+        // an honest unavailable message instead of pretending to answer.
+        const data = await sendToAssistant(
+          messageText.trim(),
+          conversationHistory,
+          context,
+          abortControllerRef.current.signal,
+        );
 
         const assistantMessage: ChatMessage = {
           role: "assistant",
@@ -102,14 +106,13 @@ export function useChat() {
         setMessages((prev) => [...prev, assistantMessage]);
       } catch (err: any) {
         if (err.name === "AbortError") return;
-        const errorMsg =
-          err.message || "Failed to send message. Please try again.";
-        setError(errorMsg);
+        console.warn("[assistant] request failed:", err?.message || err);
+        setError(err?.message || "assistant unavailable");
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: `Sorry, something went wrong: ${errorMsg}`,
+            content: ASSISTANT_UNAVAILABLE_MESSAGE,
             timestamp: new Date(),
           },
         ]);

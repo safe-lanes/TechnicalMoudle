@@ -86,7 +86,10 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     notes: 'Job definitions managed by office. Ship uses change_request for modifications. ' +
       'PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh ' +
       'are SHIP-owned once non-NULL — the one-way applier strips incoming shore values unless the row carries ' +
-      'a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). See oneWayApplier evaluateJobTrackingGuard.',
+       'a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). Historical RH estimate columns ' +
+       'rh_estimated_due_date, rh_average_per_day, and rh_estimate_basis are protected with the RH cycle so an older ' +
+       'shore row cannot replace a newer ship completion estimate; completion learning writes them with sync bypass. ' +
+       'See oneWayApplier evaluateJobTrackingGuard.',
   },
   job_component_links: {
     tableName: 'job_component_links',
@@ -98,9 +101,7 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     isGlobal: false,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Job-component associations managed by office. Integer PK, no UUID identity. ' +
-      'PROTECTED TRACKING COLUMNS (migration 161): same guard as jobs — last_done_date/next_due_date/' +
-      'last_done_rh/next_due_rh preserved on ship unless a newer tracking_rebaselined_at authorizes the overwrite.',
+    notes: 'Job-component associations managed by office. Integer PK, no UUID identity. Job cycle tracking is read from the jobs table only.',
   },
 
   // ── Fleet Management ──

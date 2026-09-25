@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   SERVER_MANAGED_WORK_ORDER_RH_FIELDS,
+  WORK_ORDER_B3_FIELDS,
+  isWorkOrderB3Applicable,
+  normalizeRhCounterType,
+  sanitizeWorkOrderB3Fields,
   stripServerManagedWorkOrderRhFields,
 } from '@shared/workOrderPayload';
 
@@ -47,4 +51,66 @@ describe('stripServerManagedWorkOrderRhFields', () => {
       rhSkipLatestRh: '725',
     });
   });
+});
+
+describe('Work Order B3 applicability', () => {
+  it.each([
+    ['MASTER', true],
+    ['master', true],
+    ['INHERITED', true],
+    ['NOT_RH_DRIVEN', false],
+    ['NOT RH DRIVEN', false],
+    ['', false],
+    [undefined, false],
+  ])('maps counter type %s to applicability %s', (counterType, expected) => {
+    expect(isWorkOrderB3Applicable(counterType)).toBe(expected);
+  });
+
+  it('canonicalizes only the legacy spaced not-driven spelling without defaulting unknown values to Master', () => {
+    expect(normalizeRhCounterType('NOT RH DRIVEN')).toBe('NOT_RH_DRIVEN');
+    expect(normalizeRhCounterType('NOT_RH_DRIVEN')).toBe('NOT_RH_DRIVEN');
+    expect(normalizeRhCounterType(' master ')).toBe('MASTER');
+    expect(normalizeRhCounterType(null)).toBe('');
+    expect(normalizeRhCounterType('')).toBe('');
+  });
+
+  it.each(['NOT_RH_DRIVEN', 'NOT RH DRIVEN'])('removes every B3 field for %s without removing Completion RH', counterType => {
+    const input = {
+      runningHours: '700',
+      previousReading: '650',
+      runningHoursDifference: '50',
+      readingDate: '2026-04-20',
+      currentReadingDate: '2026-04-20',
+      currentReading: '700',
+      woCompletionRh: '675',
+      workCarriedOut: 'Completed planned maintenance safely.',
+    };
+
+    const result = sanitizeWorkOrderB3Fields(input, counterType);
+
+    for (const field of WORK_ORDER_B3_FIELDS) {
+      expect(result).not.toHaveProperty(field);
+    }
+    expect(result).toMatchObject({
+      woCompletionRh: '675',
+      workCarriedOut: input.workCarriedOut,
+    });
+    expect(input).toHaveProperty('currentReading', '700');
+  });
+
+  it.each(['MASTER', 'INHERITED'])(
+    'keeps applicable B3 values but removes Previous Reading for %s',
+    (counterType) => {
+      const result = sanitizeWorkOrderB3Fields({
+        currentReading: '700',
+        currentReadingDate: '2026-04-20',
+        previousReading: '650',
+      }, counterType);
+
+      expect(result).toEqual({
+        currentReading: '700',
+        currentReadingDate: '2026-04-20',
+      });
+    },
+  );
 });

@@ -14,7 +14,7 @@ import changeRequestRoutes from './change-requests/routes';
 import bulkUploadRoutes from './bulk-upload/routes';
 import alertRoutes from './alerts/routes';
 import formRoutes from './forms/routes';
-import chatbotRoutes from './chatbot/routes';
+import assistantApiRoutes from './assistant-api/routes';
 import miscRoutes from './misc/routes';
 import accessControlRoutes from './access-control/routes';
 import auditRoutes from './audit/routes';
@@ -47,7 +47,7 @@ moduleRouter.use(changeRequestRoutes);
 moduleRouter.use(bulkUploadRoutes);
 moduleRouter.use(alertRoutes);
 moduleRouter.use(formRoutes);
-moduleRouter.use(chatbotRoutes);
+moduleRouter.use(assistantApiRoutes);
 moduleRouter.use(miscRoutes);
 moduleRouter.use(accessControlRoutes);
 moduleRouter.use(auditRoutes);
@@ -58,7 +58,7 @@ moduleRouter.use(dashboardRoutes);
 moduleRouter.use(shipskartRoutes);
 moduleRouter.use(rotationalItemRoutes);
 // ====== NOON REPORT MODULE — START (remove this line to disable) ======
-moduleRouter.use(noonReportRoutes);
+moduleRouter.use(noonReportRoutes);
 moduleRouter.use(approvalNotificationRoutes); // approval notifications inbox (Phase 2 follow-up)
 // ====== NOON REPORT MODULE — END ======
 

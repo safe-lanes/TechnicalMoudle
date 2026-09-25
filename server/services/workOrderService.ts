@@ -7,7 +7,14 @@ import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
 import { logFieldChanges } from "../modules/sync";
-import { parseWorkOrderDate } from "@shared/workOrders/dateParse";
+import {
+  addWorkOrderCalendarDays,
+  currentWorkOrderCalendarDate,
+  formatWorkOrderCalendarDate,
+  normalizeWorkOrderCalendarDate,
+  parseWorkOrderDate,
+} from "@shared/workOrders/dateParse";
+import { ensureCompletedWorkOrderDate } from "../modules/work-orders/utils/completedWorkOrderDate";
 import { 
   isBlockingStatus, 
   isCompletedStatus,
@@ -254,6 +261,7 @@ export class WorkOrderService {
       workOrderData.templateCode = workOrderData.workOrderNo;
     }
 
+    ensureCompletedWorkOrderDate(null, workOrderData);
     const createdWO = await storage.createWorkOrder(workOrderData);
 
     // Sync field logging — log the INSERT so ship→shore sync picks up
@@ -286,6 +294,12 @@ export class WorkOrderService {
    */
   async updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder> {
     const updatesAny = updates as any;
+    const existingWO = await storage.getWorkOrder(id);
+
+    // Validate the final state before this legacy path performs any RH audit
+    // work. It also retains a valid stored final date if a partial Completed
+    // update omits it.
+    ensureCompletedWorkOrderDate(existingWO, updatesAny);
 
     // Layer 7: When transitioning to Pending Approval with RH data, apply isolation logic
     if (updatesAny.status === 'Pending Approval' && updatesAny.currentReading) {
@@ -304,7 +318,7 @@ export class WorkOrderService {
         }
 
         try {
-          const wo = await storage.getWorkOrder(id);
+          const wo = existingWO;
           if (wo) {
             const { validateRHEntry, getCurrentRH } = await import('../modules/running-hours/services/rhTimelineValidationService');
             const allComponents = wo.vesselId ? await storage.getComponents(wo.vesselId) : [];
@@ -502,8 +516,7 @@ export class WorkOrderService {
       workOrders: [] as WorkOrder[]
     };
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day
+    const today = currentWorkOrderCalendarDate();
     
     for (const job of calendarJobs) {
       // Calculate DUE_DATE and GENERATE_DATE
@@ -512,16 +525,16 @@ export class WorkOrderService {
       // new Date() here turned DD-MM-YYYY dates into Invalid Date, and the
       // .toISOString() below then THREW — killing calendar generation for the
       // ENTIRE vessel on every scan. Unparseable dates now skip the job only.
-      const dueDate = parseWorkOrderDate(job.nextDueDate);
+      const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate);
       if (!dueDate) {
         console.warn(`⚠️ [Calendar WO Gen] Job ${job.jobNo} has unparseable nextDueDate "${job.nextDueDate}" — skipping (fix the job's due date)`);
         continue;
       }
-      dueDate.setHours(0, 0, 0, 0);
-
       // GENERATE_DATE = DUE_DATE - FIXED 30 days (business rule: generation is fixed, not vessel-driven)
-      const generateDate = new Date(dueDate);
-      generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+      const generateDate = addWorkOrderCalendarDays(
+        dueDate,
+        -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS,
+      )!;
       
       // Check auto-generation condition: Today >= GENERATE_DATE
       if (today < generateDate) {
@@ -529,10 +542,10 @@ export class WorkOrderService {
       }
       
       // Normalize due date for cycle key (ISO date string YYYY-MM-DD)
-      const dueDateStr = dueDate.toISOString().split('T')[0];
+      const dueDateStr = formatWorkOrderCalendarDate(dueDate)!;
       
       // Calculate generate date string for snapshot
-      const generateDateStr = generateDate.toISOString().split('T')[0];
+      const generateDateStr = formatWorkOrderCalendarDate(generateDate)!;
       
       // FIX: Get ALL linked components for this job (many-to-many relationship)
       // Each linked component should get its own work order

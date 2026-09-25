@@ -34,6 +34,11 @@ import { getPool } from '../../db';
 import { syncDiag } from './syncDiagLogger';
 import { isShipInstanceId } from './syncRole';
 import { shouldRetryUnknownSyncColumn } from './unknownColumnRetryPolicy';
+import { ensureDateBeforeSyncedCompletedStatus } from './completedWorkOrderDateSync';
+import {
+  isImmutableWorkOrderSnapshotField,
+  shouldApplySyncedWorkOrderSnapshot,
+} from '../work-orders/utils/workOrderPartADates';
 
 // ── Configuration ──
 
@@ -1083,6 +1088,11 @@ export class SyncEngine {
               }
             }
             } // end !dualBypassGuardsPull
+            await ensureDateBeforeSyncedCompletedStatus(
+              client,
+              log,
+              dualCtxPull.incomingCompletionDateByRow.get(log.rowUuid) ?? null,
+            );
             await this.applyFieldLog(log, client);
             try { await client.query(`RELEASE SAVEPOINT ${updSp}`); } catch { /* non-fatal */ }
             totalPulled++;
@@ -1254,6 +1264,26 @@ export class SyncEngine {
     const fieldNameSnake = SYNC_COLUMN_ALIASES[log.fieldName] ?? camelToSnake(log.fieldName);
 
     const conn = client || await getPool();
+
+    if (
+      log.tableName === 'work_orders'
+      && isImmutableWorkOrderSnapshotField(log.fieldName)
+    ) {
+      const currentResult = await conn.query(
+        `SELECT "${fieldNameSnake}" AS value FROM "work_orders" WHERE "${identityCol}" = $1 LIMIT 1`,
+        [log.rowUuid],
+      );
+      const currentValue = currentResult.rows[0]?.value;
+      if (
+        currentResult.rows.length > 0
+        && !shouldApplySyncedWorkOrderSnapshot(currentValue, log.oldValue)
+      ) {
+        syncDiag(
+          `APPLY-FIELD-LOG SNAPSHOT-ACK immutable work_orders.${fieldNameSnake} row=${log.rowUuid}`,
+        );
+        return;
+      }
+    }
 
     // JSON coercion: if the column is json/jsonb, ensure the value is valid JSON.
     // The field logger stores JSON values as JSON strings (e.g., '[{"spareId":"abc"}]').

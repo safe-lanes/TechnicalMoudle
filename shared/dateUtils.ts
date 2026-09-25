@@ -1,6 +1,104 @@
 import { format, parse, add, isValid, differenceInCalendarDays, differenceInMonths, differenceInYears } from 'date-fns';
 import { parseWorkOrderDate } from './workOrders/dateParse';
 
+const MONTH_NUMBER_BY_NAME: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+};
+
+function validatedCalendarParts(year: number, month: number, day: number): string | null {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) return null;
+  return [
+    String(day).padStart(2, '0'),
+    String(month).padStart(2, '0'),
+    year,
+  ].join('-');
+}
+
+/**
+ * Format a Work Order calendar date as DD-MM-YYYY without changing its
+ * calendar day. This is display-only; native date inputs must keep YYYY-MM-DD.
+ */
+export function formatWorkOrderDateDDMMYYYY(
+  dateInput: string | number | Date | null | undefined,
+  fallback = '',
+): string {
+  if (dateInput === null || dateInput === undefined || dateInput === '') return fallback;
+
+  const raw = String(dateInput).trim();
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
+  if (match) {
+    return validatedCalendarParts(Number(match[1]), Number(match[2]), Number(match[3]))
+      ?? fallback;
+  }
+
+  match = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (match) {
+    return validatedCalendarParts(Number(match[3]), Number(match[2]), Number(match[1]))
+      ?? fallback;
+  }
+
+  match = raw.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/ ](\d{4})$/);
+  if (match) {
+    const month = MONTH_NUMBER_BY_NAME[match[2].slice(0, 3).toLowerCase()];
+    if (month) {
+      return validatedCalendarParts(Number(match[3]), Number(month), Number(match[1]))
+        ?? fallback;
+    }
+  }
+
+  const parsed = parseWorkOrderDate(dateInput);
+  if (!parsed) return fallback;
+  return [
+    String(parsed.getUTCDate()).padStart(2, '0'),
+    String(parsed.getUTCMonth() + 1).padStart(2, '0'),
+    parsed.getUTCFullYear(),
+  ].join('-');
+}
+
+export function workOrderDateInputValue(
+  dateInput: string | number | Date | null | undefined,
+): string {
+  const displayValue = formatWorkOrderDateDDMMYYYY(dateInput);
+  const match = displayValue.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return '';
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
+export function parseWorkOrderDateDDMMYYYYInput(value: string): string | null {
+  const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+
+  const displayValue = validatedCalendarParts(
+    Number(match[3]),
+    Number(match[2]),
+    Number(match[1]),
+  );
+  if (!displayValue) return null;
+
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
+export function normalizeWorkOrderDateTyping(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+}
+
+export function workOrderOverdueCompletionMessage(
+  dueDate: string | number | Date | null | undefined,
+): string {
+  const displayedDueDate = formatWorkOrderDateDDMMYYYY(dueDate, String(dueDate ?? ''));
+  return `Work was completed after the scheduled due date (${displayedDueDate}). The record will be tagged as overdue.`;
+}
+
 /**
  * Normalize various date formats to DD-MMM-YYYY format
  * Handles: Excel serials, ISO strings, locale strings, and DD-MMM-YYYY

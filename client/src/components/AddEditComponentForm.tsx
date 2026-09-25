@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
 import { formatProfessionalDate } from "@/lib/dateUtils";
+import { buildDraftJobPayload } from "@/lib/jobFormPayload";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
 
 const SFI_FORMAT_HINT = "Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.";
@@ -849,27 +850,11 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
           const jobErrors: string[] = [];
           for (const draft of draftJobs) {
             try {
-              const jobPayload: Record<string, any> = {
-                jobTitle: draft.jobTitle,
-                maintenanceType: draft.maintenanceType || null,
-                maintenanceBasis: draft.maintenanceBasis,
-                jobPriority: draft.jobPriority || null,
-                assignedTo: draft.assignedTo || null,
-                briefWorkDescription: draft.briefWorkDescription || null,
-                componentId: newComponent.cuuid,
-                componentCode: newComponent.componentCode,
-                componentName: newComponent.name,
-                vesselId: vesselId || 'V001',
-              };
-              if (draft.maintenanceBasis === 'Running Hours') {
-                jobPayload.intervalRunningHour = parseInt(draft.frequencyValue) || 0;
-                jobPayload.frequencyUnit = 'Hours';
-                if (draft.lastDoneRH) jobPayload.lastDoneRH = draft.lastDoneRH;
-              } else {
-                jobPayload.frequencyValue = draft.frequencyValue || null;
-                jobPayload.frequencyUnit = draft.frequencyUnit || null;
-                if (draft.lastDoneDate) jobPayload.lastDoneDate = draft.lastDoneDate;
-              }
+              const jobPayload = buildDraftJobPayload(
+                draft,
+                newComponent,
+                vesselId || 'V001',
+              );
               await apiRequest('POST', '/technical/api/jobs', jobPayload);
               successCount++;
             } catch (jobErr: any) {
@@ -1289,7 +1274,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                           </div>
 
-                          {/* Row 6: Class Item and Notes / Technical Information */}
+                          {/* Row 6: Class Item, Serial No., and Notes / Technical Information */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Class Item</label>
@@ -1304,7 +1289,17 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 <option value="No">No</option>
                               </select>
                             </div>
-                            <div className="sm:col-span-1 lg:col-span-3">
+                            <div>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Serial No.</label>
+                              <input
+                                type="text"
+                                value={componentData.serialNo}
+                                onChange={(e) => handleFieldChange('serialNo', e.target.value)}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                data-testid="input-serial-no"
+                              />
+                            </div>
+                            <div className="sm:col-span-2 lg:col-span-2">
                               <label className="text-xs font-medium text-gray-600 block mb-1">Notes / Technical Information</label>
                               <textarea
                                 value={componentData.notes}
@@ -1326,7 +1321,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             ["fleetEquipmentName", "Fleet Component Name", "input-fleet-equipment-name"],
                             ["makerCode", "Maker Code", "input-maker-code"],
                             ["modelCode", "Model Code", "input-model-code"],
-                            ["serialNo", "Serial No.", "input-serial-no"],
                           ].map(([key, label, testId]) => (
                             <div key={key}>
                               <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>

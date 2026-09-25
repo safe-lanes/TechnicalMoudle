@@ -1,0 +1,66 @@
+{
+  "_README": [
+    "Destination-specific facts used by xrefs.py when it resolves a cross-reference. Every entry is",
+    "VERIFIED against the product code at the revision named below and cites file and lines, or it is",
+    "not in this file at all. Nothing here is inferred from the manuals.",
+    "",
+    "A destination absent from this file gets NO generated field list or screen claim - the adaptation",
+    "says only what the manual's own section heading establishes, and marks the rest unresolved. The",
+    "Crewing screens (Appraisals, Crew Promotion, the Annual/Periodic/Monthly/Other/Summary drug &",
+    "alcohol tests, and the Recruited/Waitlist/Rejected crew lists) are not in any repository available",
+    "here, so their field lists cannot be verified and must not be invented.",
+    "",
+    "CORRECTED 22-Sep-2026 after the reviewer read the code block I had shipped: it was the LOCATION",
+    "view (data-testid stores-loc-*), it includes an 'All Categories' filter I had missed, and filters",
+    "must be stated PER VIEW, not as one flat list. Surveys' editable fields are now listed because the",
+    "pasted Certificates steps name 'Issue Date', which Surveys does not have.",
+    "",
+    "Keys are matched case-insensitively against the destination sub-module name that xrefs.py derives",
+    "from the manual's own structure."
+  ],
+  "_revision": "aa35c4721 (TechnicalMoudle, branch chatbot-enterprise, 22-Sep-2026); stores.bulk_update added at a30d14f83 (22-Sep-2026, files identical on origin/replit_dev f95b6e307)",
+  "stores": {
+    "screen": "Stores",
+    "own_screen_evidence": "client/src/pages/TechnicalModule.tsx:218-221 renders <Spares /> and <Stores /> as separate components",
+    "filters": ["Search", "All Categories", "Stock"],
+    "filters_by_view": {
+      "Inventory (default)": "Vessel selector, Search, All Categories, Stock - Stores.tsx:2772-2829 (the viewMode === \"inventory\" branch)",
+      "Location": "Vessel selector, Search, All Categories, Stock, plus a 'Search locations...' panel - Stores.tsx:2694-2767 (data-testid stores-loc-search / stores-loc-category-filter / stores-loc-stock-filter) and :2934",
+      "History": "'Search history...' only - Stores.tsx:2860"
+    },
+    "filters_evidence": "one component serves the Stores, Lubes, Chemicals and Others tabs (activeTab); the filter bar is not gated by activeTab, so the per-view sets above apply to all four tabs. The same component serves the Office and Vessel manuals; 'criticality' and 'rotation' occur 0 times anywhere in Stores.tsx",
+    "not_present": ["Criticality", "Rotation Item"],
+    "export": "Stores exports from its own screen to stores_<tab>_inventory_<timestamp>.xlsx and stores_<tab>_history_<timestamp>.xlsx",
+    "export_evidence": "client/src/pages/stores/Stores.tsx:861-909, Export control at 2580",
+    "bulk_update": "Bulk update stays inside Stores: the '+ Bulk Update <Stores/Lubes/Chemicals/Others>' button (the label follows the selected tab; the manual prints it as '+ Bulk Updates Store') opens Stores' own full-screen bulk-update page. There, choose 'Consume' or 'Receive' in the transaction-mode selector, enter the quantities per location (for Receive, the received date/place fields apply to all rows), click 'Save Updates', then 'Confirm & Save'. The Spares sub-sub-module is NOT opened at any point; Spares has its own separate bulk-update page. Both bulk-update pages need the PMS admin permission on the server (code-derived; the manual states no role)",
+    "bulk_update_evidence": "verified 22-Sep-2026 at revision a30d14f83 (chatbot-enterprise), files byte-identical on origin/replit_dev f95b6e307: Stores.tsx:2631-2637 button label and onClick=openBulkUpdateModal; Stores.tsx:982-983 openBulkUpdateModal = navigate('/stores/bulk-update?tab=' + activeTab); App.tsx:80-81 route /stores/bulk-update -> BulkUpdateStores; BulkUpdateStores.tsx:716-717 Consume/Receive select, :759-770 received date/place, :964-971 'Save Updates', :1005-1007 'Confirm & Save', :164-172 POST /technical/api/stores/:vesselId/batch-consume|batch-receive; server/modules/stores/routes.ts:45,48 requirePMSAdmin. Spares: SparesNew.tsx:2641 navigate('/spares/bulk-update'), App.tsx:76-77, BulkUpdateSpares.tsx:141 POST /technical/api/spares/bulk-update, server/modules/spares/routes.ts:25 — a separate page and route, not shared with Stores",
+    "unresolved": [
+      "Whether the Office and Vessel environments expose exactly the same Stores filter set is established only by the code being one component; the manuals document them on different pages and were not compared control-by-control."
+    ]
+  },
+  "surveys": {
+    "screen": "Surveys",
+    "own_screen_evidence": "client/src/pages/cert-surveys/SurveysPage.tsx contains 0 occurrences of 'Certificates'",
+    "edit": "A survey is edited in place in the Surveys grid: click the cell, pick the date, and the record saves and its Last Edit timestamp refreshes",
+    "edit_evidence": "client/src/pages/cert-surveys/SurveysPage.tsx:108-109 (canEditSurvey), CellEditingStoppedEvent import at :4, lastEdit refresh at :259-265",
+    "editable_fields": ["Survey Date", "Due Date", "1st Range Date", "2nd Range Date", "Postponed"],
+    "editable_fields_evidence": "SurveysPage.tsx:415-499 - the five columns with editable: canEditSurvey and cellEditor: DateCellEditor. The Certificates page's editable set (Certificate No., Issue Date, Expiry Date, Last/Next Annual, Last/Next Interim, Endorsement Date) shares NO field with it, so the pasted 'Issue Date' step is wrong for Surveys",
+    "export": "Surveys exports from its own screen as PDF, CSV or Excel",
+    "export_evidence": "client/src/pages/cert-surveys/SurveysPage.tsx:589 (PDF), 632 (CSV), 653 (Excel)",
+    "unresolved": [
+      {
+        "when": "filters",
+        "text": "The filter field list quoted from Certificates ('Fleet', 'Add Group', 'Due Status') is NOT verified for Surveys. 'Add Group' occurs 0 times in the Surveys page AND 0 times in the Certificates page, and the due control is labelled 'Due in...'. The list is stale against the code for both screens, so it is left to the quoted source and not restated here."
+      }
+    ]
+  },
+  "condition of class coc": {
+    "screen": "Condition of Class (CoC)",
+    "own_screen_evidence": "client/src/pages/defects/DefectsCoC.tsx:244 is its own page with its own export at :421/:715",
+    "creation": "A CoC record is created through the same defect form as a defect log entry, with the CoC flag set, so the creation steps transfer",
+    "creation_evidence": "client/src/pages/defects/DefectFormWizard.tsx:186,200 (is_coc default from the isCoc prop)",
+    "unresolved": [
+      "A shared creation form establishes only that CREATION transfers. Whether every filter, export and permission also transfers is NOT established and is left unresolved."
+    ]
+  }
+}

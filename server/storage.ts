@@ -966,22 +966,11 @@ export interface IStorage {
   getJobComponentLinksByComponent(componentId: string): Promise<JobComponentLink[]>;
   createJobComponentLink(link: InsertJobComponentLink): Promise<JobComponentLink>;
   deleteJobComponentLink(jobId: string, componentId: string): Promise<void>;
-  getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>;
-  getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>>;
+  getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
+  getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string }>>>;
   getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>>;
   // Get maintenance history for a specific job-component pair
   getMaintenanceHistoryByJobAndComponent(jobId: string, componentCode: string): Promise<any[]>;
-  // Component-specific tracking updates (prevents data mixing between components)
-  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-  updateJobComponentLinkTracking(vesselId: string, jobId: string, componentId: string, updates: {
-    lastDoneDate?: string;
-    nextDueDate?: string;
-    lastDoneRH?: string;
-    nextDueRH?: string;
-    updatedAt?: Date;
-  }): Promise<JobComponentLink | null>;
-  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-  getJobComponentLinkWithTracking(vesselId: string, jobId: string, componentId: string): Promise<JobComponentLink | null>;
   
   // Spare Location Stock Methods
   getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]>;

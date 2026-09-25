@@ -9,6 +9,17 @@ import { logFieldChanges } from '../../sync';
 import { isShipInstance } from '../../sync/syncRole';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { isWorkOrderB3Applicable, normalizeRhCounterType } from '@shared/workOrderPayload';
+import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
+import {
+  ensureCompletedWorkOrderDate,
+  getJobCompletionDate,
+} from '../utils/completedWorkOrderDate';
+import {
+  estimateRhDueDate,
+  rhEstimateBasis,
+  resolveAuthoritativeRhComponent,
+} from '../../../services/rhDueDateService';
 
 // ── Complete Work Order ──
 
@@ -66,6 +77,28 @@ export async function completeWorkOrder(
   if (!workOrder) {
     throw new NotFoundError('Work order not found');
   }
+  // Validate the final state before component lookup, RH processing, claims,
+  // or audits. The date chosen here is reused in the eventual update, so a
+  // rejected completion cannot leave operational RH side effects behind.
+  const finalCompletionDate = ensureCompletedWorkOrderDate(workOrder, {
+    status: 'Completed',
+    dateCompleted: dateOfCompletion,
+  }).dateCompleted;
+
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: workOrder.maintenanceBasis,
+    startDateTime: executionData.startDateTime ?? workOrder.startDateTime,
+    lastDoneDateSnapshot: workOrder.lastDoneDateSnapshot,
+    woCompletionRh,
+    rhLastDoneSnapshot: workOrder.rhLastDoneSnapshot,
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field,
+    });
+  }
+
   const vesselCode = workOrder.vesselId
     ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode
     : undefined;
@@ -130,7 +163,8 @@ export async function completeWorkOrder(
 
   // Enforce running hours requirement only for RH-driven completions (Task #245):
   // NOT_RH_DRIVEN components treat running hours as not applicable — never required, never blocking.
-  const counterType = (component.rhCounterType || 'MASTER').toUpperCase();
+  const counterType = normalizeRhCounterType(component.rhCounterType);
+  const isB3Applicable = isWorkOrderB3Applicable(counterType);
   if (workOrder.maintenanceBasis === 'Running Hours' && counterType !== 'NOT_RH_DRIVEN' && !runningHours) {
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');
   }
@@ -144,7 +178,7 @@ export async function completeWorkOrder(
   // ── RH accuracy validations (migration 139) ──
   // BLOCK: completion RH cannot exceed the current reading — the machine cannot
   // have had MORE hours at job completion than its latest meter reading.
-  if (woCompletionRh && runningHours) {
+  if (isB3Applicable && woCompletionRh && runningHours) {
     const woRhNum = parseFloat(woCompletionRh);
     const readingNum = parseFloat(runningHours);
     if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
@@ -156,7 +190,7 @@ export async function completeWorkOrder(
     }
   }
   // BLOCK: the reading date cannot be in the future.
-  if (currentReadingDate) {
+  if (isB3Applicable && currentReadingDate) {
     const readingDateParsed = new Date(currentReadingDate);
     const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
     if (isNaN(readingDateParsed.getTime())) {
@@ -554,10 +588,10 @@ export async function completeWorkOrder(
 
   const originalDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
 
-  const updatedWorkOrder = await repo.update(workOrderId, {
+  const completionUpdate = {
     ...executionData,
     runningHoursAtCompletion: runningHours ? parseInt(runningHours) : undefined,
-    dateCompleted: dateOfCompletion,
+    dateCompleted: finalCompletionDate,
     status: 'Completed',
     missedCycles,
     originalDueDate,
@@ -577,7 +611,8 @@ export async function completeWorkOrder(
     rhBackdatedEntry: rhBackdatedSkipped ? true : undefined,
     // Save as Draft (Task #402): completion supersedes any stashed draft.
     draftExecutionData: null
-  });
+  };
+  const updatedWorkOrder = await repo.update(workOrderId, completionUpdate);
 
   // Sync field logging — log completion UPDATE
   try {
@@ -767,15 +802,45 @@ export async function completeWorkOrder(
       // completions. Semantics unchanged: Calendar/Dual/RH legs, D2 RH
       // conditionality, R1 completion-RH source — see the helper's header.
       const { computeJobCycleUpdates } = await import('@shared/workOrders/jobCycleCalc');
+      const jobCompletionDate = getJobCompletionDate(updatedWorkOrder);
       const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: workOrder.maintenanceBasis,
-        dateOfCompletion,
+        dateOfCompletion: jobCompletionDate,
         completionRH: cycleRH,
         originalDueDate,
         job,
       });
 
-      if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion && !cycleRH) {
+      // Planning estimate only: this never replaces nextDueDate or changes
+      // the scanner's actual RH threshold.
+      if (
+        jobUpdates.lastDoneRH !== undefined
+        && cycleRH
+        && (workOrder.maintenanceBasis === 'Running Hours' || workOrder.maintenanceBasis === 'Dual Frequency')
+      ) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis('MISSING_RH_SOURCE');
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          repo.findComponent,
+          repo.findComponentByCode,
+          workOrder.vesselId,
+        );
+        if (rhComponent) {
+          const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits,
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
+        }
+      }
+
+      if (workOrder.maintenanceBasis === 'Dual Frequency' && jobCompletionDate && !cycleRH) {
         console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
       }
 
@@ -937,6 +1002,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
   }
 
   const rawCompletionDate: string | null = workOrder.completionDateTime || workOrder.dateCompleted || null;
+  const jobCompletionDate = getJobCompletionDate(workOrder);
   const missedCycles: number = workOrder.missedCycles || 0;
   const originalDueDate: string | null = workOrder.originalDueDate || workOrder.nextDueDate || workOrder.dueDate || null;
 
@@ -1000,35 +1066,49 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
       }
     }
 
-    if (job && rawCompletionDate) {
-      const dateOfCompletionNorm = normalizeToISO(rawCompletionDate);
+    if (job && jobCompletionDate) {
       const basis = workOrder.maintenanceBasis;
-
-      if ((basis === 'Calendar' || basis === 'Dual Frequency') && dateOfCompletionNorm) {
-        const { calculateNextDueDate } = await import('@shared/dateUtils');
-        const updates: any = { lastDoneDate: dateOfCompletionNorm };
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) updates.nextDueDate = nextDue;
-        }
-        await repo.updateJob(job.juuid, updates);
-        console.log(`✅ [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
-      }
-
       // R1 (migration 139): next cycle derives from the stored WO Completion RH
       // (fallback: the stored reading = pre-feature behaviour for old rows).
       const finalizeCycleRH = (workOrder as any).woCompletionRh ?? workOrder.runningHours;
-      if ((basis === 'Running Hours' || basis === 'Dual Frequency') && finalizeCycleRH) {
-        const currentRH = parseInt(String(finalizeCycleRH));
-        if (!isNaN(currentRH)) {
-          const rhUpdates: any = { lastDoneRH: currentRH };
-          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-          if (rhInterval && !isNaN(rhInterval)) {
-            rhUpdates.nextDueRH = currentRH + rhInterval;
-          }
-          await repo.updateJob(job.juuid, rhUpdates);
-          console.log(`✅ [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);
+      const { computeJobCycleUpdates } = await import('@shared/workOrders/jobCycleCalc');
+      const { jobUpdates } = computeJobCycleUpdates({
+        maintenanceBasis: basis,
+        dateOfCompletion: jobCompletionDate,
+        completionRH: finalizeCycleRH != null ? String(finalizeCycleRH) : null,
+        originalDueDate,
+        job,
+      });
+
+      if (
+        jobUpdates.lastDoneRH !== undefined
+        && (basis === 'Running Hours' || basis === 'Dual Frequency')
+      ) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis('MISSING_RH_SOURCE');
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          repo.findComponent,
+          repo.findComponentByCode,
+          workOrder.vesselId,
+        );
+        if (rhComponent) {
+          const audits = await repo.findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits,
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
         }
+      }
+
+      if (Object.keys(jobUpdates).length > 0) {
+        await repo.updateJob(job.juuid, jobUpdates);
+        console.log(`✅ [Finalize] Updated ${basis} job ${job.jobNo} cycle fields without reducing newer RH state`);
       }
     }
   } catch (err) {

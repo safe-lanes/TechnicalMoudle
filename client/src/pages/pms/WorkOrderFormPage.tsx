@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
+import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators, formatWorkOrderDateDDMMYYYY, workOrderOverdueCompletionMessage } from "@shared/dateUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +52,7 @@ import { useRanks, ensureRankInOptions } from "@/hooks/useRanks";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { mapLastCompletedOnToLastDoneDate } from "@/lib/jobFormPayload";
 import { viewAuthedDocument } from "@/lib/authedDownload";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
@@ -63,8 +64,13 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
 import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
-import { stripServerManagedWorkOrderRhFields } from '@shared/workOrderPayload';
+import {
+  isWorkOrderB3Applicable,
+  sanitizeWorkOrderB3Fields,
+  stripServerManagedWorkOrderRhFields,
+} from '@shared/workOrderPayload';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
+import { validateWorkOrderB2Baselines } from '@shared/workOrders/workOrderB2Validation';
 import { SectionBlock } from '@/components/SectionBlock';
 import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
@@ -72,6 +78,7 @@ import { StatusPill } from '@/components/StatusPill';
 import { Marker } from "@/components/Marker";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection";
+import { WorkOrderDateInput } from "@/components/pms/WorkOrderDateInput";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -306,6 +313,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     },
     workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string, description: string, remarks: string}>
   });
+  const displayedPartANextDueDate =
+    resolvedMode !== 'template' && !isNewJobCreation
+      ? ((workOrderContext as any)?.templateData?.partANextDueDate || '')
+      : templateData.nextDueDate;
+  const displayedPartANextDueRH =
+    resolvedMode !== 'template'
+      && !isNewJobCreation
+      && (templateData.maintenanceBasis === 'Running Hours' || templateData.maintenanceBasis === 'Dual Frequency')
+      ? ((workOrderContext as any)?.templateData?.partANextDueRH || '')
+      : templateData.nextDueReading;
 
   const woDepartment = templateData?.department ||
     (workOrderContext as any)?.templateData?.department ||
@@ -958,7 +975,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Task #245: RH-required/load gates fire ONLY for explicitly RH-driven counter types.
   // Unknown ('') and NOT_RH_DRIVEN are treated as non-blocking so a slow/failed
   // /running-hours/current call can never wrongly block a NOT_RH_DRIVEN work order.
-  const isRhDrivenCounter = componentRhCounterType === 'MASTER' || componentRhCounterType === 'INHERITED';
+  const isRhDrivenCounter = isWorkOrderB3Applicable(componentRhCounterType);
   const isWoCompletionRhRequired = requiresWoCompletionRh(
     templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis,
     componentRhCounterType,
@@ -1020,6 +1037,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       remarks: ""
     }
   });
+  const b2BaselineErrors = useMemo(() => validateWorkOrderB2Baselines({
+    maintenanceBasis: templateData.maintenanceBasis,
+    startDateTime: executionData.startDateTime,
+    lastDoneDateSnapshot: lastDoneDateForRH || lastDoneDate,
+    woCompletionRh: executionData.woCompletionRh,
+    rhLastDoneSnapshot: lastDoneRH,
+  }), [
+    templateData.maintenanceBasis,
+    executionData.startDateTime,
+    executionData.woCompletionRh,
+    lastDoneDateForRH,
+    lastDoneDate,
+    lastDoneRH,
+  ]);
+  const startDateBaselineError = b2BaselineErrors.find(
+    (error) => error.field === 'startDateTime',
+  );
+  const completionRhBaselineError = b2BaselineErrors.find(
+    (error) => error.field === 'woCompletionRh',
+  );
 
   const { ranks: rankOptions } = useRanks();
   const ranksForAssignedTo = ensureRankInOptions(rankOptions, templateData.assignedTo);
@@ -1098,6 +1135,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
           : (context.templateData.frequencyValue || '');
 
+        const useWorkOrderSnapshot = resolvedMode !== 'template';
+        const useRhWorkOrderSnapshot =
+          useWorkOrderSnapshot
+          && context.templateData.maintenanceBasis === 'Running Hours';
         const normalizedTemplateData = {
           ...context.templateData,
           // Map backend field names to frontend field names
@@ -1110,7 +1151,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           // Ensure frequency unit matches maintenance basis
           frequencyUnit: normalizedFrequencyUnit,
           // For RH jobs, store the next due RH value
-          nextDueReading: context.templateData.nextDueRH || '',
+          nextDueReading: useRhWorkOrderSnapshot
+            ? (context.templateData.partANextDueRH || '')
+            : (context.templateData.nextDueRH || ''),
           // Map other fields
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           assignedTo: context.templateData.assignedTo || '',
@@ -1143,9 +1186,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           setLastCalendarUnit(normalizedFrequencyUnit);
         }
 
-        setLastDoneDate(context.templateData.lastCompletedDate || context.templateData.lastDoneDate || '');
-        setLastDoneRH(context.templateData.lastCompletedRH || context.templateData.lastDoneRH || '');
-        setLastDoneDateForRH(context.templateData.lastCompletedDateForRH || context.templateData.lastCompletedDate || context.templateData.lastDoneDate || '');
+        const partALastCompletedOn = context.templateData.partALastCompletedOn || '';
+        setLastDoneDate(
+          useWorkOrderSnapshot
+            ? partALastCompletedOn
+            : (context.templateData.lastCompletedDate || context.templateData.lastDoneDate || ''),
+        );
+        setLastDoneRH(
+          useRhWorkOrderSnapshot
+            ? (context.templateData.partALastCompletedRH || '')
+            : (context.templateData.lastCompletedRH || context.templateData.lastDoneRH || ''),
+        );
+        setLastDoneDateForRH(
+          useWorkOrderSnapshot
+            ? partALastCompletedOn
+            : (context.templateData.lastCompletedDateForRH || context.templateData.lastCompletedDate || context.templateData.lastDoneDate || ''),
+        );
 
         // Set Modify Mode snapshot if enabled
         if (isModifyMode && setOriginalSnapshot) {
@@ -1405,7 +1461,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const res = await fetch('/technical/api/running-hours/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue), previousReading: executionData.previousReading ? Number(executionData.previousReading) : undefined })
+        body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue) })
       });
       const result = await res.json();
       if (result.rhCounterType) setComponentRhCounterType(String(result.rhCounterType).toUpperCase());
@@ -1450,7 +1506,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setComponentActualRHStatus('loaded');
         setComponentActualRHLastUpdated(result.lastUpdated || null);
         setComponentActualRHHasBaseline(!!result.hasRealRhBaseline);
-        const fetchedDate = result.lastUpdated ? new Date(result.lastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : 'N/A';
+        const fetchedDate = formatWorkOrderDateDDMMYYYY(result.lastUpdated, 'N/A');
         toast({ title: "RH Fetched", description: `Running hours fetched: ${result.currentRH} hours as of ${fetchedDate}` });
         performRHValidation(String(result.currentRH));
       }
@@ -1523,10 +1579,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const prevMs = toUTCDay(prev.date);
       if (!isNaN(prevMs) && prevMs <= readingMs) return null;
     }
-    const fmt = (s: string) => {
-      const d = new Date(s);
-      return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
-    };
+    const fmt = (s: string) => formatWorkOrderDateDDMMYYYY(s, s);
     return `Current Reading Date (${fmt(readingStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
   }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, rhReadingDateAnchor, executionData.currentReading, rhValidation.previousEntry, rhValidation.componentActualRH]);
 
@@ -2632,6 +2685,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
+      hardErrors.push(...b2BaselineErrors.map((error) => error.message));
+
       if (!draftIntent && executionData.performedBy && hodLabel && executionData.performedBy === hodLabel) {
         hardErrors.push(`The Head of Department (${hodLabel}) cannot both perform and approve the work. The server will assign ${hodLabel} as approver based on the vessel org chart.`);
       }
@@ -2662,7 +2717,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if (currentRHValue) {
+      if (isRhDrivenCounter && currentRHValue) {
         const currentRHNum = parseFloat(currentRHValue);
         if (isNaN(currentRHNum) || currentRHNum < 0) {
           hardErrors.push("Current Reading must be a positive number (≥ 0).");
@@ -2783,22 +2838,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter) {
-        if (!draftIntent && componentActualRHStatus === 'loading') {
-          hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
-        } else if (!draftIntent && componentActualRHStatus === 'error') {
-          hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
-        }
-        // The flat "exceeds component actual RH" ceiling was removed (Task #245). MASTER readings
-        // advance the counter and INHERITED is governed by timeline validation, so the only RH gate
-        // here is the server timeline result surfaced via rhValidation.status below.
-      }
-
-      if (rhBackdateError && !isRejectedWO) {
+      if (isRhDrivenCounter && rhBackdateError && !isRejectedWO) {
         hardErrors.push(rhBackdateError);
       }
 
-      if (rhValidation.status === 'invalid' && !isRejectedWO) {
+      if (isRhDrivenCounter && rhValidation.status === 'invalid' && !isRejectedWO) {
         hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
       }
 
@@ -2831,8 +2875,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       if (draftIntent) {
         const saveExecutionData = {
-          ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
-          runningHours: currentRHValue || executionData.runningHours,
+          ...sanitizeWorkOrderB3Fields(
+            stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
+            componentRhCounterType,
+          ),
+          ...(isRhDrivenCounter ? { runningHours: currentRHValue || executionData.runningHours } : {}),
           riskAssessmentStatus: executionData.riskAssessment,
           safetyChecklistsStatus: executionData.safetyChecklists,
           operationalFormsStatus: executionData.operationalForms,
@@ -2884,8 +2931,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       } else {
         if (isDraftSave && !hasCompletionData) {
           const saveExecutionData = {
-            ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
-            runningHours: currentRHValue || executionData.runningHours,
+            ...sanitizeWorkOrderB3Fields(
+              stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
+              componentRhCounterType,
+            ),
+            ...(isRhDrivenCounter ? { runningHours: currentRHValue || executionData.runningHours } : {}),
             riskAssessmentStatus: executionData.riskAssessment,
             safetyChecklistsStatus: executionData.safetyChecklists,
             operationalFormsStatus: executionData.operationalForms,
@@ -2932,45 +2982,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if (currentRHValue && executionData.previousReading) {
-        const currentRH = parseFloat(currentRHValue);
-        const previousRH = parseFloat(executionData.previousReading);
-
-        if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
-          toast({
-            title: "Validation Error",
-            description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
-        // previousReading that can still be 0/empty on the first submit (which produced a false
-        // "0 → 9500" jump). Prefer previousReading when it holds a real value; otherwise fall back to
-        // the already-loaded component RH (lastCompletedCurrentReading / currentCumulativeRH), which is
-        // available before the first submit. Skip the warning if no valid baseline exists rather than
-        // compute against 0. Does NOT affect the save or the range validation above.
-        const jumpBaselineRaw =
-          (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
-            ? executionData.previousReading
-            : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
-                ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
-                     ? String((workOrderContext as any).component.currentCumulativeRH)
-                     : undefined));
-        const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
-
-        if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
-          toast({
-            title: "Warning — Large Reading Jump",
-            description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
-            variant: "destructive",
-          });
-          setCurrentReadingWarningAcknowledged(true);
-          return;
-        }
-      }
-
       if (templateData.nextDueDate && completionDate) {
         try {
           const normalizedNextDue = normalizeDateToDDMMMYYYY(templateData.nextDueDate);
@@ -2983,7 +2994,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             if (!isNaN(nextDueDateObj.getTime()) && completionCheckObj > nextDueDateObj) {
               toast({
                 title: "Overdue Completion",
-                description: `Work was completed after the scheduled due date (${normalizedNextDue}). The record will be tagged as overdue.`,
+                description: workOrderOverdueCompletionMessage(templateData.nextDueDate),
               });
             }
           }
@@ -3050,11 +3061,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       const saveExecutionData = {
-        ...stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
-        runningHours: currentRHValue || executionData.runningHours,
+        ...sanitizeWorkOrderB3Fields(
+          stripServerManagedWorkOrderRhFields(executionData as unknown as Record<string, unknown>),
+          componentRhCounterType,
+        ),
+        ...(isRhDrivenCounter ? { runningHours: currentRHValue || executionData.runningHours } : {}),
         // RH accuracy (migration 139): materialize the DISPLAYED defaults so what the
         // user sees is what is stored — reading date defaults to today in the UI.
-        currentReadingDate: executionData.currentReadingDate || new Date().toISOString().split('T')[0],
+        ...(isRhDrivenCounter ? {
+          currentReadingDate: executionData.currentReadingDate || new Date().toISOString().split('T')[0],
+        } : {}),
         riskAssessmentStatus: executionData.riskAssessment,
         safetyChecklistsStatus: executionData.safetyChecklists,
         operationalFormsStatus: executionData.operationalForms,
@@ -3087,7 +3103,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       if (!response.ok) {
         if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          const currentDate = result.currentRHDate
+            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
+            : '';
           throw new Error(
             `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
             `(${result.currentRH} RH${currentDate}). Correct the Current Reading before completing this Work Order.`
@@ -3228,7 +3246,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             : undefined,
         level2ReviewerRankId: (templateData as any).level2ReviewerRankId || null,
         lastDoneRH: (templateData as any).lastDoneRH ? String((templateData as any).lastDoneRH).trim() : null,
-        lastCompletedOn: (templateData as any).lastCompletedOn || null,
+        lastDoneDate: mapLastCompletedOnToLastDoneDate((templateData as any).lastCompletedOn),
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };
 
@@ -3271,6 +3289,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const handleSavePartBEdit = async () => {
     if (!workOrderId) return;
+    if (b2BaselineErrors.length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: b2BaselineErrors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSavingPartB(true);
     try {
       const payload: Record<string, unknown> = {
@@ -3333,7 +3359,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
 
     const currentRHValue = executionData.currentReading || executionData.runningHours;
-    const woPayload: Record<string, unknown> = {
+    const woPayload: Record<string, unknown> = sanitizeWorkOrderB3Fields({
       vesselId: contextVesselId,
       component: templateData.componentName,
       componentCode: templateData.componentCode,
@@ -3375,7 +3401,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       consumedSpareParts: executionData.consumedSpareParts.filter(s => s.partNo || s.description),
       requiredSpareParts: templateData.requiredSpareParts || [],
       requiredTools: templateData.requiredTools || [],
-    };
+    }, componentRhCounterType);
 
     setIsDraftSaving(true);
     try {
@@ -3494,27 +3520,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       hardErrors.push('Work Carried Out must be at least 20 characters to provide a meaningful description.');
     }
 
-    if (currentRHValue) {
+    if (isRhDrivenCounter && currentRHValue) {
       const currentRHNum = parseFloat(currentRHValue);
       if (isNaN(currentRHNum) || currentRHNum < 0) hardErrors.push('Current Reading must be a positive number (≥ 0).');
     }
 
-    // RH validation state checks (mirrors handleSave pipeline).
-    // Unplanned WOs use maintenanceBasis='Calendar' so these are no-ops in practice,
-    // but are included for full parity with the execution save path.
-    if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter) {
-      if (componentActualRHStatus === 'loading') {
-        hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
-      } else if (componentActualRHStatus === 'error') {
-        hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
-      }
-      // Flat "exceeds component actual RH" ceiling removed (Task #245); timeline validation
-      // (rhValidation.status below) is the sole RH gate for MASTER and INHERITED components.
-    }
-    if (rhBackdateError && !isRejectedWO) {
+    if (isRhDrivenCounter && rhBackdateError && !isRejectedWO) {
       hardErrors.push(rhBackdateError);
     }
-    if (rhValidation.status === 'invalid' && !isRejectedWO) {
+    if (isRhDrivenCounter && rhValidation.status === 'invalid' && !isRejectedWO) {
       hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
     }
 
@@ -3595,43 +3609,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (hardErrors.length > 0) {
       toast({ title: 'Validation Error', description: hardErrors[0], variant: 'destructive' });
       return;
-    }
-
-    // Current vs previous RH regression and large-jump acknowledgment (mirrors handleSave)
-    if (currentRHValue && executionData.previousReading) {
-      const currentRH = parseFloat(currentRHValue);
-      const previousRH = parseFloat(executionData.previousReading);
-      if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
-        toast({
-          title: 'Validation Error',
-          description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
-          variant: 'destructive',
-        });
-        return;
-      }
-      // Warning-only: compute the "large jump" against the component's ACTUAL current RH, not a
-      // previousReading that can still be 0/empty on the first submit (false "0 → 9500" jump). Prefer
-      // previousReading when it holds a real value; otherwise fall back to the already-loaded component
-      // RH. Skip the warning if no valid baseline exists rather than compute against 0. Does NOT affect
-      // the save or the range validation above.
-      const jumpBaselineRaw =
-        (executionData.previousReading && parseFloat(executionData.previousReading) > 0)
-          ? executionData.previousReading
-          : ((workOrderContext as any)?.templateData?.lastCompletedCurrentReading
-              ?? ((workOrderContext as any)?.component?.currentCumulativeRH != null
-                   ? String((workOrderContext as any).component.currentCumulativeRH)
-                   : undefined));
-      const jumpBaseline = jumpBaselineRaw != null ? parseFloat(jumpBaselineRaw) : NaN;
-
-      if (!isNaN(currentRH) && !isNaN(jumpBaseline) && jumpBaseline > 0 && (currentRH - jumpBaseline) > 2000 && !currentReadingWarningAcknowledged) {
-        toast({
-          title: 'Warning — Large Reading Jump',
-          description: `Current Reading (${currentRH}) exceeds Previous Reading (${jumpBaseline}) by ${(currentRH - jumpBaseline).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
-          variant: 'destructive',
-        });
-        setCurrentReadingWarningAcknowledged(true);
-        return;
-      }
     }
 
     // Determine submission status based on Part B completeness
@@ -3849,7 +3826,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       if (!response.ok) {
         if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate ? ` recorded on ${result.currentRHDate}` : '';
+          const currentDate = result.currentRHDate
+            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
+            : '';
           throw new Error(
             `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
             `(${result.currentRH} RH${currentDate}). Correct the Current Reading before approving this Work Order.`
@@ -4238,7 +4217,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               {topAnomaly.missedCycles > 0 ? ` — ${topAnomaly.missedCycles} missed cycles` : ''}
             </span>
             <span className={`text-xs ${sc.text} opacity-70 ml-auto`}>
-              Detected: {topAnomaly.detectedAt ? new Date(topAnomaly.detectedAt).toLocaleDateString() : 'N/A'}
+              Detected: {formatWorkOrderDateDDMMYYYY(topAnomaly.detectedAt, 'N/A')}
             </span>
           </div>
         );
@@ -4446,8 +4425,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           const woOriginalDueDate = (workOrderContext as any)?.workOrder?.originalDueDate;
                           const jobNextDueDate = templateData?.nextDueDate;
                           if (woOriginalDueDate && jobNextDueDate) {
-                            const formattedOriginal = normalizeDateToDDMMMYYYY(woOriginalDueDate) || woOriginalDueDate;
-                            const formattedNextDue = normalizeDateToDDMMMYYYY(jobNextDueDate) || jobNextDueDate;
+                            const formattedOriginal = formatWorkOrderDateDDMMYYYY(woOriginalDueDate, woOriginalDueDate);
+                            const formattedNextDue = formatWorkOrderDateDDMMYYYY(jobNextDueDate, jobNextDueDate);
                             return (
                               <p className="text-sm mt-2" style={{ color: '#92400E' }} data-testid="text-next-due-corrected">
                                 The next due date has been automatically corrected to{' '}
@@ -4818,7 +4797,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />{isNewJobCreation ? 'Next Due Hour' : 'Next Due RH'}</Label>
                       <Input
                         type="text"
-                        value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
+                        value={displayedPartANextDueRH ? `${displayedPartANextDueRH} Hours` : '-'}
                         className="text-sm bg-gray-50"
                         disabled={true}
                         data-testid="WOF.A1.27"
@@ -4827,12 +4806,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   ) : (
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
-                      <Input
-                        type="date"
-                        value={templateData.nextDueDate}
-                        onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
-                        className={`text-sm ${isNewJobCreation && templateData.maintenanceBasis === 'Calendar' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                      <WorkOrderDateInput
+                        value={displayedPartANextDueDate}
+                        onChange={(value) => handleTemplateChange('nextDueDate', value)}
                         disabled={isPartAReadOnly || (isNewJobCreation && templateData.maintenanceBasis === 'Calendar')}
+                        className={isNewJobCreation && templateData.maintenanceBasis === 'Calendar' ? 'text-sm bg-gray-50 text-gray-500 cursor-not-allowed' : 'text-sm'}
+                        aria-label="Next Due Date"
                         data-testid="WOF.A1.27"
                       />
                     </div>
@@ -4876,18 +4855,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       Last Completed On
                     </Label>
                     {isNewJobCreation ? (
-                      <Input
-                        type="date"
+                      <WorkOrderDateInput
                         value={(templateData as any).lastCompletedOn || ''}
-                        onChange={(e) => handleTemplateChange('lastCompletedOn', e.target.value)}
+                        onChange={(value) => handleTemplateChange('lastCompletedOn', value)}
                         className="text-sm"
+                        aria-label="Last Completed On"
                         data-testid="input-last-completed-on"
                       />
                     ) : (
                       <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
                         {(lastDoneDate || lastDoneDateForRH) ? (
                           <>
-                            {normalizeDateToDDMMMYYYY(lastDoneDateForRH || lastDoneDate) || lastDoneDateForRH || lastDoneDate}
+                            {formatWorkOrderDateDDMMYYYY(lastDoneDateForRH || lastDoneDate, lastDoneDateForRH || lastDoneDate)}
                             {formatRelativeTime(lastDoneDateForRH || lastDoneDate) && (
                               <span className="text-gray-500"> ({formatRelativeTime(lastDoneDateForRH || lastDoneDate)})</span>
                             )}
@@ -5337,7 +5316,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               const totalPages = Math.ceil(totalCount / WORK_HISTORY_PAGE_SIZE);
 
               const hasFilters = !!historyPeriod;
-              const fmtDate = (d: string | null | undefined) => d ? d.slice(0, 10) : '—';
+              const fmtDate = (d: string | null | undefined) =>
+                formatWorkOrderDateDDMMYYYY(d, '—');
 
               return (
                 <>
@@ -5455,7 +5435,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         <>
                                           <div>
                                             <span className="font-medium text-gray-600">Completion Date:</span>{' '}
-                                            <span className="text-gray-800">{row.date || '—'}</span>
+                                            <span className="text-gray-800">{fmtDate(row.date)}</span>
                                           </div>
                                           <div>
                                             <span className="font-medium text-gray-600">Running Hours:</span>{' '}
@@ -5877,44 +5857,57 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-medium text-gray-700" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
                   {(() => {
-                    const woOrigDueDate = (workOrderContext as any)?.workOrder?.originalDueDate;
+                    const maintenanceBasis = templateData.maintenanceBasis || (workOrderContext as any)?.maintenanceBasis;
+                    const hasCalendarDue = maintenanceBasis !== 'Running Hours' && !!displayedPartANextDueDate;
+                    const hasRhDue =
+                      (maintenanceBasis === 'Running Hours' || maintenanceBasis === 'Dual Frequency')
+                      && !!displayedPartANextDueRH;
                     const woDateCompleted = (workOrderContext as any)?.workOrder?.dateCompleted || (workOrderContext as any)?.workOrder?.completionDateTime;
                     const isCompleted = currentWorkOrderStatus === 'Completed';
-                    if (isCompleted && woOrigDueDate) {
-                      const formattedScheduled = normalizeDateToDDMMMYYYY(woOrigDueDate) || woOrigDueDate;
-                      const formattedCompletion = woDateCompleted ? (normalizeDateToDDMMMYYYY(woDateCompleted) || woDateCompleted) : '-';
+                    if (!hasCalendarDue && !hasRhDue) return null;
+                    if (isCompleted && hasCalendarDue) {
+                      const formattedScheduled = formatWorkOrderDateDDMMYYYY(displayedPartANextDueDate, displayedPartANextDueDate);
+                      const formattedCompletion = formatWorkOrderDateDDMMYYYY(woDateCompleted, '-');
                       return (
-                        <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-date-detail">
+                        <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-target-detail">
                           <div>Scheduled Due Date: <span className="text-gray-700">{formattedScheduled}</span></div>
+                          {hasRhDue && <div>Due RH: <span className="text-gray-700">{displayedPartANextDueRH} Hours</span></div>}
                           <div>Actual Completion: <span className="text-gray-700">{formattedCompletion}</span></div>
                         </div>
                       );
                     }
-                    if (workOrderDueDate) {
-                      return (
-                        <span className="text-sm text-gray-500 font-medium" data-testid="text-due-date">
-                          Due Date: <span className="text-gray-700">{workOrderDueDate}</span>
-                        </span>
-                      );
-                    }
-                    return null;
+                    return (
+                      <div className="text-sm text-gray-500 font-medium text-right" data-testid="text-due-target">
+                        {hasCalendarDue && <div>
+                          Due Date: <span className="text-gray-700">{formatWorkOrderDateDDMMYYYY(displayedPartANextDueDate, displayedPartANextDueDate)}</span>
+                        </div>}
+                        {hasRhDue && <div>
+                          Due RH: <span className="text-gray-700">{displayedPartANextDueRH} Hours</span>
+                        </div>}
+                      </div>
+                    );
                   })()}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.5"><Marker id="WOF.B2.5" />Start Date <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="date"
-                      value={executionData.startDateTime ? executionData.startDateTime.split('T')[0] : ''}
-                      onChange={(e) => {
+                    <WorkOrderDateInput
+                      value={executionData.startDateTime}
+                      onChange={(value) => {
                         const currentTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1] || '' : '';
-                        handleExecutionChange('startDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
+                        handleExecutionChange('startDateTime', currentTime ? `${value}T${currentTime}` : value);
                       }}
                       disabled={isPartBReadOnly}
-                      className="text-sm"
-                      placeholder="dd-mm-yyyy"
+                      className={`text-sm ${startDateBaselineError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                      aria-invalid={!!startDateBaselineError}
+                      aria-label="Start Date"
                       data-testid="WOF.B2.6"
                     />
+                    {startDateBaselineError && (
+                      <p className="text-xs text-red-600" data-testid="error-start-date-after-last-completed">
+                        {startDateBaselineError.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -5935,17 +5928,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.9"><Marker id="WOF.B2.9" />Completion Date <span className="text-red-500">*</span></Label>
                     <div className="flex items-center gap-2">
-                      <Input
-                        type="date"
-                        value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '')}
-                        onChange={(e) => {
+                      <WorkOrderDateInput
+                        value={executionData.completionDateTime || executionData.dateOfCompletion}
+                        onChange={(value) => {
                           const currentTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1] || '' : '';
-                          handleExecutionChange('completionDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
-                          handleExecutionChange('dateOfCompletion', e.target.value);
+                          handleExecutionChange('completionDateTime', currentTime ? `${value}T${currentTime}` : value);
+                          handleExecutionChange('dateOfCompletion', value);
                         }}
                         disabled={isPartBReadOnly}
-                        className="text-sm flex-1"
-                        placeholder="dd-mm-yyyy"
+                        className="text-sm"
+                        containerClassName="flex-1"
+                        aria-label="Completion Date"
                         data-testid="WOF.B2.10"
                       />
                       <Button
@@ -6019,10 +6012,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           value={woRhValue}
                           onChange={(e) => handleExecutionChange('woCompletionRh', e.target.value)}
                           disabled={isPartBReadOnly || isB3EditLocked}
-                          className="text-sm"
+                          className={`text-sm ${completionRhBaselineError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                          aria-invalid={!!completionRhBaselineError}
                           placeholder="RH at completion (prefilled from Current Reading)"
                           data-testid="input-wo-completion-rh"
                         />
+                        {completionRhBaselineError && (
+                          <p className="text-xs text-red-600" data-testid="error-completion-rh-after-last-completed">
+                            {completionRhBaselineError.message}
+                          </p>
+                        )}
                         <p className="text-[11px] text-gray-400">Hours at the time the work was done — drives the next RH cycle.</p>
                       </div>
                     );
@@ -6256,6 +6255,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
+          {isRhDrivenCounter && (<div className="contents">
           {/* B3. Running Hours */}
           <div data-testid="WOF.B3.1"><Marker id="WOF.B3.1" /></div>
           <div data-testid="WOF.B3.2"><Marker id="WOF.B3.2" /></div>
@@ -6271,115 +6271,64 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <span>Running Hours cannot be edited after submission — changes would affect the child component RH cascade at approval.</span>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.3"><Marker id="WOF.B3.3" />Previous reading</Label>
+                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && <span className="text-red-500"> *</span>}</Label>
                 <Input
-                  value={executionData.previousReading}
-                  className="text-sm bg-gray-50"
-                  disabled
-                  data-testid="WOF.B3.4"
+                  type="number"
+                  min="0"
+                  value={executionData.currentReading}
+                  onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                  disabled={isPartBReadOnly || isB3EditLocked}
+                  className={`text-sm w-full ${
+                    rhValidation.status === 'valid' ? 'border-green-400 focus:ring-green-400' :
+                    rhValidation.status === 'invalid' ? 'border-red-400 focus:ring-red-400' :
+                    rhValidation.status === 'warning' ? 'border-orange-400 focus:ring-orange-400' :
+                    ''
+                  }`}
+                  data-testid="WOF.B3.6"
                 />
               </div>
 
+              {/* RH accuracy (migration 139): date the reading was TAKEN — becomes the
+                  RH module's Last Updated date instead of the WO completion date.
+                  Defaults to today, cannot be in the future. */}
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]" data-testid="text-component-actual-rh-label">Component Actual RH</Label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    value={
-                      componentActualRHStatus === 'loading' ? 'Loading...' :
-                      componentActualRHStatus === 'error' ? 'Failed to load' :
-                      rhValidation.componentActualRH !== null ? `${rhValidation.componentActualRH.toLocaleString()} hrs` : 'N/A'
-                    }
-                    className={`text-sm font-semibold flex-1 ${
-                      componentActualRHStatus === 'loaded' && rhValidation.componentActualRH !== null ? 'bg-green-50 border-green-300 text-green-800' :
-                      componentActualRHStatus === 'error' ? 'bg-red-50 border-red-300 text-red-700' :
-                      'bg-gray-50 border-gray-200 text-gray-400 italic'
-                    }`}
-                    disabled
-                    data-testid="text-component-actual-rh"
-                  />
-                  {componentActualRHStatus === 'error' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={fetchComponentActualRH}
-                      className="shrink-0 text-xs border-red-300 text-red-600 hover:bg-red-50"
-                      data-testid="button-retry-rh-fetch"
-                      title="Retry loading component RH"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                      Retry
-                    </Button>
-                  )}
-                </div>
-                {componentActualRHStatus === 'error' && (
-                  <div className="text-xs text-red-600" data-testid="text-rh-fetch-error">
-                    Unable to fetch component RH. Please retry or refresh the page.
-                  </div>
-                )}
-                {componentActualRHStatus === 'loading' && (
-                  <div className="text-xs text-gray-500 flex items-center gap-1" data-testid="text-rh-loading">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Fetching component running hours...
-                  </div>
-                )}
+                <Label className="text-sm text-[#8798ad]" data-testid="label-current-reading-date">Current Reading Date</Label>
+                <WorkOrderDateInput
+                  value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(value) => handleExecutionChange('currentReadingDate', value)}
+                  disabled={isPartBReadOnly || isB3EditLocked}
+                  className="text-sm w-full"
+                  aria-label="Current Reading Date"
+                  data-testid="input-current-reading-date"
+                />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && <span className="text-red-500"> *</span>}</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    value={executionData.currentReading}
-                    onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
-                    disabled={isPartBReadOnly || isB3EditLocked}
-                    className={`text-sm flex-1 ${
-                      rhValidation.status === 'valid' ? 'border-green-400 focus:ring-green-400' :
-                      rhValidation.status === 'invalid' ? 'border-red-400 focus:ring-red-400' :
-                      rhValidation.status === 'warning' ? 'border-orange-400 focus:ring-orange-400' :
-                      ''
-                    }`}
-                    data-testid="WOF.B3.6"
-                  />
-                  {!isPartBReadOnly && !isB3EditLocked && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={fetchCurrentRHFromModule}
-                      className="shrink-0 text-xs"
-                      data-testid="button-fetch-rh"
-                      title="Fetch Current RH from Module"
-                    >
-                      <BarChart3 className="h-3.5 w-3.5 mr-1" />
-                      Fetch RH
-                    </Button>
-                  )}
-                </div>
+              {!isPartBReadOnly && !isB3EditLocked && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchCurrentRHFromModule}
+                  className="w-full shrink-0 text-xs md:w-auto"
+                  data-testid="button-fetch-rh"
+                  title="Fetch Current RH from Module"
+                >
+                  <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                  Fetch RH
+                </Button>
+              )}
+            </div>
 
-                {/* RH accuracy (migration 139): date the reading was TAKEN — becomes the
-                    RH module's Last Updated date instead of the WO completion date.
-                    Defaults to today, cannot be in the future. */}
-                <div className="space-y-1 mt-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="label-current-reading-date">Current Reading Date</Label>
-                  <Input
-                    type="date"
-                    value={executionData.currentReadingDate || new Date().toISOString().split('T')[0]}
-                    max={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => handleExecutionChange('currentReadingDate', e.target.value)}
-                    disabled={isPartBReadOnly || isB3EditLocked}
-                    className="text-sm"
-                    data-testid="input-current-reading-date"
-                  />
-                </div>
-
+            <div className="mt-3 space-y-2">
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
                     Valid range: {(() => { const vr = rhValidation.validRange!; const minStr = Number.isFinite(vr.min) ? vr.min.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `${minStr} to ${maxStr}`; })()} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
-                        | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {formatWorkOrderDateDDMMYYYY(rhValidation.previousEntry.date, rhValidation.previousEntry.date)}
                       </span>
                     )}
                   </div>
@@ -6437,11 +6386,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {(rhBackdatedBanner ||
                   !!(workOrderContext as any)?.executionData?.rhBackdatedEntry ||
                   (workOrderContext as any)?.executionData?.rhUpdateOutcome === 'skipped_lower') && (() => {
-                  const fmt = (s: string) => {
-                    if (!s) return '';
-                    const d = new Date(s);
-                    return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
-                  };
+                  const fmt = (s: string) => formatWorkOrderDateDDMMYYYY(s, s);
                   const enteredRH = executionData.currentReading || '';
                   // The server's back-dated-lower skip is keyed on readingDateForRH, so this
                   // banner must report the reading date it actually compared.
@@ -6490,7 +6435,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </a>
                   </div>
                 )}
-              </div>
             </div>
 
             {/* HOD Approval Remarks (for completed WOs) */}
@@ -6536,6 +6480,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             )}
           </SectionBlock>
+          </div>)}
 
           {/* B4. Spare Parts Consumed */}
           <div data-testid="WOF.B4.1"><Marker id="WOF.B4.1" /></div>
@@ -7034,15 +6979,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
             const approveDisabled = isProcessingApproval || isSuptLocked || (approvalMissedCycles >= 1 && !justificationValid) || !ceRemarksValid;
 
-            const formatDateForDisplay = (dateStr: string) => {
-              if (!dateStr) return '—';
-              try {
-                const d = new Date(dateStr);
-                if (isNaN(d.getTime())) return dateStr;
-                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                return `${String(d.getDate()).padStart(2,'0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
-              } catch { return dateStr; }
-            };
+            const formatDateForDisplay = (dateStr: string) =>
+              formatWorkOrderDateDDMMYYYY(dateStr, dateStr || '—');
 
             const tierBannerConfig = (() => {
               switch (approvalTier) {
@@ -7371,7 +7309,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     )}
                     {(workOrderContext as any).workOrder.rejectionDate && (
                       <span className="text-xs text-amber-600">
-                        on {new Date((workOrderContext as any).workOrder.rejectionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        on {formatWorkOrderDateDDMMYYYY((workOrderContext as any).workOrder.rejectionDate, (workOrderContext as any).workOrder.rejectionDate)}
                       </span>
                     )}
                   </div>
@@ -7396,7 +7334,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     )}
                     {(workOrderContext as any).workOrder.reopenedAt && (
                       <span className="text-xs text-amber-600">
-                        on {new Date((workOrderContext as any).workOrder.reopenedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        on {formatWorkOrderDateDDMMYYYY((workOrderContext as any).workOrder.reopenedAt, (workOrderContext as any).workOrder.reopenedAt)}
                       </span>
                     )}
                   </div>
@@ -7589,7 +7527,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <div><strong>Submitted reading:</strong> {rhLowerApprovalNotice?.submittedRH} RH</div>
                   <div>
                     <strong>Latest live reading:</strong> {rhLowerApprovalNotice?.latestRH} RH
-                    {rhLowerApprovalNotice?.latestRHDate ? ` (${rhLowerApprovalNotice.latestRHDate})` : ''}
+                    {rhLowerApprovalNotice?.latestRHDate
+                      ? ` (${formatWorkOrderDateDDMMYYYY(rhLowerApprovalNotice.latestRHDate, rhLowerApprovalNotice.latestRHDate)})`
+                      : ''}
                   </div>
                 </div>
                 <p>The submitted value remains recorded on this Work Order for completion history.</p>
@@ -8026,10 +7966,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div className="bg-red-50 p-3 rounded-lg space-y-1">
                 <div className="font-medium text-red-800">Issue: {rhErrorDetails.validationStatus?.replace(/_/g, ' ')}</div>
                 {rhErrorDetails.previousEntry && (
-                  <div className="text-red-700">Previous RH Entry: {rhErrorDetails.previousEntry.runningHours} hrs on {new Date(rhErrorDetails.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div className="text-red-700">Previous RH Entry: {rhErrorDetails.previousEntry.runningHours} hrs on {formatWorkOrderDateDDMMYYYY(rhErrorDetails.previousEntry.date, rhErrorDetails.previousEntry.date)}</div>
                 )}
                 {rhErrorDetails.nextEntry && (
-                  <div className="text-red-700">Next RH Entry: {rhErrorDetails.nextEntry.runningHours} hrs on {new Date(rhErrorDetails.nextEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div className="text-red-700">Next RH Entry: {rhErrorDetails.nextEntry.runningHours} hrs on {formatWorkOrderDateDDMMYYYY(rhErrorDetails.nextEntry.date, rhErrorDetails.nextEntry.date)}</div>
                 )}
                 {rhErrorDetails.daysBetweenPrevious > 0 && (
                   <>

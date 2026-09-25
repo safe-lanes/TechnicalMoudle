@@ -10,6 +10,9 @@ import { tenantMiddleware } from "./middleware/tenantMiddleware";
 import { requestContextMiddleware } from "./middleware/requestContext";
 import { ensureMaintenanceHistoryImmutability, ensureCertApplicabilityIndex } from "./initDb";
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
+import { getDb } from "./db";
+import { jobs as jobsTable } from "@shared/schema";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL: Ensure immutability trigger exists BEFORE registering routes
@@ -465,10 +468,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allJobs = await storage.getJobs();
       let updatedCalendar = 0;
       let updatedRH = 0;
+      let updatedRhEstimate = 0;
+      const {
+        estimateRhDueDate,
+        isCurrentRhEstimateBasis,
+        rhEstimateBasis,
+        resolveAuthoritativeRhComponent,
+      } = await import("./services/rhDueDateService");
 
       for (const job of allJobs) {
         let updates: any = {};
         let needsUpdate = false;
+        let effectiveNextDueRh = job.nextDueRH;
 
         // Calendar-based jobs: Calculate nextDueDate if missing
         if (job.maintenanceBasis === 'Calendar' && !job.nextDueDate) {
@@ -490,116 +501,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Running Hours-based jobs: Calculate nextDueRH if missing
         // Only use intervalRunningHour, not frequencyValue
         // VALIDATION: interval must be a valid number > 0
-        if (job.maintenanceBasis === 'Running Hours' && !job.nextDueRH) {
+        if (
+          (job.maintenanceBasis === 'Running Hours' || job.maintenanceBasis === 'Dual Frequency')
+          && !job.nextDueRH
+        ) {
           const lastDoneRH = job.lastDoneRH;
           const intervalRH = Number(job.intervalRunningHour);
           if (lastDoneRH && !isNaN(intervalRH) && intervalRH > 0) {
             const lastRH = Number(lastDoneRH);
             if (!isNaN(lastRH)) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-              needsUpdate = true;
-              updatedRH++;
-            }
-          }
-        }
-
-        // Apply updates if needed
-        if (needsUpdate) {
-          await storage.updateJob(job.juuid, updates);
-        }
-      }
-
-      if (updatedCalendar > 0 || updatedRH > 0) {
-        console.log(`✅ Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH)`);
-      } else {
-        console.log('✅ Job backfill check complete - all jobs already have due dates/RH calculated');
-      }
-    } catch (err) {
-      console.error('⚠️ Error during job nextDueDate/nextDueRH backfill:', err);
-    }
-  })();
-
-  // STARTUP REMEDIATION: Derive component-specific tracking from ACTUAL maintenance history
-  // This uses maintenance history as the source of truth for each component's completion dates
-  (async () => {
-    try {
-      const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import("@shared/dateUtils");
-
-      // Get all job-component links
-      const allLinks = await storage.getAllJobComponentLinks();
-      let updatedCount = 0;
-
-      for (const link of allLinks) {
-        // Get the LATEST maintenance history record for this job+component pair
-        const maintenanceHistory = await storage.getMaintenanceHistoryByJobAndComponent(
-          link.jobId,
-          link.componentCode
-        );
-
-        if (!maintenanceHistory || maintenanceHistory.length === 0) {
-          continue; // No maintenance history for this job-component pair
-        }
-
-        // Get the most recent record (sorted by date_completed DESC)
-        const latestRecord = maintenanceHistory[0];
-
-        // Check if the link's tracking data matches the latest maintenance history
-        const historyDate = latestRecord.dateCompleted;
-        const historyRH = latestRecord.runningHoursAtCompletion;
-
-        // Get the job to determine frequency for next due calculation
-        const job = await storage.getJob(link.jobId);
-        if (!job) continue;
-
-        // Build update if different from current link data
-        const updates: any = {};
-        let needsUpdate = false;
-
-        if (historyDate && link.lastDoneDate !== historyDate) {
-          updates.lastDoneDate = historyDate;
-          needsUpdate = true;
-
-          // Calculate nextDueDate if calendar-based
-          if (job.maintenanceBasis === 'Calendar' && job.frequencyValue && job.frequencyUnit) {
-            const normalizedDate = normalizeDateToDDMMMYYYY(historyDate);
-            if (normalizedDate) {
-              const nextDue = calculateNextDueDate(normalizedDate, job.frequencyValue, job.frequencyUnit);
-              if (nextDue) {
-                updates.nextDueDate = nextDue;
+              const derivedNextDueRh = String(lastRH + intervalRH);
+              const db = await getDb();
+              const repaired = await db.update(jobsTable)
+                .set({
+                  nextDueRH: derivedNextDueRh,
+                  updatedAt: new Date(),
+                })
+                .where(and(
+                  eq(jobsTable.juuid, job.juuid),
+                  isNull(jobsTable.nextDueRH),
+                  sql`${jobsTable.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+                ))
+                .returning({ nextDueRH: jobsTable.nextDueRH });
+              if (repaired.length > 0) {
+                effectiveNextDueRh = repaired[0].nextDueRH;
+                updatedRH++;
+              } else {
+                // A live completion or another repair won after the startup
+                // snapshot. Its cycle writer owns the matching estimate.
+                effectiveNextDueRh = null;
               }
             }
           }
         }
 
-        if (historyRH && link.lastDoneRH !== historyRH) {
-          updates.lastDoneRH = historyRH;
-          needsUpdate = true;
+        // Persist basic due-field repairs first so estimate compare-and-set sees
+        // the same current RH threshold in this startup pass.
+        if (needsUpdate) {
+          await storage.updateJob(job.juuid, updates);
+        }
 
-          // Calculate nextDueRH if RH-based
-          if (job.maintenanceBasis === 'Running Hours' && job.intervalRunningHour) {
-            const lastRH = parseFloat(historyRH);
-            const intervalRH = parseFloat(job.intervalRunningHour);
-            if (!isNaN(lastRH) && !isNaN(intervalRH) && intervalRH > 0) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-            }
+        // Historical-utilization projection for existing RH and Dual jobs.
+        // Persist even an unavailable basis once so startup does not repeat
+        // the same audit scan until a real completion recalculates the cycle.
+        if (
+          (job.maintenanceBasis === 'Running Hours' || job.maintenanceBasis === 'Dual Frequency')
+          && !isCurrentRhEstimateBasis(job.rhEstimateBasis)
+          && job.lastDoneDate
+          && Number(job.intervalRunningHour) > 0
+          && Number(effectiveNextDueRh) >= 0
+        ) {
+          let component: any = job.componentId
+            ? await storage.getComponent(job.componentId)
+            : null;
+          if (!component && job.componentCode && job.vesselId) {
+            component = await storage.getComponentByCode(job.componentCode, job.vesselId);
           }
+          component = await resolveAuthoritativeRhComponent(
+            component,
+            id => storage.getComponent(id),
+            (code, vesselId) => storage.getComponentByCode(code, vesselId),
+            job.vesselId,
+          );
+          let estimate = {
+            dueDate: null as string | null,
+            averagePerDay: null as number | null,
+            basis: rhEstimateBasis('MISSING_RH_SOURCE'),
+          };
+          if (component) {
+            const audits = await storage.getRunningHoursAudits(component.cuuid || component.id);
+            estimate = estimateRhDueDate(
+              job.lastDoneDate,
+              job.intervalRunningHour,
+              audits,
+            );
+          }
+          // Compare-and-set prevents this detached startup backfill from
+          // replacing a cycle estimate written by a concurrent completion.
+          const db = await getDb();
+          const saved = await db.update(jobsTable)
+            .set({
+              rhEstimatedDueDate: estimate.dueDate,
+              rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
+              rhEstimateBasis: estimate.basis,
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(jobsTable.juuid, job.juuid),
+              sql`${jobsTable.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+              sql`${jobsTable.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
+              sql`${jobsTable.rhEstimatedDueDate} IS NOT DISTINCT FROM ${job.rhEstimatedDueDate}`,
+              sql`${jobsTable.rhEstimateBasis} IS NOT DISTINCT FROM ${job.rhEstimateBasis}`,
+            ))
+            .returning({ juuid: jobsTable.juuid });
+          if (saved.length > 0) updatedRhEstimate++;
         }
 
-        if (needsUpdate && link.vesselId) {
-          updates.updatedAt = new Date();
-          // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
-          await storage.updateJobComponentLinkTracking(link.vesselId, link.jobId, link.componentId, updates);
-          updatedCount++;
-        }
       }
 
-      if (updatedCount > 0) {
-        console.log(`✅ Remediated ${updatedCount} job-component links with component-specific tracking from maintenance history`);
+      if (updatedCalendar > 0 || updatedRH > 0 || updatedRhEstimate > 0) {
+        console.log(`✅ Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH), ${updatedRhEstimate} RH historical estimates`);
       } else {
-        console.log('✅ Component-specific tracking check complete - all data matches maintenance history');
+        console.log('✅ Job backfill check complete - all jobs already have due dates/RH calculated');
       }
     } catch (err) {
-      console.error('⚠️ Error during component-specific tracking remediation:', err);
+      console.error('⚠️ Error during job nextDueDate/nextDueRH backfill:', err);
     }
   })();
 

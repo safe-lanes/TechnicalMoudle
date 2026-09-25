@@ -6,6 +6,10 @@ import { invalidateComplianceCache } from './complianceAnomalyService';
 import { logFieldChanges } from '../../sync';
 import { finalizeWorkOrderCompletion } from './workOrderCompletionService';
 import { isSuperintendentLockEnabled } from './workOrderService';
+import {
+  ensureCompletedWorkOrderDate,
+  resolveFinalCompletionDate,
+} from '../utils/completedWorkOrderDate';
 
 // ── Bulk Approve Work Orders ──
 
@@ -32,8 +36,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       }
 
       // Only approve work orders in 'Pending Approval' status
-      if (existingWO.status !== 'Pending Approval' &&
-          (existingWO as any).computedStatus !== 'Pending Approval') {
+      if (existingWO.status !== 'Pending Approval') {
         results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
         continue;
       }
@@ -51,7 +54,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       }
 
       // Calculate next due date/reading based on actual completion date
-      const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
+      const actualCompletionDate = resolveFinalCompletionDate(existingWO);
       let nextDueDate = undefined;
       let nextDueReading = undefined;
 
@@ -178,6 +181,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         updateData.dateCompleted = actualCompletionDate;
       }
 
+      ensureCompletedWorkOrderDate(existingWO, updateData);
       await repo.update(workOrderId, updateData);
 
       // Sync field logging — bulk approve
@@ -203,6 +207,14 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
           });
         } catch (err) {
           console.error('[BACKFILL ERROR] Failed to create skipped cycle records (bulk):', err);
+        }
+      }
+
+      if (!requiresLevel2Review) {
+        try {
+          await finalizeWorkOrderCompletion(workOrderId);
+        } catch (finalizeErr) {
+          console.error('[Bulk Approve] finalizeWorkOrderCompletion failed (non-blocking):', finalizeErr);
         }
       }
 
@@ -252,7 +264,7 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     }
   }
 
-  const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
+  const actualCompletionDate = resolveFinalCompletionDate(existingWO);
   const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
 
   let nextDueDate: string | undefined;
@@ -291,6 +303,7 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     updateData.dateCompleted = actualCompletionDate;
   }
 
+  ensureCompletedWorkOrderDate(existingWO, updateData);
   await repo.update(workOrderId, updateData);
 
   try {

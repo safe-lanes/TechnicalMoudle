@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue } from "@/components/filters/PeriodFilter";
-import { getDisplayStatus, getEffectiveStatus, filterAndSortWorkOrders, type WorkOrderApprovalTierCounts } from "@shared/utils/workOrderFilters";
+import { getDisplayStatus, getDisplayedWorkOrderDueDate, getEffectiveStatus, filterAndSortWorkOrders, isDisplayedWorkOrderDueDateExpected, shouldShowNextDueHourColumn, type WorkOrderApprovalTierCounts } from "@shared/utils/workOrderFilters";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -49,6 +49,7 @@ import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
+import { formatWorkOrderExportDueValue } from "./workOrderExportDueValue";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,6 +72,8 @@ import {
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   computedStatus?: ComputedWorkOrderStatus;
   dueRH?: number | null;
+  nextDueHour?: number | null;
+  rhEstimatedDueDate?: string | null;
   currentRH?: number | null;
   postponementReason?: string | null;
   postponementRemarks?: string | null;
@@ -520,15 +523,6 @@ const WorkOrders: React.FC = () => {
       },
     ];
 
-    if (activeTab === "Pending Approval") {
-      cols.push({
-        headerName: 'WO Template Code',
-        field: 'templateCode',
-        minWidth: 150,
-        flex: 1,
-      });
-    }
-
     cols.push(
       {
         headerName: 'Job Title',
@@ -542,7 +536,7 @@ const WorkOrders: React.FC = () => {
           return (
             <div className={`flex items-center gap-1 min-w-0 overflow-hidden w-full ${isRejectedWO ? 'text-red-600' : ''}`}>
               <span className="truncate">{wo.jobTitle}</span>
-              {wo.maintenanceBasis === "Running Hours" && (
+              {(wo.maintenanceBasis === "Running Hours" || wo.maintenanceBasis === "Dual Frequency") && (
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap shrink-0" data-testid={`badge-rh-${wo.id}`}>
                   RH
                 </span>
@@ -572,39 +566,23 @@ const WorkOrders: React.FC = () => {
           if (activeTab === "Unplanned") {
             return <span>{wo.dueDate ? formatProfessionalDate(wo.dueDate) : wo.submittedDate ? formatProfessionalDate(wo.submittedDate) : '—'}</span>;
           }
-          if (wo.maintenanceBasis === "Running Hours") {
-            const rhTarget = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null);
-            const rhCurrent = wo.currentRH ?? (wo.currentReading != null ? Number(wo.currentReading) : null);
-            const hasTarget = rhTarget != null && !isNaN(rhTarget);
-            const hasCurrent = rhCurrent != null && !isNaN(rhCurrent);
-            return (
-              <div className="relative group">
-                <span className="text-gray-900 font-medium" data-testid={`text-rh-due-${wo.id}`}>
-                  {hasTarget ? `${rhTarget.toLocaleString()} RH` : '—'}
-                </span>
-                {hasTarget && (
-                  <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
-                    <div className="flex flex-col gap-1">
-                      <span>Next Due RH: {rhTarget.toLocaleString()}</span>
-                      <span>Current RH: {hasCurrent ? rhCurrent.toLocaleString() : '—'}</span>
-                      {hasCurrent ? (
-                        <span className={rhTarget - rhCurrent <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
-                          Remaining RH: {(rhTarget - rhCurrent).toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Remaining RH: —</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          }
+          const displayedDueDate = getDisplayedWorkOrderDueDate(wo);
+           const isExpectedDueDate = isDisplayedWorkOrderDueDateExpected(wo);
           return (
             <div className="flex items-center gap-2">
-              <span>{wo.dueDate ? formatProfessionalDate(wo.dueDate) : '—'}</span>
-              {wo.dueDate && wo.leadTimeValue && wo.leadTimeUnit && (() => {
-                const leadTimeStatus = calculateLeadTimeStatus(wo.dueDate, wo.leadTimeValue, wo.leadTimeUnit);
+              <span data-testid={`text-due-date-${wo.id}`}>
+                {displayedDueDate ? formatProfessionalDate(displayedDueDate) : '—'}
+              </span>
+               {displayedDueDate && isExpectedDueDate && (
+                 <span
+                   className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 whitespace-nowrap"
+                   data-testid={`badge-expected-due-date-${wo.id}`}
+                 >
+                   Expected
+                 </span>
+               )}
+              {displayedDueDate && wo.leadTimeValue && wo.leadTimeUnit && (() => {
+                const leadTimeStatus = calculateLeadTimeStatus(displayedDueDate, wo.leadTimeValue, wo.leadTimeUnit);
                 if (leadTimeStatus.isInLeadTimePeriod) {
                   return (
                     <div className="relative group">
@@ -632,12 +610,56 @@ const WorkOrders: React.FC = () => {
           const woB = nodeB?.data;
           if (!woA || !woB) return 0;
           const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
-          const aVal = useSubmitted ? (woA.submittedDate || "") : (woA.dueDate || "");
-          const bVal = useSubmitted ? (woB.submittedDate || "") : (woB.dueDate || "");
+          const aVal = useSubmitted ? (woA.submittedDate || "") : (getDisplayedWorkOrderDueDate(woA) || "");
+          const bVal = useSubmitted ? (woB.submittedDate || "") : (getDisplayedWorkOrderDueDate(woB) || "");
           return aVal.localeCompare(bVal);
         },
       }
     );
+
+    if (shouldShowNextDueHourColumn(activeTab)) {
+      cols.push({
+        headerName: 'Due Hour',
+        field: 'nextDueHour',
+        minWidth: 145,
+        flex: 1,
+        valueGetter: (params: any) => {
+          const value = params.data?.nextDueHour;
+          return value != null && Number.isFinite(Number(value)) ? Number(value) : null;
+        },
+        valueFormatter: (params: any) =>
+          params.value != null ? `${Number(params.value).toLocaleString()} RH` : '—',
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          if (!wo) return null;
+          const rhTarget = params.value;
+          const rhCurrent = wo.currentRH ?? (wo.currentReading != null ? Number(wo.currentReading) : null);
+          const hasTarget = rhTarget != null && Number.isFinite(Number(rhTarget));
+          const hasCurrent = rhCurrent != null && Number.isFinite(Number(rhCurrent));
+          if (!hasTarget) return <span>—</span>;
+          return (
+            <div className="relative group">
+              <span className="text-gray-900 font-medium" data-testid={`text-next-due-hour-${wo.id}`}>
+                {Number(rhTarget).toLocaleString()} RH
+              </span>
+              <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
+                <div className="flex flex-col gap-1">
+                  <span>Next Due RH: {Number(rhTarget).toLocaleString()}</span>
+                  <span>Current RH: {hasCurrent ? Number(rhCurrent).toLocaleString() : '—'}</span>
+                  {hasCurrent ? (
+                    <span className={Number(rhTarget) - Number(rhCurrent) <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
+                      Remaining RH: {(Number(rhTarget) - Number(rhCurrent)).toLocaleString()}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">Remaining RH: —</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        },
+      });
+    }
 
     if (activeTab === "Planned") {
       cols.push({
@@ -1228,9 +1250,7 @@ const WorkOrders: React.FC = () => {
       type PostponedExcelRow = BaseExcelRow & { 'Postpone Until': string; 'Authorized By': string };
 
       const rows = exportList.map((wo, idx): BaseExcelRow | PostponedExcelRow => {
-        const dueDateStr = wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-');
+        const dueDateStr = formatWorkOrderExportDueValue(wo);
         const base: BaseExcelRow = {
           'S.No': idx + 1,
           'Component': wo.component || '-',
@@ -1318,9 +1338,7 @@ const WorkOrders: React.FC = () => {
       type PostponedPdfRow = BasePdfRow & { postponeUntil: string; authorizedBy: string };
 
       const data = exportList.map((wo, idx): BasePdfRow | PostponedPdfRow => {
-        const dueDateStr = wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-');
+        const dueDateStr = formatWorkOrderExportDueValue(wo);
         const base: BasePdfRow = {
           sNo: idx + 1,
           component: wo.component || '-',

@@ -1,0 +1,1071 @@
+[
+ {
+  "id": "fs-off-1",
+  "file": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf",
+  "kind": "condition",
+  "question": "Can an office user delete a fleet sharing record after it's already been submitted, or only while it's still a draft?",
+  "pages": [
+   5
+  ],
+  "section": "Document",
+  "must": [
+   "draft",
+   "cannot be deleted"
+  ],
+  "must_not": [
+   "can be deleted after submission",
+   "any time"
+  ],
+  "evidence": "Records can only be deleted while they are in Draft status. Submitted Fleet Sharing cannot be deleted."
+ },
+ {
+  "id": "fs-off-2",
+  "file": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf",
+  "kind": "procedure",
+  "question": "What are the steps to add an action item that vessels need to complete on a fleet sharing record?",
+  "pages": [
+   6
+  ],
+  "section": "3.2 ACTIONS",
+  "must": [
+   "+ add action",
+   "nature of action",
+   "due date"
+  ],
+  "must_not": [
+   "edit icon",
+   "delete icon"
+  ],
+  "evidence": "Click + Add Action to create a new action. In the Add Action window, enter the mandatory details marked with (*), including the Nature of Action and Due Date. Click Save to add the action to the Fleet Sharing record."
+ },
+ {
+  "id": "fs-ves-1",
+  "file": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf",
+  "kind": "condition",
+  "question": "As a ship user, am I able to edit the information the office entered under Step 1 of a fleet sharing record?",
+  "pages": [
+   5
+  ],
+  "section": "Step 1 – Description",
+  "must": [
+   "read-only",
+   "cannot modify"
+  ],
+  "must_not": [
+   "can be edited",
+   "editable by users"
+  ],
+  "evidence": "The information displayed under Step 1 is shared by the Office for reference and is read-only. Vessel users cannot modify this information."
+ },
+ {
+  "id": "fs-ves-2",
+  "file": "Audit - Fleet Sharing Manual- Vessel_R1_30.06.2026.pdf",
+  "kind": "procedure",
+  "question": "After closing out all the actions the office assigned in a fleet sharing record, what do I need to do to finish it off?",
+  "pages": [
+   6
+  ],
+  "section": "Step 3 – Actions",
+  "must": [
+   "date completed",
+   "submit"
+  ],
+  "must_not": [
+   "save only",
+   "no submission needed"
+  ],
+  "evidence": "Enter the Date Completed for the action in the Update Action window. Upload the required supporting attachments, if applicable. Click Submit to submit the Fleet Sharing record. After updating the Date Closed for all actions, click Submit to submit the record."
+ },
+ {
+  "id": "hist-1",
+  "file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "kind": "condition",
+  "question": "Who is allowed to add comments in the Review section of an inspection history record — the ship or the office?",
+  "pages": [
+   16
+  ],
+  "section": "3.3 REVIEW PAGE:",
+  "must": [
+   "office users only"
+  ],
+  "must_not": [
+   "vessel users",
+   "both vessel and office"
+  ],
+  "evidence": "The Review section is intended for office users only."
+ },
+ {
+  "id": "hist-2",
+  "file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "kind": "table",
+  "question": "What does the pencil icon do on the inspection records list?",
+  "pages": [
+   6
+  ],
+  "section": "1.4 ACTION ICONS.",
+  "must": [
+   "edit record",
+   "open and edit"
+  ],
+  "must_not": [
+   "delete the selected",
+   "view attachment"
+  ],
+  "evidence": "[icon: pencil] Edit Record — Open and edit the selected Inspection record."
+ },
+ {
+  "id": "hist-3",
+  "file": "Audit - History Manual_R1_30.06.2026.pdf",
+  "kind": "xref",
+  "question": "The manual explains how to record a negative observation with attachments — does that same process apply when I want to add a Positive Observation or LAE finding instead?",
+  "pages": [
+   10
+  ],
+  "section": "2.1.4 ADDING ATTACHMENTS",
+  "must": [
+   "follow the above procedure",
+   "positive observations",
+   "lae"
+  ],
+  "must_not": [
+   "different procedure",
+   "not supported"
+  ],
+  "evidence": "Follow the above procedure for adding Positive Observations and LAE finding details. Various types of inspection records can be created using the same procedure in SAIL."
+ },
+ {
+  "id": "prep-1",
+  "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "kind": "procedure",
+  "question": "What are the steps to start a brand new SIRE preparation record for a vessel?",
+  "pages": [
+   13
+  ],
+  "section": "3.1 HOW TO CREATE NEW PREPARATION",
+  "must": [
+   "save changes",
+   "discard"
+  ],
+  "must_not": [
+   "only save, no discard option",
+   "automatic without clicking"
+  ],
+  "evidence": "Click '+ New Preparation' to create a new preparation record. A Preparation Details window is displayed. Select the required Inspection Type. Complete all mandatory preparation details... Click Save Changes to create the preparation record or Discard to cancel without saving."
+ },
+ {
+  "id": "prep-2",
+  "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "kind": "condition",
+  "question": "If I change the assigned inspector on an existing preparation record, which fields can't be changed, and what happens to the vessel's answers that were already entered?",
+  "pages": [
+   11
+  ],
+  "section": "2.7 EDITING EXISTING PREPARATION",
+  "must": [
+   "viq version",
+   "viq group",
+   "permanently removes"
+  ],
+  "must_not": [
+   "responses are retained",
+   "no impact"
+  ],
+  "evidence": "All fields can be edited except VIQ Version and VIQ Group. Important: Changing the Inspector permanently removes all vessel responses associated with the previously assigned Inspector for that preparation."
+ },
+ {
+  "id": "prep-3",
+  "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf",
+  "kind": "screenshot",
+  "question": "On the preparation checklist, how do I add a new attachment to a question, and what can I do with it afterward?",
+  "pages": [
+   20
+  ],
+  "section": "Document",
+  "must": [
+   "click to add attachment",
+   "delete and download"
+  ],
+  "must_not": [
+   "upload not possible",
+   "read only attachments"
+  ],
+  "evidence": "screenshot_from_computer: SIRE 2.0 Questionnaire interface showing uploaded attachments with callouts for 'Uploaded attachments are displayed here', 'Delete and Download icon', 'Click to add attachment'."
+ },
+ {
+  "id": "inc-1",
+  "file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "kind": "condition",
+  "question": "Can a vessel user fill in the closeout comments and close an incident report themselves?",
+  "pages": [
+   18
+  ],
+  "section": "Part K: Office Closeout",
+  "must": [
+   "office users only"
+  ],
+  "must_not": [
+   "vessel users can close",
+   "either party"
+  ],
+  "evidence": "The Office Closeout section is intended for office users only."
+ },
+ {
+  "id": "inc-2",
+  "file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "kind": "table",
+  "question": "What does it mean if an incident report shows the overdue-action status icon?",
+  "pages": [
+   19
+  ],
+  "section": "Overdue Action",
+  "must": [
+   "overdue",
+   "necessary measures"
+  ],
+  "must_not": [
+   "report closed",
+   "no actions added"
+  ],
+  "evidence": "Required actions are overdue. The vessel should take the necessary measures to complete the overdue actions and update the report accordingly."
+ },
+ {
+  "id": "inc-3",
+  "file": "Incident - Incident User Manual R0_20.05.2026.pdf",
+  "kind": "procedure",
+  "question": "What's the second way to record the sequence of events for an incident, using separate date/time fields instead of typing it into one box?",
+  "pages": [
+   9
+  ],
+  "section": "⮚ METHOD 2:",
+  "must": [
+   "date, time, and description",
+   "new date",
+   "key moment"
+  ],
+  "must_not": [
+   "editor box only",
+   "method 1"
+  ],
+  "evidence": "Enter the sequence of event details using the Date, Time, and Description fields. Click the '+' icon to add additional event entries for the same date. Click 'New Date' to add event entries for a different or consecutive date. Select the Key Moment checkbox to highlight important events, if applicable."
+ },
+ {
+  "id": "fn-1",
+  "file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+  "kind": "condition",
+  "question": "When I'm updating the actions on a fleet notification, when exactly should I click Submit?",
+  "pages": [
+   7
+  ],
+  "section": "Document",
+  "must": [
+   "date closed",
+   "all actions"
+  ],
+  "must_not": [
+   "submit before updating",
+   "any time"
+  ],
+  "evidence": "Note: Click \"Submit\" only after updating the Date Closed for all actions."
+ },
+ {
+  "id": "fn-2",
+  "file": "Incident - Fleet Notification User Manual_Vessel_ R0_20.03.2026.pdf",
+  "kind": "procedure",
+  "question": "How do I record that a fleet notification was discussed onboard with the crew?",
+  "pages": [
+   6
+  ],
+  "section": "FLEET NOTIFICATION - USER MANUAL",
+  "must": [
+   "discussed on board",
+   "submit"
+  ],
+  "must_not": [
+   "office closeout",
+   "delete record"
+  ],
+  "evidence": "Select the 'Notification Discussed on board' checkbox once the discussion is completed. Enter the Date of discussion. Enter the participant details in the provided field. Click Save and then Submit to complete the section."
+ },
+ {
+  "id": "ll-1",
+  "file": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf",
+  "kind": "condition",
+  "question": "Can I, as a ship user, edit the description details the office shared in a lesson learnt record?",
+  "pages": [
+   6
+  ],
+  "section": "3. LESSON LEARNT FORM",
+  "must": [
+   "viewing only",
+   "cannot be edited"
+  ],
+  "must_not": [
+   "can be edited",
+   "editable by users"
+  ],
+  "evidence": "In Section 1 – Description, the information is displayed for viewing only and cannot be edited by vessel users."
+ },
+ {
+  "id": "ll-2",
+  "file": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf",
+  "kind": "procedure",
+  "question": "What steps confirm that a lesson learnt record has been discussed with the crew onboard?",
+  "pages": [
+   7
+  ],
+  "section": "LESSON LEARNT USER MANUAL",
+  "must": [
+   "discussed on board",
+   "submit"
+  ],
+  "must_not": [
+   "office closeout",
+   "cannot be discussed"
+  ],
+  "evidence": "Select the 'Notification Discussed on board' checkbox once the discussion is completed. Enter the Date of discussion. Enter the participant details in the provided field. Click Save and then Submit to complete the section."
+ },
+ {
+  "id": "nm-1",
+  "file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "kind": "xref",
+  "question": "I need to report a Significant Near Miss — do I fill it in on this same reporting form?",
+  "pages": [
+   8
+  ],
+  "section": "Document",
+  "must": [
+   "sign. nm menu"
+  ],
+  "must_not": [
+   "use the same form",
+   "standard reporting form"
+  ],
+  "evidence": "*For Significant NM, use form available under Sign. NM menu."
+ },
+ {
+  "id": "nm-2",
+  "file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "kind": "condition",
+  "question": "Is a vessel user permitted to fill in the Office Closeout part of a near miss report?",
+  "pages": [
+   11
+  ],
+  "section": "6. OFFICE CLOSEOUT",
+  "must": [
+   "office users only",
+   "should not enter"
+  ],
+  "must_not": [
+   "vessel users may enter",
+   "shared responsibility"
+  ],
+  "evidence": "The Office Closeout section is intended for office users only. Vessel users should not enter or modify any information in this section."
+ },
+ {
+  "id": "nm-3",
+  "file": "Incident - Near Miss User Manual R1_30.05.2026.pdf",
+  "kind": "table",
+  "question": "What does the grey circle-with-slash icon mean next to a near miss report?",
+  "pages": [
+   11
+  ],
+  "section": "7. STATUS INDICATORS",
+  "must": [
+   "action(s) due",
+   "pending completion"
+  ],
+  "must_not": [
+   "overdue action(s)",
+   "report closed"
+  ],
+  "evidence": "[icon: grey circle with slash] Action(s) Due - Actions have been added and are pending completion within the due date."
+ },
+ {
+  "id": "crewing-1",
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "kind": "procedure",
+  "question": "In the In-Progress screen, what do I click to start a new crew record, and can I save my work before I finish filling in the form?",
+  "pages": [
+   14
+  ],
+  "section": "1.2.1.3 HOW TO CREATE A NEW CREW RECORD",
+  "must": [
+   "+ new crew",
+   "recruitment application",
+   "save draft"
+  ],
+  "must_not": [
+   "crew pool",
+   "add crew"
+  ],
+  "evidence": "Go to the 'In-Progress' sub-sub module. * Click on the \"+ New Crew\" button to create a new crew record. * The 'Recruitment Application – New Candidate' form below appears after clicking the '+ New Crew' button. * Users can save the form at any stage by clicking the 'Save Draft' button before final submission."
+ },
+ {
+  "id": "crewing-2",
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "kind": "condition",
+  "question": "Does a crew promotion review form show up directly in the Promotion sub-module, or does something else have to happen first?",
+  "pages": [
+   48
+  ],
+  "section": "1.6.1.5 HOW TO EXECUTE A PROMOTION",
+  "must": [
+   "admin",
+   "released"
+  ],
+  "must_not": [
+   "automatically available",
+   "promotion sub-module directly"
+  ],
+  "evidence": "Promotion forms are created and released through the 'Admin' sub-module before they become available in the Promotion sub-module."
+ },
+ {
+  "id": "crewing-3",
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "kind": "table",
+  "question": "On the Crew Due/Overdue timeline, what does it mean when a crew member's bar shows as green versus yellow versus red?",
+  "pages": [
+   39
+  ],
+  "section": "1.5.1.1 HOW TO ACCESS CREW DUE / OVERDUE STATUS",
+  "must": [
+   "active or ongoing onboard",
+   "approaching the relief due",
+   "overdue for relief"
+  ],
+  "must_not": [
+   "on leave",
+   "awaiting sign-on"
+  ],
+  "evidence": "Note: Timeline color code represents the following meaning: * Green bar: Indicates the active or ongoing onboard service period. * Yellow bar: Indicates the crew member is approaching the relief due period. * Red bar: Indicates the crew member is overdue for relief."
+ },
+ {
+  "id": "crewing-4",
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "kind": "screenshot",
+  "question": "On the New Rotation Plan screen, besides picking the vessel, rank, and date range and then saving, is there anything else the annotated screenshot says I can do from that screen?",
+  "pages": [
+   41
+  ],
+  "section": "SAIL - CREWING MODULE USER MANUAL",
+  "must": [
+   "check the compliance"
+  ],
+  "must_not": [
+   "not possible from this screen",
+   "cannot check compliance"
+  ],
+  "evidence": "screenshot_from_computer: New Rotation Plan V2 interface with annotations. 1. From here, the user can select the Vessel, Ranks, and date range to set the plan duration. 2. Click here to save and propose to submit for approval. Note: From here, the user can check the compliance."
+ },
+ {
+  "id": "crewing-5",
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "kind": "xref",
+  "question": "After clicking '+ New Crew' in the Crew Database to add someone straight to the Crew Pool, which other section's steps am I supposed to follow to fill out the form?",
+  "pages": [
+   29
+  ],
+  "section": "1.3.1.5 HOW TO ADD RECORDS TO CREW POOL",
+  "must": [
+   "in-progress"
+  ],
+  "must_not": [
+   "annual",
+   "post incident"
+  ],
+  "evidence": "Refer to the 'In-Progress' sub-sub-module and follow the same steps to fill the Crew Pool Form. Fields marked with a red asterisk (*) are mandatory in the Crew Pool form."
+ },
+ {
+  "id": "crewing-6",
+  "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf",
+  "kind": "procedure",
+  "question": "What button do I press to add a brand-new record to the Training Matrix, and what do I click afterward to save it once the details are entered?",
+  "pages": [
+   110
+  ],
+  "section": "1.12.3.3 HOW TO ADD A NEW TRAINING RECORD",
+  "must": [
+   "+ new",
+   "create training"
+  ],
+  "must_not": [
+   "+ add task",
+   "save draft"
+  ],
+  "evidence": "Click on the '+ New' button. * The screen below appears after clicking the '+ New' button. * Enter the required training details. * Click on the 'Create Training' button to save the record and add it to the Training Matrix."
+ },
+ {
+  "id": "moc-office-1",
+  "file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+  "kind": "table",
+  "question": "In the MoC Log, what does clicking the eye icon actually do, and does that differ between the Office and Vessel versions of the manual?",
+  "pages": [
+   7
+  ],
+  "section": "3. MoC LOG – OVERVIEW",
+  "must": [
+   "view, edit, or export"
+  ],
+  "must_not": [
+   "delete the selected moc record",
+   "create a duplicate"
+  ],
+  "evidence": "Office (p.7): eye icon = 'View Record' – 'View, edit, or export the selected MoC record.' Vessel (p.5): eye icon = 'View Attachments' – 'View the documents that have been attached to the MoC record.'"
+ },
+ {
+  "id": "moc-office-2",
+  "file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf",
+  "kind": "xref",
+  "question": "When I click the Link icon in Part C's Risk Assessment section of an Office MoC, where does the saved RA actually end up?",
+  "pages": [
+   13
+  ],
+  "section": "PART – C (Continued)",
+  "must": [
+   "ra sub-module",
+   "ra form"
+  ],
+  "must_not": [
+   "vessel risk assessment page"
+  ],
+  "evidence": "Note: After selecting the relevant RA option, the user will be redirected to the RA form. Once the details are saved, the RA will be stored in the appropriate RA sub-module. Click the Back icon on the RA form to return to the MoC form."
+ },
+ {
+  "id": "moc-vessel-1",
+  "file": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf",
+  "kind": "condition",
+  "question": "In a Vessel MoC, what happens automatically if the MoC Approver selects 'No' in Part D?",
+  "pages": [
+   11
+  ],
+  "section": "7. HOW TO FILL MOC FORM – PART D",
+  "must": [
+   "not approved"
+  ],
+  "must_not": [
+   "not processed"
+  ],
+  "evidence": "Note: If \"No\" is selected, the MoC will automatically be marked as \"Not Approved\"."
+ },
+ {
+  "id": "moc-vessel-2",
+  "file": "Safety - MOC User Manual_Vessel_R0_31.03.2026.pdf",
+  "kind": "procedure",
+  "question": "What are the steps to fill out and submit Part A of a Vessel MoC form?",
+  "pages": [
+   6
+  ],
+  "section": "3. HOW TO FILL MOC FORM – PART A",
+  "must": [
+   "moc no",
+   "upload"
+  ],
+  "must_not": [
+   "select yes if approved"
+  ],
+  "evidence": "1. Complete the required fields under Part A. 2. Add attachments using the Upload button. Attachments can be viewed under View. 3. Click 'Save' to generate the MoC No./ID and continue later if required. 4. After completing and reviewing the information, click 'Submit'."
+ },
+ {
+  "id": "master-review-1",
+  "file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+  "kind": "table",
+  "question": "What can I do with the action icons in the Master Review report table besides deleting a record?",
+  "pages": [
+   6
+  ],
+  "section": "MASTER REVIEW USER MANUAL",
+  "must": [
+   "attached",
+   "history record"
+  ],
+  "must_not": [
+   "view, edit, or export"
+  ],
+  "evidence": "[eye icon] View Attachments – View the documents that have been attached to the History record. [trash can icon] Delete Record – Delete the selected History record from the system."
+ },
+ {
+  "id": "master-review-2",
+  "file": "Safety - Master Review Manual R1_10.06.2026.pdf",
+  "kind": "condition",
+  "question": "Who is meant to use Part E of a Master Review record, and what can they do there?",
+  "pages": [
+   11
+  ],
+  "section": "4. OFFICE CLOSEOUT FOR MASTER REVIEW FORM",
+  "must": [
+   "office users",
+   "close the master review"
+  ],
+  "must_not": [
+   "vessel users"
+  ],
+  "evidence": "Part E - Office users can add comments and close the Master Review accordingly."
+ },
+ {
+  "id": "ra-office-1",
+  "file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "kind": "condition",
+  "question": "Can the same Position/Rank hold two different Approval Levels for Risk Assessments, and what should I do if one needs to change?",
+  "pages": [
+   25
+  ],
+  "section": "8. KEY PERSONNEL – MANAGING APPROVERS",
+  "must": [
+   "only one approval level",
+   "edit the existing"
+  ],
+  "must_not": [
+   "create a new approver"
+  ],
+  "evidence": "A Position/Rank can be assigned only one Approval Level. If an existing approver needs to be assigned a different Approval Level, edit the existing record instead of creating a new one."
+ },
+ {
+  "id": "ra-office-2",
+  "file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "kind": "screenshot",
+  "question": "When adding hazards from the database in Part B of an Office RA, what are the tab categories in the hazard-selection pop-up window?",
+  "pages": [
+   13
+  ],
+  "section": "Document",
+  "must": [
+   "work environment",
+   "processes (act)",
+   "organization"
+  ],
+  "must_not": [
+   "weather & sea conditions"
+  ],
+  "evidence": "Figure 15 — 'Select Applicable Hazards' pop-up: Hazard categories (tabs): 1. Work Environment · 2. Equipment · 3. Programs/ Procedures · 4. Processes (Act) · 5. People · 6. Organization."
+ },
+ {
+  "id": "ra-office-3",
+  "file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf",
+  "kind": "xref",
+  "question": "Do the filters work the same way in the Generic RA Library, Office RA, and Vessels RA sections, or is each explained separately?",
+  "pages": [
+   7
+  ],
+  "section": "4. HOW TO APPLY FILTERS",
+  "must": [
+   "same across",
+   "office ra"
+  ],
+  "must_not": [
+   "different filter fields for each section"
+  ],
+  "evidence": "The filtering functionality is same across the Generic RA Library, Office RA, and Vessels RA sections. The available filter options vary depending on the selected section. The example below demonstrates the filtering process in the Office RA section."
+ },
+ {
+  "id": "ra-vessel-1",
+  "file": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+  "kind": "condition",
+  "question": "As a vessel user, can I edit Generic Risk Assessments in the Generic RA Library, or only look at them?",
+  "pages": [
+   7
+  ],
+  "section": "4. HOW TO VIEW GENERIC RISK ASSESSMENT REPORT",
+  "must": [
+   "viewing purposes only"
+  ],
+  "must_not": [
+   "can be edited by vessel users"
+  ],
+  "evidence": "The GRA Library is available to vessel users for viewing purposes only."
+ },
+ {
+  "id": "ra-vessel-2",
+  "file": "Safety - Risk Assessment User Manual_Vessel_R1_30.05.2026.pdf",
+  "kind": "procedure",
+  "question": "What are the three ways offered for starting a brand-new Vessel Risk Assessment?",
+  "pages": [
+   10
+  ],
+  "section": "6. HOW TO CREATE NEW VESSEL RISK ASSESSMENT",
+  "must": [
+   "generic library",
+   "vessel library",
+   "create fresh ra"
+  ],
+  "must_not": [
+   "office library"
+  ],
+  "evidence": "New Risk Assessment can be created in three ways: Import from the 'Generic Library.' Import an existing Risk Assessment from the 'Vessel Library.' Create a new Risk Assessment by clicking 'Create Fresh RA'."
+ },
+ {
+  "id": "sms-office-1",
+  "file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "kind": "xref",
+  "question": "For approving a revision of an already-uploaded SMS document (Section 4.2.2), what does the manual tell the Approver to do?",
+  "pages": [
+   21
+  ],
+  "section": "4.2.2 Approval",
+  "must": [
+   "4.1.2"
+  ],
+  "must_not": [
+   "different approval process for revisions"
+  ],
+  "evidence": "Follow steps in section 4.1.2."
+ },
+ {
+  "id": "sms-office-2",
+  "file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "kind": "condition",
+  "question": "If I create a folder in SMS with the 'Is Form' checkbox selected, will the documents I upload there show up when users browse SMS?",
+  "pages": [
+   14,
+   15
+  ],
+  "section": "Document",
+  "must": [
+   "not be displayed",
+   "only be downloaded"
+  ],
+  "must_not": [
+   "will be displayed in html format"
+  ],
+  "evidence": "Select the \"Is Form\" checkbox when creating a folder intended only for uploading forms and checklists (not required to be viewed in SAIL). Documents uploaded to folders created with the \"Is Form\" option selected will not be displayed in SAIL and can only be downloaded."
+ },
+ {
+  "id": "sms-office-3",
+  "file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf",
+  "kind": "screenshot",
+  "question": "In the SMS hyperlinking example figure, what specific document reference is shown as something a link inside a document can jump straight to?",
+  "pages": [
+   10
+  ],
+  "section": "3.1.6 Hyperlinking in SMS documents",
+  "must": [
+   "doc 4.2.03"
+  ],
+  "must_not": [
+   "sec 1"
+  ],
+  "evidence": "screenshot: SMS Procedures document view showing hyperlinked text. A callout box 'Clicking here to go to this section' points to a red-boxed 'sec 1' link. Another callout box 'Click here to view this document' points to a red-boxed 'Doc 4.2.03' link."
+ },
+ {
+  "id": "safety-meeting-1",
+  "file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf",
+  "kind": "xref",
+  "question": "For an Additional Safety Meeting (Add SM) form, do Parts B, C and D have their own instructions, or should I look elsewhere in the manual?",
+  "pages": [
+   18
+  ],
+  "section": "2.2 HOW TO FILL ADD SM FORM",
+  "must": [
+   "monthly safety meeting"
+  ],
+  "must_not": [
+   "add sm has its own part b instructions"
+  ],
+  "evidence": "Follow the instructions provided in the Monthly Safety Meeting form to complete Part B and Part C of the Additional Safety Meeting form. Section D is for office use only. Follow the procedure outlined under Monthly Safety Meeting – Office Closeout."
+ },
+ {
+  "id": "safety-meeting-2",
+  "file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf",
+  "kind": "condition",
+  "question": "What happens to a circular in the Advisories & Circulars section if nobody marks it as discussed during the meeting?",
+  "pages": [
+   13
+  ],
+  "section": "PART C: Advisories & Circulars",
+  "must": [
+   "carried forward"
+  ],
+  "must_not": [
+   "removed from the list"
+  ],
+  "evidence": "Any circulars not marked as discussed will be automatically carried forward to the next meeting."
+ },
+ {
+  "id": "certsurveys-1",
+  "file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "procedure",
+  "question": "What are the steps to add a brand-new certificate type to the Master list under Ship's Certificates?",
+  "pages": [
+   17,
+   18
+  ],
+  "section": "1.2.1.4 HOW TO ADD A NEW MASTER CERTIFICATE",
+  "must": [
+   "new",
+   "save",
+   "master id"
+  ],
+  "must_not": [
+   "delete",
+   "export"
+  ],
+  "evidence": "Click the 'Edit' button. Click the 'New' button to add a new certificate record. The system adds a new editable row at the bottom of the table with an auto-generated Master ID. Enter the required details, including Certificate Name, Category, Group... Click the 'Save' icon to create the new certificate record, then click 'Yes, Reorder' or 'No, Keep at End'."
+ },
+ {
+  "id": "certsurveys-2",
+  "file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "condition",
+  "question": "Is there anything that stops me from saving a new certificate master record if I leave some fields blank?",
+  "pages": [
+   18
+  ],
+  "section": "1.2.1.4 HOW TO ADD A NEW MASTER CERTIFICATE",
+  "must": [
+   "mandatory fields",
+   "before the record can be saved"
+  ],
+  "must_not": [
+   "can be saved without"
+  ],
+  "evidence": "☞ Mandatory fields (*) must be completed before the record can be saved."
+ },
+ {
+  "id": "certsurveys-3",
+  "file": "Technical - Cert. & Surveys User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "xref",
+  "question": "How do I add or view attachments for a survey record — is the process different from certificates?",
+  "pages": [
+   11,
+   9
+  ],
+  "section": "1.1.4.5 HOW TO ADD AND VIEW ATTACHMENTS",
+  "must": [
+   "certificates",
+   "same steps"
+  ],
+  "must_not": [
+   "not supported",
+   "different process"
+  ],
+  "evidence": "Refer to the 'Certificates' sub-sub-module for the add or view attachment and follow the same steps. [target, p.9, section 1.1.3.5]: Click the upload area to browse and upload attachment files for the selected certificate record in PDF, JPG, or PNG format."
+ },
+ {
+  "id": "defects-1",
+  "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "kind": "screenshot",
+  "question": "In the Defects Log list, is there a way to edit a report directly from its row without opening it via the Eye icon first?",
+  "pages": [
+   16
+  ],
+  "section": "1.1.4.4 HOW TO VIEW AND EDIT DEFECT REPORT",
+  "must": [
+   "edit icon"
+  ],
+  "must_not": [
+   "cannot be edited",
+   "view only"
+  ],
+  "evidence": "Screenshot of Defects Log interface with callouts: 1. Click here to view the report (pointing to eye icon), 2. Click here to link related defects (pointing to link icon), 3. Click here to verify the report (pointing to checkmark icon), and a red note: Note: The report can also be edited by clicking here (pointing to edit icon)."
+ },
+ {
+  "id": "defects-2",
+  "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "kind": "condition",
+  "question": "What happens after I click Submit on a new defect report?",
+  "pages": [
+   15
+  ],
+  "section": "1.1.4.3 HOW TO CREATE A NEW DEFECT",
+  "must": [
+   "forwarded",
+   "next stage",
+   "workflow"
+  ],
+  "must_not": [
+   "closed",
+   "deleted"
+  ],
+  "evidence": "☞ Clicking 'Submit' button, the updated defect report is forwarded to the next stage of the configured defect management workflow."
+ },
+ {
+  "id": "defects-3",
+  "file": "Technical - Defects User Manual For Office_Sail Admin_R2_13.06.2026.pdf",
+  "kind": "xref",
+  "question": "How do I export all the Condition of Class records at once, or do I need to export them one at a time?",
+  "pages": [
+   20,
+   17
+  ],
+  "section": "1.1.5.5 HOW TO EXPORT ALL COC RECORDS",
+  "must": [
+   "defect log",
+   "export"
+  ],
+  "must_not": [
+   "one at a time",
+   "not possible"
+  ],
+  "evidence": "Refer to the 'Defect Log' sub-sub-module for the export process and follow the same steps. [target, p.17, section 1.1.4.5]: Select the required vessel from the 'Vessel' dropdown. Click the 'Export' button to download all the displayed defect reports in PDF format. Click the 'Export CSV' or 'Export Excel' button..."
+ },
+ {
+  "id": "pmsoffice-1",
+  "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "table",
+  "question": "In the Work Orders section, what's the difference between a job showing 'Due' status versus 'Overdue' status?",
+  "pages": [
+   28
+  ],
+  "section": "1.1.5.1 HOW TO ACCESS WORK ORDERS (W. O)",
+  "must": [
+   "current period",
+   "past their due date"
+  ],
+  "must_not": [
+   "cancelled",
+   "rejected"
+  ],
+  "evidence": "Due: Jobs that are due within the current period. Overdue: Jobs past their due date that have not been completed."
+ },
+ {
+  "id": "pmsoffice-2",
+  "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "condition",
+  "question": "Can I update a spare part's ROB directly without selecting a storage location first?",
+  "pages": [
+   45
+  ],
+  "section": "1.1.7.3 HOW TO UPDATE & TRACK SPARE INVENTORY TRANSACTIONS",
+  "must": [
+   "cannot be modified",
+   "location"
+  ],
+  "must_not": [
+   "without selecting a location",
+   "no location required"
+  ],
+  "evidence": "☞ The ROB cannot be modified unless a location is selected. ☞ Consumption cannot exceed the current ROB. Bulk Update available for multiple items. ☞ Updates to a spare part's ROB are recorded in the History tab."
+ },
+ {
+  "id": "pmsoffice-3",
+  "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "procedure",
+  "question": "How can I reorder components within the Component Tree?",
+  "pages": [
+   26
+  ],
+  "section": "1.1.4.5 HOW TO EDIT THE COMPONENT TREE VIEW",
+  "must": [
+   "drag and drop",
+   "edit",
+   "save"
+  ],
+  "must_not": [
+   "cannot be reordered"
+  ],
+  "evidence": "Select any component from the Component Tree. Click on the 'Edit' button. ... Users can drag and drop components to rearrange them according to their preference. Click the 'Save' button to save the changes."
+ },
+ {
+  "id": "pmsoffice-4",
+  "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "screenshot",
+  "question": "Is there a special restriction on approving a locked work order?",
+  "pages": [
+   34
+  ],
+  "section": "1.1.5.7 HOW TO APPROVE / REJECT A WORK ORDER",
+  "must": [
+   "tech superintendent",
+   "hod"
+  ],
+  "must_not": [
+   "no restriction",
+   "any user can approve"
+  ],
+  "evidence": "A red banner at the bottom states: 'For locked WOs, approval is permitted only after Tech Superintendent acknowledgement, followed by HOD approval.'"
+ },
+ {
+  "id": "pmsoffice-5",
+  "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf",
+  "kind": "condition",
+  "question": "On the PMS Dashboard, what fields can I filter by — and is that the same set of filters available on the vessel side?",
+  "pages": [
+   9
+  ],
+  "section": "1.1.3.2 HOW TO USE FILTER",
+  "must": [
+   "vessel",
+   "scope",
+   "criticality"
+  ],
+  "must_not": [
+   "criticality only"
+  ],
+  "evidence": "Office (p.9): Select the Vessel, Scope, and Criticality filters to refine the displayed records. ☞ When an office user selects 'My Vessel' as the Scope, only the vessels assigned to that user are displayed. Vessel manual (p.9, same section): Select the required criticality level to filter equipment or work orders."
+ },
+ {
+  "id": "pmsvessel-1",
+  "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "kind": "table",
+  "question": "What are the different item categories under Stores, and what does each one show?",
+  "pages": [
+   42
+  ],
+  "section": "1.1.8.1 HOW TO ACCESS THE STORE",
+  "must": [
+   "lubes",
+   "chemicals",
+   "others"
+  ],
+  "must_not": [
+   "spares category",
+   "critical items"
+  ],
+  "evidence": "☞ Items are categorized as Stores, Lubes, Chemicals, and Others. Lubes: Displays lubricants and oils only. Chemicals: Displays onboard chemicals with fields such as Hazard Classification, UN Number, and Flash Point. Others: Displays miscellaneous items outside the defined categories. ☞ View Modes – Inventory, Location, History."
+ },
+ {
+  "id": "pmsvessel-2",
+  "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "kind": "screenshot",
+  "question": "As a Vessel User, can I create a new Modify PMS change request myself?",
+  "pages": [
+   47
+  ],
+  "section": "1.1.10.1 HOW TO ACCESS MODIFY PMS",
+  "must": [
+   "vessel user",
+   "not available"
+  ],
+  "must_not": [
+   "same for both"
+  ],
+  "evidence": "* The following screen is displayed only to HOD. (Ref Figure 77) ... * The following screen is displayed only to Vessel User. (Ref Figure 78) screenshot: Modify PMS - Change Requests interface for Vessel User with a note that the Change request option is not available"
+ },
+ {
+  "id": "pmsvessel-3",
+  "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "kind": "xref",
+  "question": "How do I perform a bulk stock update for Stores items — does that follow a separate process from Spares?",
+  "pages": [
+   43,
+   40
+  ],
+  "section": "1.1.8.3 HOW TO UPDATE STOCK TRANSACTIONS IN A STORE IN BULK",
+  "must": [
+   "spares",
+   "same steps"
+  ],
+  "must_not": [
+   "separate process",
+   "not supported"
+  ],
+  "evidence": "Click the 'Store' sub-sub-module. Click on the '+ Bulk Updates Store' button. Refer to the 'Spares' sub-sub-module and follow the same steps. [target, p.40, section 1.1.7.6]: Click on the 'Spares' sub – sub module. Click on the 'Bulk Update Spares' button to update multiple spares at once."
+ },
+ {
+  "id": "pmsvessel-4",
+  "file": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026.pdf",
+  "kind": "condition",
+  "question": "If I try to generate a work order for a component job that already has an active one, what happens?",
+  "pages": [
+   16
+  ],
+  "section": "1.1.4.2 HOW TO VIEW COMPONENT DETAILS",
+  "must": [
+   "no active wo",
+   "duplicate"
+  ],
+  "must_not": [
+   "multiple work orders allowed",
+   "no restriction"
+  ],
+  "evidence": "Ensure that there is no active WO for the same selected job, as the system does not allow the generation of duplicate work orders."
+ }
+]

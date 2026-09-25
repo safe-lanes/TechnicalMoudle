@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm"; // 23-Sep-2026: tables in assistant answers rendered as raw pipes without GFM
 import { Bot, User } from "lucide-react";
 import { useLocation } from "wouter";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useChat";
@@ -38,7 +39,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none [&_table]:text-xs [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_p]:my-1 [&_h2]:text-sm [&_h2]:mt-2 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:mt-2 [&_h3]:mb-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0">
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
+                // narrow screens (the panel is full-width on phones, 400px on desktop): a wide table
+                // scrolls sideways inside the bubble instead of breaking the layout
+                table: ({ children }) => (
+                  <div className="overflow-x-auto -mx-1 my-1" data-testid="chat-table">
+                    <table className="min-w-full border-collapse whitespace-nowrap">{children}</table>
+                  </div>
+                ),
                 a: ({ href, children }) => (
                   <a
                     href={href}

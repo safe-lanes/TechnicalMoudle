@@ -5,6 +5,7 @@ import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrd
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { buildExternalMasterDataUrl, getExternalMasterDataBaseUrl } from '../../../config/externalApi';
 import { logFieldChanges } from '../../sync';
+import { ensureCompletedWorkOrderDate } from '../../work-orders/utils/completedWorkOrderDate';
 import { sql, eq, and } from 'drizzle-orm';
 import {
   vessels as vesselsTable,
@@ -14,7 +15,6 @@ import {
   fleetGroups as fleetGroupsTable,
   masterUsers as masterUsersTable,
   jobs as jobsTable,
-  jobComponentLinks as jobComponentLinksTable,
   workOrders as workOrdersTable,
   components as componentsTable,
   mocApprovers,
@@ -360,7 +360,8 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
         });
 
         if (!dryRun) {
-          const updated = await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
+          const statusUpdate = ensureCompletedWorkOrderDate(wo, { status: computedStatus });
+          const updated = await storage.updateWorkOrder(wo.wouuid, statusUpdate);
           // Sync field logging — admin status sync
           try { await logFieldChanges('work_orders', wo.wouuid, (wo as any).vesselId || null, wo, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO admin status sync:', e); }
         }
@@ -976,8 +977,6 @@ export async function rhDiagnostic(req: Request, res: Response) {
         ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || '0')
         : 0;
 
-      const linkLastDone = parseFloat(link.lastDoneRH || '0');
-      const linkNextDue = parseFloat(link.nextDueRH || '0');
       const jobLastDone = parseFloat(job.lastDoneRH || '0');
       const jobNextDue = parseFloat(job.nextDueRH || '0');
 
@@ -1000,7 +999,7 @@ export async function rhDiagnostic(req: Request, res: Response) {
       }
       const correctNextDue = actualLastDoneRH + interval;
 
-      const needsRepair = linkNextDue !== correctNextDue || linkLastDone !== actualLastDoneRH;
+      const needsRepair = jobNextDue !== correctNextDue || jobLastDone !== actualLastDoneRH;
 
       diagnosticRows.push({
         jobNo: job.jobNo,
@@ -1010,8 +1009,6 @@ export async function rhDiagnostic(req: Request, res: Response) {
         interval,
         currentRH,
         stored: {
-          linkLastDoneRH: linkLastDone,
-          linkNextDueRH: linkNextDue,
           jobLastDoneRH: jobLastDone,
           jobNextDueRH: jobNextDue,
         },
@@ -1043,8 +1040,6 @@ export async function rhDiagnostic(req: Request, res: Response) {
         interval,
         currentRH,
         stored: {
-          linkLastDoneRH: null,
-          linkNextDueRH: null,
           jobLastDoneRH: jobLastDone,
           jobNextDueRH: jobNextDue,
         },
@@ -1076,7 +1071,7 @@ export async function rhDiagnostic(req: Request, res: Response) {
 
 // DELIBERATE LOCAL-ONLY REPAIR (mig-138 class; plan §9.3, reviewed 2026-07-23): the
 // nextDueReading corrections below write work_orders DIRECTLY and are intentionally NOT
-// field-logged. Each instance derives the correct values from its OWN jobs/links and runs
+// field-logged. Each instance derives the correct values from its OWN jobs and runs
 // the repair itself — syncing 'system'-authored repairs would recreate the false-conflict
 // class (the removed status-recalculator lesson). Do NOT add logFieldChanges here.
 export async function repairRhTracking(req: Request, res: Response) {
@@ -1119,7 +1114,6 @@ export async function repairRhTracking(req: Request, res: Response) {
   const FINALIZED = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
 
   let jobsRepaired = 0;
-  let linksRepaired = 0;
   let wosRepaired = 0;
   const repairs: any[] = [];
 
@@ -1155,32 +1149,6 @@ export async function repairRhTracking(req: Request, res: Response) {
         correctLastDone = cyclesPassed * interval;
       }
       const correctNextDue = correctLastDone + interval;
-
-      const storedLastDone = parseFloat(link.lastDoneRH || '0');
-      const storedNextDue = parseFloat(link.nextDueRH || '0');
-
-      if (storedLastDone !== correctLastDone || storedNextDue !== correctNextDue) {
-        if (!dryRun) {
-          await db.update(jobComponentLinksTable)
-            .set({
-              lastDoneRH: correctLastDone.toString(),
-              nextDueRH: correctNextDue.toString(),
-              updatedAt: new Date(),
-            })
-            .where(and(
-              eq(jobComponentLinksTable.jobId, job.juuid),
-              eq(jobComponentLinksTable.componentId, link.componentId)
-            ));
-        }
-        linksRepaired++;
-        repairs.push({
-          type: 'link',
-          jobNo: job.jobNo,
-          componentCode: compCode,
-          before: { lastDoneRH: storedLastDone, nextDueRH: storedNextDue },
-          after: { lastDoneRH: correctLastDone, nextDueRH: correctNextDue },
-        });
-      }
 
       if (correctLastDone > jobLevelLastDone) {
         jobLevelLastDone = correctLastDone;
@@ -1282,7 +1250,7 @@ export async function repairRhTracking(req: Request, res: Response) {
     }
   }
 
-  console.log(`🔧 [RH REPAIR] ${dryRun ? 'DRY RUN' : 'LIVE'} complete: ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} WOs repaired`);
+  console.log(`🔧 [RH REPAIR] ${dryRun ? 'DRY RUN' : 'LIVE'} complete: ${jobsRepaired} jobs, ${wosRepaired} WOs repaired`);
 
   res.json({
     success: true,
@@ -1290,9 +1258,8 @@ export async function repairRhTracking(req: Request, res: Response) {
     vesselId: vesselId || 'all',
     totalRhJobs: rhJobs.length,
     jobsRepaired,
-    linksRepaired,
     wosRepaired,
     repairs: repairs.slice(0, 200),
-    message: `${dryRun ? '[DRY RUN] Would repair' : 'Repaired'} ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} work orders`,
+    message: `${dryRun ? '[DRY RUN] Would repair' : 'Repaired'} ${jobsRepaired} jobs and ${wosRepaired} work orders`,
   });
 }

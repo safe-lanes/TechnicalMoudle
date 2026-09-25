@@ -90,7 +90,7 @@ export async function autoGenerate(vesselId: string) {
           vesselId: (job as any).vesselId,
           component: (job as any).componentId,
           componentCode: componentCode,
-          jobId: (job as any).id, // Store job ID for reliable lead time hydration
+          jobId: (job as any).juuid || (job as any).id, // Canonical Job identity
           workOrderNo: workOrderNo,
           workOrderType: 'Planned' as const,
           templateCode: workOrderNo,
@@ -155,6 +155,7 @@ export async function autoGenerate(vesselId: string) {
 
     const currentRH = parseInt(component.currentCumulativeRH || '0');
     const dueRH = parseInt((job as any).nextDueRH || '0');
+    const lastDoneRH = parseInt((job as any).lastDoneRH || '0');
 
     // Determine lead time based on job criticality - use vessel settings
     const isCritical = (job as any).criticality === 'Yes' || (job as any).jobPriority === 'Critical';
@@ -183,7 +184,7 @@ export async function autoGenerate(vesselId: string) {
           vesselId: (job as any).vesselId,
           component: (job as any).componentId,
           componentCode: componentCode, // Use resolved componentCode
-          jobId: (job as any).id, // Store job ID for reliable lead time hydration
+          jobId: (job as any).juuid || (job as any).id, // Canonical Job identity
           workOrderNo: workOrderNo,
           workOrderType: 'Planned' as const,
           templateCode: workOrderNo,
@@ -199,6 +200,16 @@ export async function autoGenerate(vesselId: string) {
           classRelated: (job as any).classRelated,
           briefWorkDescription: (job as any).briefWorkDescription,
           department: (job as any).department,
+          nextDueReading: String(dueRH),
+          currentReading: String(currentRH),
+          intervalRunningHour: (job as any).intervalRunningHour,
+          driverType: 'RH',
+          cycleDueRhSnapshot: String(dueRH),
+          generateRhSnapshot: String(Math.max(0, dueRH - leadTimeHours)),
+          dueRhSnapshot: String(dueRH),
+          effectiveRhAtGeneration: String(currentRH),
+          rhLastDoneSnapshot: String(lastDoneRH),
+          lastDoneDateSnapshot: (job as any).lastDoneDate || null,
           requiredSpareParts: (job as any).requiredSpareParts || [],
           requiredTools: (job as any).requiredTools || [],
           safetyRequirements: (job as any).safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }

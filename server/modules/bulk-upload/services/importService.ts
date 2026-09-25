@@ -22,6 +22,8 @@ import { applyAssignmentSync } from '../../work-orders/services/workOrderService
 import * as woRepo from '../../work-orders/repositories/workOrderRepository';
 import { logFieldChangesBatch, logFieldChanges } from '../../sync';
 import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
+import { ensureCompletedWorkOrderDate } from '../../work-orders/utils/completedWorkOrderDate';
+import { buildRunningHoursWorkOrderSnapshots } from '../../work-orders/utils/workOrderPartADates';
 
 
 export interface SpareInventoryResult {
@@ -1557,6 +1559,11 @@ export async function performImport(
           ? String(row['Running Hours at Completion']).trim() : null;
         const dueRhSnapshot   = row['WO Due Hour'] != null ? String(row['WO Due Hour']).trim() : null;
         const nextDueHour     = row['Next Due Hour'] != null ? String(row['Next Due Hour']).trim() : null;
+        const parseOptionalSnapshotNumber = (value: string | null): number | undefined => {
+          if (!value) return undefined;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        };
 
         // ── Step 1: Create or update the work_orders record ──
         const existingWO = woByNumber.get(woNumber);
@@ -1586,9 +1593,9 @@ export async function performImport(
           nextDueDate: nextDueDate || undefined,             // text("next_due_date")
           nextDueReading: nextDueHour || undefined,          // text("next_due_reading")
           runningHours: rhAtCompletion || undefined,         // text("running_hours") — RH at completion
-          dueRhSnapshot: dueRhSnapshot ? parseFloat(dueRhSnapshot) || undefined : undefined, // decimal
+          dueRhSnapshot: parseOptionalSnapshotNumber(dueRhSnapshot),
+          cycleDueRhSnapshot: parseOptionalSnapshotNumber(dueRhSnapshot),
         };
-
         if (!existingWO) {
           if (mode === 'update') {
             // update-only mode: skip if WO doesn't exist
@@ -1597,6 +1604,7 @@ export async function performImport(
             _emitProgress('Processing WO History…');
             continue;
           }
+          ensureCompletedWorkOrderDate(null, woPayload);
           savedWO = await storage.createWorkOrder(woPayload);
           woByNumber.set(woNumber, savedWO);
           // Field-log the full-row CREATE so this bulk-imported WO syncs (direct logFieldChanges;
@@ -1615,6 +1623,20 @@ export async function performImport(
             _emitProgress('Processing WO History…');
             continue;
           }
+          for (const snapshotField of [
+            'dueRhSnapshot',
+            'cycleDueRhSnapshot',
+          ] as const) {
+            const currentValue = existingWO[snapshotField];
+            if (
+              currentValue !== null
+              && currentValue !== undefined
+              && String(currentValue).trim() !== ''
+            ) {
+              delete woPayload[snapshotField];
+            }
+          }
+          ensureCompletedWorkOrderDate(existingWO, woPayload);
           savedWO = await storage.updateWorkOrder(existingWO.id, woPayload);
           woByNumber.set(woNumber, savedWO);
           result.updated++;
@@ -3240,8 +3262,8 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
         j.jobTitle === jobTitle
       );
       if (matchingJob) {
-        jobId = matchingJob.id;
-        console.log(`Auto-resolved jobId: ${matchingJob.id} for imported work order with component ${componentCode} and job "${jobTitle}"`);
+        jobId = matchingJob.juuid || matchingJob.id;
+        console.log(`Auto-resolved jobId: ${jobId} for imported work order with component ${componentCode} and job "${jobTitle}"`);
       }
     } catch (error) {
       console.error('Failed to auto-resolve jobId during bulk import:', error);
@@ -3269,6 +3291,7 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
     workOrderNo = await generateUnplannedWorkOrderNumber(storage, effectiveVesselId, componentCode);
   }
   
+  const isRunningHours = (row['Schedule_Type'] || matchingJob?.maintenanceBasis) === 'Running Hours';
   const workOrderData = {
     vesselId: effectiveVesselId,
     component: component?.name || row['Component_Name'] || componentCode,
@@ -3287,7 +3310,17 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
     frequencyUnit: row['Interval_Unit'] || null,
     classRelated: row['Criticality'] || null,
     jobPriority: null,
-    briefWorkDescription: row['Job_Description'] || null
+    briefWorkDescription: row['Job_Description'] || null,
+    ...(isRunningHours && matchingJob
+      ? buildRunningHoursWorkOrderSnapshots({
+          lastDoneDate: matchingJob.lastDoneDate,
+          lastDoneRH: matchingJob.lastDoneRH,
+          dueRH: matchingJob.nextDueRH,
+          currentRH: component?.currentCumulativeRH,
+          intervalRunningHour:
+            matchingJob.intervalRunningHour ?? row['Interval'] ?? null,
+        })
+      : {}),
   };
 
   await applyAssignmentSync(workOrderData);

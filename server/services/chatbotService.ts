@@ -3,6 +3,22 @@ import type { IStorage } from "../storage";
 import { getDb } from "../db";
 import { vessels as vesselsTable, vesselCertificateData, vesselSurveyData, shipCertificatesMaster, shipSurveysMaster } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { canAccessVessel } from "../middleware/auth";
+
+/**
+ * CONTRACT (CLAUDE.md, Work Order Status): every overdue/due read goes through
+ * getWorkOrdersWithComputedStatus — the SAME enrichment + status computation the Work Orders
+ * screen and the reports use. The derived band (Active / Due / Due (Grace P) / Overdue) is never
+ * persisted, so the raw storage rows the tools read before (23-Sep-2026) carried stale stored
+ * statuses AND archived (soft-deleted) rows: pilot vessel 302 raw rows / 140 "Overdue" vs the
+ * screen's 153 rows / 142 Overdue. Rows come back with `status` = computed status and keep
+ * every raw column the tools use (dataScope, component, jobTitle, dueDate, jobPriority, …).
+ */
+async function loadWorkOrders(vesselId?: string): Promise<any[]> {
+  const { getWorkOrdersWithComputedStatus } = await import("../modules/work-orders/services/workOrderService");
+  return getWorkOrdersWithComputedStatus(vesselId);
+}
+
 
 let openaiClient: OpenAI | null = null;
 
@@ -142,7 +158,7 @@ Use maritime terminology naturally (Main Engine, Chief Engineer, ROB, running ho
 Crew are busy — get to the point fast, lead with what matters most.`;
 }
 
-const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+export const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
@@ -208,14 +224,18 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "get_overdue_work_orders",
       description:
-        "Get all overdue work orders for a vessel. Use when user asks about overdue maintenance.",
+        "Get all overdue work orders for a vessel. Use when user asks about overdue maintenance. Returns at most 10 rows per call (priority first, then days overdue); pass offset to page through the rest.",
       parameters: {
         type: "object",
         properties: {
           vesselId: { type: "string", description: "Vessel ID (required)" },
           limit: {
             type: "number",
-            description: "Maximum number of results (default: 50)",
+            description: "Maximum number of results per call (max 10)",
+          },
+          offset: {
+            type: "number",
+            description: "Rows to skip — use the number already shown to get the next page",
           },
         },
         required: ["vesselId"],
@@ -792,15 +812,49 @@ const CHATBOT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
-async function executeTool(
+export async function executeTool(
   toolName: string,
   args: any,
-  storage: IStorage
+  storage: IStorage,
+  access?: VesselAccess
 ): Promise<any> {
   try {
+    // Stage A — vessel-scope enforcement: the LLM supplies args.vesselId with no inherent
+    // access check. Verify the caller may see the requested vessel before any DB read.
+    // Gated by CHATBOT_ENFORCE_VESSEL_SCOPE (default on); no-op for Office/Admin/Sail Admin
+    // (so current single-user/admin behavior is unchanged).
+    // 23-Sep-2026 (pilot): resolve the requested vessel FIRST — the widget's selector carries `vessels.id`
+    // (pilot: 'WKFV') while every data table is keyed by `vuuid`; the two differ on the pilot BY DESIGN
+    // (the identity trap) and may differ elsewhere. Unknown vessel = explicit failure, never "zero records"
+    // (the assistant reported an unknown id as "0 work orders"). Access is then checked against BOTH forms.
+    let requested: { id: string; vuuid: string } | null = null;
+    if (typeof args?.vesselId === "string" && args.vesselId && args.vesselId !== "all" && toolName !== "get_fleet_overview") {
+      const vessel = (await storage.getVessels({ includeDeleted: false })).find(
+        (v) => v.id === args.vesselId || v.vuuid === args.vesselId
+      );
+      if (!vessel) {
+        return { error: `Unknown vessel '${args.vesselId}': no vessel with this ID exists here. Check the vessel selection.` };
+      }
+      requested = { id: vessel.id, vuuid: vessel.vuuid };
+    }
+    if (access && process.env.CHATBOT_ENFORCE_VESSEL_SCOPE !== "false") {
+      if (toolName === "get_fleet_overview") {
+        if (access.role === "Ship") {
+          return { error: "Fleet-wide data isn't available for your role. Ask about your assigned vessel instead." };
+        }
+      } else if (requested) {
+        if (!canAccessVessel(access, requested.vuuid) && !canAccessVessel(access, requested.id)) {
+          return { error: `You don't have access to vessel '${args.vesselId}'. You can only view data for your assigned vessel.` };
+        }
+      }
+    }
+    if (requested && requested.vuuid !== args.vesselId) {
+      args = { ...args, vesselId: requested.vuuid }; // tools query by vuuid
+    }
+
     switch (toolName) {
       case "get_work_orders": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const workOrders = await loadWorkOrders(args.vesselId);
         let filtered = workOrders.filter(
           (wo) => wo.dataScope === "vessel"
         );
@@ -854,7 +908,7 @@ async function executeTool(
       }
 
       case "get_work_order_detail": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const wo = allWOs.find(
           (w) =>
             w.id === args.workOrderId ||
@@ -885,7 +939,7 @@ async function executeTool(
       }
 
       case "get_overdue_work_orders": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const workOrders = await loadWorkOrders(args.vesselId);
         const overdue = workOrders.filter(
           (wo) => wo.status === "Overdue" && wo.dataScope === "vessel"
         );
@@ -925,6 +979,10 @@ async function executeTool(
             assignedTo: wo.assignedTo,
             jobPriority: wo.jobPriority,
             daysOverdue: wo.dueDate ? Math.max(0, Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24))) : 0,
+            // 23-Sep-2026: running-hours jobs have no calendar due date — give the basis and the hours instead
+            maintenanceBasis: wo.maintenanceBasis ?? null,
+            dueRH: wo.dueRH ?? wo.nextDueReading ?? null,
+            currentRH: wo.currentRH ?? null,
           }))
           .sort((a, b) => {
             const priorityOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
@@ -935,68 +993,106 @@ async function executeTool(
           });
 
         const limit = Math.min(args.limit || 10, 10);
+        // 23-Sep-2026: paging ('show more') — offset = rows already shown
+        const offset = Math.max(0, Math.min(Number(args.offset) || 0, sorted.length));
+        const page = sorted.slice(offset, offset + limit);
+        // the list is priority-first, so the oldest item can sit below the cut — name it explicitly
+        const oldest = sorted.length > 0 ? [...sorted].sort((a, b) => b.daysOverdue - a.daysOverdue)[0] : null;
         return {
           totalOverdue: overdue.length,
-          showing: Math.min(limit, sorted.length),
-          remainingSummary: sorted.length > limit ? `...and ${sorted.length - limit} more overdue items` : null,
+          offset,
+          showing: page.length,
+          remainingSummary: sorted.length > offset + page.length ? `...and ${sorted.length - offset - page.length} more overdue items (call again with offset ${offset + page.length})` : null,
+          listOrder: "priority (Critical first) then days overdue — the oldest item may not be among the rows shown",
           analysisSummary: {
             byPriority,
             topComponents,
             oldestOverdueDays: oldestDays,
+            oldestOverdue: oldest ? { workOrderNo: oldest.workOrderNo, component: oldest.component, jobPriority: oldest.jobPriority, daysOverdue: oldest.daysOverdue } : null,
             averageOverdueDays: agingDays.length > 0 ? Math.round(agingDays.reduce((a, b) => a + b, 0) / agingDays.length) : 0,
           },
-          workOrders: sorted.slice(0, limit),
+          workOrders: page,
         };
       }
 
       case "get_due_work_orders": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
-        let due = workOrders.filter(
+        const workOrders = await loadWorkOrders(args.vesselId);
+        const due = workOrders.filter(
           (wo) =>
             (wo.status === "Due" || wo.status === "Due (Grace P)") &&
             wo.dataScope === "vessel"
         );
 
-        if (args.dateRange) {
+        // 23-Sep-2026: calendar-dated and running-hours jobs are reported SEPARATELY. A running-hours job is Due by
+        // hours and has no calendar due date — that date cannot be determined from the hours available — so a
+        // date-range question ("due this week") counts ONLY calendar-dated jobs, and the running-hours ones are
+        // listed apart with that statement: never silently counted in, never silently dropped.
+        const rhBased = due.filter((wo) => wo.maintenanceBasis === "Running Hours" || !wo.dueDate);
+        let calendar = due.filter((wo) => !rhBased.includes(wo));
+        const rangeLabel: string | null = ["week", "month", "quarter"].includes(args.dateRange) ? args.dateRange : null;
+        if (rangeLabel) {
           const now = new Date();
           const cutoffDate = new Date();
-          if (args.dateRange === "week") cutoffDate.setDate(now.getDate() + 7);
-          else if (args.dateRange === "month")
-            cutoffDate.setDate(now.getDate() + 30);
-          else if (args.dateRange === "quarter")
-            cutoffDate.setDate(now.getDate() + 90);
-
-          due = due.filter((wo) => {
-            if (!wo.dueDate) return false;
-            const dueDate = new Date(wo.dueDate);
-            return dueDate <= cutoffDate;
-          });
+          cutoffDate.setDate(now.getDate() + (rangeLabel === "week" ? 7 : rangeLabel === "month" ? 30 : 90));
+          calendar = calendar.filter((wo) => new Date(wo.dueDate) <= cutoffDate);
         }
-
-        return {
-          totalDue: due.length,
-          workOrders: due.slice(0, 50).map((wo) => ({
+        const row = (wo: any) => {
+          const dueRH = wo.dueRH ?? wo.nextDueReading ?? null;
+          const currentRH = wo.currentRH ?? null;
+          const remaining = dueRH != null && currentRH != null ? Number(dueRH) - Number(currentRH) : null;
+          return {
             id: wo.id,
             workOrderNo: wo.workOrderNo,
             component: wo.component,
             componentCode: wo.componentCode,
             jobTitle: wo.jobTitle,
-            dueDate: wo.dueDate,
+            dueDate: wo.dueDate ?? null,
             assignedTo: wo.assignedTo,
             jobPriority: wo.jobPriority,
-          })),
+            maintenanceBasis: wo.maintenanceBasis ?? null,
+            dueRH,
+            currentRH,
+            rhRemaining: remaining,
+            rhLeadTimeHours: wo.rhLeadTimeHours ?? null,
+            // the application's rule: Due when 0 <= remaining hours <= the vessel's running-hours lead time
+            rhStatusBasis: remaining == null ? null
+              : remaining <= 0 ? "due hours reached"
+              : `${remaining} h remaining, within the ${wo.rhLeadTimeHours ?? "configured"} h running-hours lead time`,
+          };
+        };
+
+        return {
+          totalDue: due.length,
+          dateRange: rangeLabel,
+          calendarDue: {
+            count: calendar.length,
+            note: rangeLabel
+              ? `Calendar-dated work orders due within the next ${rangeLabel}.`
+              : "Calendar-dated work orders currently Due.",
+            workOrders: calendar.slice(0, 50).map(row),
+          },
+          runningHoursDue: {
+            count: rhBased.length,
+            note: "Running-hours work orders currently Due. Their calendar due date cannot be determined from the available hours, so they are NOT counted in the date-range figure. rhStatusBasis states why each is Due under the application's rule; a reading of 0 h or one unchanged for a long time needs confirmation on board.",
+            workOrders: rhBased.slice(0, 50).map(row),
+          },
         };
       }
 
       case "get_work_order_counts": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
-        const overdueCount = vesselWOs.filter((wo) => wo.status === "Overdue").length;
-        const dueCount = vesselWOs.filter((wo) => wo.status === "Due" || wo.status === "Due (Grace P)").length;
-        const completedCount = vesselWOs.filter((wo) => wo.status === "Completed").length;
-        const activeCount = vesselWOs.filter((wo) => wo.status === "Active").length;
-        const postponedCount = vesselWOs.filter((wo) => wo.status === "Postponed").length;
-        const pendingCount = vesselWOs.filter((wo) => wo.status === "Pending Approval").length;
+        // 23-Sep-2026: the SAME tab-badge calculation as the Work Orders screen (computeWorkOrderTabCounts
+        // over computed statuses) so the assistant quotes the numbers the user sees on screen. "active" is
+        // the screen's "Scheduled" tab (planned, not yet due); Due includes "Due (Grace P)".
+        const { computeWorkOrderTabCounts } = await import("@shared/utils/workOrderFilters");
+        const tabs = computeWorkOrderTabCounts(vesselWOs);
+        const overdueCount = tabs["Overdue"];
+        const dueCount = tabs["Due"];
+        const completedCount = tabs["Completed"];
+        const activeCount = tabs["Planned"];
+        const postponedCount = tabs["Postponed"];
+        const pendingCount = tabs["Pending Approval"];
         const totalActionable = overdueCount + dueCount + completedCount;
         const completionRate = totalActionable > 0 ? Math.round((completedCount / totalActionable) * 100) : 0;
         const overdueRate = vesselWOs.length > 0 ? Math.round((overdueCount / vesselWOs.length) * 100) : 0;
@@ -1010,7 +1106,9 @@ async function executeTool(
           completionRate,
           pendingApproval: pendingCount,
           active: activeCount,
+          unplanned: tabs["Unplanned"],
           postponed: postponedCount,
+          basis: "Same calculation as the Work Orders screen tabs (computed status; archived work orders excluded). 'active' is the screen's Scheduled tab.",
           insight: overdueRate > 20 ? "HIGH_OVERDUE_RATE" : overdueRate > 10 ? "ELEVATED_OVERDUE_RATE" : "NORMAL",
         };
       }
@@ -1527,7 +1625,7 @@ async function executeTool(
       }
 
       case "get_maintenance_calendar": {
-        const workOrders = await storage.getWorkOrders(args.vesselId);
+        const workOrders = await loadWorkOrders(args.vesselId);
         const vesselWOs = workOrders.filter((wo) => wo.dataScope === "vessel");
 
         const now = new Date();
@@ -1678,7 +1776,7 @@ async function executeTool(
       }
 
       case "get_maintenance_insights": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
 
@@ -1848,7 +1946,7 @@ async function executeTool(
       }
 
       case "get_workload_analysis": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
 
@@ -1938,7 +2036,7 @@ async function executeTool(
       }
 
       case "get_component_health_score": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const components = await storage.getComponents(args.vesselId);
         const topN = args.topN || 10;
@@ -2036,7 +2134,7 @@ async function executeTool(
       }
 
       case "get_performance_trends": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const periodDays = args.periodDays || 90;
         const now = new Date();
@@ -2175,7 +2273,7 @@ async function executeTool(
           });
         }
 
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const rhBasedDue = allWOs.filter((wo) => wo.dataScope === "vessel" && (wo.status === "Due" || wo.status === "Overdue") && wo.driverType === "RH");
 
         return {
@@ -2195,7 +2293,7 @@ async function executeTool(
 
       case "get_maintenance_planner": {
         const periodDays = args.periodDays || 90;
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
         const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
@@ -2550,7 +2648,7 @@ async function executeTool(
           return { error: `No equipment found matching "${args.equipmentFilter}". Try a broader search term.`, suggestions: ["pump", "separator", "generator", "compressor", "engine"] };
         }
 
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         let defects: any[] = [];
         try { defects = await storage.getDefects({ vesselId: args.vesselId }); } catch (e) {}
@@ -2597,7 +2695,7 @@ async function executeTool(
       }
 
       case "get_cost_impact_estimate": {
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
         const now = new Date();
@@ -2653,7 +2751,7 @@ async function executeTool(
 
       case "get_workload_forecast": {
         const forecastMonths = args.forecastMonths || 3;
-        const allWOs = await storage.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = new Date();
 
@@ -2767,19 +2865,36 @@ export interface ChatContext {
   userRole: string;
 }
 
+// Stage A: the caller's vessel-access identity, used to enforce that the LLM-supplied
+// args.vesselId is one the user may actually see. Optional — when omitted, no enforcement.
+export interface VesselAccess {
+  role: string;
+  vesselId: string | null;
+}
+
 export interface ChatResponse {
   response: string;
   toolsUsed: string[];
   conversationHistory: ChatMessage[];
+  // Stage A: token usage for the central log / cost view (best-effort; omitted on error paths).
+  usage?: { tokensIn: number; tokensOut: number };
 }
 
 export async function processChatMessage(
   message: string,
   conversationHistory: ChatMessage[],
   context: ChatContext,
-  storage: IStorage
+  storage: IStorage,
+  access?: VesselAccess
 ): Promise<ChatResponse> {
   const toolsUsed: string[] = [];
+  // Stage A — reliability: per-LLM-call timeout + an overall tool-loop wall-clock budget so a
+  // hung call fails gracefully and the loop can't run unbounded. Generous defaults → byte-identical.
+  const LLM_TIMEOUT_MS = parseInt(process.env.LLM_TIMEOUT_MS || "", 10) || 60_000;
+  const TOTAL_BUDGET_MS = parseInt(process.env.LLM_TOTAL_BUDGET_MS || "", 10) || 120_000;
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  let tokensIn = 0;
+  let tokensOut = 0;
 
   try {
     const systemPrompt = buildSystemPrompt(context);
@@ -2815,7 +2930,9 @@ export async function processChatMessage(
       tool_choice: "auto",
       temperature: 0.4,
       max_tokens: 4000,
-    });
+    }, { timeout: LLM_TIMEOUT_MS });
+    tokensIn += response.usage?.prompt_tokens ?? 0;
+    tokensOut += response.usage?.completion_tokens ?? 0;
 
     let assistantMessage = response.choices[0].message;
     let iterations = 0;
@@ -2824,7 +2941,8 @@ export async function processChatMessage(
     while (
       assistantMessage.tool_calls &&
       assistantMessage.tool_calls.length > 0 &&
-      iterations < maxIterations
+      iterations < maxIterations &&
+      Date.now() < deadline
     ) {
       iterations++;
 
@@ -2836,7 +2954,7 @@ export async function processChatMessage(
         toolsUsed.push(toolName);
 
         console.log(`[Chatbot] Executing tool: ${toolName}`, toolArgs);
-        const result = await executeTool(toolName, toolArgs, storage);
+        const result = await executeTool(toolName, toolArgs, storage, access);
 
         messages.push({
           role: "tool",
@@ -2852,7 +2970,9 @@ export async function processChatMessage(
         tool_choice: "auto",
         temperature: 0.4,
         max_tokens: 4000,
-      });
+      }, { timeout: LLM_TIMEOUT_MS });
+      tokensIn += response.usage?.prompt_tokens ?? 0;
+      tokensOut += response.usage?.completion_tokens ?? 0;
 
       assistantMessage = response.choices[0].message;
     }
@@ -2870,6 +2990,7 @@ export async function processChatMessage(
       response: assistantContent,
       toolsUsed: Array.from(new Set(toolsUsed)),
       conversationHistory: updatedHistory,
+      usage: { tokensIn, tokensOut },
     };
   } catch (error: any) {
     console.error("[Chatbot] Error processing message:", error);

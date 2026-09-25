@@ -421,6 +421,108 @@
   border-radius: 0.5rem;
 }
 
+/* Component Register data grids: match the restrained component section styling. */
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) {
+  --ag-header-background-color: #f8fafc;
+  --ag-header-foreground-color: #16569e;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell {
+  color: #16569e;
+  border-right: 1px solid #e5e7eb;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell:last-child {
+  border-right: none;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell-text,
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell .ag-header-icon,
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell .ag-icon {
+  color: #16569e !important;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell:hover {
+  background-color: #f1f5f9;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell-resize {
+  width: 10px;
+  opacity: 0.35;
+  cursor: col-resize;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell:hover .ag-header-cell-resize {
+  opacity: 0.8;
+}
+
+.wo-ag-grid.ag-theme-alpine:is(
+  [data-testid="component-running-hours-grid"],
+  [data-testid="component-jobs-grid"],
+  [data-testid="component-maintenance-history-grid"],
+  [data-testid="component-spares-grid"]
+) .ag-header-cell-resize::after {
+  background-color: #94a3b8;
+}
+
+.wo-ag-grid.ag-theme-alpine[data-testid="component-running-hours-grid"] .ag-row {
+  cursor: default;
+}
+
 .wo-ag-grid.ag-theme-alpine .wo-rejected-row {
   background-color: #fef2f2 !important;
 }

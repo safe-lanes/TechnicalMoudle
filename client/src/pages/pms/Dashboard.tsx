@@ -935,24 +935,6 @@ const Dashboard = () => {
     enabled: !!effectiveVesselId,
   });
 
-  const { data: complianceAnomalies } = useQuery<{
-    cycleSkipRate: { severity: string };
-    backdatingFrequency: { severity: string };
-    bulkCompletions: { severity: string; eventCount: number };
-    scheduleDrift: { severity: string };
-  }>({
-    queryKey: ['/technical/api/dashboard/compliance-anomalies', effectiveVesselId],
-    queryFn: async () => {
-      const url = isAllVessels
-        ? '/technical/api/dashboard/compliance-anomalies'
-        : `/technical/api/dashboard/compliance-anomalies?vesselId=${effectiveVesselId}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch compliance anomalies');
-      return res.json();
-    },
-    enabled: activeTab === 'management' && !!effectiveVesselId,
-  });
-
   // Helper: Calculate stock status
   const getStockStatus = (rob: number, min: number): { label: string; isLow: boolean } => {
     if (rob < min) return { label: 'Low', isLow: true };
@@ -1844,16 +1826,9 @@ const Dashboard = () => {
     const postponementCount = isHeadOfDept ? 0 : pendingApprovalWOs.filter((wo: any) => wo._pendingType === 'postponement').length;
     const l2ReviewCount = isHeadOfDept ? 0 : pendingApprovalWOs.filter((wo: any) => wo._pendingType === 'l2review').length;
 
-    const effectiveAnomalyIndicators = complianceAnomalies || null;
-    const anomalyCount = effectiveAnomalyIndicators ? [
-      effectiveAnomalyIndicators.cycleSkipRate,
-      effectiveAnomalyIndicators.backdatingFrequency,
-      effectiveAnomalyIndicators.bulkCompletions,
-      effectiveAnomalyIndicators.scheduleDrift,
-    ].filter(s => {
-      const severity = typeof s === 'string' ? s : (s as { severity: string }).severity;
-      return severity !== 'green';
-    }).length : 0;
+    // The W.O Anomalies KPI represents Work Orders awaiting superintendent
+    // acknowledgement, not the number of non-green compliance indicators.
+    const anomalyCount = superintendentSummary?.pendingCount ?? 0;
 
     // All submitted CRs are always visible to every user — the approval workflow only
     // controls who can click Approve/Reject, not who can see the requests.
@@ -1886,7 +1861,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, pendingApproverCRs, localApprovers, currentUser, complianceAnomalies, isHeadOfDept]);
+  }, [operationWOs, sparesData, changeRequestsData, pendingApproverCRs, localApprovers, currentUser, superintendentSummary, isHeadOfDept]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
