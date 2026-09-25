@@ -120,7 +120,14 @@ async function main() {
   r = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-user-1', {}, JWT_SECRET, { userType: 'Office' }), identityHeaders('u-user-1', 'Sail Admin', 'Office'));
   record("optionB: JWT without role, master data says 'User' although the header says Sail Admin → 403 not permitted", r.status === 403 && /not permitted/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
   r = await mint(BASE, sailerpJwt(DOMAIN_A, 'nobody-9', {}, JWT_SECRET, { userType: 'Office' }), identityHeaders('nobody-9', 'Sail Admin', 'Office'));
-  record('optionB: JWT without role, user NOT in master data, header claims Sail Admin → 403 (no header fallback)', r.status === 403 && /master data/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  if ((process.env.ASSISTANT_ROLE_FALLBACK || '').toLowerCase() === 'profile') {
+    const idF = r.body?.token ? decodeIdentity(r.body.token) : {};
+    record('roleFallback=profile: JWT without role, user NOT in master data → 200 with the browser-forwarded role (browser-trusted, opt-in)', r.status === 200 && idF.role === 'Sail Admin', `${r.status} role=${idF.role ?? r.body?.error}`);
+    r = await mint(BASE, sailerpJwt(DOMAIN_A, 'nobody-9', {}, JWT_SECRET, { userType: 'Office' }), identityHeaders('nobody-9', 'User', 'Office'));
+    record("roleFallback=profile: forwarded role 'User' → 403 not permitted (allow-list still applies)", r.status === 403 && /not permitted/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  } else {
+    record('optionB: JWT without role, user NOT in master data, header claims Sail Admin → 403 (no header fallback)', r.status === 403 && /master data/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
+  }
   r = await mint(BASE, sailerpJwt(DOMAIN_A, 'pilot-super-1', {}, JWT_SECRET, { role: 'Sail Admin' }), office);
   record('optionA: JWT without userType claim → 403', r.status === 403 && /userType/.test(r.text), `${r.status} ${r.body?.error ?? ''}`);
   r = await mint(BASE, sailerpJwt(DOMAIN_A, 'u-user-1', {}, JWT_SECRET, { role: 'User', userType: 'Office' }), identityHeaders('u-user-1', 'Sail Admin', 'Office'));

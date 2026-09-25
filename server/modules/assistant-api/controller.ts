@@ -24,9 +24,13 @@
  * LLM can relay them politely; non-200 is reserved for transport/auth failures.
  */
 import { Response } from 'express';
-import { type AuthenticatedRequest } from '../../middleware/auth';
+import { type AuthenticatedRequest, getRbacIdentity } from '../../middleware/auth';
 import type { VerifiedUser } from '../../middleware/tenantMiddleware';
 import { findMasterUserById } from './masterUserRepository';
+
+/** Role fallback when neither the token nor master data supplies one: 'profile' = the browser-forwarded SAILERP
+ *  profile role (browser-trusted, explicit opt-in per environment); anything else = refuse. */
+const roleFallbackFromProfile = () => (process.env.ASSISTANT_ROLE_FALLBACK || '').trim().toLowerCase() === 'profile';
 
 /** The role claim name as configured for the login token (SAILERP_JWT_USER_CLAIMS = "id,role,userType"). */
 const ROLE_CLAIM = ((process.env.SAILERP_JWT_USER_CLAIMS || 'id,role,userType').split(',')[1] || 'role').trim();
@@ -130,16 +134,28 @@ export async function handleMintToken(req: AuthenticatedRequest, res: Response) 
     });
   }
   let role = vu.role;
-  let roleSource: 'token' | 'master_users' = 'token';
+  let roleSource: 'token' | 'master_users' | 'profile-header' = 'token';
   if (!role) {
     const mu = await findMasterUserById(vu.userId!);
-    if (!mu || !mu.role) {
+    if (mu?.role) {
+      role = mu.role;
+      roleSource = 'master_users';
+    } else if (roleFallbackFromProfile()) {
+      // ASSISTANT_ROLE_FALLBACK=profile (25-Sep-2026, Ghazi's decision): for environments whose master data is not
+      // yet populated, accept the role the browser forwarded from the decrypted SAILERP profile (x-user-role →
+      // req.rbac.role). This is BROWSER-TRUSTED — the same trust the rest of the module applies — and is logged as
+      // such. Off by default; production decides separately.
+      const fwd = getRbacIdentity(req);
+      if (fwd.source === 'forwarded' && fwd.role) {
+        role = fwd.role;
+        roleSource = 'profile-header';
+      }
+    }
+    if (!role) {
       return res.status(403).json({
         error: `cannot mint: the login token carries no role and user '${vu.userId}' has no role in the synced master data (master_users)`,
       });
     }
-    role = mu.role;
-    roleSource = 'master_users';
   }
   if (!allowedRoles().includes(role)) {
     return res.status(403).json({ error: `cannot mint: role '${role}' is not permitted to use the assistant` });

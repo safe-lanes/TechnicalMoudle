@@ -150,7 +150,7 @@ tenant/database selection, cross-tenant refusal, missing/expired/tampered creden
 |---|---|---|---|
 | `tenantDomain`, `tuid` | SAILERP login token, `domain` claim | HS256 signature with the shared `JWT_SECRET` (tenantMiddleware) | **Server-verified.** Cannot be set by the browser. |
 | `userId`, `userType` | SAILERP login token claims (`id`, `userType`; names configurable via `SAILERP_JWT_USER_CLAIMS`), read by tenantMiddleware from the SAME verified token and exposed as `req.verifiedUser` | Same HS256 signature | **Server-verified.** A token missing either cannot mint (403, no header fallback). |
-| `role` | The token claim `role` if the login token carries one; otherwise (**the genuine SAILERP token does NOT — PROVEN on dev 25-Sep-2026**) the role of the VERIFIED user id in the tenant's synced SAILERP master data (`master_users.role`, Option B) | HS256 signature (claim) or the server's own synced master data (lookup by verified id) | **Server-verified.** The browser's `x-user-role` header is never consulted. A user with no role in master data cannot mint. |
+| `role` | 1) the token claim `role` if the login token carries one; 2) otherwise (**the genuine SAILERP token does NOT — PROVEN on dev 25-Sep-2026**) the role of the VERIFIED user id in the tenant's synced SAILERP master data (`master_users.role`); 3) otherwise, ONLY when the environment sets `ASSISTANT_ROLE_FALLBACK=profile`, the browser-forwarded profile role (`x-user-role`) | 1–2 server-verified; 3 browser-trusted (explicit opt-in, logged as `profile-header`) | Sources 1–2 cannot be set by the browser. Source 3 is the module's existing header trust, for environments whose master data is not yet populated; off by default; the role allow-list applies to every source. |
 | `userName` | Browser profile header | — | Display and masking only; never used for authorisation. |
 | `vesselId` | Session (null on the shore) | — | Ship users never reach the shore assistant; a Ship-type identity with no vessel is refused by the tools. |
 
@@ -213,7 +213,7 @@ Configuration required (no "zero configuration": trusted registration is the poi
 | Where | Setting |
 |---|---|
 | Assistant (AI server), once per instance | one entry in `ASSISTANT_MODULE_INSTANCES` (issuer id, module, env, exact URL, secret, signing key); `IDENTITY_SIGNING_KEY` = shared documentation key, distinct from every instance key |
-| Module instance (PM2 env) | `ASSISTANT_INSTANCE_ID` (= its issuer id), `ASSISTANT_IDENTITY_SIGNING_KEY` (= that entry's signing key), `ASSISTANT_SERVICE_SECRET` (= that entry's secret) |
+| Module instance (PM2 env) | `ASSISTANT_INSTANCE_ID` (= its issuer id), `ASSISTANT_IDENTITY_SIGNING_KEY` (= that entry's signing key), `ASSISTANT_SERVICE_SECRET` (= that entry's secret); optional `ASSISTANT_ROLE_FALLBACK=profile` (browser-trusted role when master data has none) |
 
 `ASSISTANT_MODULE_APIS` (module-keyed, one URL per module) is retired and ignored.
 
