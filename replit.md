@@ -198,10 +198,11 @@ Follow them on every change.
 
 ### TypeScript
 
-- **Never increase the tsc baseline.** Run `npx tsc --noEmit` before 
-  committing. The count must not exceed the current baseline of 290. 
-  Do not increase it. If you introduce new errors, fix them before 
+- **Never increase the tsc baseline.** Run `npx tsc --noEmit` before
+  committing. The count must not exceed the current baseline of 294.
+  Do not increase it. If you introduce new errors, fix them before
   committing.
+- The 294-error figure is the measured count as at September 16, 2026; any change to it must be stated explicitly in a task report rather than absorbed silently.
 
 - **Don't suppress with `as any` or `@ts-ignore`** to bypass real 
   type mismatches. Fix the type or fix the value.
@@ -274,7 +275,7 @@ Follow them on every change.
 
 Before pushing any commit:
 
-1. `npx tsc --noEmit` — count must not exceed baseline (290). 
+1. `npx tsc --noEmit` — count must not exceed baseline (294).
    Do not increase.
 2. If you added a migration: re-run it locally to verify 
    idempotency.

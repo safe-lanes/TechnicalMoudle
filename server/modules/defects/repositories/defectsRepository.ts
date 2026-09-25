@@ -3,7 +3,9 @@ import type {
   Defect, InsertDefect,
   DefectAction, InsertDefectAction,
   DefectAttachment, InsertDefectAttachment,
-  RecurringDefect
+  RecurringDefect,
+  DefectApprovalSettings,
+  DefectClosureHistory,
 } from '@shared/schema';
 
 // ── Core Defects ──
@@ -30,6 +32,41 @@ export async function updateDefect(id: string, updates: Partial<InsertDefect>): 
 
 export async function deleteDefect(id: string): Promise<void> {
   return storage.deleteDefect(id);
+}
+
+export async function getDefectClosureHistory(defectDuuid: string): Promise<DefectClosureHistory[]> {
+  return storage.getDefectClosureHistory(defectDuuid);
+}
+
+export async function reopenDefectAfterVerificationReturn(input: {
+  defectDuuid: string;
+  approvalRequestUuid: string;
+  rejectedByUserUuid: string;
+  rejectedByName: string;
+  rejectedByPosition: string;
+  rejectionReason: string;
+}): Promise<{ history: DefectClosureHistory; defect: Defect; alreadyApplied: boolean }> {
+  return storage.reopenDefectAfterVerificationReturn(input);
+}
+
+export async function getDefectApprovalSettings(): Promise<DefectApprovalSettings | undefined> {
+  return storage.getDefectApprovalSettings();
+}
+
+export async function upsertDefectApprovalSettings(settings: {
+  longExtensionDays: number;
+  showRejectedClosuresOnReport: boolean;
+  updatedByUuid?: string | null;
+}): Promise<DefectApprovalSettings> {
+  return storage.upsertDefectApprovalSettings(settings);
+}
+
+export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: string): Promise<boolean> {
+  return storage.hasActiveUserVesselAssignment(userUuid, vesselId);
+}
+
+export async function createAuditLog(data: any): Promise<any> {
+  return storage.createAuditLog(data);
 }
 
 // ── Defect Actions ──

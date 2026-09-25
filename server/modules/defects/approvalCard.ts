@@ -26,6 +26,7 @@ import { AppError } from '../shared/errors';
 
 export const DEFECTS_MODULE_ID = 'defects';
 export const DEFECTS_EXTENSION_SCREEN = 'defects-extension';
+export const DEFECTS_REPEAT_EXTENSION_SCREEN = 'defects-repeat-extension';
 export const DEFECTS_VERIFICATION_SCREEN = 'defects-verification';
 /** Stable classification ids — these ARE the admin-matrix variable names (2-bucket model). */
 export const DEFECT_CLASS_CRITICAL = 'Critical Equipment / COC Related';
@@ -39,7 +40,7 @@ const db = () => {
 /** The subject payload Defects hands to submit(). subjectRef is always the defect duuid;
  *  extensionId (client-generated EXT-<ts>) pins which B5 entry a chain was raised for. */
 export type DefectSubject =
-  | { kind: 'defect-extension'; duuid: string; extensionId?: string }
+  | { kind: 'defect-extension'; duuid: string; extensionId?: string; classification?: string }
   | { kind: 'defect-verification'; duuid: string };
 
 /**
@@ -47,17 +48,22 @@ export type DefectSubject =
  * nowhere) simply contributes "not critical" — a defect with no linked component and no
  * COC flag is Normal, never an error (defects.componentId is nullable by design).
  */
-export async function classifyDefect(duuid: string): Promise<string> {
+export async function defectClassificationFactors(duuid: string): Promise<{ isCoC: boolean; isCriticalComponent: boolean }> {
   const defect = (await db().select({ isCoc: defects.is_coc, componentId: defects.componentId })
     .from(defects).where(eq(defects.duuid, duuid)).limit(1))[0];
   if (!defect) throw new AppError(404, `[approvals] defect ${duuid} not found for classification`);
-  if (defect.isCoc === true) return DEFECT_CLASS_CRITICAL;
+  let isCriticalComponent = false;
   if (defect.componentId) {
     const comp = (await db().select({ critical: components.critical })
       .from(components).where(eq(components.cuuid, defect.componentId)).limit(1))[0];
-    if (comp?.critical === true) return DEFECT_CLASS_CRITICAL;
+    isCriticalComponent = comp?.critical === true;
   }
-  return DEFECT_CLASS_NORMAL;
+  return { isCoC: defect.isCoc === true, isCriticalComponent };
+}
+
+export async function classifyDefect(duuid: string): Promise<string> {
+  const factors = await defectClassificationFactors(duuid);
+  return factors.isCoC || factors.isCriticalComponent ? DEFECT_CLASS_CRITICAL : DEFECT_CLASS_NORMAL;
 }
 
 async function defectVesselId(subjectRef: string): Promise<string | null> {
@@ -71,6 +77,8 @@ export const defectsApprovalCard: ApprovalCard = {
   label: 'Defects',
   scopes: [
     { screenId: DEFECTS_EXTENSION_SCREEN, actionId: '', label: 'Defect Target Date Extension',
+      classifications: [{ id: DEFECT_CLASS_CRITICAL, label: DEFECT_CLASS_CRITICAL }, { id: DEFECT_CLASS_NORMAL, label: DEFECT_CLASS_NORMAL }] },
+    { screenId: DEFECTS_REPEAT_EXTENSION_SCREEN, actionId: '', label: 'Target Date Repeat Extension',
       classifications: [{ id: DEFECT_CLASS_CRITICAL, label: DEFECT_CLASS_CRITICAL }, { id: DEFECT_CLASS_NORMAL, label: DEFECT_CLASS_NORMAL }] },
     { screenId: DEFECTS_VERIFICATION_SCREEN, actionId: '', label: 'Defect Verification (C2)',
       classifications: [{ id: DEFECT_CLASS_CRITICAL, label: DEFECT_CLASS_CRITICAL }, { id: DEFECT_CLASS_NORMAL, label: DEFECT_CLASS_NORMAL }] },
@@ -86,6 +94,7 @@ export const defectsApprovalCard: ApprovalCard = {
   async classify(_ctx, _scope: Scope, subject: unknown) {
     const s = subject as DefectSubject;
     if (!s?.duuid) throw new AppError(400, `[approvals] defect scopes need a {duuid} subject`);
+    if (s.kind === 'defect-extension' && s.classification) return s.classification;
     return classifyDefect(s.duuid);
   },
 
@@ -100,10 +109,10 @@ export const defectsApprovalCard: ApprovalCard = {
     const { applyExtensionDecision, applyVerificationDecision } = await import('./services/defectsApprovalHooks');
     const approve = notice.outcome === 'approved';
     const remarks = notice.remarks ?? (approve ? 'Approved via approval workflow' : 'Returned via approval workflow');
-    if (notice.scope.screenId === DEFECTS_EXTENSION_SCREEN) {
+    if (notice.scope.screenId === DEFECTS_EXTENSION_SCREEN || notice.scope.screenId === DEFECTS_REPEAT_EXTENSION_SCREEN) {
       await applyExtensionDecision(notice.subjectRef, approve, remarks, notice.decidedBy);
     } else if (notice.scope.screenId === DEFECTS_VERIFICATION_SCREEN) {
-      await applyVerificationDecision(notice.subjectRef, approve, remarks, notice.decidedBy);
+      await applyVerificationDecision(notice.subjectRef, approve, remarks, notice.decidedBy, notice.requuid);
     } else {
       throw new AppError(400, `[approvals] unknown defects scope ${notice.scope.screenId}`);
     }

@@ -5,3 +5,8 @@
 - [Completed Work Order dates](completed-work-order-dates.md) — final Completed state requires a valid completion date without changing pre-approval date behavior.
 - [Work Order B2 baselines](work-order-b2-baselines.md) — Start Date and RH completion boundaries are strict and use immutable Part A snapshots.
 - [Trailing-space Git paths](trailing-space-git-paths.md) — patch file headers may lose trailing spaces; verify exact path bytes and tracked state during cleanup.
+- [Approval status availability](approval-status-availability.md) — loading, unavailable/error, confirmed no-workflow, and loaded approval states must remain distinct.
+- [Defect extension approval correspondence](defect-extension-approval-correspondence.md) — a pending defect-level request governs only the oldest Requested extension; later Requested entries are orphans.
+- [Defect extension history correlation](defect-extension-history-correlation.md) — engine requests lack extension IDs; historical chains must use conservative ordering and leave ambiguous entries unmatched.
+- [Rejected defect closure attempts](rejected-defect-closure-attempts.md) — returned C2 snapshots are immutable shore-authored history; reopening preserves approved deferment and target date.
+- [Verification decision ordering](verification-decision-ordering.md) — compare terminal verification timestamps explicitly and flag ambiguity rather than trusting engine row order.

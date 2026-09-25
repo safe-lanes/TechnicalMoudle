@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1776,6 +1776,55 @@ export const insertDefectSchema = createInsertSchema(defects).omit({
 export type InsertDefect = z.infer<typeof insertDefectSchema>;
 export type Defect = typeof defects.$inferSelect;
 
+// Immutable snapshots of C1 closeout attempts returned during C2 verification.
+// Shore is the write master; vessels receive these records as read-only compliance history.
+export const defectClosureHistory = pgTable("defect_closure_history", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  dchuuid: text("dchuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  defectDuuid: text("defect_duuid").notNull().references(() => defects.duuid),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  attemptNumber: integer("attempt_number").notNull(),
+  priorStatus: text("prior_status").notNull(),
+  closedOutByName: text("closed_out_by_name"),
+  closedOutByRank: text("closed_out_by_rank"),
+  confirmCompleted: boolean("confirm_completed").notNull().default(false),
+  dateCompleted: text("date_completed"),
+  closedByName: text("closed_by_name"),
+  closedByRank: text("closed_by_rank"),
+  closureComment: text("closure_comment"),
+  closedBy: text("closed_by"),
+  closedOn: text("closed_on"),
+  closureFiles: text("closure_files").array(),
+  rejectedByUserUuid: text("rejected_by_user_uuid").notNull(),
+  rejectedByName: text("rejected_by_name").notNull(),
+  rejectedByPosition: text("rejected_by_position").notNull(),
+  rejectedAt: timestamp("rejected_at").notNull().defaultNow(),
+  rejectionReason: text("rejection_reason").notNull(),
+  approvalRequestUuid: text("approval_request_uuid").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => ({
+  defectIdx: index("idx_defect_closure_history_defect").on(table.defectDuuid),
+  vesselIdx: index("idx_defect_closure_history_vessel").on(table.vesselId),
+  defectAttemptUnique: uniqueIndex("uq_defect_closure_history_attempt").on(table.defectDuuid, table.attemptNumber),
+  requestUnique: uniqueIndex("uq_defect_closure_history_request").on(table.approvalRequestUuid),
+  attemptPositive: check("defect_closure_history_attempt_positive", sql`${table.attemptNumber} > 0`),
+}));
+
+export const insertDefectClosureHistorySchema = createInsertSchema(defectClosureHistory).omit({
+  id: true,
+  dchuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDefectClosureHistory = z.infer<typeof insertDefectClosureHistorySchema>;
+export type DefectClosureHistory = typeof defectClosureHistory.$inferSelect;
+
 // Defect Actions Table for corrective/preventive actions
 export const defectActions = pgTable("defect_actions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -2481,6 +2530,36 @@ export const companyApprovalSettings = pgTable("company_approval_settings", {
 });
 
 export type CompanyApprovalSettings = typeof companyApprovalSettings.$inferSelect;
+
+// Shore-side Defects approval-routing settings. This table is intentionally
+// instance-local (NO_SYNC handover tracked separately); the ship never classifies
+// approval requests because the approval engine is mounted only on shore.
+export const defectApprovalSettings = pgTable("defect_approval_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  dasuuid: text("dasuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  singletonKey: text("singleton_key").notNull().unique().default("default"),
+  longExtensionDays: integer("long_extension_days").notNull().default(90),
+  showRejectedClosuresOnReport: boolean("show_rejected_closures_on_report").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => ({
+  singletonKeyCheck: check("defect_approval_settings_singleton_key_check", sql`${table.singletonKey} = 'default'`),
+  longExtensionDaysCheck: check("defect_approval_settings_long_extension_days_check", sql`${table.longExtensionDays} BETWEEN 1 AND 3650`),
+}));
+
+export const insertDefectApprovalSettingsSchema = createInsertSchema(defectApprovalSettings).omit({
+  id: true,
+  dasuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDefectApprovalSettings = z.infer<typeof insertDefectApprovalSettingsSchema>;
+export type DefectApprovalSettings = typeof defectApprovalSettings.$inferSelect;
 
 // =====================================================
 // MAKER LIST - Master data for equipment manufacturers

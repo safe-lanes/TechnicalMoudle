@@ -11,6 +11,18 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  formatInlineApprovalSlotRemark,
+  formatMaritimeUtcDateTime,
+  formatRejectionHeading,
+} from "@/pages/defects/defectApprovalPresentation";
+
+export class DefectApprovalChainFetchError extends Error {
+  constructor(message: string, public readonly code?: string, public readonly status?: number) {
+    super(message);
+    this.name = "DefectApprovalChainFetchError";
+  }
+}
 
 interface SlotView {
   nodeKey: string; slotOrdinal: number; roleId: string; roleLabel: string;
@@ -23,6 +35,77 @@ interface RequestView {
   currentNodeKey: string | null; submittedAt: string;
   snapshot: { nodes: Array<{ key: string; type: string; label: string; ordinal: number; quorum?: { rule: string; n?: number } }> };
   slots: SlotView[];
+}
+
+/** The compact response used by the defects approval-chain endpoint. */
+export interface DefectApprovalStep {
+  key?: string;
+  stepKey?: string;
+  nodeKey?: string;
+  label?: string;
+  name?: string;
+  status?: string;
+  decidedBy?: string | null;
+  decidedByName?: string | null;
+  decidedByPosition?: string | null;
+  decidedAt?: string | null;
+  remarks?: string | null;
+  slots?: Array<{
+    slotId?: string;
+    roleLabel?: string;
+    status?: string;
+    decidedBy?: string | null;
+    decidedByName?: string | null;
+    decidedByPosition?: string | null;
+    decidedAt?: string | null;
+    remarks?: string | null;
+  }>;
+  [key: string]: unknown;
+}
+
+export interface DefectApprovalChain {
+  hasActiveWorkflow: boolean;
+  scope?: string | null;
+  classification?: string | null;
+  requestStatus?: string | null;
+  requestUuid?: string | null;
+  currentStepKey?: string | null;
+  steps: DefectApprovalStep[];
+  currentUserCanDecide: boolean;
+  currentUserSlotId?: string | null;
+  extensionChains?: Record<string, DefectApprovalChain>;
+}
+
+export function defectApprovalChainQueryKey(
+  defectId: string | number | null | undefined,
+  action: "extension" | "verification",
+) {
+  return [`/technical/api/defects/${defectId}/approval-chain`, action] as const;
+}
+
+export function useDefectApprovalChain(
+  defectId: string | number | null | undefined,
+  action: "extension" | "verification",
+) {
+  return useQuery<DefectApprovalChain>({
+    queryKey: defectApprovalChainQueryKey(defectId, action),
+    enabled: defectId !== null && defectId !== undefined && String(defectId) !== "",
+    retry: false,
+    queryFn: async () => {
+      const response = await fetch(
+        `/technical/api/defects/${encodeURIComponent(String(defectId))}/approval-chain?action=${action}`,
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new DefectApprovalChainFetchError(
+          typeof body?.error === "string" ? body.error : `Could not load approval status (${response.status})`,
+          typeof body?.code === "string" ? body.code : undefined,
+          response.status,
+        );
+      }
+      return response.json();
+    },
+  });
 }
 
 /** Host admin roles that get a blanket decide override (mirror of mount.ts APPROVAL_ADMIN_ROLES). */
@@ -87,8 +170,23 @@ const DOT: Record<string, string> = {
 };
 
 /** Compact step list; renders NOTHING when there is no pending chain. */
-export function ApprovalChainProgress({ screenId, subjectRef }: { screenId: string; subjectRef: string | null | undefined }) {
-  const { request } = useApprovalChain(screenId, subjectRef);
+export function ApprovalChainProgress({
+  screenId,
+  subjectRef,
+  chain,
+}: {
+  screenId: string;
+  subjectRef: string | null | undefined;
+  /** Supply this for the compact defects endpoint without changing legacy consumers. */
+  chain?: DefectApprovalChain | null;
+}) {
+  // Keep the existing request/status behavior untouched for PMS and Work Orders. A supplied
+  // chain intentionally disables that legacy query and only changes this component's data view.
+  const { request } = useApprovalChain(screenId, chain !== undefined ? null : subjectRef);
+  if (chain !== undefined) {
+    if (!chain || (!chain.hasActiveWorkflow && !chain.steps?.length && !["rejected", "returned"].includes(String(chain.requestStatus).toLowerCase()))) return null;
+    return <DefectChainProgress chain={chain} />;
+  }
   if (!request) return null;
   const steps = request.snapshot.nodes.filter((n) => n.type === "approval-step").sort((a, b) => a.ordinal - b.ordinal);
   return (
@@ -107,7 +205,7 @@ export function ApprovalChainProgress({ screenId, subjectRef }: { screenId: stri
                   data-testid={unresolved ? "approval-slot-unresolved" : undefined}
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, background: unresolved ? "#fef3f2" : "#f9fafb", border: unresolved ? "1px solid #fda29b" : undefined, color: unresolved ? "#b42318" : undefined, borderRadius: 10, padding: "1px 8px" }}>
                   <span style={{ width: 8, height: 8, borderRadius: 4, background: DOT[s.status] ?? "#98a2b3", display: "inline-block" }} />
-                  {s.roleLabel}{unresolved ? " — ⚠ no approver assigned for this vessel" : ""}
+                  {s.roleLabel}{unresolved ? " — no approver assigned for this vessel" : ""}
                 </span>
               );
             })}
@@ -116,6 +214,76 @@ export function ApprovalChainProgress({ screenId, subjectRef }: { screenId: stri
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
+  const steps = Array.isArray(chain.steps) ? chain.steps : [];
+  const rejectedStepIndex = steps.findIndex((step) =>
+    String(step.status).toLowerCase() === "rejected"
+    || (step.slots ?? []).some((slot) => String(slot.status).toLowerCase() === "rejected"));
+  const rejectedWorkflowStep = rejectedStepIndex >= 0 ? steps[rejectedStepIndex] : undefined;
+  const rejectedStep = rejectedWorkflowStep?.slots?.find((slot) => String(slot.status).toLowerCase() === "rejected")
+    || (String(rejectedWorkflowStep?.status).toLowerCase() === "rejected" ? rejectedWorkflowStep : undefined);
+  const requestRejected = ["rejected", "returned"].includes(String(chain.requestStatus).toLowerCase());
+  const rejection = rejectedStep || (requestRejected
+    ? steps.flatMap((step) => [step, ...(step.slots ?? [])]).find((item) => item.remarks || item.decidedBy || item.decidedByName)
+    : undefined);
+  const chainRecord = chain as DefectApprovalChain & { rejectedBy?: string | null; rejectionReason?: string | null; remarks?: string | null };
+  const rejectionAttribution = rejection?.decidedBy || rejection?.decidedByName || chainRecord.rejectedBy;
+  const rejectionReason = rejection?.remarks || chainRecord.rejectionReason || chainRecord.remarks;
+
+  return (
+    <div style={{ border: "1px solid #e4e7ec", borderRadius: 8, padding: 10, margin: "8px 0", fontSize: 13 }} data-testid="approval-chain-progress">
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>Approval progress</div>
+      <div className="space-y-1">
+        {steps.length === 0 ? (
+          <div className="text-sm text-gray-600">No approval steps are configured.</div>
+        ) : steps.map((step, index) => {
+          const key = step.key || step.stepKey || step.nodeKey || `step-${index}`;
+          const status = String(step.status || (chain.currentStepKey === key ? "active" : "pending")).toLowerCase();
+          const color = status === "approved" ? "#12b76a" : status === "active" ? "#2e90fa" : status === "rejected" ? "#f04438" : "#98a2b3";
+          return (
+            <div key={key} className="flex items-center gap-2 flex-wrap">
+              <span className="min-w-[90px]">{step.label || step.name || key}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2 py-0.5">
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: color, display: "inline-block" }} />
+                {status}
+              </span>
+              {step.decidedBy && <span className="text-gray-600">by {step.decidedBy}</span>}
+              {step.slots?.map((slot, slotIndex) => {
+                const remark = formatInlineApprovalSlotRemark(slot.status, slot.remarks);
+                return (
+                  <div key={slot.slotId || `${key}-slot-${slotIndex}`} className="flex flex-col items-start gap-1">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${slot.status === "rejected" ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-700"}`}>
+                      {slot.roleLabel || "Approver"}: {String(slot.status || "pending").toLowerCase()}
+                      {slot.decidedByName ? ` — ${slot.decidedByName}` : ""}
+                      {slot.decidedByPosition ? ` (${slot.decidedByPosition})` : ""}
+                      {slot.decidedAt ? ` on ${formatMaritimeUtcDateTime(slot.decidedAt)}` : ""}
+                    </span>
+                    {remark ? (
+                      <div className="ml-2 max-w-xl whitespace-pre-wrap text-xs text-gray-600" data-testid="approval-slot-remark">
+                        {remark}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      {(rejection || requestRejected) && (
+        <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-red-800" data-testid="approval-rejection-attribution">
+          <div className="font-medium">{formatRejectionHeading(
+            rejectedStepIndex >= 0 ? rejectedStepIndex : null,
+            steps.length,
+            rejectionAttribution,
+          )}</div>
+          {rejectionReason && <div>{rejectionReason}</div>}
+        </div>
+      )}
     </div>
   );
 }

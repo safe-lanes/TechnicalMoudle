@@ -1,7 +1,25 @@
 import * as defectsRepo from '../repositories/defectsRepository';
-import { insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from '@shared/schema';
+import { admnRoleMaster, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from '@shared/schema';
 import { generateDefectNumber } from '../../../utils/defectNumbering';
 import { storage } from '../../../storage';
+import {
+  DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN, DEFECTS_VERIFICATION_SCREEN,
+  DEFECT_CLASS_CRITICAL, DEFECT_CLASS_NORMAL, classifyDefect, deciderIdentity,
+} from '../approvalCard';
+import {
+  activeWorkflowScoped, approvalActorCanDecide, approvalRequestsInScopes,
+  isApprovalEngineAvailable, scopeFor,
+} from '../../approvals/engineGateway';
+import type { RequestRow, RequestSlotRow, StoredWorkflow } from '../../approval-engine';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { defects } from '@shared/schema';
+import {
+  apprvWorkflows, apprvWorkflowNodes, apprvNodeSlots,
+  apprvRequests, apprvRequestSlots,
+} from '../../approval-engine/db/schema';
+import { getPostgresClient } from '../../../postgresClient';
+import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage';
+import { resolveRoleApproverUserIds } from '../../approvals/approvalCard';
 
 // ── Core Defects ──
 
@@ -28,8 +46,578 @@ export async function getDefect(id: string) {
   return defectsRepo.getDefect(id);
 }
 
-export async function createDefect(body: any) {
+export async function getDefectClosureHistory(id: string) {
+  const defect = await defectsRepo.getDefect(id);
+  if (!defect) {
+    throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
+  }
+  return defectsRepo.getDefectClosureHistory(defect.duuid);
+}
+
+export async function getDefectApprovalSettings() {
+  const settings = await defectsRepo.getDefectApprovalSettings();
+  if (!settings) {
+    throw Object.assign(new Error('Defect approval settings row not found; run the generated migration'), { statusCode: 500 });
+  }
+  return settings;
+}
+
+export async function updateDefectApprovalSettings(
+  values: { longExtensionDays: number; showRejectedClosuresOnReport: boolean },
+  actorUserId?: string | null,
+) {
+  const previous = await getDefectApprovalSettings();
+  const updated = await defectsRepo.upsertDefectApprovalSettings({
+    ...values,
+    updatedByUuid: actorUserId ?? null,
+  });
+  await defectsRepo.createAuditLog({
+    userId: actorUserId || 'system',
+    entityType: 'defect_approval_settings',
+    entityId: updated.dasuuid,
+    actionType: 'update',
+    fieldName: 'approval_settings',
+    oldValue: JSON.stringify({
+      longExtensionDays: previous.longExtensionDays,
+      showRejectedClosuresOnReport: previous.showRejectedClosuresOnReport,
+    }),
+    newValue: JSON.stringify(values),
+    source: 'api',
+    payload: { actor: actorUserId ?? null },
+  });
+  return updated;
+}
+
+export async function getDefectApprovalRouting(
+  id: string,
+  action: 'extension' | 'verification',
+  newTargetDate: string | null,
+  actorUserId?: string | null,
+) {
+  const { resolveDefectApprovalRouting } = await import('./defectsApprovalHooks');
+  return resolveDefectApprovalRouting(id, action, newTargetDate, actorUserId, { auditFallback: false });
+}
+
+const DIAGNOSTIC_CLASSIFICATIONS = [DEFECT_CLASS_NORMAL, DEFECT_CLASS_CRITICAL] as const;
+const DIAGNOSTIC_SCOPES = [
+  DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN, DEFECTS_VERIFICATION_SCREEN,
+] as const;
+const diagnosticDb = () => getCurrentTenantContext()?.db ?? getPostgresClient().db;
+const missingWorkflowConsequence = (scope: string) =>
+  scope === DEFECTS_REPEAT_EXTENSION_SCREEN
+    ? 'Repeat extensions in this classification will fall back to the initial extension workflow until this is configured.'
+    : scope === DEFECTS_EXTENSION_SCREEN
+      ? 'Initial extension approval has no alternate fallback; repeat requests relying on this fallback cannot complete through approval until the initial extension workflow is configured.'
+      : 'Verification C2 cannot complete through approval until this is configured.';
+
+/**
+ * Bounded, read-only Defects approval health projection. The five base reads are
+ * set-based; role membership is the only bounded cartesian operation (role ×
+ * vessel), because the shared resolver is the server-authoritative membership
+ * implementation.
+ */
+export async function getDefectApprovalDiagnostics() {
+  const queryPlan = {
+    fixedReads: 7,
+    resolverQueriesPerPair: 3,
+    description: 'Seven bounded set-based reads plus strict role resolution for each distinct active-workflow role and vessel with a nondeleted defect.',
+    formula: 'fixedReads + (distinctRoles × vesselsWithDefects × resolverQueriesPerPair)',
+    conditionalReads: 'workflow nodes/slots reads are skipped when there are no active Defects workflows; pending requests/active slots and returned-verification consistency each use one bounded read',
+  };
+  if (!isApprovalEngineAvailable()) {
+    const workflowMatrix = DIAGNOSTIC_SCOPES.flatMap((scope) =>
+      DIAGNOSTIC_CLASSIFICATIONS.map((classification) => ({
+        scope, classification, configured: false,
+        consequence: 'Approval Engine is unavailable; configuration could not be confirmed.',
+      })));
+    return {
+      generatedAt: new Date().toISOString(),
+      available: false,
+      healthy: false,
+      consequence: 'Approval Engine is unavailable on this instance; no engine diagnostics can be confirmed.',
+      workflowMatrix,
+      missingActiveWorkflows: [],
+      roleCoverage: [],
+      unresolvedApprovers: [],
+      stalledRequests: [],
+      orphanRequestedExtensions: [],
+      returnedVerificationStillVerified: [],
+      summary: { workflowGaps: 0, unresolvedApprovers: 0, stalledRequests: 0, orphanRequestedExtensions: 0, returnedVerificationStillVerified: 0 },
+      queryPlan: { ...queryPlan, resolverPairs: 0, expectedQueries: 0, currentExpectedQueries: 0 },
+    };
+  }
+
+  const db = diagnosticDb();
+  const workflows = await db.select({
+    wfuuid: apprvWorkflows.wfuuid,
+    screenId: apprvWorkflows.screenId,
+    classification: apprvWorkflows.classification,
+  }).from(apprvWorkflows).where(and(
+    eq(apprvWorkflows.moduleId, 'defects'),
+    inArray(apprvWorkflows.screenId, [...DIAGNOSTIC_SCOPES]),
+    eq(apprvWorkflows.status, 'active'),
+    eq(apprvWorkflows.isDeleted, false),
+  ));
+  const workflowIds = workflows.map((w) => w.wfuuid);
+  const workflowNodes = workflowIds.length
+    ? await db.select({ workflowWfuuid: apprvWorkflowNodes.workflowWfuuid, nodeKey: apprvWorkflowNodes.nodeKey })
+      .from(apprvWorkflowNodes).where(and(inArray(apprvWorkflowNodes.workflowWfuuid, workflowIds), eq(apprvWorkflowNodes.type, 'approval-step')))
+    : [];
+  const workflowSlots = workflowIds.length
+    ? await db.select({
+      workflowWfuuid: apprvNodeSlots.workflowWfuuid,
+      nodeKey: apprvNodeSlots.nodeKey,
+      roleId: apprvNodeSlots.roleId,
+      roleLabel: apprvNodeSlots.roleLabel,
+    }).from(apprvNodeSlots).where(inArray(apprvNodeSlots.workflowWfuuid, workflowIds))
+    : [];
+  const activeRoleRows = await db.select({
+    roleId: admnRoleMaster.ruid,
+    roleName: admnRoleMaster.assignedRole,
+  }).from(admnRoleMaster).where(and(
+    eq(admnRoleMaster.isActive, true),
+    eq(admnRoleMaster.isDeleted, false),
+  ));
+  const activeRoleIds = new Set(activeRoleRows.map((role) => role.roleId));
+  const defectRows: any[] = await db.select({
+    duuid: defects.duuid, reportId: defects.id, vesselId: defects.vesselId, vesselName: defects.vesselName,
+    status: defects.status, isDeleted: defects.isDeleted,
+    verified: defects.verified,
+    targetDateExtensions: defects.targetDateExtensions,
+  }).from(defects).where(or(eq(defects.isDeleted, false), isNull(defects.isDeleted)));
+  const pendingWithSlots = await db.select({
+    requuid: apprvRequests.requuid, subjectRef: apprvRequests.subjectRef,
+    vesselId: apprvRequests.vesselId, submittedAt: apprvRequests.submittedAt,
+    screenId: apprvRequests.screenId,
+    slotRequuid: apprvRequestSlots.requuid, nodeKey: apprvRequestSlots.nodeKey,
+    slotOrdinal: apprvRequestSlots.slotOrdinal, resolved: apprvRequestSlots.resolvedApproverIdsJson,
+    slotStatus: apprvRequestSlots.status,
+  }).from(apprvRequests).leftJoin(apprvRequestSlots, and(
+    eq(apprvRequestSlots.requuid, apprvRequests.requuid),
+    eq(apprvRequestSlots.status, 'active'),
+  )).where(and(
+    eq(apprvRequests.moduleId, 'defects'),
+    inArray(apprvRequests.screenId, [...DIAGNOSTIC_SCOPES]),
+    eq(apprvRequests.status, 'pending'),
+  ));
+  const terminalVerificationRows = await db.select({
+    requuid: apprvRequests.requuid,
+    subjectRef: apprvRequests.subjectRef,
+    vesselId: apprvRequests.vesselId,
+    status: apprvRequests.status,
+    submittedAt: apprvRequests.submittedAt,
+    finalizedAt: apprvRequests.finalizedAt,
+  }).from(apprvRequests).where(and(
+    eq(apprvRequests.moduleId, 'defects'),
+    eq(apprvRequests.screenId, DEFECTS_VERIFICATION_SCREEN),
+    inArray(apprvRequests.status, ['approved', 'returned']),
+  ));
+  const pendingRequests = Array.from(new Map(pendingWithSlots.map((r) => [r.requuid, {
+    requuid: r.requuid, subjectRef: r.subjectRef, vesselId: r.vesselId,
+    submittedAt: r.submittedAt, screenId: r.screenId,
+  }])).values());
+  const activeSlots = pendingWithSlots.filter((r) => r.slotRequuid).map((r) => ({
+    requuid: r.slotRequuid!, nodeKey: r.nodeKey, slotOrdinal: r.slotOrdinal,
+    resolved: r.resolved, status: r.slotStatus,
+  }));
+
+  const vessels = Array.from(new Set(defectRows.map((d) => d.vesselId).filter(Boolean)));
+  const roleMap = new Map<string, { roleId: string; roleLabel: string; workflowScopes: string[] }>();
+  for (const slot of workflowSlots) {
+    const workflow = workflows.find((w) => w.wfuuid === slot.workflowWfuuid);
+    if (!workflow) continue;
+    const existing = roleMap.get(slot.roleId) ?? {
+      roleId: slot.roleId, roleLabel: slot.roleLabel, workflowScopes: [],
+    };
+    const scopeKey = `${workflow.screenId}:${workflow.classification}`;
+    if (!existing.workflowScopes.includes(scopeKey)) existing.workflowScopes.push(scopeKey);
+    roleMap.set(slot.roleId, existing);
+  }
+  const roleCoverage = [];
+  for (const role of Array.from(roleMap.values())) {
+    const zeroVessels: string[] = [];
+    let resolvedPairs = 0;
+    for (const vesselId of vessels) {
+      const ids = await resolveRoleApproverUserIds(role.roleId, vesselId);
+      if (ids.length === 0) zeroVessels.push(vesselId);
+      else resolvedPairs++;
+    }
+    roleCoverage.push({
+      ...role, vesselsChecked: vessels.length, resolvedVessels: resolvedPairs,
+      zeroApproverVessels: zeroVessels,
+      healthy: zeroVessels.length === 0,
+      consequence: zeroVessels.length
+        ? 'No approver resolves for one or more defect vessels; requests can stall until role assignment is fixed.'
+        : null,
+    });
+  }
+
+  const missingActiveWorkflows = DIAGNOSTIC_SCOPES.flatMap((screenId) =>
+    DIAGNOSTIC_CLASSIFICATIONS.filter((classification) =>
+      !workflows.some((w) => w.screenId === screenId && w.classification === classification))
+      .map((classification) => ({
+        screenId, classification,
+        consequence: missingWorkflowConsequence(screenId),
+      })));
+  const workflowMatrix = DIAGNOSTIC_SCOPES.flatMap((scope) =>
+    DIAGNOSTIC_CLASSIFICATIONS.map((classification) => {
+      const configured = workflows.some((w) => w.screenId === scope && w.classification === classification);
+      return {
+        scope, classification, configured,
+        consequence: configured ? null : missingWorkflowConsequence(scope),
+      };
+    }));
+  const defectById = new Map(defectRows.map((d) => [d.duuid, d]));
+  const vesselNameById = new Map<string, string>();
+  for (const defect of defectRows) {
+    if (defect.vesselId && defect.vesselName) vesselNameById.set(defect.vesselId, defect.vesselName);
+  }
+  const displayVesselName = (vesselId: string | null | undefined) =>
+    (vesselId && vesselNameById.get(vesselId)) || 'Unknown vessel (no longer in the vessel list)';
+  const displayReportId = (defectId: string) =>
+    defectById.get(defectId)?.reportId || 'Unknown defect (report ID unavailable)';
+  const stalledRequests = pendingRequests.filter((r) =>
+    activeSlots.filter((s) => s.requuid === r.requuid)
+      .some((s) => !Array.isArray(s.resolved) || s.resolved.length === 0)
+    && defectById.has(r.subjectRef))
+    .map((r) => ({
+      requestUuid: r.requuid, defectId: r.subjectRef, vesselId: r.vesselId ?? defectById.get(r.subjectRef)?.vesselId ?? null,
+      defectReportId: displayReportId(r.subjectRef),
+      vesselName: displayVesselName(r.vesselId ?? defectById.get(r.subjectRef)?.vesselId),
+      screenId: r.screenId, submittedAt: r.submittedAt,
+      daysPending: Math.max(0, Math.floor((Date.now() - new Date(r.submittedAt).getTime()) / 86_400_000)),
+      consequence: 'The active approval step has no resolved approver; this request cannot advance until assignment is fixed.',
+    }));
+  const pendingExtensionIds = new Set(pendingRequests
+    .filter((r) => r.screenId === DEFECTS_EXTENSION_SCREEN || r.screenId === DEFECTS_REPEAT_EXTENSION_SCREEN)
+    .map((r) => r.subjectRef));
+  const orphanRequestedExtensions = defectRows
+    .filter((d) => d.status !== 'Closed' && d.status !== 'Resolved')
+    .flatMap((d) => {
+      const requested = (Array.isArray(d.targetDateExtensions) ? d.targetDateExtensions : [])
+        .filter((e: any) => e?.status === 'Requested');
+      const correspondingId = pendingExtensionIds.has(d.duuid) ? requested[0]?.id : null;
+      return requested.filter((e: any) => e?.id !== correspondingId)
+      .map((e: any) => ({
+        defectId: d.duuid, vesselId: d.vesselId, entryId: e.id ?? null,
+        defectReportId: d.reportId || 'Unknown defect (report ID unavailable)',
+        vesselName: displayVesselName(d.vesselId),
+        requestedAt: e.requestedAt ?? null, newTargetDate: e.newTargetDate ?? null,
+        consequence: 'Requested extension has no pending engine request; it does not block closeout and needs review.',
+      }));
+    });
+  const terminalVerificationsByDefect = new Map<string, typeof terminalVerificationRows>();
+  for (const request of terminalVerificationRows) {
+    const existing = terminalVerificationsByDefect.get(request.subjectRef) ?? [];
+    existing.push(request);
+    terminalVerificationsByDefect.set(request.subjectRef, existing);
+  }
+  const returnedVerificationStillVerified = Array.from(terminalVerificationsByDefect.entries())
+    .flatMap(([defectId, requests]) => {
+      if (defectById.get(defectId)?.verified !== true) return [];
+      const timestamped = requests.map((request) => {
+        const effectiveTimestamp = request.finalizedAt ?? request.submittedAt;
+        const epoch = effectiveTimestamp ? new Date(effectiveTimestamp).getTime() : Number.NaN;
+        return { request, epoch };
+      });
+      const determinate = timestamped.filter(({ epoch }) => Number.isFinite(epoch));
+      const hasUnknownTimestamp = determinate.length !== timestamped.length;
+      const latestEpoch = determinate.length ? Math.max(...determinate.map(({ epoch }) => epoch)) : null;
+      const latest = latestEpoch === null ? [] : determinate.filter(({ epoch }) => epoch === latestEpoch);
+      const latestIsUnambiguousApproval = !hasUnknownTimestamp && latest.length > 0 &&
+        latest.every(({ request }) => request.status === 'approved');
+      if (latestIsUnambiguousApproval) return [];
+      const returned = requests.filter((request) => request.status === 'returned');
+      return returned.length ? [returned.reduce((selected, request) => {
+        const selectedEpoch = new Date(selected.finalizedAt ?? selected.submittedAt ?? 0).getTime();
+        const requestEpoch = new Date(request.finalizedAt ?? request.submittedAt ?? 0).getTime();
+        return requestEpoch > selectedEpoch ? request : selected;
+      })] : [];
+    })
+    .map((request) => ({
+      requestUuid: request.requuid,
+      defectId: request.subjectRef,
+      vesselId: request.vesselId ?? defectById.get(request.subjectRef)?.vesselId ?? null,
+      defectReportId: displayReportId(request.subjectRef),
+      vesselName: displayVesselName(request.vesselId ?? defectById.get(request.subjectRef)?.vesselId),
+      finalizedAt: request.finalizedAt,
+      consequence: 'Verification was returned by the Approval Engine, but the defect still carries verified closure state. The Defects reopen callback failed or was not applied and requires reconciliation.',
+    }));
+  const unresolvedApproverRows = roleCoverage.flatMap((role) =>
+    role.zeroApproverVessels.map((vesselId) => ({
+      roleId: role.roleId,
+      roleLabel: role.roleLabel || 'Unknown role (removed from the role list)',
+      issue: activeRoleIds.has(role.roleId) ? 'missing-vessel-membership' as const : 'missing-workflow-role' as const,
+      vesselId,
+      workflowScopes: role.workflowScopes,
+    })));
+  const unresolvedApprovers = Array.from(new Set(unresolvedApproverRows.map((row) => row.vesselId))).map((vesselId) => {
+    const rows = unresolvedApproverRows.filter((row) => row.vesselId === vesselId);
+    return {
+      vesselId,
+      vesselName: displayVesselName(vesselId),
+      roles: rows.map((row) => ({ roleId: row.roleId, roleName: row.roleLabel, issue: row.issue })),
+      workflowScopes: Array.from(new Set(rows.flatMap((row) => row.workflowScopes))),
+      consequence: 'Until these roles are assigned, approval requests for this vessel will wait with nobody able to action them.',
+    };
+  });
+  const resolverPairs = roleMap.size * vessels.length;
+  const expectedQueries = queryPlan.fixedReads + resolverPairs * queryPlan.resolverQueriesPerPair;
+  return {
+    generatedAt: new Date().toISOString(),
+    available: true, healthy: missingActiveWorkflows.length === 0 && roleCoverage.every((r) => r.healthy) &&
+      stalledRequests.length === 0 && orphanRequestedExtensions.length === 0 &&
+      returnedVerificationStillVerified.length === 0,
+    consequence: missingActiveWorkflows.length || roleCoverage.some((r) => !r.healthy) || stalledRequests.length ||
+      orphanRequestedExtensions.length || returnedVerificationStillVerified.length
+      ? 'One or more approval configuration or data integrity issues require administrator review.'
+      : null,
+    workflowMatrix, missingActiveWorkflows, roleCoverage, unresolvedApprovers,
+    stalledRequests, orphanRequestedExtensions, returnedVerificationStillVerified,
+    summary: {
+      workflowGaps: missingActiveWorkflows.length,
+      unresolvedApprovers: unresolvedApprovers.length,
+      stalledRequests: stalledRequests.length,
+      orphanRequestedExtensions: orphanRequestedExtensions.length,
+      returnedVerificationStillVerified: returnedVerificationStillVerified.length,
+    },
+    queryPlan: { ...queryPlan, resolverPairs, expectedQueries, currentExpectedQueries: expectedQueries },
+  };
+}
+
+export type DefectApprovalChainAction = 'extension' | 'verification';
+
+type DefectApprovalChain = {
+  hasActiveWorkflow: boolean;
+  scope: string;
+  classification: string;
+  requestStatus: 'pending' | 'approved' | 'returned' | 'none';
+  requestUuid: string | null;
+  currentStepKey: string | null;
+  steps: Array<{
+    nodeKey: string;
+    label: string;
+    ordinal: number;
+    quorumRule: string;
+    status: 'pending' | 'active' | 'approved' | 'rejected' | 'skipped';
+    slots: Array<{
+      slotId: string;
+      roleLabel: string;
+      status: 'pending' | 'active' | 'approved' | 'rejected' | 'skipped';
+      decidedByName: string | null;
+      decidedByPosition: string | null;
+      decidedAt: string | null;
+      remarks: string | null;
+    }>;
+  }>;
+  currentUserCanDecide: boolean;
+  currentUserSlotId: string | null;
+  extensionChains?: ExtensionChainMap;
+};
+
+type ExtensionChainMap = Record<string, DefectApprovalChain>;
+type ChainRequest = RequestRow & { slots: RequestSlotRow[] };
+
+const requestDateForExtension = (defect: any): string | null => {
+  const entries = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
+  const requested = entries.find((entry: any) => entry?.status === 'Requested');
+  return requested?.newTargetDate ?? null;
+};
+
+const extensionScopeForDefect = (defect: any) => {
+  const entries = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
+  return entries.some((entry: any) => entry?.status === 'Approved')
+    ? scopeFor('defects', DEFECTS_REPEAT_EXTENSION_SCREEN)
+    : scopeFor('defects', DEFECTS_EXTENSION_SCREEN);
+};
+
+const slotViewStatus = (status: RequestSlotRow['status'] | undefined): DefectApprovalChain['steps'][number]['slots'][number]['status'] => {
+  if (status === 'superseded') return 'skipped';
+  return status ?? 'pending';
+};
+
+const projectApprovalChain = async (
+  request: ChainRequest | null,
+  workflow: Pick<StoredWorkflow, 'nodes'> | null,
+  classification: string,
+  scope: any,
+  actorUserId?: string | null,
+  actorRole?: string | null,
+): Promise<DefectApprovalChain> => {
+  const activeRequest = request?.status === 'pending' ? request : null;
+  const actorDecision = activeRequest
+    ? approvalActorCanDecide(activeRequest, actorUserId, actorRole)
+    : { canDecide: false, slotId: null };
+  const requestSlots = request?.slots ?? [];
+  const nodes = (workflow?.nodes ?? [])
+    .filter((node) => node.type === 'approval-step')
+    .slice()
+    .sort((a, b) => a.ordinal - b.ordinal);
+  const currentOrdinal = request?.currentNodeKey == null
+    ? null
+    : nodes.find((node) => node.key === request.currentNodeKey)?.ordinal ?? null;
+  const decidedByIds = Array.from(new Set(requestSlots.map((slot) => slot.decidedBy).filter((id): id is string => !!id)));
+  const identities = new Map<string, { name: string; roleLabel: string }>();
+  await Promise.all(decidedByIds.map(async (userUuid) => identities.set(userUuid, await deciderIdentity(userUuid))));
+  const steps = nodes.map((node) => {
+    const nodeSlots = requestSlots.filter((slot) => slot.nodeKey === node.key);
+    let status: DefectApprovalChain['steps'][number]['status'] = 'pending';
+    if (request) {
+      if (request.status === 'pending') {
+        if (request.currentNodeKey === node.key || nodeSlots.some((slot) => slot.status === 'active')) status = 'active';
+        else if (nodeSlots.some((slot) => slot.status === 'approved') ||
+          (currentOrdinal !== null && node.ordinal < currentOrdinal)) status = 'approved';
+      } else {
+        if (nodeSlots.some((slot) => slot.status === 'rejected')) status = 'rejected';
+        else if (nodeSlots.some((slot) => slot.status === 'approved')) status = 'approved';
+        else status = 'skipped';
+      }
+    }
+    const slots = (node.slots ?? []).map((slot, slotOrdinal) => {
+      const persisted = nodeSlots.find((candidate) => candidate.slotOrdinal === slotOrdinal);
+      const identity = persisted?.decidedBy ? identities.get(persisted.decidedBy) : undefined;
+      return {
+        slotId: `${node.key}:${slotOrdinal}`, roleLabel: persisted?.roleLabel ?? slot.roleLabel,
+        status: slotViewStatus(persisted?.status), decidedByName: identity?.name ?? null,
+        decidedByPosition: identity?.roleLabel ?? null, decidedAt: persisted?.decidedAt ?? null,
+        remarks: persisted?.remarks ?? null,
+      };
+    });
+    return { nodeKey: node.key, label: node.label || node.key, ordinal: node.ordinal,
+      quorumRule: node.quorum?.rule ?? 'all', status, slots };
+  });
+  return {
+    hasActiveWorkflow: !!workflow || !!request, scope: scope.screenId, classification,
+    requestStatus: request?.status ?? 'none', requestUuid: request?.requuid ?? null,
+    currentStepKey: request?.currentNodeKey ?? null, steps,
+    currentUserCanDecide: actorDecision.canDecide, currentUserSlotId: actorDecision.slotId,
+  };
+};
+
+const extensionRequestStatusCompatible = (entry: any, request: ChainRequest) =>
+  (entry?.status ?? entry?.state) === 'Approved' ? request.status === 'approved'
+    : (entry?.status ?? entry?.state) === 'Rejected' ? request.status === 'returned'
+      : (entry?.status ?? entry?.state) === 'Requested' ? request.status === 'pending' : false;
+
+/** Pair immutable extension history with its persisted request, without fabricating legacy chains. */
+const matchExtensionRequests = (entries: any[], requests: ChainRequest[]): Map<string, ChainRequest> => {
+  const result = new Map<string, ChainRequest>();
+  const dateValue = (value: any) => value ? new Date(value).getTime() : Number.NaN;
+  const entriesByStatus = (status: string) => entries.filter((entry) => (entry?.status ?? entry?.state) === status);
+  // Stage 1's correspondence rule is intentionally conservative: the one pending
+  // request belongs to the oldest Requested entry, never to a nearest-date guess.
+  const requestedEntries = entriesByStatus('Requested')
+    .slice().sort((a, b) => {
+      const ad = dateValue(a.requestedAt ?? a.submittedAt), bd = dateValue(b.requestedAt ?? b.submittedAt);
+      return (Number.isNaN(ad) ? 9e15 : ad) - (Number.isNaN(bd) ? 9e15 : bd);
+    });
+  const pendingRequests = requests.filter((request) => request.status === 'pending')
+    .slice().sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt)));
+  if (requestedEntries[0]?.id && pendingRequests[0]) {
+    result.set(String(requestedEntries[0].id), pendingRequests[0]);
+  }
+
+  // Terminal history has no extension id. Pairing is safe only if each side has
+  // complete, unique dates; otherwise legacy entries remain visibly unmatched.
+  for (const [entryStatus, requestStatus] of [['Approved', 'approved'], ['Rejected', 'returned']] as const) {
+    const terminalEntries = entriesByStatus(entryStatus);
+    const terminalRequests = requests.filter((request) => request.status === requestStatus);
+    if (terminalEntries.length !== terminalRequests.length || terminalEntries.length === 0) continue;
+    const entryDates = terminalEntries.map((entry) => dateValue(entry.requestedAt ?? entry.submittedAt));
+    const requestDates = terminalRequests.map((request) => dateValue(request.submittedAt));
+    const unique = (dates: number[]) => dates.every((date) => !Number.isNaN(date))
+      && new Set(dates).size === dates.length;
+    if (!unique(entryDates) || !unique(requestDates)) continue;
+    terminalEntries.slice().sort((a, b) => dateValue(a.requestedAt ?? a.submittedAt) - dateValue(b.requestedAt ?? b.submittedAt))
+      .forEach((entry, index) => result.set(String(entry.id), terminalRequests
+        .slice().sort((a, b) => dateValue(a.submittedAt) - dateValue(b.submittedAt))[index]));
+  }
+  return result;
+};
+
+/**
+ * Read-only approval chain projection for Defects. Existing requests are selected from the
+ * engine's persisted request history first; only a subject with no request is routed through
+ * the same Stage 1 classification/scope resolver used by submission.
+ */
+export async function getDefectApprovalChain(
+  id: string,
+  action: DefectApprovalChainAction,
+  actorUserId?: string | null,
+  actorRole?: string | null,
+): Promise<DefectApprovalChain> {
+  const defect: any = await defectsRepo.getDefect(id);
+  if (!defect) throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
+  if (!isApprovalEngineAvailable()) {
+    throw Object.assign(new Error('Approval status is unavailable on this instance'), {
+      statusCode: 503,
+      code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE',
+    });
+  }
+
+  const candidateScopes = action === 'verification'
+    ? [scopeFor('defects', DEFECTS_VERIFICATION_SCREEN)]
+    : [
+      scopeFor('defects', DEFECTS_EXTENSION_SCREEN),
+      scopeFor('defects', DEFECTS_REPEAT_EXTENSION_SCREEN),
+    ];
+  const requests = await approvalRequestsInScopes(candidateScopes, defect.duuid);
+  const sortedRequests = requests.slice().sort((a, b) =>
+    new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  // A pending request always wins over terminal history, even if a clock or scope causes
+  // submittedAt ordering to be surprising.
+  const request = sortedRequests.find((row) => row.status === 'pending') ?? sortedRequests[0] ?? null;
+
+  let classification: string;
+  let scope = candidateScopes[0];
+  let workflow: Pick<StoredWorkflow, 'nodes'> | null = null;
+  if (request) {
+    // The request snapshot is immutable and is authoritative for an existing chain.
+    classification = request.classification;
+    scope = request.scope;
+    workflow = request.snapshot;
+  } else {
+    const { resolveDefectApprovalRouting } = await import('./defectsApprovalHooks');
+    const extensionDate = action === 'extension' ? requestDateForExtension(defect) : null;
+    if (action === 'verification' || extensionDate) {
+      const routing = await resolveDefectApprovalRouting(id, action, extensionDate, actorUserId, { auditFallback: false });
+      classification = routing.classification;
+      scope = routing.scope;
+    } else {
+      // There is no extension request to supply a new date yet. Keep Stage 1's
+      // classification predicate authoritative, while selecting its initial/repeat scope.
+      classification = await classifyDefect(defect.duuid);
+      scope = extensionScopeForDefect(defect);
+    }
+    workflow = await activeWorkflowScoped(scope, classification);
+  }
+
+  const chain = await projectApprovalChain(request, workflow, classification, scope, actorUserId, actorRole);
+  if (action !== 'extension') return chain;
+
+  // This is deliberately derived from the single requests-in-scopes read above.
+  // Legacy entries without a compatible persisted request remain absent.
+  const entries = Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : [];
+  const matches = matchExtensionRequests(entries, requests as ChainRequest[]);
+  const extensionChains: ExtensionChainMap = {};
+  await Promise.all(entries.map(async (entry: any) => {
+    const matched = entry?.id == null ? null : matches.get(String(entry.id));
+    if (!matched) return;
+    extensionChains[String(entry.id)] = await projectApprovalChain(
+      matched, matched.snapshot, matched.classification, matched.scope, actorUserId, actorRole,
+    );
+  }));
+  return entries.length ? { ...chain, extensionChains } : chain;
+}
+
+export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: string) {
+  return defectsRepo.hasActiveUserVesselAssignment(userUuid, vesselId);
+}
+
+export async function createDefect(body: any, _actor?: import('./defectsApprovalHooks').DefectActor) {
   const validatedData = insertDefectSchema.parse(body);
+  const { assertDefectCreationApprovalStateAllowed } = await import('./defectsApprovalHooks');
+  assertDefectCreationApprovalStateAllowed(validatedData);
 
   // Generate proper defect ID using naming convention
   const vesselId = validatedData.vesselId || 'UNKNOWN';
@@ -61,13 +649,51 @@ export async function updateDefect(id: string, body: any, actor?: import('./defe
   const partialDefectSchema = insertDefectSchema.partial();
   const validatedData = partialDefectSchema.parse(gated.body);
   const updated = await defectsRepo.updateDefect(id, validatedData);
+  const approvalSubmissions: Array<import('./defectsApprovalHooks').ExtensionSubmissionOutcome> = [];
+  const recordSubmissionFailure = async (payload: any) => {
+    try {
+      await defectsRepo.createAuditLog({
+        userId: actor?.userUuid || 'system',
+        entityType: 'defect_extension_approval',
+        entityId: id,
+        actionType: 'submission_failed',
+        fieldName: 'targetDateExtensions',
+        oldValue: null,
+        newValue: null,
+        source: 'approval-engine',
+        payload,
+      });
+    } catch (auditError) {
+      // Audit persistence is best effort after the defect has been saved.
+      console.error('[approvals] defects submission-failure audit write failed:', auditError);
+    }
+  };
   for (const task of gated.postSave) {
-    try { await task(); } catch (e) { console.error('[approvals] defects post-save submit failed (legacy continues):', e); }
+    try {
+      const outcome = await task();
+      approvalSubmissions.push(outcome);
+      if (outcome.status === 'error') {
+        await recordSubmissionFailure({
+          status: outcome.status,
+          error: outcome.error ?? 'Approval engine submission failed',
+        });
+      }
+    } catch (e: any) {
+      // The extension was intentionally persisted before this task. Surface a
+      // structured failure rather than converting a successful save into a 500.
+      console.error('[approvals] defects post-save submit failed (legacy continues):', e);
+      const outcome = {
+        status: 'error' as const,
+        error: 'The extension was saved, but approval submission failed. Contact an administrator.',
+      };
+      approvalSubmissions.push(outcome);
+      await recordSubmissionFailure({ ...outcome, internalError: String(e?.message ?? e) });
+    }
   }
   try { await afterDefectUpdate(current, updated, actor ?? {}); } catch (e) {
     console.error('[approvals] defects post-update hook failed (non-fatal):', e);
   }
-  return updated;
+  return { defect: updated, approvalSubmissions };
 }
 
 export async function deleteDefect(id: string) {
@@ -152,9 +778,10 @@ export async function closeDefect(defectId: string, body: any, actor?: import('.
   // Master-only closure rule (03-Sep-2026). This route has no live UI caller (Phase A:
   // DefectsActive/DefectsLog are not rendered) but stays HTTP-reachable — an ungated
   // side door around the PATCH gate is not acceptable, so the same rule applies here.
-  if ((actor?.rankName || '').trim() !== 'Master') {
-    throw Object.assign(new Error('Only the Master may perform defect closure (Part C1 Closeout).'), { statusCode: 403, code: 'CLOSURE_MASTER_ONLY' });
-  }
+  const current = await defectsRepo.getDefect(defectId);
+  if (!current) throw Object.assign(new Error(`Defect ${defectId} not found`), { statusCode: 404 });
+  const { assertDefectCloseoutAllowed } = await import('./defectsApprovalHooks');
+  await assertDefectCloseoutAllowed(current, actor ?? {});
   const { closedBy, closureComment, closureFiles, actionTakenRequested, targetCloseDate, dateCompleted } = body;
 
   // Validate all required fields

@@ -8,7 +8,7 @@
  *   - EngineError → AppError translation (asyncHandler understands AppError only),
  *   - the shore-side ARRIVAL SWEEP (CRs / postponement WOs that arrived via sync).
  */
-import { ApprovalEngine, EngineError, type EngineCtx, type Scope } from '../approval-engine';
+import { ApprovalEngine, EngineError, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
 import { AppError } from '../shared/errors';
 import { currentEngineTenantId } from './tenantProvider';
 import { TECHNICAL_MODULE_ID, type TechnicalSubject } from './approvalCard';
@@ -28,6 +28,13 @@ export const techScope = (screenId: string): Scope => ({ moduleId: TECHNICAL_MOD
  *  (Second integration, Defects, 03-Sep-2026: the gateway generalizes; the Technical-named
  *  exports below stay as thin aliases so W3 callers don't churn.) */
 export const scopeFor = (moduleId: string, screenId: string): Scope => ({ moduleId, screenId, actionId: '' });
+
+/** Host roles which receive the approval engine's deliberately narrow override. */
+const isApprovalAdminRole = (role: string | null | undefined): boolean =>
+  !!role && APPROVAL_ADMIN_ROLES.has(role);
+
+/** Whether the shore-only embedded engine is mounted in this process. */
+export const isApprovalEngineAvailable = (): boolean => engine !== null;
 
 export function engineCtx(actorUserId: string | null | undefined): EngineCtx {
   const rbacRole = getRequestContext()?.rbacRole ?? null;
@@ -101,6 +108,71 @@ export async function pendingEngineRequestScoped(scope: Scope, subjectRef: strin
   if (!engine) return null;
   const rows = await engine.status(engineCtx(null), scope, subjectRef).catch(() => []);
   return rows.find((r) => r.status === 'pending') ?? null;
+}
+
+/** Read-only workflow existence check for module routing decisions. */
+export async function activeWorkflowExistsScoped(scope: Scope, classification: string): Promise<boolean> {
+  if (!engine) return false;
+  const rows = await engine.listWorkflows(engineCtx(null), scope);
+  return rows.some((row) => row.status === 'active' && row.classification === classification);
+}
+
+/**
+ * Find an existing pending request across known scopes. The returned request carries the
+ * scope persisted at submission time; callers must use that scope for decisions instead of
+ * recomputing routing from mutable subject data.
+ */
+export async function pendingEngineRequestInScopes(scopes: readonly Scope[], subjectRef: string) {
+  for (const scope of scopes) {
+    const pending = await pendingEngineRequestScoped(scope, subjectRef);
+    if (pending) return { scope: pending.scope, request: pending };
+  }
+  return null;
+}
+
+/**
+ * Read all request history for a subject across the candidate scopes for a module action.
+ * The request's own persisted scope is returned unchanged; callers must not recompute it
+ * from mutable subject data when rendering an in-flight (or terminal) chain.
+ */
+export async function approvalRequestsInScopes(
+  scopes: readonly Scope[], subjectRef: string,
+): Promise<Array<RequestRow & { slots: RequestSlotRow[] }>> {
+  if (!engine) return [];
+  const rows: Array<RequestRow & { slots: RequestSlotRow[] }> = [];
+  for (const scope of scopes) {
+    rows.push(...await engine.status(engineCtx(null), scope, subjectRef));
+  }
+  return rows;
+}
+
+/** Read the active workflow snapshot used for a new, not-yet-submitted subject. */
+export async function activeWorkflowScoped(scope: Scope, classification: string): Promise<StoredWorkflow | null> {
+  if (!engine) return null;
+  const summaries = await engine.listWorkflows(engineCtx(null), scope);
+  const summary = summaries.find((row) => row.status === 'active' && row.classification === classification);
+  return summary ? await engine.getWorkflow(engineCtx(null), summary.wfuuid) : null;
+}
+
+/**
+ * Mirror the engine's decide authorization for presentation. This is intentionally based on
+ * the resolved approver ids captured on the active slots, not on role names or configuration.
+ * The only override is the same zero-resolved-approver admin exception used by decide().
+ */
+export function approvalActorCanDecide(
+  request: RequestRow & { slots: RequestSlotRow[] },
+  actorUserId: string | null | undefined,
+  actorRole?: string | null,
+): { canDecide: boolean; slotId: string | null } {
+  if (request.status !== 'pending' || !actorUserId) return { canDecide: false, slotId: null };
+  const active = request.slots.filter((slot) => slot.status === 'active');
+  const mine = active.find((slot) => (slot.resolvedApproverIds ?? []).includes(actorUserId));
+  if (mine) return { canDecide: true, slotId: `${mine.nodeKey}:${mine.slotOrdinal}` };
+  if (isApprovalAdminRole(actorRole ?? getRequestContext()?.rbacRole)) {
+    const stuck = active.length > 0 && active.every((slot) => (slot.resolvedApproverIds ?? []).length === 0);
+    if (stuck) return { canDecide: true, slotId: `${active[0].nodeKey}:${active[0].slotOrdinal}` };
+  }
+  return { canDecide: false, slotId: null };
 }
 
 /**
