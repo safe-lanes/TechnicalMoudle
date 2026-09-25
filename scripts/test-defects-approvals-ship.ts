@@ -4,7 +4,8 @@
  *   shore AE_TEST_BASE (default :5077, DB pms_ae_test) · ship AE_TEST_SHIP_BASE (default :5177, container pms-ship-ae)
  *
  *   R  routing: CoC → 'Critical Equipment / COC Related'; extension > 90 days → critical; plain → 'Normal'
- *   N  no chains: ship extension request stays Requested and waits on shore (no request);
+ *   N  no chains: ship extension request stays Requested and waits on shore (no request); on shore a
+ *      new extension (Requested or self-Approved) or a decision on the waiting one is BLOCKED (25-Sep);
  *      shore verification of a ship-closed defect is BLOCKED (VERIFICATION_WORKFLOW_UNAVAILABLE)
  *   X  chains set → sync → sweep starts extension + verification chains
  *      ship cannot decide (403 decided ashore); shore Master closeout blocked while extension pending
@@ -132,6 +133,18 @@ async function cleanup() {
   await sync('N');
   check('shore: d1 extension arrived Requested, no engine request (no chain)',
     (await shoreSql(`SELECT target_date_extensions->0->>'status' s FROM defects WHERE duuid=$1`, [d1.duuid]))[0].s === 'Requested' && (await engineReqs(d1.duuid)).length === 0);
+  // 25-Sep-2026 (Ghazi): no chain → a Defects extension is BLOCKED on shore (no more self-approve)
+  const orphan = (await shoreSql(`SELECT target_date_extensions t FROM defects WHERE duuid=$1`, [d1.duuid]))[0].t[0];
+  const selfOk = await call(SHORE, 'PATCH', `/defects/${s1}`, { targetDateExtensions: [{ ...orphan, status: 'Approved', approved: true, approvalDate: iso(0) }] }, APPROVER);
+  check('shore: approving the waiting ship request with no chain → 409 "not set up"', selfOk.status === 409
+    && /No approval workflow is set up for "Defect Target Date Extension" \(Normal\)/.test(selfOk.json?.error ?? ''));
+  const newShore = await call(SHORE, 'PATCH', `/defects/${sCoc}`, { targetDateExtensions: [extEntry(`EXT-${TAG}-S`, T0, iso(30))] }, OFFICER);
+  check('shore: new extension request with no chain → 409 (CoC → critical bucket named)', newShore.status === 409
+    && /No approval workflow is set up for "Defect Target Date Extension" \(Critical Equipment \/ COC Related\)/.test(newShore.json?.error ?? ''));
+  const newSelf = await call(SHORE, 'PATCH', `/defects/${sCoc}`, { targetDateExtensions: [{ ...extEntry(`EXT-${TAG}-T`, T0, iso(30)), status: 'Approved', approved: true, approvalDate: iso(0) }], targetCloseDate: iso(30) }, OFFICER);
+  const cocRow = (await shoreSql(`SELECT target_date_extensions t, target_close_date FROM defects WHERE duuid=$1`, [dCoc.duuid]))[0];
+  check('shore: new self-Approved extension with no chain → 409, nothing saved', newSelf.status === 409
+    && (!cocRow.t || cocRow.t.length === 0) && String(cocRow.target_close_date).slice(0, 10) === T0);
   const vNo = await call(SHORE, 'PATCH', `/defects/${s2}`, { verified: true, dateVerified: iso(0), verifiedByName: 'x', verifiedByOfficePosition: 'x' }, APPROVER);
   check('shore: verify with no chain → 409 VERIFICATION_WORKFLOW_UNAVAILABLE', vNo.status === 409 && /Verification approval workflow is unavailable/.test(vNo.json?.error ?? ''));
 

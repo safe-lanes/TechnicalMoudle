@@ -6,8 +6,8 @@
  * body against the stored row and routes approval-field writes engine-first. A raw PATCH
  * cannot bypass the gate because the PATCH *is* the gate.
  *
- * SACRED FALLBACK: engine absent / NO_WORKFLOW / DISABLED → every write passes through
- * byte-identically (legacy self-approve included) — with ONE deliberate, product-approved
+ * FALLBACK: since 25-Sep-2026 a shore EXTENSION with no usable chain is BLOCKED (see
+ * assertExtensionApprovalReady); verification was already fail-closed — with ONE deliberate, product-approved
  * deviation (Ghazi, 03-Sep-2026): on SHIP instances extension entries are ALWAYS
  * submit-only ('Requested') and extension decisions are refused, chain or no chain. Ships
  * cannot ask the shore-only engine what is configured, and ship-side self-approval is the
@@ -23,11 +23,12 @@ import * as defectsRepo from '../repositories/defectsRepository';
 import {
   DEFECTS_MODULE_ID, DEFECTS_EXTENSION_SCREEN, DEFECTS_REPEAT_EXTENSION_SCREEN,
   DEFECTS_VERIFICATION_SCREEN, DEFECT_CLASS_CRITICAL, DEFECT_CLASS_NORMAL,
-  defectClassificationFactors, deciderIdentity, type DefectSubject,
+  defectClassificationFactors, deciderIdentity, defectsApprovalCard, type DefectSubject,
 } from '../approvalCard';
 import {
   scopeFor, engineSubmitOutcome, maybeEngineSubmitScoped, activeWorkflowExistsScoped,
   maybeEngineDecideScoped, pendingEngineRequestScoped, pendingEngineRequestInScopes,
+  approvalReadinessScoped,
 } from '../../approvals/engineGateway';
 import type { Scope } from '../../approval-engine';
 
@@ -170,6 +171,24 @@ export async function resolveDefectApprovalRouting(
   };
 }
 
+/**
+ * 25-Sep-2026 (Ghazi): a Defects extension with NO usable chain is BLOCKED on shore with a
+ * message — same rule as Technical. It replaces the legacy self-approve fallback for new
+ * extension entries and for deciding a Requested entry that never got a chain. Ships are
+ * unaffected (submit-only; the request waits on shore until a chain exists).
+ */
+async function assertExtensionApprovalReady(routing: DefectApprovalRouting): Promise<void> {
+  const readiness = await approvalReadinessScoped(routing.scope, routing.classification);
+  if (readiness === 'READY' || readiness === 'SHIP') return;
+  const label = defectsApprovalCard.scopes.find((sc) => sc.screenId === routing.scope.screenId)?.label ?? routing.scope.screenId;
+  const message = readiness === 'DISABLED'
+    ? `Approval for "${label}" is switched off. Ask an administrator to enable it in Admin → Approval Workflow.`
+    : readiness === 'OFF'
+      ? 'The approval service is not available on this server. Contact your administrator.'
+      : `No approval workflow is set up for "${label}" (${routing.classification}). Ask an administrator to set it up in Admin → Approval Workflow.`;
+  throw new AppError(409, message, { code: 'EXTENSION_APPROVAL_NOT_SET_UP', readiness });
+}
+
 /** Part C1 closeout fields — writing/changing ANY of these is "performing closure". */
 export const C1_FIELDS = [
   'confirmCompleted', 'dateCompleted', 'closedByName', 'closedByRank',
@@ -294,6 +313,7 @@ export async function gateDefectUpdate(
           const routing = await resolveDefectApprovalRouting(
             duuid, 'extension', entry.newTargetDate, actor.userUuid, { auditFallback: false },
           );
+          await assertExtensionApprovalReady(routing);
           preflightRouting.set(entry.id, routing);
           if (routing.activeWorkflowExists && entry.status !== 'Requested') {
             effectiveStatus = 'Requested';
@@ -527,6 +547,7 @@ export async function gateDefectUpdate(
         decisionApplied = true; // onDecision wrote the entry + side effects
       } else {
         const routing = await resolveDefectApprovalRouting(duuid, 'extension', e.newTargetDate, actor.userUuid);
+        await assertExtensionApprovalReady(routing);
         const subject: DefectSubject = {
           kind: 'defect-extension', duuid, extensionId: e.id, classification: routing.classification,
         };

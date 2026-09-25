@@ -31,11 +31,19 @@ vi.mock('../approvalCard', () => ({
   DEFECT_CLASS_NORMAL: 'Normal',
   defectClassificationFactors: mocks.defectClassificationFactors,
   deciderIdentity: vi.fn(),
+  defectsApprovalCard: { scopes: [
+    { screenId: 'defects-extension', label: 'Defect Target Date Extension' },
+    { screenId: 'defects-repeat-extension', label: 'Target Date Repeat Extension' },
+    { screenId: 'defects-verification', label: 'Defect Verification (C2)' },
+  ] },
 }));
 
 vi.mock('../../approvals/engineGateway', () => ({
   scopeFor: (moduleId: string, screenId: string) => ({ moduleId, screenId, actionId: '' }),
   activeWorkflowExistsScoped: mocks.activeWorkflowExistsScoped,
+  // 25-Sep-2026 readiness (scope enabled + active chain) — follows the workflow-exists fake.
+  approvalReadinessScoped: async (scope: any, classification: string) =>
+    (await mocks.activeWorkflowExistsScoped(scope, classification)) ? 'READY' : 'NO_WORKFLOW',
   pendingEngineRequestInScopes: mocks.pendingEngineRequestInScopes,
   pendingEngineRequestScoped: mocks.pendingEngineRequestScoped,
   maybeEngineDecideScoped: mocks.maybeEngineDecideScoped,
@@ -383,12 +391,34 @@ describe('Defects approval routing', () => {
     expect(mocks.engineSubmitOutcome).not.toHaveBeenCalled();
   });
 
-  it('allows atomic closeout with an orphan Requested extension when no workflow is active', async () => {
+  it('allows atomic closeout with an EXISTING orphan Requested extension when no workflow is active', async () => {
     mocks.activeWorkflowExistsScoped.mockResolvedValue(false);
-    await expect(gateDefectUpdate(baseDefect, {
+    const current = { ...baseDefect, targetDateExtensions: [{ id: 'orphan', status: 'Requested', newTargetDate: '2026-02-01' }] };
+    await expect(gateDefectUpdate(current, {
       targetDateExtensions: [{ id: 'orphan', status: 'Requested', newTargetDate: '2026-02-01' }],
       confirmCompleted: true,
     }, { userUuid: 'master-1', rankName: 'Master' })).resolves.toBeDefined();
+  });
+
+  it('blocks a NEW extension request on shore when no workflow is active (25-Sep-2026)', async () => {
+    mocks.activeWorkflowExistsScoped.mockResolvedValue(false);
+    await expect(gateDefectUpdate(baseDefect, {
+      targetDateExtensions: [{ id: 'new-req', status: 'Requested', newTargetDate: '2026-02-01' }],
+    }, { userUuid: 'user-1' })).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'No approval workflow is set up for "Defect Target Date Extension" (Normal). Ask an administrator to set it up in Admin → Approval Workflow.',
+      details: { code: 'EXTENSION_APPROVAL_NOT_SET_UP' },
+    });
+    expect(mocks.engineSubmitOutcome).not.toHaveBeenCalled();
+  });
+
+  it('still accepts a NEW extension request on a ship with no workflow (it waits on shore)', async () => {
+    mocks.isShipInstance.mockResolvedValue(true);
+    mocks.activeWorkflowExistsScoped.mockResolvedValue(false);
+    const gated = await gateDefectUpdate(baseDefect, {
+      targetDateExtensions: [{ id: 'ship-req', status: 'Requested', newTargetDate: '2026-02-01' }],
+    }, { userUuid: 'user-1' });
+    expect(gated.body.targetDateExtensions[0].status).toBe('Requested');
   });
 
   it('blocks atomic C1 with a newly Approved governed extension before submission', async () => {
@@ -463,13 +493,15 @@ describe('Defects approval routing', () => {
     })).rejects.toMatchObject({ statusCode: 409, details: { code: 'EXTENSION_PENDING_CLOSEOUT' } });
   });
 
-  it('keeps a new Approved extension legacy when no workflow is active', async () => {
+  it('blocks a new self-Approved extension when no workflow is active (25-Sep-2026; was legacy self-approve)', async () => {
     mocks.activeWorkflowExistsScoped.mockResolvedValue(false);
     await expect(gateDefectUpdate(baseDefect, {
       targetDateExtensions: [{ id: 'legacy-approved', status: 'Approved', newTargetDate: '2026-02-01' }],
       confirmCompleted: true,
-    }, { userUuid: 'master-1', rankName: 'Master' })).resolves.toBeDefined();
-    expect(mocks.engineSubmitOutcome).toHaveBeenCalledTimes(1);
+    }, { userUuid: 'master-1', rankName: 'Master' })).rejects.toMatchObject({
+      statusCode: 409, details: { code: 'EXTENSION_APPROVAL_NOT_SET_UP' },
+    });
+    expect(mocks.engineSubmitOutcome).not.toHaveBeenCalled();
   });
 
   it('protects the governed Requested entry from removal while pending', async () => {
