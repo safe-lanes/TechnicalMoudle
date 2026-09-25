@@ -3139,54 +3139,67 @@ export async function rejectCompletedWorkOrder(
  */
 // ── Classify a WO for the postponement approval workflow ─────────────────────
 
+/** Engine classification ids for WO postponement / re-postponement (awc variableNames). */
+export const WO_APPROVAL_CLASSIFICATION: Record<'criticalEquipment' | 'critical' | 'normal', string> = {
+  criticalEquipment: 'Critical Equipment WO',
+  critical: 'Critical WO',
+  normal: 'Normal WO',
+};
+
+/**
+ * Classify a WO for postponement / re-postponement approval. 25-Sep-2026: the old Level 1 /
+ * Level 2 ticks (approval_workflow_config) are RETIRED — approval runs on the engine only, so
+ * the level flags are always false (kept in the return shape for the snapshot columns).
+ */
+async function classifyWoForApproval(wo: any): Promise<'criticalEquipment' | 'critical' | 'normal'> {
+  if (!wo.jobId) return 'normal';
+  const job = await repo.findJob(wo.jobId);
+  if (!job) return 'normal';
+  let isOnCriticalEquipment = false;
+  if ((job as any).componentId) {
+    const comp = await repo.findComponent((job as any).componentId);
+    isOnCriticalEquipment = (comp as any)?.critical === true;
+  }
+  if (isOnCriticalEquipment) return 'criticalEquipment';
+  if ((job as any).criticality === 'Yes') return 'critical';
+  return 'normal';
+}
+
 export async function classifyWoForPostponement(wo: any): Promise<{
   classification: 'criticalEquipment' | 'critical' | 'normal';
   level1Enabled: boolean;
   level2Enabled: boolean;
 }> {
-  // WOs with no linked job always fall into normal — no config lookup needed
-  if (!wo.jobId) {
-    return { classification: 'normal', level1Enabled: false, level2Enabled: false };
+  return { classification: await classifyWoForApproval(wo), level1Enabled: false, level2Enabled: false };
+}
+
+/**
+ * 25-Sep-2026 — a postponement submitted before the old ticks were retired may still carry
+ * Pending Level 1 / Level 2 rows in wo_postponement_approvals. The engine's final decision
+ * replaces them: mark them Superseded (history kept, nothing deleted).
+ */
+async function supersedeLegacyWoSteps(postponementId: string, outcome: 'approved' | 'rejected'): Promise<void> {
+  const steps = await repo.getWoPostponementApprovalSteps(postponementId);
+  for (const step of steps.filter((st: any) => st.status === 'Pending')) {
+    await repo.updateWoPostponementApprovalStep(step.id, {
+      status: 'Superseded',
+      actionAt: new Date(),
+      remarks: `Superseded — ${outcome} through the approval workflow`,
+    });
   }
-
-  let classification: 'criticalEquipment' | 'critical' | 'normal' = 'normal';
-
-  const job = await repo.findJob(wo.jobId);
-  if (job) {
-    let isOnCriticalEquipment = false;
-    if ((job as any).componentId) {
-      const comp = await repo.findComponent((job as any).componentId);
-      isOnCriticalEquipment = (comp as any)?.critical === true;
-    }
-    if (isOnCriticalEquipment) {
-      classification = 'criticalEquipment';
-    } else if ((job as any).criticality === 'Yes') {
-      classification = 'critical';
-    }
-  }
-
-  const variableNameMap: Record<'criticalEquipment' | 'critical' | 'normal', string> = {
-    criticalEquipment: 'Critical Equipment WO',
-    critical: 'Critical WO',
-    normal: 'Normal WO',
-  };
-
-  const allConfigs = await storage.getApprovalWorkflowConfig();
-  const config = allConfigs.find(
-    (c: any) => c.functionId === 'pms-wo-postponement' && c.variableName === variableNameMap[classification] && !c.isDeleted
-  );
-
-  return {
-    classification,
-    level1Enabled: config?.level1Enabled ?? false,
-    level2Enabled: config?.level2Enabled ?? false,
-  };
 }
 
 export async function submitPostponeRequest(id: string, body: any) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
   if (!wo) throw new NotFoundError('Work order not found');
+
+  // 25-Sep-2026: approval runs on the engine only. On shore, block before anything changes
+  // when no chain is set up (or the action is switched off). Ships pass — the request
+  // syncs and waits on shore until a chain exists.
+  const gw = await import('../../approvals/engineGateway');
+  const classification = await classifyWoForPostponement(wo);
+  await gw.assertTechnicalApprovalReady('pms-wo-postponement', WO_APPROVAL_CLASSIFICATION[classification.classification]);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -3209,8 +3222,7 @@ export async function submitPostponeRequest(id: string, body: any) {
     await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || 'system');
   } catch (err) { console.error('[FieldLogger] WO postpone-request:', err); }
 
-  // Classify the WO and build the approval workflow snapshot
-  const classification = await classifyWoForPostponement(wo);
+  // Approval workflow snapshot (historical shape; level flags always false now)
   const approvalWorkflowSnapshot = {
     woClassification: classification.classification,
     level1Enabled: classification.level1Enabled,
@@ -3238,33 +3250,8 @@ export async function submitPostponeRequest(id: string, body: any) {
     approvalWorkflowSnapshot,
   });
 
-  // Create level approval step rows
-  if (classification.level1Enabled) {
-    await repo.createWoPostponementApprovalStep({
-      postponementId,
-      workOrderId: wo.wouuid,
-      approvalLevel: 'Level 1',
-      status: 'Pending',
-    });
-  }
-  if (classification.level2Enabled) {
-    await repo.createWoPostponementApprovalStep({
-      postponementId,
-      workOrderId: wo.wouuid,
-      approvalLevel: 'Level 2',
-      status: 'Pending',
-    });
-  }
-
-  // Phase 2 / W3 — offer the request to the approval engine (no-op on ships / no workflow /
-  // disabled — legacy behaviour byte-identical). Runs AFTER the legacy snapshot + steps.
-  try {
-    const gw = await import('../../approvals/engineGateway');
-    const requuid = await gw.maybeEngineSubmit('pms-wo-postponement', wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId ?? null, body.userId || body.performedBy || null);
-    if (requuid && (classification.level1Enabled || classification.level2Enabled)) {
-      console.warn(`[approvals] WO ${wo.wouuid}: BOTH an engine workflow and legacy awc levels are active for pms-wo-postponement — cutover rule is workflow XOR awc levels`);
-    }
-  } catch (e) { console.error('[approvals] postponement engine submit hook failed (legacy continues):', e); }
+  // Start the engine chain (shore; no-op on a ship — the chain starts on shore after sync).
+  await gw.maybeEngineSubmit('pms-wo-postponement', wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId ?? null, body.userId || body.performedBy || null);
 
   return updatedWO;
 }
@@ -3283,7 +3270,7 @@ export async function editPostponeRequest(id: string, body: any) {
  * Office approves a postponement request.
  * Gates on multi-level approval steps if configured; finalises when all levels are satisfied.
  */
-export async function approvePostponement(id: string, body: any) {
+export async function approvePostponement(id: string, body: any, opts: { viaEngine?: boolean } = {}) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
   if (!wo) throw new NotFoundError('Work order not found');
@@ -3303,44 +3290,17 @@ export async function approvePostponement(id: string, body: any) {
     const gw = await import('../../approvals/engineGateway');
     const decided = await gw.maybeEngineDecide('pms-wo-postponement', wo.wouuid, 'approve', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
     if (decided) return (await repo.findById(id)) || wo;
-  }
-
-  // ── Multi-level approval gate ────────────────────────────────────────────
-  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
-  if (awaitingPostponement) {
-    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
-    if (steps.length > 0) {
-      const now = new Date();
-      const activeStep = steps.find((s: any) => s.status === 'Pending');
-      if (!activeStep) {
-        throw new ValidationError('No pending approval step found — this request may have already been fully approved');
-      }
-
-      const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
-      if (!isSailAdmin) {
-        const reviewerId = body.userUuid || body.approvedBy;
-        const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
-        if (!isAuthorised) {
-          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
-        }
-      }
-
-      const remaining = steps.filter((s: any) => s.id !== activeStep.id && s.status === 'Pending');
-      await repo.updateWoPostponementApprovalStep(activeStep.id, {
-        status: 'Approved',
-        actionByUserId: body.approvedBy,
-        actionAt: now,
-        remarks: body.approvalRemarks || null,
-      });
-
-      if (remaining.length > 0) {
-        console.log(`[WO_POSTPONE_WORKFLOW] WO ${wo.wouuid} — ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
-        return (await repo.findById(id)) || wo;
-      }
-      console.log(`[WO_POSTPONE_WORKFLOW] WO ${wo.wouuid} — all approval levels satisfied, finalising`);
+    // 25-Sep-2026: no direct decision any more — only the engine's final decision applies.
+    if (!opts.viaEngine) {
+      const cls = await classifyWoForPostponement(wo);
+      await gw.refuseDirectDecision('pms-wo-postponement', WO_APPROVAL_CLASSIFICATION[cls.classification]);
     }
   }
-  // ── End gate — fall through to finalisation ──────────────────────────────
+
+  // 25-Sep-2026: old Level 1 / Level 2 steps retired — only the engine's final decision
+  // reaches here. Any Pending step rows left from before the cutover are marked Superseded.
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) await supersedeLegacyWoSteps(awaitingPostponement.id, 'approved');
 
   const today = new Date().toISOString().split('T')[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
@@ -3411,7 +3371,7 @@ export async function approvePostponement(id: string, body: any) {
  * Records the rejection on the active approval step (if any), reverts WO status to Due/Overdue,
  * and inserts a NEW immutable decision row in work_order_postponements.
  */
-export async function rejectPostponement(id: string, body: any) {
+export async function rejectPostponement(id: string, body: any, opts: { viaEngine?: boolean } = {}) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
   if (!wo) throw new NotFoundError('Work order not found');
@@ -3427,33 +3387,16 @@ export async function rejectPostponement(id: string, body: any) {
     const gw = await import('../../approvals/engineGateway');
     const decided = await gw.maybeEngineDecide('pms-wo-postponement', wo.wouuid, 'reject', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
     if (decided) return (await repo.findById(id)) || wo;
-  }
-
-  // ── Mark the active approval step as Rejected (if steps exist) ──────────
-  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
-  if (awaitingPostponement) {
-    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
-    if (steps.length > 0) {
-      const activeStep = steps.find((s: any) => s.status === 'Pending');
-      if (activeStep) {
-        const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
-        if (!isSailAdmin) {
-          const reviewerId = body.userUuid || body.approvedBy;
-          const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
-          if (!isAuthorised) {
-            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
-          }
-        }
-        await repo.updateWoPostponementApprovalStep(activeStep.id, {
-          status: 'Rejected',
-          actionByUserId: body.approvedBy,
-          actionAt: new Date(),
-          remarks: body.approvalRemarks || null,
-        });
-      }
+    // 25-Sep-2026: no direct decision any more — only the engine's final decision applies.
+    if (!opts.viaEngine) {
+      const cls = await classifyWoForPostponement(wo);
+      await gw.refuseDirectDecision('pms-wo-postponement', WO_APPROVAL_CLASSIFICATION[cls.classification]);
     }
   }
-  // ── End step rejection — fall through to WO status revert ───────────────
+
+  // 25-Sep-2026: old Level 1 / Level 2 steps retired — mark leftover Pending rows Superseded.
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) await supersedeLegacyWoSteps(awaitingPostponement.id, 'rejected');
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -3528,86 +3471,19 @@ export async function rejectPostponement(id: string, body: any) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WO Re-Postponement
-// Mirrors the base Postponement flow but uses pms-wo-re-postponement config,
-// always reverts to 'Postponement Approved' on reject, and fails fast if the
-// approval config has not yet arrived on this vessel via sync.
+// Mirrors the base Postponement flow (engine scope pms-wo-re-postponement) and
+// always reverts to 'Postponement Approved' on reject.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Classify a WO for Re-Postponement and look up the pms-wo-re-postponement
- * approval workflow config. Returns the classification and enabled levels.
- * Returns { level1Enabled: false, level2Enabled: false } for WOs without a
- * linked job (same behaviour as the base postponement classifier).
- *
- * Unlike the base classifier this function throws a ValidationError when the
- * config rows for pms-wo-re-postponement do not exist (they arrive via
- * ONE_WAY sync from shore after migration 150 runs). The caller must NOT
- * proceed if config is absent — a missing config produces a stuck WO that
- * cannot be approved or rejected through the normal UI.
- */
+/** Classify a WO for Re-Postponement (same rules as postponement). */
 export async function classifyWoForRePostponement(wo: any): Promise<{
   classification: 'criticalEquipment' | 'critical' | 'normal';
   level1Enabled: boolean;
   level2Enabled: boolean;
 }> {
-  // WOs with no linked job always fall into normal
-  if (!wo.jobId) {
-    // Still need to verify config exists even for normal WOs — fail fast if not
-    const allConfigs = await storage.getApprovalWorkflowConfig();
-    const cfg = allConfigs.find(
-      (c: any) => c.functionId === 'pms-wo-re-postponement' && c.variableName === 'Normal WO' && !c.isDeleted
-    );
-    if (!cfg) {
-      throw new ValidationError(
-        'Re-Postponement approval configuration is not yet available on this vessel. ' +
-        'Please sync and try again.'
-      );
-    }
-    return { classification: 'normal', level1Enabled: cfg.level1Enabled ?? false, level2Enabled: cfg.level2Enabled ?? false };
-  }
-
-  let classification: 'criticalEquipment' | 'critical' | 'normal' = 'normal';
-
-  const job = await repo.findJob(wo.jobId);
-  if (job) {
-    let isOnCriticalEquipment = false;
-    if ((job as any).componentId) {
-      const comp = await repo.findComponent((job as any).componentId);
-      isOnCriticalEquipment = (comp as any)?.critical === true;
-    }
-    if (isOnCriticalEquipment) {
-      classification = 'criticalEquipment';
-    } else if ((job as any).criticality === 'Yes') {
-      classification = 'critical';
-    }
-  }
-
-  const variableNameMap: Record<'criticalEquipment' | 'critical' | 'normal', string> = {
-    criticalEquipment: 'Critical Equipment WO',
-    critical: 'Critical WO',
-    normal: 'Normal WO',
-  };
-
-  const allConfigs = await storage.getApprovalWorkflowConfig();
-  const config = allConfigs.find(
-    (c: any) =>
-      c.functionId === 'pms-wo-re-postponement' &&
-      c.variableName === variableNameMap[classification] &&
-      !c.isDeleted
-  );
-
-  if (!config) {
-    throw new ValidationError(
-      'Re-Postponement approval configuration is not yet available on this vessel. ' +
-      'Please sync and try again.'
-    );
-  }
-
-  return {
-    classification,
-    level1Enabled: config.level1Enabled ?? false,
-    level2Enabled: config.level2Enabled ?? false,
-  };
+  // 25-Sep-2026: no approval_workflow_config lookup any more (old ticks retired), so the
+  // former "configuration is not yet available on this vessel" refusal is gone too.
+  return { classification: await classifyWoForApproval(wo), level1Enabled: false, level2Enabled: false };
 }
 
 /**
@@ -3621,7 +3497,10 @@ export async function classifyWoForRePostponement(wo: any): Promise<{
 async function createRePostponementRecord(wo: any, body: any, dueDateSnapshot: string | null) {
   const today = new Date().toISOString().split('T')[0];
 
+  // 25-Sep-2026: engine-only approval — block on shore when no chain is set up (ships pass).
   const classification = await classifyWoForRePostponement(wo);
+  const gw = await import('../../approvals/engineGateway');
+  await gw.assertTechnicalApprovalReady('pms-wo-re-postponement', WO_APPROVAL_CLASSIFICATION[classification.classification]);
   const approvalWorkflowSnapshot = {
     woClassification: classification.classification,
     level1Enabled: classification.level1Enabled,
@@ -3666,26 +3545,6 @@ async function createRePostponementRecord(wo: any, body: any, dueDateSnapshot: s
     requestType: 'Re-Postponement',
   } as any);
 
-  // Create level approval step rows
-  if (classification.level1Enabled) {
-    await repo.createWoPostponementApprovalStep({
-      postponementId,
-      workOrderId: wo.wouuid,
-      approvalLevel: 'Level 1',
-      status: 'Pending',
-      requestType: 'Re-Postponement',
-    } as any);
-  }
-  if (classification.level2Enabled) {
-    await repo.createWoPostponementApprovalStep({
-      postponementId,
-      workOrderId: wo.wouuid,
-      approvalLevel: 'Level 2',
-      status: 'Pending',
-      requestType: 'Re-Postponement',
-    } as any);
-  }
-
   return updatedWO;
 }
 
@@ -3711,11 +3570,9 @@ export async function submitRePostponeRequest(id: string, body: any) {
 
   const rePostponeResult = await createRePostponementRecord(wo, body, dueDateSnapshot);
 
-  // Phase 2 / W3 — offer the re-postponement to the approval engine (no-op fallbacks as above).
-  try {
-    const gw = await import('../../approvals/engineGateway');
-    await gw.maybeEngineSubmit('pms-wo-re-postponement', wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId ?? null, body.userId || body.performedBy || null);
-  } catch (e) { console.error('[approvals] re-postponement engine submit hook failed (legacy continues):', e); }
+  // Start the engine chain (shore; no-op on a ship — the chain starts on shore after sync).
+  const gw = await import('../../approvals/engineGateway');
+  await gw.maybeEngineSubmit('pms-wo-re-postponement', wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId ?? null, body.userId || body.performedBy || null);
 
   return rePostponeResult;
 }
@@ -3754,7 +3611,7 @@ export async function editRePostponeRequest(id: string, body: any) {
  * Gates on multi-level approval steps if configured; finalises when all levels
  * are satisfied. Final WO status is always 'Postponement Approved'.
  */
-export async function approveRePostponement(id: string, body: any) {
+export async function approveRePostponement(id: string, body: any, opts: { viaEngine?: boolean } = {}) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
   if (!wo) throw new NotFoundError('Work order not found');
@@ -3770,44 +3627,17 @@ export async function approveRePostponement(id: string, body: any) {
     const gw = await import('../../approvals/engineGateway');
     const decided = await gw.maybeEngineDecide('pms-wo-re-postponement', wo.wouuid, 'approve', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
     if (decided) return (await repo.findById(id)) || wo;
-  }
-
-  // ── Multi-level approval gate ────────────────────────────────────────────
-  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
-  if (awaitingPostponement) {
-    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
-    if (steps.length > 0) {
-      const now = new Date();
-      const activeStep = steps.find((s: any) => s.status === 'Pending');
-      if (!activeStep) {
-        throw new ValidationError('No pending approval step found — this request may have already been fully approved');
-      }
-
-      const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
-      if (!isSailAdmin) {
-        const reviewerId = body.userUuid || body.approvedBy;
-        const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
-        if (!isAuthorised) {
-          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
-        }
-      }
-
-      const remaining = steps.filter((s: any) => s.id !== activeStep.id && s.status === 'Pending');
-      await repo.updateWoPostponementApprovalStep(activeStep.id, {
-        status: 'Approved',
-        actionByUserId: body.approvedBy,
-        actionAt: now,
-        remarks: body.approvalRemarks || null,
-      });
-
-      if (remaining.length > 0) {
-        console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} — ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
-        return (await repo.findById(id)) || wo;
-      }
-      console.log(`[WO_RE_POSTPONE_WORKFLOW] WO ${wo.wouuid} — all approval levels satisfied, finalising`);
+    // 25-Sep-2026: no direct decision any more — only the engine's final decision applies.
+    if (!opts.viaEngine) {
+      const cls = await classifyWoForRePostponement(wo);
+      await gw.refuseDirectDecision('pms-wo-re-postponement', WO_APPROVAL_CLASSIFICATION[cls.classification]);
     }
   }
-  // ── End gate — fall through to finalisation ──────────────────────────────
+
+  // 25-Sep-2026: old Level 1 / Level 2 steps retired — only the engine's final decision
+  // reaches here. Any Pending step rows left from before the cutover are marked Superseded.
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) await supersedeLegacyWoSteps(awaitingPostponement.id, 'approved');
 
   const today = new Date().toISOString().split('T')[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
@@ -3873,7 +3703,7 @@ export async function approveRePostponement(id: string, body: any) {
  * the WO was already in 'Postponement Approved' before the re-postponement was
  * submitted, and it must return to that state unconditionally.
  */
-export async function rejectRePostponement(id: string, body: any) {
+export async function rejectRePostponement(id: string, body: any, opts: { viaEngine?: boolean } = {}) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
   if (!wo) throw new NotFoundError('Work order not found');
@@ -3889,9 +3719,13 @@ export async function rejectRePostponement(id: string, body: any) {
     const gw = await import('../../approvals/engineGateway');
     const decided = await gw.maybeEngineDecide('pms-wo-re-postponement', wo.wouuid, 'reject', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
     if (decided) return (await repo.findById(id)) || wo;
+    // 25-Sep-2026: no direct decision any more — only the engine's final decision applies.
+    if (!opts.viaEngine) {
+      const cls = await classifyWoForRePostponement(wo);
+      await gw.refuseDirectDecision('pms-wo-re-postponement', WO_APPROVAL_CLASSIFICATION[cls.classification]);
+    }
   }
 
-  // ── Mark the active approval step as Rejected ────────────────────────────
   const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
   let dueDateToRestore: string | null = null;
 
@@ -3899,29 +3733,9 @@ export async function rejectRePostponement(id: string, body: any) {
     // The originalDueDate on the pending record is the due date that was active
     // when the re-postponement was submitted — restore it on rejection
     dueDateToRestore = awaitingPostponement.originalDueDate || null;
-
-    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
-    if (steps.length > 0) {
-      const activeStep = steps.find((s: any) => s.status === 'Pending');
-      if (activeStep) {
-        const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
-        if (!isSailAdmin) {
-          const reviewerId = body.userUuid || body.approvedBy;
-          const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
-          if (!isAuthorised) {
-            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
-          }
-        }
-        await repo.updateWoPostponementApprovalStep(activeStep.id, {
-          status: 'Rejected',
-          actionByUserId: body.approvedBy,
-          actionAt: new Date(),
-          remarks: body.approvalRemarks || null,
-        });
-      }
-    }
+    // 25-Sep-2026: old Level 1 / Level 2 steps retired — mark leftover Pending rows Superseded.
+    await supersedeLegacyWoSteps(awaitingPostponement.id, 'rejected');
   }
-  // ── End step rejection — revert WO to Postponement Approved ─────────────
 
   const today = new Date().toISOString().split('T')[0];
 

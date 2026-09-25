@@ -288,21 +288,19 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
   const cls = await classifyChangeRequestScope(cr);
   const { equipmentClassification, spareClassification, jobClassification } = cls;
 
-  // Look up the approval workflow config for this CR category (same rows as before)
-  let level1Enabled = false;
-  let level2Enabled = false;
+  // 25-Sep-2026 — the old Level 1 / Level 2 ticks (approval_workflow_config) are RETIRED:
+  // approval runs on the engine only. On shore, an action with no active chain (or switched
+  // off) is BLOCKED here, before anything changes. Ships have no engine — the CR is saved,
+  // syncs, and the shore arrival sweep starts its chain once one is set up.
+  // Work-Order-target CRs have no engine action by decision (no functionId) — unchanged.
+  const gw = await import('../../approvals/engineGateway');
   if (cls.functionId && cls.variableName) {
-    const allConfigs = await crRepo.getApprovalWorkflowConfig();
-    const config = allConfigs.find(
-      c => c.functionId === cls.functionId && c.variableName === cls.variableName && !c.isDeleted
-    );
-    if (config) {
-      level1Enabled = config.level1Enabled;
-      level2Enabled = config.level2Enabled;
-    }
+    await gw.assertTechnicalApprovalReady(cls.functionId, cls.variableName);
   }
 
-  // Build snapshot — each CR category records its classification key
+  // Snapshot keeps its historical shape; the level flags are always false now.
+  const level1Enabled = false;
+  const level2Enabled = false;
   const snapshot = cr.targetType === 'spare'
     ? { level1Enabled, level2Enabled, spareClassification }
     : cr.targetType === 'store'
@@ -319,37 +317,12 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     approvalWorkflowSnapshot: snapshot
   } as any);
 
-  // Create approval step rows
-  if (level1Enabled) {
-    await crRepo.createChangeRequestApprovalStep({
-      changeRequestId: id,
-      changeRequestUuid: cr.cruuid,
-      approvalLevel: 'Level 1',
-      status: 'Pending',
-    });
-  }
-  if (level2Enabled) {
-    await crRepo.createChangeRequestApprovalStep({
-      changeRequestId: id,
-      changeRequestUuid: cr.cruuid,
-      approvalLevel: 'Level 2',
-      status: 'Pending',
-    });
-  }
-
-  // Phase 2 / W3 — offer the submitted CR to the approval engine (shore only; the gateway is
-  // a no-op on ships / with no workflow / disabled scope — legacy behaviour byte-identical).
-  // Runs AFTER the legacy snapshot+steps so a NO_WORKFLOW fallback has everything it had before.
-  // Dynamic import: the approvals card imports this service (inward); keep the reverse edge lazy.
+  // Start the engine chain (shore). On a ship this is a no-op — the chain starts on shore.
   if (cls.functionId) {
-    try {
-      const gw = await import('../../approvals/engineGateway');
-      const requuid = await gw.maybeEngineSubmit(cls.functionId, cr.cruuid, { kind: 'cr', targetType: cr.targetType, targetId: cr.targetId }, cr.vesselId, userId);
-      if (requuid && (level1Enabled || level2Enabled)) {
-        console.warn(`[approvals] CR ${cr.cruuid}: BOTH an engine workflow and legacy awc levels are active for ${cls.functionId}/${cls.variableName} — cutover rule is workflow XOR awc levels (see PHASE2-REPORT)`);
-      }
-    } catch (e) {
-      console.error('[approvals] CR engine submit hook failed (legacy path continues):', e);
+    const requuid = await gw.maybeEngineSubmit(cls.functionId, cr.cruuid, { kind: 'cr', targetType: cr.targetType, targetId: cr.targetId }, cr.vesselId, userId);
+    if (!requuid && gw.isApprovalEngineAvailable()) {
+      const pending = await gw.pendingEngineRequest(cls.functionId, cr.cruuid);
+      if (!pending) console.error(`[approvals] CR ${cr.cruuid}: submitted but no engine chain started for ${cls.functionId}/${cls.variableName} — the arrival sweep will retry`);
     }
   }
 
@@ -357,7 +330,7 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     : cr.targetType === 'store' ? 'standard'
     : cr.targetType === 'job' ? jobClassification
     : equipmentClassification;
-  console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted — classification: ${classLabel}, L1: ${level1Enabled}, L2: ${level2Enabled}`);
+  console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted — classification: ${classLabel} (approval via engine)`);
   return updated;
 }
 
@@ -397,7 +370,7 @@ export async function approveChangeRequest(id: number, body: {
   reviewerId?: string;
   role?: string;
   overriddenChanges?: Array<{ field: string; approverNewValue: string }>;
-}) {
+}, opts: { viaEngine?: boolean } = {}) {
   const { comment, reviewerId, role, overriddenChanges } = body;
 
   if (!comment) {
@@ -430,6 +403,9 @@ export async function approveChangeRequest(id: number, body: {
     if (cls.functionId) {
       const decided = await gw.maybeEngineDecide(cls.functionId, existing.cruuid, 'approve', reviewerId || 'reviewer', comment);
       if (decided) return (await crRepo.getChangeRequest(id))!;
+      // 25-Sep-2026: no direct approval any more — only the engine's final decision applies.
+      if (!opts.viaEngine) await gw.refuseDirectDecision(cls.functionId, cls.variableName ?? '');
+      await supersedeLegacyCrSteps(id, 'approved');
     }
   }
 
@@ -446,7 +422,7 @@ export async function approveChangeRequest(id: number, body: {
   return updated;
 }
 
-export async function rejectChangeRequest(id: number, body: { comment: string; reviewerId?: string; role?: string }) {
+export async function rejectChangeRequest(id: number, body: { comment: string; reviewerId?: string; role?: string }, opts: { viaEngine?: boolean } = {}) {
   const { comment, reviewerId, role } = body;
 
   if (!comment) {
@@ -472,6 +448,8 @@ export async function rejectChangeRequest(id: number, body: { comment: string; r
     if (cls.functionId) {
       const decided = await gw.maybeEngineDecide(cls.functionId, existing.cruuid, 'reject', reviewerId || 'reviewer', comment);
       if (decided) return (await crRepo.getChangeRequest(id))!;
+      if (!opts.viaEngine) await gw.refuseDirectDecision(cls.functionId, cls.variableName ?? '');
+      await supersedeLegacyCrSteps(id, 'rejected');
     }
   }
 
@@ -479,6 +457,22 @@ export async function rejectChangeRequest(id: number, body: { comment: string; r
   const updated = await crRepo.rejectChangeRequest(id, reviewerId || 'reviewer', comment, role);
   console.log('Successfully rejected request:', updated);
   return updated;
+}
+
+/**
+ * 25-Sep-2026 — a CR submitted before the old ticks were retired may still carry Pending
+ * Level 1 / Level 2 step rows. The engine's final decision replaces them: mark them
+ * Superseded so the storage finalise runs its zero-step branch (direct apply / reject).
+ */
+async function supersedeLegacyCrSteps(id: number, outcome: 'approved' | 'rejected'): Promise<void> {
+  const steps = await crRepo.getChangeRequestApprovalSteps(id);
+  for (const step of steps.filter((s) => s.status === 'Pending')) {
+    await crRepo.updateChangeRequestApprovalStep(step.id, {
+      status: 'Superseded',
+      actionAt: new Date(),
+      remarks: `Superseded — ${outcome} through the approval workflow`,
+    });
+  }
 }
 
 // ── Approval Steps ──

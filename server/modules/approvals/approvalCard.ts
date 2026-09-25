@@ -145,8 +145,8 @@ export const technicalApprovalCard: ApprovalCard = {
   async onDecision(_ctx, notice: DecisionNotice) {
     // The engine finalized BEFORE this call (single-fire). We invoke the LEGACY finalise
     // paths — Phase-0 hardened and idempotent (CR decide-once 409, postponement status
-    // guard + one-tx finalize). Under the cutover rule (workflow active ⇒ awc levels off)
-    // these run their zero-step branch = direct apply. Already-decided answers are the
+    // guard + one-tx finalize) with { viaEngine: true } — since 25-Sep-2026 the ONLY way a
+    // Technical CR / postponement decision is applied (old Level 1/2 ticks retired). Already-decided answers are the
     // idempotent no-op signal, swallowed here per the integration guide.
     const approve = notice.outcome === 'approved';
     const remarks = notice.remarks ?? (approve ? 'Approved via approval workflow' : 'Returned via approval workflow');
@@ -156,8 +156,8 @@ export const technicalApprovalCard: ApprovalCard = {
           .where(eq(changeRequest.cruuid, notice.subjectRef)).limit(1))[0];
         if (!cr) throw new AppError(404, `[approvals] CR ${notice.subjectRef} not found for onDecision`);
         const crService = await import('../change-requests/services/changeRequestsService');
-        if (approve) await crService.approveChangeRequest(cr.id, { comment: remarks, reviewerId: notice.decidedBy, role: 'Office' });
-        else await crService.rejectChangeRequest(cr.id, { comment: remarks, reviewerId: notice.decidedBy, role: 'Office' });
+        if (approve) await crService.approveChangeRequest(cr.id, { comment: remarks, reviewerId: notice.decidedBy, role: 'Office' }, { viaEngine: true });
+        else await crService.rejectChangeRequest(cr.id, { comment: remarks, reviewerId: notice.decidedBy, role: 'Office' }, { viaEngine: true });
       } else {
         const wo = (await db().select({ id: workOrders.id }).from(workOrders)
           .where(eq(workOrders.wouuid, notice.subjectRef)).limit(1))[0];
@@ -165,11 +165,11 @@ export const technicalApprovalCard: ApprovalCard = {
         const woService = await import('../work-orders/services/workOrderService');
         const body = { approvedBy: notice.decidedBy, approvalRemarks: remarks, userUuid: notice.decidedBy, role: 'Office' };
         if (notice.scope.screenId === 'pms-wo-re-postponement') {
-          if (approve) await woService.approveRePostponement(wo.id, body);
-          else await woService.rejectRePostponement(wo.id, body);
+          if (approve) await woService.approveRePostponement(wo.id, body, { viaEngine: true });
+          else await woService.rejectRePostponement(wo.id, body, { viaEngine: true });
         } else {
-          if (approve) await woService.approvePostponement(wo.id, body);
-          else await woService.rejectPostponement(wo.id, body);
+          if (approve) await woService.approvePostponement(wo.id, body, { viaEngine: true });
+          else await woService.rejectPostponement(wo.id, body, { viaEngine: true });
         }
       }
     } catch (e: any) {

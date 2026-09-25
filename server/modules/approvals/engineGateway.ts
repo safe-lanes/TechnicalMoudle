@@ -11,7 +11,7 @@
 import { ApprovalEngine, EngineError, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
 import { AppError } from '../shared/errors';
 import { currentEngineTenantId } from './tenantProvider';
-import { TECHNICAL_MODULE_ID, type TechnicalSubject } from './approvalCard';
+import { TECHNICAL_MODULE_ID, technicalApprovalCard, type TechnicalSubject } from './approvalCard';
 import { getRequestContext } from '../../middleware/requestContext';
 
 // F3b (Q3): host admin roles that get the engine decide-override on a zero-approver step.
@@ -108,6 +108,57 @@ export async function pendingEngineRequestScoped(scope: Scope, subjectRef: strin
   if (!engine) return null;
   const rows = await engine.status(engineCtx(null), scope, subjectRef).catch(() => []);
   return rows.find((r) => r.status === 'pending') ?? null;
+}
+
+/**
+ * 25-Sep-2026 — old Level 1 / Level 2 ticks retired (Ghazi + Sahil): Technical approvals run on
+ * the engine ONLY. An action whose scope is switched off ("Enabled for this tenant" unticked)
+ * or has no active chain for the classification is BLOCKED with a message — never approved
+ * directly. Ships have no engine: a ship-raised request is saved, syncs to shore and waits
+ * there; the arrival sweep starts its chain once one is set up.
+ */
+export type ApprovalReadiness = 'READY' | 'DISABLED' | 'NO_WORKFLOW' | 'OFF' | 'SHIP';
+
+export async function approvalReadinessScoped(scope: Scope, classification: string): Promise<ApprovalReadiness> {
+  const { isShipInstance } = await import('../sync/syncRole');
+  if (await isShipInstance()) return 'SHIP';
+  if (!engine) return 'OFF';
+  const ctx = engineCtx(null);
+  if (!(await engine.getScopeEnabled(ctx, scope))) return 'DISABLED';
+  const rows = await engine.listWorkflows(ctx, scope);
+  return rows.some((row) => row.status === 'active' && row.classification === classification) ? 'READY' : 'NO_WORKFLOW';
+}
+
+/** Plain-language refusal for a Technical action that cannot go for approval yet. */
+export function approvalNotReadyMessage(screenId: string, classification: string, readiness: ApprovalReadiness): string {
+  const label = technicalApprovalCard.scopes.find((s) => s.screenId === screenId)?.label ?? screenId;
+  if (readiness === 'DISABLED') {
+    return `Approval for "${label}" is switched off. Ask an administrator to enable it in Admin → Approval Workflow.`;
+  }
+  if (readiness === 'OFF') {
+    return 'The approval service is not available on this server. Contact your administrator.';
+  }
+  return `No approval workflow is set up for "${label}" (${classification}). Ask an administrator to set it up in Admin → Approval Workflow.`;
+}
+
+/** Throws a 400 with the plain-language message unless the action may go for approval here.
+ *  Ships always pass (the request waits on shore). */
+export async function assertTechnicalApprovalReady(screenId: string, classification: string): Promise<void> {
+  const readiness = await approvalReadinessScoped(techScope(screenId), classification);
+  if (readiness === 'READY' || readiness === 'SHIP') return;
+  throw new AppError(400, approvalNotReadyMessage(screenId, classification, readiness), { code: 'APPROVAL_NOT_SET_UP', readiness });
+}
+
+/** Refusal for a direct approve/reject with no engine chain behind it. */
+export async function refuseDirectDecision(screenId: string, classification: string): Promise<never> {
+  const readiness = await approvalReadinessScoped(techScope(screenId), classification);
+  if (readiness === 'SHIP') {
+    throw new AppError(403, 'Approval happens in the office. This request will be decided on shore and the result will reach the vessel by sync.', { code: 'APPROVAL_SHORE_ONLY' });
+  }
+  if (readiness === 'READY') {
+    throw new AppError(409, 'This request has not started its approval workflow yet. It starts automatically after the next sync; try again shortly.', { code: 'APPROVAL_NOT_STARTED' });
+  }
+  throw new AppError(400, approvalNotReadyMessage(screenId, classification, readiness), { code: 'APPROVAL_NOT_SET_UP', readiness });
 }
 
 /** Read-only workflow existence check for module routing decisions. */

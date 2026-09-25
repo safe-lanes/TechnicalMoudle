@@ -6452,12 +6452,13 @@ export class PostgresStorage {
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
 
-    // Load approval steps for this CR
-    const steps = await this.getChangeRequestApprovalSteps(id);
+    // Load approval steps for this CR. 25-Sep-2026: 'Superseded' rows (old Level 1/2 steps
+    // replaced by the approval engine's final decision) are settled history, not gates.
+    const steps = (await this.getChangeRequestApprovalSteps(id)).filter(s => s.status !== 'Superseded');
     const now = new Date();
 
     // No approval steps → legacy single-step approval (backward compat)
-    if (steps.length === 0) {
+    if (steps.length === 0 || !steps.some(s => s.status === 'Pending')) {
       return this.finaliseApprovedCR(id, existing, reviewerId, comment, overriddenChanges);
     }
 
@@ -7049,10 +7050,10 @@ export class PostgresStorage {
     const existing = await this.getChangeRequest(id);
     const now = new Date();
 
-    // Load approval steps
-    const steps = await this.getChangeRequestApprovalSteps(id);
+    // Load approval steps (25-Sep-2026: Superseded rows are settled history, not gates)
+    const steps = (await this.getChangeRequestApprovalSteps(id)).filter(s => s.status !== 'Superseded');
 
-    if (steps.length > 0) {
+    if (steps.some(s => s.status === 'Pending')) {
       // Level-aware rejection
       const activeStep = steps.find(s => s.status === 'Pending');
       if (!activeStep) {
