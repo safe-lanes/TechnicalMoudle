@@ -24,8 +24,16 @@
  * LLM can relay them politely; non-200 is reserved for transport/auth failures.
  */
 import { Response } from 'express';
-import { type AuthenticatedRequest } from '../../middleware/auth';
+import { type AuthenticatedRequest, getRbacIdentity } from '../../middleware/auth';
 import type { VerifiedUser } from '../../middleware/tenantMiddleware';
+import { findMasterUserById } from './masterUserRepository';
+
+/** Role fallback when neither the token nor master data supplies one: 'profile' = the browser-forwarded SAILERP
+ *  profile role (browser-trusted, explicit opt-in per environment); anything else = refuse. */
+const roleFallbackFromProfile = () => (process.env.ASSISTANT_ROLE_FALLBACK || '').trim().toLowerCase() === 'profile';
+
+/** The role claim name as configured for the login token (SAILERP_JWT_USER_CLAIMS = "id,role,userType"). */
+const ROLE_CLAIM = ((process.env.SAILERP_JWT_USER_CLAIMS || 'id,role,userType').split(',')[1] || 'role').trim();
 import { CHATBOT_TOOLS, executeTool, type VesselAccess } from '../../services/chatbotService';
 import { storage } from '../../storage';
 import { signIdentity, verifyIdentity } from './identityToken';
@@ -116,19 +124,48 @@ export async function handleMintToken(req: AuthenticatedRequest, res: Response) 
       error: 'cannot mint: no verified login identity on this request (multi-tenant mode with a SAILERP token is required)',
     });
   }
-  if (vu.missing.length) {
+  // Option B (25-Sep-2026, PROVEN on dev): the genuine SAILERP token carries `id` and `userType` but no `role`.
+  // The role is then resolved SERVER-SIDE from the tenant's synced SAILERP master data (master_users) by the
+  // verified user id — never from the browser's x-user-role header. A user absent from master data cannot mint.
+  const hardMissing = vu.missing.filter((c) => c !== ROLE_CLAIM);
+  if (hardMissing.length) {
     return res.status(403).json({
-      error: `cannot mint: the login token is missing required claim(s): ${vu.missing.join(', ')}`,
+      error: `cannot mint: the login token is missing required claim(s): ${hardMissing.join(', ')}`,
     });
   }
-  if (!allowedRoles().includes(vu.role!)) {
-    return res.status(403).json({ error: `cannot mint: role '${vu.role}' is not permitted to use the assistant` });
+  let role = vu.role;
+  let roleSource: 'token' | 'master_users' | 'profile-header' = 'token';
+  if (!role) {
+    const mu = await findMasterUserById(vu.userId!);
+    if (mu?.role) {
+      role = mu.role;
+      roleSource = 'master_users';
+    } else if (roleFallbackFromProfile()) {
+      // ASSISTANT_ROLE_FALLBACK=profile (25-Sep-2026, Ghazi's decision): for environments whose master data is not
+      // yet populated, accept the role the browser forwarded from the decrypted SAILERP profile (x-user-role →
+      // req.rbac.role). This is BROWSER-TRUSTED — the same trust the rest of the module applies — and is logged as
+      // such. Off by default; production decides separately.
+      const fwd = getRbacIdentity(req);
+      if (fwd.source === 'forwarded' && fwd.role) {
+        role = fwd.role;
+        roleSource = 'profile-header';
+      }
+    }
+    if (!role) {
+      return res.status(403).json({
+        error: `cannot mint: the login token carries no role and user '${vu.userId}' has no role in the synced master data (master_users)`,
+      });
+    }
   }
+  if (!allowedRoles().includes(role)) {
+    return res.status(403).json({ error: `cannot mint: role '${role}' is not permitted to use the assistant` });
+  }
+  console.log(`[assistant-api] mint user=${vu.userId} role=${role} (${roleSource}) userType=${vu.userType} iss=${instanceId()}`);
   const token = signIdentity(
     {
       userId: vu.userId!,
       userName: req.user?.fullName, // display/masking only (from the profile) — never used for authorisation
-      role: vu.role!, // VERIFIED token claim
+      role, // VERIFIED: token claim, or the synced master-data role for the verified user id
       userType: vu.userType, // VERIFIED token claim — the vessel-scope decision key
       vesselId: (req as any).user?.vesselId ?? null,
       tenantDomain: (req as any).tenantDomain ?? null,

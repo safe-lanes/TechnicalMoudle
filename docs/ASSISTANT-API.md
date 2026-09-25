@@ -149,7 +149,8 @@ tenant/database selection, cross-tenant refusal, missing/expired/tampered creden
 | Field(s) | Source | Verified by | Trust |
 |---|---|---|---|
 | `tenantDomain`, `tuid` | SAILERP login token, `domain` claim | HS256 signature with the shared `JWT_SECRET` (tenantMiddleware) | **Server-verified.** Cannot be set by the browser. |
-| `userId`, `role`, `userType` | SAILERP login token claims (`id`, `role`, `userType` — names configurable via `SAILERP_JWT_USER_CLAIMS`), read by tenantMiddleware from the SAME verified token and exposed as `req.verifiedUser` | Same HS256 signature | **Server-verified (Option A, pilot).** The mint reads ONLY these; the browser's `x-user-*` headers, the mock session and `req.rbac` are not consulted. A token missing any of the three claims cannot mint (403, no header fallback). |
+| `userId`, `userType` | SAILERP login token claims (`id`, `userType`; names configurable via `SAILERP_JWT_USER_CLAIMS`), read by tenantMiddleware from the SAME verified token and exposed as `req.verifiedUser` | Same HS256 signature | **Server-verified.** A token missing either cannot mint (403, no header fallback). |
+| `role` | 1) the token claim `role` if the login token carries one; 2) otherwise (**the genuine SAILERP token does NOT — PROVEN on dev 25-Sep-2026**) the role of the VERIFIED user id in the tenant's synced SAILERP master data (`master_users.role`); 3) otherwise, ONLY when the environment sets `ASSISTANT_ROLE_FALLBACK=profile`, the browser-forwarded profile role (`x-user-role`) | 1–2 server-verified; 3 browser-trusted (explicit opt-in, logged as `profile-header`) | Sources 1–2 cannot be set by the browser. Source 3 is the module's existing header trust, for environments whose master data is not yet populated; off by default; the role allow-list applies to every source. |
 | `userName` | Browser profile header | — | Display and masking only; never used for authorisation. |
 | `vesselId` | Session (null on the shore) | — | Ship users never reach the shore assistant; a Ship-type identity with no vessel is refused by the tools. |
 
@@ -164,9 +165,10 @@ product decides otherwise.
 token and therefore cannot mint at all (fail closed) — the assistant needs multi-tenant mode, which dev and
 production run.
 
-**`userType` — exactly where it comes from.** SAILERP supplies it in the signed login token AND in the
-encrypted `userProfile` in local storage (Ghazi, 24-Sep-2026). Since Option A the assistant reads it from the
-**token**; the rest of the module still reads the header. The server requires from SAILERP: an HS256 Bearer
+**Genuine-session result (dev, 25-Sep-2026, from the browser console — names only):** the SAILERP login token carries
+`id`, `userType` and `domain`; it does **not** carry `role` (the role is only in the browser profile). Hence Option B:
+the mint takes `id` and `userType` from the token and the role from `master_users` by that id. The rest of the module
+still reads the profile headers. The server requires from SAILERP: an HS256 Bearer
 signed with the shared `JWT_SECRET` carrying `domain`, and — for the assistant — `id`, `role`, `userType`
 (the exact claim names WILL BE confirmed by the §3.3 inspection, still pending; until then they are the Crewing-validated
 defaults, and a mismatch shows up as "missing required claim(s)", never as a silent header fallback).
@@ -211,7 +213,7 @@ Configuration required (no "zero configuration": trusted registration is the poi
 | Where | Setting |
 |---|---|
 | Assistant (AI server), once per instance | one entry in `ASSISTANT_MODULE_INSTANCES` (issuer id, module, env, exact URL, secret, signing key); `IDENTITY_SIGNING_KEY` = shared documentation key, distinct from every instance key |
-| Module instance (PM2 env) | `ASSISTANT_INSTANCE_ID` (= its issuer id), `ASSISTANT_IDENTITY_SIGNING_KEY` (= that entry's signing key), `ASSISTANT_SERVICE_SECRET` (= that entry's secret) |
+| Module instance (PM2 env) | `ASSISTANT_INSTANCE_ID` (= its issuer id), `ASSISTANT_IDENTITY_SIGNING_KEY` (= that entry's signing key), `ASSISTANT_SERVICE_SECRET` (= that entry's secret); optional `ASSISTANT_ROLE_FALLBACK=profile` (browser-trusted role when master data has none) |
 
 `ASSISTANT_MODULE_APIS` (module-keyed, one URL per module) is retired and ignored.
 
@@ -250,11 +252,12 @@ Before Option A the assistant answered as whoever the browser claimed to be (wit
 Two options made `userId` / `role` / `userType` server-verified without a new authentication architecture;
 A is implemented on the pilot, B remains available for the module's own guards:
 
-- **A. Trusted token claims — IMPLEMENTED on the pilot (24-Sep-2026, §3.2).** The mint reads user id, role
-  and userType from the verified token; headers are ignored; missing claims are refused. Remaining: the §3.3
-  inspection confirms the real claim names (set `SAILERP_JWT_USER_CLAIMS` if they differ), then the same
-  change deploys with the Data API. Extending the module's own RBAC guards to the verified claims is a
-  separate, larger decision.
+- **A. Trusted token claims — IMPLEMENTED (24-Sep-2026).** `id` and `userType` come from the verified token. The
+  §3.3 inspection (25-Sep, dev) showed the token has NO `role` claim.
+- **B. Server-side identity lookup — IMPLEMENTED for the role (25-Sep-2026).** `server/modules/assistant-api/masterUserRepository.ts`
+  resolves the role of the verified user id from the tenant's synced `master_users`; a user absent there cannot mint.
+  Requirement for every environment: the SAILERP master-data import must have populated `master_users` with the
+  users who use the assistant (id = SAILERP user id, role, user_type).
 - **B. Server-side identity lookup.** The tenant database already holds SAILERP's user and role tables:
   `master_users` (columns include `role`, `userType`, `designation`, `department`), `users` (`role`,
   `vesselId`), `admn_role_master` (`assignedRole`), `master_user_vessels` (user ↔ vessel). The mint (and, if
