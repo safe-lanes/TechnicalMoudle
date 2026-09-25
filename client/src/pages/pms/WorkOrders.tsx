@@ -49,6 +49,7 @@ import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
+import { formatWorkOrderExportDueValue } from "./workOrderExportDueValue";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1249,9 +1250,7 @@ const WorkOrders: React.FC = () => {
       type PostponedExcelRow = BaseExcelRow & { 'Postpone Until': string; 'Authorized By': string };
 
       const rows = exportList.map((wo, idx): BaseExcelRow | PostponedExcelRow => {
-        const dueDateStr = wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-');
+        const dueDateStr = formatWorkOrderExportDueValue(wo);
         const base: BaseExcelRow = {
           'S.No': idx + 1,
           'Component': wo.component || '-',
@@ -1339,9 +1338,7 @@ const WorkOrders: React.FC = () => {
       type PostponedPdfRow = BasePdfRow & { postponeUntil: string; authorizedBy: string };
 
       const data = exportList.map((wo, idx): BasePdfRow | PostponedPdfRow => {
-        const dueDateStr = wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-');
+        const dueDateStr = formatWorkOrderExportDueValue(wo);
         const base: BasePdfRow = {
           sNo: idx + 1,
           component: wo.component || '-',
