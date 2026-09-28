@@ -210,6 +210,14 @@ export async function getDefectApprovalSettings(_req: Request, res: Response) {
   }
 }
 
+export async function getDefectReportSettings(_req: Request, res: Response) {
+  try {
+    res.json(await defectsService.getDefectReportSettings());
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to fetch defect report settings');
+  }
+}
+
 export async function updateDefectApprovalSettings(req: Request, res: Response) {
   try {
     const body = approvalSettingsBodySchema.parse(req.body);

@@ -96,14 +96,26 @@ export interface DefectReportPdfData {
     dueDate: string;
     status: string;
   }>;
-  targetDateExtension?: {
+  /** EVERY extension, oldest first (Sahil E12, 28-Sep-2026 — was: the latest one only). */
+  targetDateExtensions: Array<{
     existingTargetDate: string;
     newTargetDate: string;
     reasonForExtension: string;
     approved: string;
     approvalDate: string;
     approverComments: string;
-  };
+  }>;
+  /** Rejected closure attempts — printed only when the Defects approval setting
+   *  'show rejected closures on the printed report' is on (Sahil F1). */
+  rejectedClosures?: Array<{
+    attemptNumber: string;
+    dateCompleted: string;
+    closedBy: string;
+    closureComment: string;
+    rejectedBy: string;
+    rejectedAt: string;
+    rejectionReason: string;
+  }>;
 
   confirmCompleted: boolean;
   dateCompleted: string;
@@ -1294,16 +1306,19 @@ class PDFReportGenerator {
       y += 8;
     }
 
-    if (defectData.targetDateExtension) {
+    const extensions = defectData.targetDateExtensions ?? [];
+    for (let extIndex = 0; extIndex < extensions.length; extIndex++) {
+      const ext = extensions[extIndex];
       y = this.checkPageBreak(y, 60);
 
       this.doc.setFontSize(10);
       this.doc.setFont('helvetica', 'bold');
       this.doc.setTextColor(...PDF_COLORS.textDark);
-      this.doc.text('B5. Target Date Extension', margin, y);
+      this.doc.text(extensions.length > 1
+        ? `B5. Target Date Extension ${extIndex + 1} of ${extensions.length}`
+        : 'B5. Target Date Extension', margin, y);
       y += 5;
 
-      const ext = defectData.targetDateExtension;
       y1 = this.addFormField(margin, y, 'Existing Target Date', ext.existingTargetDate, col2Width);
       y2 = this.addFormField(margin + col2Width, y, 'New Target Date', ext.newTargetDate, col2Width);
       y = Math.max(y1, y2) + 2;
@@ -1352,6 +1367,29 @@ class PDFReportGenerator {
     y1 = this.addFormField(margin, y, 'Verified By (Name)', defectData.verifiedByName, col2Width);
     y2 = this.addFormField(margin + col2Width, y, 'Verified By (Office Position)', defectData.verifiedByOfficePosition, col2Width);
     y = Math.max(y1, y2) + 2;
+
+    const rejected = defectData.rejectedClosures ?? [];
+    if (rejected.length > 0) {
+      y = this.checkPageBreak(y + 4, 40);
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setTextColor(...PDF_COLORS.textDark);
+      this.doc.text('C3. Rejected Closure Attempts', margin, y);
+      y += 5;
+      for (const attempt of rejected) {
+        y = this.checkPageBreak(y, 45);
+        y1 = this.addFormField(margin, y, 'Attempt', attempt.attemptNumber, col2Width);
+        y2 = this.addFormField(margin + col2Width, y, 'Date Completed', attempt.dateCompleted, col2Width);
+        y = Math.max(y1, y2) + 2;
+        y = this.addFormField(margin, y, 'Closed By', attempt.closedBy, contentWidth);
+        y = this.addFormField(margin, y, 'Closure Comment', attempt.closureComment, contentWidth);
+        y1 = this.addFormField(margin, y, 'Rejected By', attempt.rejectedBy, col2Width);
+        y2 = this.addFormField(margin + col2Width, y, 'Rejected On', attempt.rejectedAt, col2Width);
+        y = Math.max(y1, y2) + 2;
+        y = this.addFormField(margin, y, 'Rejection Reason', attempt.rejectionReason, contentWidth);
+        y += 4;
+      }
+    }
 
     this.addFooter(pageWidth, pageHeight, margin);
 

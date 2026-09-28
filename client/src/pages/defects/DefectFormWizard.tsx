@@ -1234,8 +1234,14 @@ export default function DefectFormWizard({
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     const data = form.getValues();
+    // Sahil F1: rejected closure attempts print only when the Defects approval setting is on.
+    let showRejectedClosures = false;
+    try {
+      const res = await fetch('/technical/api/defects/report-settings');
+      if (res.ok) showRejectedClosures = (await res.json())?.showRejectedClosuresOnReport === true;
+    } catch { /* print without the section */ }
     const vesselName = vessels.find((v: any) => v.id === data.vesselId)?.name || data.vesselName || '';
     const sourceName = findSourceById(data.source || '')?.name || data.source || '';
     const componentDisplay = data.componentHardwareLevel3 || '';
@@ -1251,7 +1257,6 @@ export default function DefectFormWizard({
       ? buildRootCauseText(rootCauseVal as { individualFactor: string[]; systemFactor: string[] })
       : String(rootCauseVal || '');
 
-    const lastExt = targetDateExtensions.length > 0 ? targetDateExtensions[targetDateExtensions.length - 1] : null;
 
     const pdfData: DefectReportPdfData = {
       reportId: currentDefect?.defectId || defectId,
@@ -1290,14 +1295,28 @@ export default function DefectFormWizard({
         dueDate: formatDate(a.dueDate),
         status: a.status || '',
       })),
-      targetDateExtension: lastExt ? {
-        existingTargetDate: formatDate(lastExt.existingTargetDate),
-        newTargetDate: formatDate(lastExt.newTargetDate),
-        reasonForExtension: lastExt.reasonForExtension || '',
-        approved: lastExt.status || '',
-        approvalDate: formatDate(lastExt.approvalDate),
-        approverComments: lastExt.approverComments || '',
-      } : undefined,
+      // Sahil E12: every extension, oldest first (was: the latest one only).
+      targetDateExtensions: targetDateExtensions.map((ext) => ({
+        existingTargetDate: formatDate(ext.existingTargetDate),
+        newTargetDate: formatDate(ext.newTargetDate),
+        reasonForExtension: ext.reasonForExtension || '',
+        approved: ext.status || '',
+        approvalDate: formatDate(ext.approvalDate),
+        approverComments: ext.approverComments || '',
+      })),
+      rejectedClosures: showRejectedClosures
+        ? [...(closureHistory.data ?? [])]
+            .sort((a, b) => Number(a.attemptNumber ?? 0) - Number(b.attemptNumber ?? 0))
+            .map((h) => ({
+              attemptNumber: String(h.attemptNumber ?? ''),
+              dateCompleted: formatDate(h.dateCompleted ?? ''),
+              closedBy: [h.closedByName, h.closedByRank].filter(Boolean).join(' — '),
+              closureComment: h.closureComment || '',
+              rejectedBy: [h.rejectedByName, h.rejectedByPosition].filter(Boolean).join(' — '),
+              rejectedAt: formatDate(h.rejectedAt ?? ''),
+              rejectionReason: h.rejectionReason || '',
+            }))
+        : undefined,
 
       confirmCompleted: data.confirmCompleted || false,
       dateCompleted: formatDate(data.dateCompleted),

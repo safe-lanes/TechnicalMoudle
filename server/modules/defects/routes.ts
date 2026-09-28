@@ -46,6 +46,9 @@ const defectsApprovalEdit = requirePermission('approval-workflow-defects', 'edit
 router.get('/defects/approval-settings', defectsApprovalView, asyncHandler(defectsCtrl.getDefectApprovalSettings));
 router.put('/defects/approval-settings', defectsApprovalEdit, asyncHandler(defectsCtrl.updateDefectApprovalSettings));
 router.get('/defects/approval-diagnostics', defectsApprovalView, asyncHandler(defectsCtrl.getDefectApprovalDiagnostics));
+// GET /defects/report-settings — read-only print options for anyone who can open a defect (Sahil E12/F1):
+// only the 'show rejected closures on the printed report' switch, nothing else from the settings row.
+router.get('/defects/report-settings', asyncHandler(defectsCtrl.getDefectReportSettings));
 
 // POST /defects — create new defect
 router.post('/defects', asyncHandler(defectsCtrl.createDefect));

@@ -63,6 +63,13 @@ export async function getDefectApprovalSettings() {
   return settings;
 }
 
+/** Print options only (E12/F1). A missing settings row (e.g. a ship, where the table is shore-local
+ *  and not synced) prints with the default: rejected closures hidden. */
+export async function getDefectReportSettings(): Promise<{ showRejectedClosuresOnReport: boolean }> {
+  const settings = await defectsRepo.getDefectApprovalSettings();
+  return { showRejectedClosuresOnReport: settings?.showRejectedClosuresOnReport === true };
+}
+
 export async function updateDefectApprovalSettings(
   values: { longExtensionDays: number; showRejectedClosuresOnReport: boolean },
   actorUserId?: string | null,
