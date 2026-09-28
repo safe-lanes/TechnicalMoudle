@@ -399,7 +399,7 @@ type DefectApprovalChain = {
   hasActiveWorkflow: boolean;
   scope: string;
   classification: string;
-  requestStatus: 'pending' | 'approved' | 'returned' | 'none';
+  requestStatus: 'pending' | 'approved' | 'returned' | 'withdrawn' | 'none';
   requestUuid: string | null;
   currentStepKey: string | null;
   steps: Array<{
@@ -719,6 +719,33 @@ export async function assertDefectEvidenceRules(current: any, body: any): Promis
       }
     }
   }
+}
+
+/**
+ * 28-Sep-2026 (Sahil E6): the SENDER withdrew a pending target-date extension. The entry becomes
+ * 'Withdrawn'; the target date is unchanged. Called by the approvals withdrawal service after the
+ * engine request was withdrawn (or when none was running). Written through the synced repo path.
+ */
+export async function withdrawExtensionEntry(duuid: string, entryId: string): Promise<void> {
+  const defect = await defectsRepo.getDefect(duuid);
+  if (!defect) throw Object.assign(new Error('Defect not found'), { statusCode: 404 });
+  const entries: defectsRepo.DefectExtensionEntryRecord[] = defect.targetDateExtensions ?? [];
+  const entry = entries.find((e) => e?.id === entryId);
+  if (!entry || entry.status !== 'Requested') {
+    throw Object.assign(new Error('Only a requested (pending) extension can be withdrawn.'), { statusCode: 409 });
+  }
+  const next = entries.map((e) => (e?.id === entryId ? { ...e, status: 'Withdrawn' as const, withdrawnAt: new Date().toISOString() } : e));
+  await defectsRepo.updateDefectExtensionEntries(duuid, next);
+}
+
+/** The requester of a defect extension entry (null for entries created before 28-Sep-2026). */
+export async function extensionEntrySender(defectRef: string, entryId: string): Promise<{ duuid: string; sender: string | null; status: string | null; vesselId: string | null } | null> {
+  const defect = await defectsRepo.getDefect(defectRef);
+  if (!defect) return null;
+  const entries: defectsRepo.DefectExtensionEntryRecord[] = defect.targetDateExtensions ?? [];
+  const entry = entries.find((e) => e?.id === entryId);
+  if (!entry) return null;
+  return { duuid: defect.duuid, sender: entry.requestedByUserId ?? null, status: entry.status ?? null, vesselId: defect.vesselId ?? null };
 }
 
 export async function updateDefect(id: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor) {

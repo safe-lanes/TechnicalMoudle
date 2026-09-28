@@ -16,6 +16,7 @@ import WOAgGridTable from '@/components/WOAgGridTable';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { queryClient } from '@/lib/queryClient';
+import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
 import { Label } from '@/components/ui/label';
 import { ChangeRequestModal } from '@/components/modify/ChangeRequestModal';
 import ApproveRejectModal from '@/pages/change-requests/ApproveRejectModal';
@@ -528,6 +529,14 @@ export function ModifyPMS() {
           </div>
         )}
 
+        {viewingRequest?.cruuid && (
+          <WithdrawRequestPanel subjectType="change-request" subjectRef={viewingRequest.cruuid} className="mb-2"
+            onWithdrawn={() => {
+              // The CR is back to draft: close the (now stale) review dialog and refresh the list.
+              queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests'] });
+              setViewingRequest(null);
+            }} />
+        )}
         <DialogFooter className="space-x-2">
           {/* View Changes Button - available for all requests */}
           {viewingRequest && (

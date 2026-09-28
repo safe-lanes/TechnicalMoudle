@@ -46,9 +46,12 @@ const extensionScopes = (): Scope[] => [extScope(), repeatExtScope()];
 type ExtensionEntry = {
   id: string; existingTargetDate: string; newTargetDate: string; reasonForExtension: string;
   submitForApprovalTo: string; submitForApprovalToName: string;
-  status: 'Requested' | 'Approved' | 'Rejected';
+  status: 'Requested' | 'Approved' | 'Rejected' | 'Withdrawn';
   approved?: boolean; approvalDate: string; approverComments: string;
   electronicConfirmation?: string; requestedAt: string;
+  /** 28-Sep-2026 (E6): who asked — set by the SERVER from the verified actor on a new entry. */
+  requestedByUserId?: string | null;
+  withdrawnAt?: string;
 };
 const entriesHaveRequested = (entries: unknown): boolean =>
   Array.isArray(entries) && entries.some((entry: any) => entry?.status === 'Requested');
@@ -478,7 +481,9 @@ export async function gateDefectUpdate(
     for (const e of entries) {
       const cur = currentById.get(e.id);
       if (!cur) {
-        // NEW entry
+        // NEW entry — 28-Sep-2026 (E6): record the requester from the verified actor (never the
+        // browser's value), so only that user can later withdraw it.
+        e.requestedByUserId = actor.userUuid ?? null;
         if (onShip) {
           if (e.status !== 'Requested' || e.approved !== undefined) downgradeToRequested(e); // ship = submit-only (approved deviation)
           continue; // engine is shore-only; the arrival sweep submits after sync
@@ -518,6 +523,11 @@ export async function gateDefectUpdate(
         }
         continue;
       }
+      // E6: the requester / withdrawal stamps are server-owned — keep the stored values whatever the browser sent.
+      e.requestedByUserId = cur.requestedByUserId;
+      e.withdrawnAt = cur.withdrawnAt;
+      if (e.requestedByUserId === undefined) delete e.requestedByUserId;
+      if (e.withdrawnAt === undefined) delete e.withdrawnAt;
       const isDecision = cur.status === 'Requested' && (e.status === 'Approved' || e.status === 'Rejected');
       if (e.status !== undefined && e.status !== cur.status && !isDecision) {
         throw new AppError(409,

@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
+import { queryClient as woQueryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -576,6 +578,14 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Postpone Work Order</DialogTitle>
+          {workOrder?.id && (workOrder.status === 'Awaiting Office Approval' || workOrder.computedStatus === 'Awaiting Office Approval') && (
+            <WithdrawRequestPanel subjectType="wo-postponement" subjectRef={workOrder.id}
+              onWithdrawn={() => {
+                // E6: the WO is back to its original date — refresh every work-order list, then close.
+                void woQueryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? '').startsWith('/technical/api/work-orders') });
+                onClose();
+              }} />
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-1">

@@ -12,6 +12,10 @@ export async function getChangeRequests(filters?: { category?: string; status?: 
   return storage.getChangeRequests(filters);
 }
 
+export async function getChangeRequestByUuid(cruuid: string): Promise<ChangeRequest | undefined> {
+  return storage.getChangeRequestByUuid(cruuid);
+}
+
 export async function getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
   return storage.getChangeRequest(id);
 }

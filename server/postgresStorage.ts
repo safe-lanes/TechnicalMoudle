@@ -6090,6 +6090,11 @@ export class PostgresStorage {
     return result[0];
   }
 
+  async getChangeRequestByUuid(cruuid: string): Promise<ChangeRequest | undefined> {
+    const db = await getDb();
+    return (await db.select().from(changeRequest).where(eq(changeRequest.cruuid, cruuid)).limit(1))[0];
+  }
+
   async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
     const db = await getDb();
     const result = await db.insert(changeRequest).values({

@@ -202,7 +202,7 @@ export class DrizzleApprovalRepository implements ApprovalRepository {
     });
   }
 
-  async finalizeRequest(requuid: string, status: 'approved' | 'returned'): Promise<boolean> {
+  async finalizeRequest(requuid: string, status: 'approved' | 'returned' | 'withdrawn'): Promise<boolean> {
     const updated = await this.db.update(apprvRequests)
       .set({ status, finalizedAt: new Date(), currentNodeKey: null })
       .where(and(eq(apprvRequests.requuid, requuid), eq(apprvRequests.status, 'pending')))

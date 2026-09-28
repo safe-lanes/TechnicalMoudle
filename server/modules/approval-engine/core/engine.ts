@@ -178,6 +178,32 @@ export class ApprovalEngine {
     return { requuid, outcome };
   }
 
+  /**
+   * WITHDRAW (28-Sep-2026, Sahil E6 / Q8: "only the sender"). Ends a PENDING request as 'withdrawn':
+   * every open slot is superseded (never deleted), approvers of the active step are told via the
+   * 'request-withdrawn' event. The card's onDecision is NOT called — the module that asked for the
+   * withdrawal resets its own record. Who may withdraw is decided by the host module (it knows the
+   * sender of its record); the engine only refuses a request that is no longer pending (409).
+   */
+  async withdraw(ctx: EngineCtx, requuid: string, reason: string | null): Promise<{ requuid: string; status: 'withdrawn' }> {
+    const repo = this.repo(ctx);
+    const request = await repo.getRequest(requuid);
+    if (!request) err(404, 'NOT_FOUND', `request ${requuid} not found`);
+    if (request!.status !== 'pending') {
+      err(409, 'ALREADY_DECIDED', `request ${requuid} is already ${request!.status}`);
+    }
+    const slots = await repo.getSlots(requuid);
+    const approverUserIds = Array.from(new Set(slots.filter((s) => s.status === 'active').flatMap((s) => s.resolvedApproverIds ?? [])));
+    const transitioned = await repo.finalizeRequest(requuid, 'withdrawn');
+    if (!transitioned) err(409, 'ALREADY_DECIDED', `request ${requuid} was decided meanwhile`);
+    await repo.applySlotUpdates(requuid, slots
+      .filter((s) => s.status === 'active' || s.status === 'pending')
+      .map((s) => ({ nodeKey: s.nodeKey, slotOrdinal: s.slotOrdinal, status: 'superseded' as const })), null);
+    this.emit({ type: 'request-withdrawn', tenantId: ctx.tenantId, requuid, scope: request!.scope, subjectRef: request!.subjectRef,
+      withdrawnBy: ctx.actor.userId, approverUserIds, reason });
+    return { requuid, status: 'withdrawn' };
+  }
+
   // ── decide ─────────────────────────────────────────────────────────────────
   async decide(ctx: EngineCtx, requuid: string, input: DecideInput): Promise<DecideResult> {
     const repo = this.repo(ctx);

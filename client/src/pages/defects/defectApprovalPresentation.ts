@@ -84,7 +84,7 @@ export function projectExtensionCardPresentation(input: {
       ? `Extension — ${normalizedStatus}`
       : `Extension ${input.index + 1} of ${input.total} — ${normalizedStatus}`,
     expanded: input.current || input.total === 1,
-    readOnly: ["APPROVED", "REJECTED", "RETURNED"].includes(normalizedStatus),
+    readOnly: ["APPROVED", "REJECTED", "RETURNED", "WITHDRAWN"].includes(normalizedStatus),
     reasonForExtension: input.reasonForExtension || "Not recorded",
   };
 }
@@ -135,7 +135,8 @@ export type DefectExtensionUiState =
   | "requester-pending"
   | "approver-pending"
   | "approved"
-  | "rejected";
+  | "rejected"
+  | "withdrawn";
 
 export function resolveEffectiveExtensionRequestStatus(
   localStatus?: string | null,
@@ -145,6 +146,8 @@ export function resolveEffectiveExtensionRequestStatus(
   if (normalizedChain && ["approved", "rejected", "returned"].includes(normalizedChain)) {
     return normalizedChain;
   }
+  // E6 (28-Sep-2026): the sender withdrew the entry — terminal, whatever the chain says.
+  if (localStatus?.toLowerCase() === "withdrawn") return "withdrawn";
   if (localStatus?.toLowerCase() === "requested") return "pending";
   return normalizedChain ?? localStatus?.toLowerCase() ?? null;
 }
@@ -162,7 +165,7 @@ export function resolveDefectExtensionUi(input: {
   showSubmit: boolean;
 } {
   const status = String(input.requestStatus ?? "pending").toLowerCase();
-  const isTerminal = status === "approved" || status === "rejected" || status === "returned";
+  const isTerminal = status === "approved" || status === "rejected" || status === "returned" || status === "withdrawn";
   if (input.formOpen && (!input.hasStoredExtension || isTerminal)) {
     return {
       state: "draft-preview",
@@ -182,6 +185,9 @@ export function resolveDefectExtensionUi(input: {
   }
   if (status === "rejected" || status === "returned") {
     return { state: "rejected", showContainer: true, fieldsReadOnly: true, showSubmit: false };
+  }
+  if (status === "withdrawn") {
+    return { state: "withdrawn", showContainer: true, fieldsReadOnly: true, showSubmit: false };
   }
   return {
     state: input.currentUserCanDecide ? "approver-pending" : "requester-pending",

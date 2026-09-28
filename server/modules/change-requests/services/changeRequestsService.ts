@@ -475,6 +475,29 @@ async function supersedeLegacyCrSteps(id: number, outcome: 'approved' | 'rejecte
   }
 }
 
+/**
+ * 28-Sep-2026 (Sahil E6): the SENDER withdrew this change request — back to 'draft' so it can be
+ * edited and sent again. Called by the approvals withdrawal service AFTER the engine request was
+ * withdrawn (or when none was running). Old pending Level 1/2 rows are marked Superseded.
+ */
+export async function withdrawChangeRequest(id: number): Promise<void> {
+  const cr = await crRepo.getChangeRequest(id);
+  if (!cr) throw new NotFoundError('Change request not found');
+  if (cr.status !== 'submitted') {
+    throw new ConflictError(`Change request ${id} is ${cr.status}; only a submitted request can be withdrawn.`, { code: 'CR_NOT_SUBMITTED' });
+  }
+  await supersedeLegacyCrSteps(id, 'rejected');
+  await crRepo.updateChangeRequest(id, { status: 'draft' });
+}
+
+/** The sender of a change request (the user who submitted it). */
+export async function changeRequestSender(cruuid: string): Promise<{ id: number; sender: string | null; status: string; vesselId: string | null; functionId: string | null } | null> {
+  const cr = await crRepo.getChangeRequestByUuid(cruuid);
+  if (!cr) return null;
+  const { functionId } = await classifyChangeRequestScope(cr);
+  return { id: cr.id, sender: cr.requestedByUserId ?? null, status: cr.status, vesselId: cr.vesselId ?? null, functionId };
+}
+
 // ── Approval Steps ──
 
 export async function getApprovalSteps(changeRequestId: number) {

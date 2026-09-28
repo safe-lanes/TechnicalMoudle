@@ -30,6 +30,20 @@ export async function updateDefect(id: string, updates: Partial<InsertDefect>): 
   return storage.updateDefect(id, updates);
 }
 
+/**
+ * Write a defect's extension entries including the 'Withdrawn' status (E6, 28-Sep-2026).
+ * The column is JSON; shared/schema.ts types the entry status as Requested/Approved/Rejected only
+ * and is not changed during module work, so the wider entry shape is asserted here, in one place.
+ */
+export type DefectExtensionEntryRecord = Omit<NonNullable<Defect['targetDateExtensions']>[number], 'status'> & {
+  status: 'Requested' | 'Approved' | 'Rejected' | 'Withdrawn';
+  requestedByUserId?: string | null;
+  withdrawnAt?: string;
+};
+export async function updateDefectExtensionEntries(id: string, entries: DefectExtensionEntryRecord[]): Promise<Defect> {
+  return storage.updateDefect(id, { targetDateExtensions: entries } as Partial<InsertDefect>);
+}
+
 export async function deleteDefect(id: string): Promise<void> {
   return storage.deleteDefect(id);
 }

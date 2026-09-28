@@ -60,7 +60,7 @@ export interface StoredWorkflowSummary {
 }
 
 // ── Requests / progress ──────────────────────────────────────────────────────
-export type RequestStatus = 'pending' | 'approved' | 'returned';
+export type RequestStatus = 'pending' | 'approved' | 'returned' | 'withdrawn';
 export type SlotStatus = 'pending' | 'active' | 'approved' | 'rejected' | 'superseded';
 
 export interface RequestRow {
@@ -140,7 +140,9 @@ export interface DecideResult {
 export type EngineEvent =
   | { type: 'step-activated'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; nodeKey: string; approverUserIds: string[] }
   | { type: 'request-completed'; tenantId: string; requuid: string; scope: Scope; subjectRef: string }
-  | { type: 'request-returned'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; returnedBy: string; remarks: string | null };
+  | { type: 'request-returned'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; returnedBy: string; remarks: string | null }
+  /** 28-Sep-2026: the SENDER withdrew a pending request; approverUserIds = the active step's approvers. */
+  | { type: 'request-withdrawn'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; withdrawnBy: string; approverUserIds: string[]; reason: string | null };
 
 // ── Card contract (v3 §A4) — the module adapter ─────────────────────────────
 export interface CardScope {

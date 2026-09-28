@@ -90,7 +90,7 @@ export async function subjectLine(scope: Scope, subjectRef: string, vesselId: st
 /** Insert in-app rows + email the recipients. Returns nothing; logs + stores email status. */
 export async function notifyUsers(userIds: string[], base: {
   requuid: string; scope: Scope; subjectRef: string; vesselId: string | null;
-  kind: 'pending-approval' | 'approved' | 'returned' | 'stalled-no-approver'; title: string; message: string;
+  kind: 'pending-approval' | 'approved' | 'returned' | 'stalled-no-approver' | 'withdrawn'; title: string; message: string;
 }): Promise<void> {
   const unique = Array.from(new Set(userIds.filter(Boolean)));
   if (unique.length === 0) return;
@@ -217,6 +217,21 @@ export function approvalEventNotifier(evt: EngineEvent): void {
           });
         }
         await auditRow('approval_request_returned', evt, { returnedBy: evt.returnedBy, remarks: evt.remarks, tenantId: evt.tenantId });
+      } else if (evt.type === 'request-withdrawn') {
+        // 28-Sep-2026 (Sahil E6): tell the approvers who had it waiting that the sender withdrew it.
+        const info = await requestInfo(evt.tenantId, evt.scope, evt.subjectRef, evt.requuid);
+        const subject = await subjectLine(evt.scope, evt.subjectRef, info.vesselId);
+        await notifyUsers(evt.approverUserIds, {
+          requuid: evt.requuid, scope: evt.scope, subjectRef: evt.subjectRef, vesselId: info.vesselId,
+          kind: 'withdrawn',
+          title: `Withdrawn: ${label(evt.scope)} — ${subject}`,
+          message: `This ${label(evt.scope).toLowerCase()} was withdrawn by the sender and no longer needs your approval.${evt.reason ? `
+
+Reason: ${evt.reason}` : ''}
+
+${subject}`,
+        });
+        await auditRow('approval_request_withdrawn', evt, { withdrawnBy: evt.withdrawnBy, reason: evt.reason, tenantId: evt.tenantId });
       }
     } catch (e) {
       console.error('[approvals] notifier failed (approval unaffected):', e);

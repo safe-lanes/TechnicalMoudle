@@ -173,6 +173,12 @@ export async function getEngineRequest(requuid: string): Promise<(RequestRow & {
   return engine.getRequest(engineCtx(null), requuid);
 }
 
+/** Withdraw a pending request (the host module has already checked the sender). */
+export async function withdrawEngineRequest(requuid: string, actorUserId: string | null, reason: string | null): Promise<void> {
+  if (!engine) throw new AppError(503, 'The approval engine is not available on this server.');
+  try { await engine.withdraw(engineCtx(actorUserId), requuid, reason); } catch (e) { translate(e); }
+}
+
 /** Re-deliver a finished request's decision to its module (diagnostics "Apply again"). */
 export async function replayEngineDecision(requuid: string, actorUserId: string | null): Promise<{ requuid: string; outcome: 'approved' | 'returned' }> {
   if (!engine) throw new AppError(503, 'The approval engine is not available on this server.');
@@ -317,6 +323,16 @@ export async function approvalArrivalSweep(vesselId: string): Promise<{ submitte
   const { changeRequest, workOrders, workOrderPostponements } = await import('@shared/schema');
   const { and, eq } = await import('drizzle-orm');
   let submitted = 0;
+
+  // E6 (28-Sep-2026): sender withdrawals that arrived with this sync are settled FIRST, so a request
+  // sent and then withdrawn on board never starts a chain (and a running one is cancelled).
+  try {
+    const { processOpenWithdrawals } = await import('./approvalWithdrawalService');
+    const settled = await processOpenWithdrawals(vesselId);
+    if (settled > 0) console.log(`[approvals] arrival sweep vessel ${vesselId}: ${settled} withdrawal(s) settled`);
+  } catch (e) {
+    console.error(`[approvals] withdrawal sweep failed for vessel ${vesselId} (non-fatal):`, e);
+  }
 
   const crs = await db.select().from(changeRequest)
     .where(and(eq(changeRequest.vesselId, vesselId), eq(changeRequest.status, 'submitted')));

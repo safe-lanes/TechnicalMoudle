@@ -12,6 +12,7 @@ import type { AuthenticatedRequest } from '../../middleware/auth';
 import { requireRole } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import * as diagnosticsCtrl from './approvalDiagnosticsController';
+import * as withdrawalCtrl from './approvalWithdrawalController';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
@@ -90,6 +91,13 @@ router.get('/approvals/diagnostics',
 router.post('/approvals/diagnostics/:requuid/reapply',
   asyncHandler(diagnosticsCtrl.guardReapply),
   asyncHandler(diagnosticsCtrl.reapply));
+
+// ── Sender withdrawals (28-Sep-2026, Sahil E6) ──
+// POST — the SENDER withdraws a pending CR / WO postponement / defect extension (sender checked in the
+// service; ship rows are cancelled by the office when they arrive). GET ?subjectRef= — history + notes.
+router.get('/approvals/withdrawals/status', asyncHandler(withdrawalCtrl.getWithdrawalStatus));
+router.post('/approvals/withdrawals', asyncHandler(withdrawalCtrl.createWithdrawal));
+router.get('/approvals/withdrawals', asyncHandler(withdrawalCtrl.listWithdrawals));
 
 // GET /approvals/notifications/count — unread badge
 router.get('/approvals/notifications/count', asyncHandler(async (req, res) => {

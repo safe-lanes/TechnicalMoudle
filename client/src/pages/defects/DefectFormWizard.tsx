@@ -36,6 +36,7 @@ import {
   useDefectApprovalChain,
   type DefectApprovalChain,
 } from "@/components/approvals/ApprovalChainProgress";
+import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
 import {
   Form,
   FormControl,
@@ -706,7 +707,9 @@ export default function DefectFormWizard({
     ? "Approved"
     : effectiveExtensionStatus === "rejected" || effectiveExtensionStatus === "returned"
       ? "Rejected"
-      : displayedExtension?.status;
+      : effectiveExtensionStatus === "withdrawn"
+        ? "Withdrawn"
+        : displayedExtension?.status;
   const hasPendingExtension = extensionUi.state === "requester-pending" || extensionUi.state === "approver-pending";
   const hasPendingExtensionRequest = hasPendingExtensionForEntries(targetDateExtensions, currentExtensionChain);
   const latestExtensionIndex = latestExtension
@@ -2349,6 +2352,13 @@ export default function DefectFormWizard({
                                     approval={currentExtensionApproval}
                                     canEdit={canEditDefect && !isViewMode && String(displayedExtensionStatus ?? "").toLowerCase() === "requested"}
                                   />
+                                )}
+                                {approvalDefectId && displayedExtension.id && (
+                                  <WithdrawRequestPanel subjectType="defect-extension" subjectRef={String(approvalDefectId)} extensionId={displayedExtension.id}
+                                    onWithdrawn={() => {
+                                      void queryClient.invalidateQueries({ queryKey: ['defects'] });
+                                      void queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? '').startsWith('/technical/api/defects/') });
+                                    }} />
                                 )}
                               </>
                             )}

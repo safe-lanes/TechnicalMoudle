@@ -81,7 +81,7 @@ export const NotificationBell: React.FC = () => {
   // ── Approval notifications (Phase 2 follow-up — Sahil: in-app + email) ──
   // Per-user inbox rows written by the approval engine's notifier on shore. Fail-soft:
   // on ships / errors these return empty and only the alerts section renders, as before.
-  interface ApprovalNotification { anuuid: string; kind: 'pending-approval' | 'approved' | 'returned' | 'stalled-no-approver'; title: string; readAt: string | null; createdAt: string; }
+  interface ApprovalNotification { anuuid: string; kind: 'pending-approval' | 'approved' | 'returned' | 'stalled-no-approver' | 'withdrawn'; title: string; readAt: string | null; createdAt: string; }
   // F1 fix: key the query on the authenticated user's UUID and gate with `enabled`.
   // The server scopes these rows by req.user.userUuid (forwarded x-user-id header). On a
   // fresh page load this bell's child effect runs BEFORE AuthProvider's setActiveIdentity,
@@ -202,7 +202,7 @@ export const NotificationBell: React.FC = () => {
                     data-testid={`approval-notification-${r.anuuid}`}
                   >
                     <div className="flex items-start gap-2">
-                      <span className="mt-1.5 inline-block flex-shrink-0" style={{ width: 8, height: 8, borderRadius: 4, background: r.kind === 'pending-approval' ? '#2e90fa' : r.kind === 'approved' ? '#12b76a' : r.kind === 'stalled-no-approver' ? '#f79009' : '#f04438' }} />
+                      <span className="mt-1.5 inline-block flex-shrink-0" style={{ width: 8, height: 8, borderRadius: 4, background: r.kind === 'pending-approval' ? '#2e90fa' : r.kind === 'approved' ? '#12b76a' : r.kind === 'stalled-no-approver' ? '#f79009' : r.kind === 'withdrawn' ? '#98a2b3' : '#f04438' }} />
                       <div className="min-w-0">
                         <div className="text-sm text-gray-800 leading-snug">{r.title}</div>
                         <div className="text-xs text-gray-400 mt-0.5">{formatTimeAgo(r.createdAt)}</div>

@@ -446,6 +446,7 @@ export interface IStorage {
   // Change Request methods
   getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string; pendingForApprover?: string }): Promise<ChangeRequest[]>;
   getChangeRequest(id: number): Promise<ChangeRequest | undefined>;
+  getChangeRequestByUuid(cruuid: string): Promise<ChangeRequest | undefined>;
   createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest>;
   updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest>;
   updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest>;

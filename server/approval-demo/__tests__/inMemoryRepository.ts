@@ -82,7 +82,7 @@ export class InMemoryApprovalRepository implements ApprovalRepository {
       if (r) r.currentNodeKey = setCurrentNodeKey;
     }
   }
-  async finalizeRequest(requuid: string, status: 'approved' | 'returned'): Promise<boolean> {
+  async finalizeRequest(requuid: string, status: 'approved' | 'returned' | 'withdrawn'): Promise<boolean> {
     const r = this.requests.get(requuid);
     if (!r || r.status !== 'pending') return false;   // single-fire guard, same as the SQL transition
     r.status = status; r.finalizedAt = new Date().toISOString(); r.currentNodeKey = null;

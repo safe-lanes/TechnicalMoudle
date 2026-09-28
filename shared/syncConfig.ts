@@ -749,6 +749,18 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: null,
     notes: 'Defect corrective actions. Vessel scope resolved via parent defect FK.',
   },
+  approval_withdrawals: {
+    tableName: 'approval_withdrawals',
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'awuuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: false,
+    businessRules: 'Disjoint writers: the sender (ship or shore) inserts; the shore writes the outcome after cancelling the approval.',
+    notes: 'Sender withdrawals of pending approvals (migration 178, 28-Sep-2026, Sahil E6). A ship withdrawal travels to shore by sync; the shore cancels the engine request and resets the record, and the outcome (withdrawn / too-late / refused) travels back.',
+  },
   defect_closure_history: {
     tableName: 'defect_closure_history',
     category: 'ONE_WAY_SHORE_TO_SHIP',
@@ -1815,6 +1827,8 @@ export function getSyncPhaseOrder(): string[][] {
      'spares_history', 'spare_location_stock', 'spare_component_links',
      'stores_ledger', 'inventory_transactions',
      'change_request_attachment', 'change_request_comment', 'change_request_approval',
+     // 178: sender withdrawals reference CR / WO / defect subjects (no FK) — after their parents.
+     'approval_withdrawals',
      // rotation_history references rotational_items (riuuid) + components — Phase 4 after Phase 3 parents.
      'rotation_history',
      'ihm_maintenance_log', 'component_documents', 'component_requisitions',

@@ -37,7 +37,7 @@ export interface ApprovalRepository {
    * pending → terminal transition. Returns true ONLY for the call that actually
    * transitioned the row (single-fire guard for onDecision).
    */
-  finalizeRequest(requuid: string, status: 'approved' | 'returned'): Promise<boolean>;
+  finalizeRequest(requuid: string, status: 'approved' | 'returned' | 'withdrawn'): Promise<boolean>;
   /** Active slots whose resolved approver ids contain userId, joined to their requests. */
   pendingSlotsForUser(userId: string): Promise<PendingItem[]>;
 }

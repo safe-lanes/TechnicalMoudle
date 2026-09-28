@@ -1,4 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
+import { getRequestContext } from '../../../middleware/requestContext';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
@@ -3174,6 +3175,30 @@ export async function classifyWoForPostponement(wo: any): Promise<{
 }
 
 /**
+ * 28-Sep-2026 (Sahil E6): the SENDER withdrew a pending postponement / re-postponement request. The WO
+ * goes back exactly as on a rejection (status recomputed from the original due date; a re-postponement
+ * restores the due date it had), and the decision row is recorded as 'Withdrawn'. Called by the
+ * approvals withdrawal service after the engine request was withdrawn (or when none was running).
+ */
+export async function withdrawPostponementRequest(wouuid: string, actor: { userUuid: string; name: string | null }): Promise<void> {
+  const wo = await repo.findById(wouuid);
+  if (!wo) throw new NotFoundError('Work order not found');
+  const rows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const isRe = (rows ?? []).some((r: any) => r.status === 'Approved');
+  const body = { approvedBy: actor.name || actor.userUuid, userUuid: actor.userUuid, approvalRemarks: 'Withdrawn by the sender' };
+  if (isRe) await rejectRePostponement(wo.id, body, { viaEngine: true, withdrawn: true });
+  else await rejectPostponement(wo.id, body, { viaEngine: true, withdrawn: true });
+}
+
+/** The sender of the waiting postponement request (created_by_uuid of its 'Awaiting Approval' row). */
+export async function postponementRequestSender(woRef: string): Promise<{ wouuid: string; sender: string | null; status: string | null; vesselId: string | null } | null> {
+  const wo = await repo.findById(woRef);
+  if (!wo) return null;
+  const awaiting = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  return { wouuid: wo.wouuid, sender: awaiting?.createdByUuid ?? null, status: wo.status ?? null, vesselId: wo.vesselId ?? null };
+}
+
+/**
  * 25-Sep-2026 — a postponement submitted before the old ticks were retired may still carry
  * Pending Level 1 / Level 2 rows in wo_postponement_approvals. The engine's final decision
  * replaces them: mark them Superseded (history kept, nothing deleted).
@@ -3248,6 +3273,8 @@ export async function submitPostponeRequest(id: string, body: any) {
     status: 'Awaiting Approval',
     informOffice: true,
     approvalWorkflowSnapshot,
+    // 28-Sep-2026 (E6): the sender — the only user who may withdraw this request.
+    createdByUuid: getRequestContext()?.userId ?? body.userId ?? null,
   });
 
   // Start the engine chain (shore; no-op on a ship — the chain starts on shore after sync).
@@ -3371,7 +3398,7 @@ export async function approvePostponement(id: string, body: any, opts: { viaEngi
  * Records the rejection on the active approval step (if any), reverts WO status to Due/Overdue,
  * and inserts a NEW immutable decision row in work_order_postponements.
  */
-export async function rejectPostponement(id: string, body: any, opts: { viaEngine?: boolean } = {}) {
+export async function rejectPostponement(id: string, body: any, opts: { viaEngine?: boolean; withdrawn?: boolean } = {}) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
   if (!wo) throw new NotFoundError('Work order not found');
@@ -3462,7 +3489,7 @@ export async function rejectPostponement(id: string, body: any, opts: { viaEngin
     approver: body.approvedBy || 'Office',
     durationDays: latestReject?.durationDays || null,
     submittedDate: today,
-    status: 'Rejected',
+    status: opts.withdrawn ? 'Withdrawn' : 'Rejected', // 28-Sep-2026 (E6): sender withdrawal reuses the reject revert
     informOffice: true,
   });
 
@@ -3543,6 +3570,8 @@ async function createRePostponementRecord(wo: any, body: any, dueDateSnapshot: s
     informOffice: true,
     approvalWorkflowSnapshot,
     requestType: 'Re-Postponement',
+    // 28-Sep-2026 (E6): the sender — the only user who may withdraw this request.
+    createdByUuid: getRequestContext()?.userId ?? body.userId ?? null,
   } as any);
 
   return updatedWO;
@@ -3703,7 +3732,7 @@ export async function approveRePostponement(id: string, body: any, opts: { viaEn
  * the WO was already in 'Postponement Approved' before the re-postponement was
  * submitted, and it must return to that state unconditionally.
  */
-export async function rejectRePostponement(id: string, body: any, opts: { viaEngine?: boolean } = {}) {
+export async function rejectRePostponement(id: string, body: any, opts: { viaEngine?: boolean; withdrawn?: boolean } = {}) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
   if (!wo) throw new NotFoundError('Work order not found');
@@ -3782,7 +3811,7 @@ export async function rejectRePostponement(id: string, body: any, opts: { viaEng
     approver: body.approvedBy || 'Office',
     durationDays: latestReject?.durationDays || null,
     submittedDate: today,
-    status: 'Rejected',
+    status: opts.withdrawn ? 'Withdrawn' : 'Rejected', // E6 withdrawal
     informOffice: true,
     requestType: 'Re-Postponement',
   } as any);
