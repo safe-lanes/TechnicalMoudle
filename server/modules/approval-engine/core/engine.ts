@@ -150,6 +150,34 @@ export class ApprovalEngine {
     }
   }
 
+  /**
+   * Re-deliver a FINISHED request's decision to its card (25/28-Sep-2026, Sahil C5: "apply again").
+   * The engine commits the terminal state BEFORE card.onDecision; if onDecision failed, the request
+   * says approved/returned while the module record still waits — nothing retries it. This re-runs
+   * onDecision with the stored outcome and the deciding slot's identity. Cards are idempotent
+   * (already-applied answers are a no-op), so a replay of an applied decision changes nothing.
+   * Does not change the engine's own state.
+   */
+  async replayDecision(ctx: EngineCtx, requuid: string): Promise<{ requuid: string; outcome: 'approved' | 'returned' }> {
+    const repo = this.repo(ctx);
+    const request = await repo.getRequest(requuid);
+    if (!request) err(404, 'NOT_FOUND', `request ${requuid} not found`);
+    if (request!.status !== 'approved' && request!.status !== 'returned') {
+      err(409, 'NOT_FINISHED', `request ${requuid} is ${request!.status}; only a finished request can be applied again`);
+    }
+    const { card } = this.cardFor(request!.scope);
+    const slots = await repo.getSlots(requuid);
+    const decisive = slots
+      .filter((s) => (s.status === 'approved' || s.status === 'rejected') && s.decidedAt)
+      .sort((a, b) => Date.parse(b.decidedAt!) - Date.parse(a.decidedAt!))[0];
+    const outcome = request!.status as 'approved' | 'returned';
+    await card.onDecision({ tenantId: ctx.tenantId }, {
+      requuid, scope: request!.scope, classification: request!.classification, subjectRef: request!.subjectRef,
+      outcome, decidedBy: decisive?.decidedBy ?? ctx.actor.userId, remarks: decisive?.remarks ?? null,
+    });
+    return { requuid, outcome };
+  }
+
   // ── decide ─────────────────────────────────────────────────────────────────
   async decide(ctx: EngineCtx, requuid: string, input: DecideInput): Promise<DecideResult> {
     const repo = this.repo(ctx);
@@ -263,6 +291,12 @@ export class ApprovalEngine {
     const repo = this.repo(ctx);
     const rows = orderRequestsNewestFirst(await repo.listBySubject(scope, subjectRef));
     return Promise.all(rows.map(async (r) => ({ ...r, slots: await repo.getSlots(r.requuid) })));
+  }
+  /** Read-only: one request with its slots, or null. */
+  async getRequest(ctx: EngineCtx, requuid: string): Promise<(RequestRow & { slots: RequestSlotRow[] }) | null> {
+    const repo = this.repo(ctx);
+    const r = await repo.getRequest(requuid);
+    return r ? { ...r, slots: await repo.getSlots(requuid) } : null;
   }
   /** Read-only: every pending request with its slots (host health checks / diagnostics). */
   async pendingRequests(ctx: EngineCtx): Promise<Array<RequestRow & { slots: RequestSlotRow[] }>> {

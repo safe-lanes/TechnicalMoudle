@@ -10,6 +10,8 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { asyncHandler } from '../shared/middleware';
 import type { AuthenticatedRequest } from '../../middleware/auth';
 import { requireRole } from '../../middleware/auth';
+import { requirePermission } from '../../middleware/permissions';
+import * as diagnosticsCtrl from './approvalDiagnosticsController';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
@@ -77,6 +79,17 @@ router.put('/approvals/email-config',
     await setApprovalEmailEnabled(enabled, actor); // repository write + field log (Sahil E4)
     res.json({ ...emailConfigStatus(), emailEnabled: enabled });
   }));
+
+// ── Approval diagnostics (28-Sep-2026, Sahil C3/C4/C5) ──
+// GET — read-only health checks for Technical + failed updates across modules (Access Control view).
+// POST …/reapply — "Apply again": re-deliver a finished request's decision (edit on that module's menu).
+const diagnosticsView = requirePermission('approval-workflow-pms', 'view', { enforce: true, unconfigured: 'deny' });
+router.get('/approvals/diagnostics',
+  (req, res, next) => diagnosticsView(req as AuthenticatedRequest, res, next),
+  asyncHandler(diagnosticsCtrl.getDiagnostics));
+router.post('/approvals/diagnostics/:requuid/reapply',
+  asyncHandler(diagnosticsCtrl.guardReapply),
+  asyncHandler(diagnosticsCtrl.reapply));
 
 // GET /approvals/notifications/count — unread badge
 router.get('/approvals/notifications/count', asyncHandler(async (req, res) => {

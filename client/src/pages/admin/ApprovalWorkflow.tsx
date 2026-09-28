@@ -31,7 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import ApprovalEngineAdmin from "../../../../server/modules/approval-engine/client/ApprovalEngineAdmin";
-import { DefectApprovalDiagnosticsPanel, DefectApprovalSettingsPanel, EmailStatusBanner } from "./ApprovalAdminPanels";
+import { ApprovalDiagnosticsPanel, DefectApprovalDiagnosticsPanel, DefectApprovalSettingsPanel, EmailStatusBanner } from "./ApprovalAdminPanels";
 
 interface ApprovalFunctionNode {
   id: string;
@@ -494,6 +494,7 @@ export default function ApprovalWorkflow() {
           </div>
           {isShore && (
             <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4" data-testid="approval-diagnostics-section">
+              <ApprovalDiagnosticsPanel />
               <DefectApprovalDiagnosticsPanel />
             </div>
           )}

@@ -167,6 +167,41 @@ export async function listPendingEngineRequests(): Promise<Array<RequestRow & { 
   return engine.pendingRequests(engineCtx(null));
 }
 
+/** Read-only: one engine request with slots, or null (engine off / unknown). */
+export async function getEngineRequest(requuid: string): Promise<(RequestRow & { slots: RequestSlotRow[] }) | null> {
+  if (!engine) return null;
+  return engine.getRequest(engineCtx(null), requuid);
+}
+
+/** Re-deliver a finished request's decision to its module (diagnostics "Apply again"). */
+export async function replayEngineDecision(requuid: string, actorUserId: string | null): Promise<{ requuid: string; outcome: 'approved' | 'returned' }> {
+  if (!engine) throw new AppError(503, 'The approval engine is not available on this server.');
+  try { return await engine.replayDecision(engineCtx(actorUserId), requuid); } catch (e) { translate(e); }
+}
+
+/** Every Technical/Defects scope with its classifications and whether each has an active chain. */
+export async function engineWorkflowMatrix(moduleId: string): Promise<Array<{ screenId: string; label: string; classification: string; enabled: boolean; active: boolean }>> {
+  if (!engine) return [];
+  const ctx = engineCtx(null);
+  const mod = engine.registryTree().modules.find((m) => m.moduleId === moduleId);
+  const out: Array<{ screenId: string; label: string; classification: string; enabled: boolean; active: boolean }> = [];
+  for (const sc of mod?.scopes ?? []) {
+    const scope = scopeFor(moduleId, sc.screenId);
+    const enabled = await engine.getScopeEnabled(ctx, scope);
+    const wfs = await engine.listWorkflows(ctx, scope);
+    for (const c of sc.classifications) {
+      out.push({ screenId: sc.screenId, label: sc.label, classification: c.id,
+        enabled, active: wfs.some((w) => w.status === 'active' && w.classification === c.id) });
+    }
+  }
+  return out;
+}
+
+/** Active workflow of a scope + classification with its nodes (for role coverage). */
+export async function engineActiveWorkflowNodes(moduleId: string, screenId: string, classification: string): Promise<StoredWorkflow | null> {
+  return activeWorkflowScoped(scopeFor(moduleId, screenId), classification);
+}
+
 /** Read-only workflow existence check for module routing decisions. */
 export async function activeWorkflowExistsScoped(scope: Scope, classification: string): Promise<boolean> {
   if (!engine) return false;

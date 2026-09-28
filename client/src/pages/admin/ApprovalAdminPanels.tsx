@@ -324,3 +324,80 @@ export function DefectApprovalSettingsPanel({ readOnly }: { readOnly: boolean })
     </section>
   );
 }
+
+// 28-Sep-2026 (Sahil C3/C4/C5) — shared approval diagnostics: Technical checks + failed updates across
+// modules, each group in plain language with one instruction. "Apply again" re-delivers a finished
+// approval to the change request / work order / defect that did not update (server checks the
+// module's Access Control edit permission).
+type SharedDiagnostics = {
+  available: boolean;
+  healthy: boolean;
+  groups: Array<{ key: string; title: string; consequence: string; instruction: string;
+    rows: Array<{ text: string; detail?: string; requuid?: string }> }>;
+};
+
+export function ApprovalDiagnosticsPanel() {
+  const queryClient = useQueryClient();
+  const { currentUser } = useAuth();
+  const key = ["/technical/api/approvals/diagnostics"];
+  const { data, isLoading, error } = useQuery<SharedDiagnostics>({
+    queryKey: key,
+    enabled: !!currentUser,
+    queryFn: async () => {
+      const res = await fetch("/technical/api/approvals/diagnostics");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+  const [message, setMessage] = useState<Record<string, string>>({});
+  const reapply = useMutation({
+    mutationFn: async (requuid: string) => {
+      const res = await fetch(`/technical/api/approvals/diagnostics/${encodeURIComponent(requuid)}/reapply`, { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(res.status === 403 ? "You do not have permission to apply this approval." : (body?.error || `Failed (HTTP ${res.status})`));
+      return requuid;
+    },
+    onSuccess: (requuid) => { setMessage((m) => ({ ...m, [requuid]: "Applied." })); queryClient.invalidateQueries({ queryKey: key }); },
+    onError: (e: Error, requuid) => setMessage((m) => ({ ...m, [requuid]: e.message })),
+  });
+  return (
+    <section aria-label="Approval diagnostics" data-testid="approval-diagnostics"
+      style={{ margin: "12px", padding: "14px", border: "1px solid #d0d5dd", borderRadius: 8, background: "#fff" }}>
+      <h2 style={{ margin: 0, fontSize: 16, color: "#1e3a5f" }}>Approval diagnostics</h2>
+      <p style={{ margin: "4px 0 12px", fontSize: 12, color: "#667085" }}>
+        Read-only checks for Technical approvals, and approvals of any module that finished without updating their record.
+      </p>
+      {isLoading && <div style={{ fontSize: 13 }}>Loading diagnostics...</div>}
+      {(error || data?.available === false) && <div style={{ color: "#b42318", fontSize: 13 }}>Diagnostics unavailable. Contact your administrator.</div>}
+      {data?.available && data.healthy && <div style={{ color: "#067647", fontSize: 13 }} data-testid="approval-diagnostics-healthy">No problems found.</div>}
+      {data?.available && data.groups.map((g) => (
+        <div key={g.key} data-testid={`approval-diagnostics-group-${g.key}`} style={{ marginTop: 10, borderTop: "1px solid #eaecf0", paddingTop: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "#b42318" }}>{g.title} ({g.rows.length})</div>
+          <div style={{ fontSize: 12, color: "#475467", margin: "2px 0" }}>{g.consequence}</div>
+          <div style={{ fontSize: 12, color: "#1e3a5f", marginBottom: 6 }}><strong>What to do:</strong> {g.instruction}</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+            {g.rows.map((r, i) => (
+              <li key={`${g.key}-${i}`} style={{ marginBottom: 4 }}>
+                <span>{r.text}</span>
+                {r.detail && <span style={{ color: "#667085" }}> — {r.detail}</span>}
+                {g.key === "failedUpdates" && r.requuid && (
+                  <>
+                    {" "}
+                    <button onClick={() => reapply.mutate(r.requuid!)} disabled={reapply.isPending}
+                      data-testid={`button-reapply-${r.requuid}`}
+                      style={{ marginLeft: 6, padding: "1px 8px", borderRadius: 5, border: "1px solid #2e90fa", background: "#fff", color: "#2e90fa", cursor: "pointer", fontSize: 12 }}>
+                      Apply again
+                    </button>
+                    {message[r.requuid] && <span style={{ marginLeft: 6, fontSize: 12 }}>{message[r.requuid]}</span>}
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+}
