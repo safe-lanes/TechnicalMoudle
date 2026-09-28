@@ -24,6 +24,7 @@ chat did not work until it was added (section 6). Companion to
 |---|---|---|---|
 | Dev | `technical-dev` | `https://dev.sl-sail.com` | `https://dev.sl-sail.com/technical/api` |
 | Production | `technical-prod` | `https://sailerp.sl-sail.com` | `https://sailerp.sl-sail.com/technical/api` |
+| Demo | `technical-demo` | `https://erp.sl-sail.com` | `https://erp.sl-sail.com/technical/api` |
 
 ## 2. Generate the two values (once per environment)
 
