@@ -4,9 +4,9 @@ import * as subEntityService from '../services/subEntityService';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
 import { captureTenantFromReq } from '../../../utils/tenantConnectionManager';
 
-function getUserInfo(req: Request) {
+function getUserInfo(req: Request): { username: string; role: string; vesselId?: string } {
   const user = (req as AuthenticatedRequest).user!;
-  return { username: user.username, role: user.role, vesselId: user.vesselId };
+  return { username: user.username, role: user.role, vesselId: user.vesselId ?? undefined };
 }
 
 // ── Documents ──

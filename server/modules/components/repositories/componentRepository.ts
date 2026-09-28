@@ -157,6 +157,10 @@ export async function findClassRegulatory(componentId: string) {
   return storage.getComponentClassRegulatory(componentId);
 }
 
+export async function findClassRegulatoryItem(id: number) {
+  return storage.getComponentClassRegulatoryItem(id);
+}
+
 export async function createClassRegulatory(data: any) {
   return storage.createComponentClassRegulatory(data);
 }
