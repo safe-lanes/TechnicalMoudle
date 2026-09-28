@@ -1,4 +1,5 @@
 import * as defectsRepo from '../repositories/defectsRepository';
+import { computeDefectStatus, isDefectOverdue } from '@shared/defectStatus';
 import { admnRoleMaster, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from '@shared/schema';
 import { generateDefectNumber } from '../../../utils/defectNumbering';
 import { storage } from '../../../storage';
@@ -883,13 +884,16 @@ export async function generateReport(reportKey: string, filters: any) {
   switch(reportKey) {
     case 'status-summary':
       reportData.title = 'Defects Status Summary';
-      // Group defects by status
+      // 25-Sep-2026 (Sahil E1/Q5): group by the ONE computed status policy (Reported / In Progress /
+      // Extended / Overdue / Closed / Verified) — "Extended" is its own group, and an extended defect
+      // is Overdue only after its extended (current) target date. Was: raw DB status.
       const statusGroups = defects.reduce((acc: any, defect) => {
-        if (!acc[defect.status]) {
-          acc[defect.status] = { count: 0, defects: [] };
+        const status = computeDefectStatus(defect);
+        if (!acc[status]) {
+          acc[status] = { count: 0, defects: [] };
         }
-        acc[defect.status].count++;
-        acc[defect.status].defects.push(defect);
+        acc[status].count++;
+        acc[status].defects.push(defect);
         return acc;
       }, {});
       reportData.data = Object.entries(statusGroups).map(([status, data]: [string, any]) => ({
@@ -901,12 +905,9 @@ export async function generateReport(reportKey: string, filters: any) {
 
     case 'overdue':
       reportData.title = 'Overdue Defects';
-      const today = new Date().toISOString().split('T')[0];
-      reportData.data = defects.filter((d: any) =>
-        d.status === 'Open' &&
-        d.targetCloseDate &&
-        new Date(d.targetCloseDate.split('-').reverse().join('-')) < new Date(today)
-      );
+      // Shared policy (E1). The old filter only saw status 'Open' and reversed the date parts,
+      // which turned a YYYY-MM-DD target into the wrong month (e.g. 2026-09-10 read as 9-Oct-2026).
+      reportData.data = defects.filter((d) => isDefectOverdue(d));
       break;
 
     case 'critical':

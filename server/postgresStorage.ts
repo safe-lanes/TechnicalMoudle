@@ -5084,6 +5084,8 @@ export class PostgresStorage {
       const todayStr = today.toISOString().split('T')[0];
       conditions.push(lt(defects.targetCloseDate, todayStr));
       conditions.push(sql`(${defects.verified} IS NULL OR ${defects.verified} = false)`);
+      // E1 (28-Sep-2026): a completed defect is Closed, not Overdue (shared defect status policy).
+      conditions.push(sql`(${defects.dateCompleted} IS NULL OR ${defects.dateCompleted} = '')`);
     } else if (filters?.dueOverdue === 'due') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);

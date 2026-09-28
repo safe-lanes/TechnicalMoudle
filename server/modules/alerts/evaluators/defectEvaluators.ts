@@ -18,6 +18,7 @@
  */
 
 import type { AlertPolicy } from '@shared/schema';
+import { isDefectOverdue } from '@shared/defectStatus';
 import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import type { PmsDateAlert } from './certificateEvaluators';
 
@@ -31,6 +32,9 @@ export interface DefectRow {
   category?: string | null;
   is_coc?: boolean | null;
   targetCloseDate?: string | null;
+  verified?: boolean | null;
+  dateCompleted?: string | null;
+  isDeferred?: boolean | null;
 }
 
 /** A defect is DONE (resolved) when its status contains 'closed' or 'cancel'. */
@@ -56,6 +60,9 @@ export function evaluateDefectOverdue(
     if (!row.vesselId) continue;
     if (isDone(row.status)) continue;
     if (!row.targetCloseDate) continue;
+    // E1 (28-Sep-2026): the ONE defect status policy — completed/verified defects are not overdue;
+    // an extended defect is overdue only after its extended (current) target date.
+    if (!isDefectOverdue(row)) continue;
 
     const parsed = parseWorkOrderDate(row.targetCloseDate);
     if (!parsed) {
