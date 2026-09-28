@@ -885,8 +885,8 @@ var init_schema = __esm({
     cascadeRunningHoursSchema = z.object({
       parentComponentId: z.string(),
       mode: z.enum(["setTotal", "addDelta"]),
-      // Set Total remains non-negative. Add Delta may be negative only when the
-      // Sail Admin-authorized validation bypass is requested and approved server-side.
+      // Set Total remains non-negative. Add Delta represents accumulated operating
+      // time and must be positive; counter reductions use explicit reset/correction flows.
       value: z.number().finite(),
       dateUpdated: z.string(),
       // DD-MMM-YYYY HH:mm format
@@ -1861,6 +1861,12 @@ var init_schema = __esm({
       // Last completion running hours (for RH-based jobs)
       nextDueRH: text2("next_due_rh"),
       // Calculated: lastDoneRH + frequencyValue (for RH-based jobs)
+      rhEstimatedDueDate: text2("rh_estimated_due_date"),
+      // Historical-utilization projection; never an RH trigger
+      rhAveragePerDay: decimal2("rh_average_per_day", { precision: 12, scale: 6 }),
+      // Full-precision RH/day used for the projection
+      rhEstimateBasis: text2("rh_estimate_basis"),
+      // 'HISTORICAL' or an explicit unavailable reason
       // Authorized-rebaseline stamp (migration 161): shore tracking values only pass the
       // one-way applier's job-tracking guard when this incoming stamp is newer than local.
       trackingRebaselinedAt: timestamp3("tracking_rebaselined_at"),
@@ -2117,6 +2123,13 @@ var init_schema = __esm({
       // master RH. In this case the RH module is NOT updated; the reading is saved to the
       // WO only for job scheduling / next-due calculation.
       rhBackdatedEntry: boolean2("rh_backdated_entry"),
+      // Approval-time RH application outcome. A lower submitted reading can be
+      // retained on the WO while the authoritative live RH counter stays unchanged.
+      rhUpdateOutcome: text2("rh_update_outcome"),
+      rhSkipReason: text2("rh_skip_reason"),
+      rhSkipSubmittedRh: decimal2("rh_skip_submitted_rh", { precision: 10, scale: 2 }),
+      rhSkipLatestRh: decimal2("rh_skip_latest_rh", { precision: 10, scale: 2 }),
+      rhSkipLatestRhDate: text2("rh_skip_latest_rh_date"),
       // === Save as Draft (migration 165, Task #402) ===
       // In-progress Part-B edits stashed as a JSON document. Draft saves write ONLY
       // this column (no status/completion/RH/due writes) so the computed tab never
@@ -4059,14 +4072,20 @@ var init_schema = __esm({
       // Vessel name for display
       masterId: text2("master_id").notNull(),
       // References ship_certificates_master.master_id
+      certificateNumber: text2("certificate_number"),
+      // Vessel-specific free-text certificate number
       issueDate: text2("issue_date"),
       // Date certificate was issued
       expiryDate: text2("expiry_date"),
       // Date certificate expires
       lastAnnual: text2("last_annual"),
       // Date of last annual survey
+      nextAnnual: text2("next_annual"),
+      // Date of next annual survey
       lastInterm: text2("last_interm"),
       // Date of last intermediate survey
+      nextInterm: text2("next_interm"),
+      // Date of next intermediate survey
       endorsementDate: text2("endorsement_date"),
       // Date of endorsement
       lastEditUpload: text2("last_edit_upload"),
@@ -5551,7 +5570,7 @@ var init_syncConfig = __esm({
         isGlobal: false,
         isConfigurable: false,
         businessRules: "Ship can request changes via Modify PMS (change_request) but cannot edit jobs directly",
-        notes: "Job definitions managed by office. Ship uses change_request for modifications. PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh are SHIP-owned once non-NULL \u2014 the one-way applier strips incoming shore values unless the row carries a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). See oneWayApplier evaluateJobTrackingGuard."
+        notes: "Job definitions managed by office. Ship uses change_request for modifications. PROTECTED TRACKING COLUMNS (migration 161): last_done_date, next_due_date, last_done_rh, next_due_rh are SHIP-owned once non-NULL \u2014 the one-way applier strips incoming shore values unless the row carries a newer tracking_rebaselined_at stamp (authorized shore admin rebaseline). Historical RH estimate columns rh_estimated_due_date, rh_average_per_day, and rh_estimate_basis are protected with the RH cycle so an older shore row cannot replace a newer ship completion estimate; completion learning writes them with sync bypass. See oneWayApplier evaluateJobTrackingGuard."
       },
       job_component_links: {
         tableName: "job_component_links",
@@ -5563,7 +5582,7 @@ var init_syncConfig = __esm({
         isGlobal: false,
         isConfigurable: false,
         businessRules: null,
-        notes: "Job-component associations managed by office. Integer PK, no UUID identity. PROTECTED TRACKING COLUMNS (migration 161): same guard as jobs \u2014 last_done_date/next_due_date/last_done_rh/next_due_rh preserved on ship unless a newer tracking_rebaselined_at authorizes the overwrite."
+        notes: "Job-component associations managed by office. Integer PK, no UUID identity. Job cycle tracking is read from the jobs table only."
       },
       // ── Fleet Management ──
       fleet_components: {
@@ -7079,7 +7098,7 @@ var init_syncDiagLogger = __esm({
 // server/middleware/auditActor.ts
 function resolveAuditActor(user) {
   if (!user) return SYSTEM_ACTOR;
-  const uuid = user.userUuid && String(user.userUuid).trim() || null;
+  const uuid2 = user.userUuid && String(user.userUuid).trim() || null;
   const email = user.email && String(user.email).trim() || null;
   const rank = user.rank_name && String(user.rank_name).trim() || null;
   const role = user.forwardedRole && String(user.forwardedRole).trim() || user.role && String(user.role).trim() || null;
@@ -7087,7 +7106,7 @@ function resolveAuditActor(user) {
   const userType = user.userType && String(user.userType).trim() || null;
   if (userType === "Ship") {
     return {
-      actorId: uuid || rank || "system",
+      actorId: uuid2 || rank || "system",
       actorLabel: rank || name || "Ship User",
       actorEmail: email,
       actorType: "Ship",
@@ -7096,7 +7115,7 @@ function resolveAuditActor(user) {
     };
   }
   return {
-    actorId: uuid || email || "system",
+    actorId: uuid2 || email || "system",
     actorLabel: name || email || "Office User",
     actorEmail: email,
     actorType: userType || "Office",
@@ -7147,6 +7166,180 @@ var init_requestContext = __esm({
     "use strict";
     init_auditActor();
     asyncLocalStorage = new AsyncLocalStorage2();
+  }
+});
+
+// server/modules/shared/errors.ts
+var errors_exports = {};
+__export(errors_exports, {
+  AppError: () => AppError,
+  ConflictError: () => ConflictError,
+  ForbiddenError: () => ForbiddenError,
+  NotFoundError: () => NotFoundError,
+  ValidationError: () => ValidationError
+});
+var AppError, NotFoundError, ValidationError, ConflictError, ForbiddenError;
+var init_errors = __esm({
+  "server/modules/shared/errors.ts"() {
+    "use strict";
+    AppError = class extends Error {
+      constructor(statusCode, message, details) {
+        super(message);
+        this.statusCode = statusCode;
+        this.details = details;
+        this.name = this.constructor.name;
+      }
+    };
+    NotFoundError = class extends AppError {
+      constructor(message = "Resource not found", details) {
+        super(404, message, details);
+      }
+    };
+    ValidationError = class extends AppError {
+      constructor(message = "Validation failed", details) {
+        super(400, message, details);
+      }
+    };
+    ConflictError = class extends AppError {
+      constructor(message = "Resource already exists", details) {
+        super(409, message, details);
+      }
+    };
+    ForbiddenError = class extends AppError {
+      constructor(message = "Forbidden", details) {
+        super(403, message, details);
+      }
+    };
+  }
+});
+
+// server/modules/work-orders/utils/completedWorkOrderDate.ts
+function nonBlank(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+function isCompletedWorkOrderStatus(value) {
+  return typeof value === "string" && value.trim().toLowerCase() === "completed";
+}
+function isRealCalendarDate(year, month, day) {
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+function namedMonthNumber(value) {
+  const month = MONTH_NUMBER[value.slice(0, 3).toLowerCase()];
+  return month ?? null;
+}
+function hasValidTimeSuffix(value) {
+  if (!value.trim()) return true;
+  const match = value.match(/^(?:T|\s+)(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-](\d{2}):?(\d{2}))?$/);
+  if (!match) return false;
+  const [, hour, minute, second = "0", offsetHour, offsetMinute] = match;
+  if (Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59) return false;
+  return offsetHour === void 0 || Number(offsetHour) <= 23 && Number(offsetMinute) <= 59;
+}
+function isValidNamedMonthDate(date2) {
+  let match = date2.match(/^(\d{1,2})[-/\s]([A-Za-z]{3,9})[-/\s](\d{4})(.*)$/);
+  if (match) {
+    const [, day, monthName, year, trailing] = match;
+    const month = namedMonthNumber(monthName);
+    if (month === null || !isRealCalendarDate(Number(year), month, Number(day))) return false;
+    return hasValidTimeSuffix(trailing);
+  }
+  match = date2.match(/^([A-Za-z]{3,9})[\s-](\d{1,2}),?[\s-](\d{4})(.*)$/);
+  if (match) {
+    const [, monthName, day, year, trailing] = match;
+    const month = namedMonthNumber(monthName);
+    if (month === null || !isRealCalendarDate(Number(year), month, Number(day))) return false;
+    return hasValidTimeSuffix(trailing);
+  }
+  return false;
+}
+function isValidCompletedWorkOrderDate(value) {
+  const date2 = nonBlank(value);
+  if (!date2) return false;
+  const isoMatch = date2.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    if (!isRealCalendarDate(Number(year), Number(month), Number(day))) return false;
+    return date2.length === 10 || !Number.isNaN(new Date(date2).getTime());
+  }
+  const numericMatch = date2.match(/^(\d{2})[-/](\d{2})[-/](\d{4})(.*)$/);
+  if (numericMatch) {
+    const [, day, month, year, trailing] = numericMatch;
+    return isRealCalendarDate(Number(year), Number(month), Number(day)) && hasValidTimeSuffix(trailing);
+  }
+  return isValidNamedMonthDate(date2);
+}
+function getJobCompletionDate(workOrder) {
+  const date2 = nonBlank(workOrder.dateCompleted);
+  if (!date2 || !isValidCompletedWorkOrderDate(date2)) return null;
+  let match = date2.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  match = date2.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+  match = date2.match(/^(\d{1,2})[-/\s]([A-Za-z]{3,9})[-/\s](\d{4})/);
+  if (match) {
+    const month = namedMonthNumber(match[2]);
+    return month === null ? null : `${match[3]}-${String(month).padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  }
+  match = date2.match(/^([A-Za-z]{3,9})[\s-](\d{1,2}),?[\s-](\d{4})/);
+  if (match) {
+    const month = namedMonthNumber(match[1]);
+    return month === null ? null : `${match[3]}-${String(month).padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+  }
+  return null;
+}
+function resolveFinalCompletionDate(workOrder) {
+  return nonBlank(workOrder.dateCompleted) ?? nonBlank(workOrder.completionDateTime);
+}
+function ensureCompletedWorkOrderDate(existing, update7) {
+  const resultingStatus = update7.status ?? existing?.status;
+  if (!isCompletedWorkOrderStatus(resultingStatus)) return update7;
+  const outgoingDate = nonBlank(update7.dateCompleted);
+  if (outgoingDate) {
+    if (!isValidCompletedWorkOrderDate(outgoingDate)) {
+      throw new ValidationError("A completed work order requires a valid completion date.");
+    }
+    return update7;
+  }
+  const savedFinalDate = nonBlank(existing?.dateCompleted);
+  if (savedFinalDate) {
+    if (!isValidCompletedWorkOrderDate(savedFinalDate)) {
+      throw new ValidationError("A completed work order has an invalid stored completion date.");
+    }
+    update7.dateCompleted = savedFinalDate;
+    return update7;
+  }
+  const savedExecutionDate = nonBlank(existing?.completionDateTime);
+  if (savedExecutionDate) {
+    if (!isValidCompletedWorkOrderDate(savedExecutionDate)) {
+      throw new ValidationError("A completed work order requires a valid completion date.");
+    }
+    update7.dateCompleted = savedExecutionDate;
+    return update7;
+  }
+  throw new ValidationError("A completion date is required before a work order can be marked Completed.");
+}
+var MONTH_NUMBER;
+var init_completedWorkOrderDate = __esm({
+  "server/modules/work-orders/utils/completedWorkOrderDate.ts"() {
+    "use strict";
+    init_errors();
+    MONTH_NUMBER = {
+      jan: 1,
+      feb: 2,
+      mar: 3,
+      apr: 4,
+      may: 5,
+      jun: 6,
+      jul: 7,
+      aug: 8,
+      sep: 9,
+      oct: 10,
+      nov: 11,
+      dec: 12
+    };
   }
 });
 
@@ -7258,6 +7451,7 @@ var rhEventComparator_exports = {};
 __export(rhEventComparator_exports, {
   RH_GUARD_STRIP_COLUMNS: () => RH_GUARD_STRIP_COLUMNS,
   applyWinningRhToComponent: () => applyWinningRhToComponent,
+  canApplyWinningRHToCurrent: () => canApplyWinningRHToCurrent,
   claimWoRhSync: () => claimWoRhSync,
   compareRhEvents: () => compareRhEvents,
   effectiveReadingDay: () => effectiveReadingDay,
@@ -7336,6 +7530,9 @@ async function latestRotationDay(conn, componentId) {
     return null;
   }
 }
+function canApplyWinningRHToCurrent(currentRH, winnerRH, approvedReset = false) {
+  return approvedReset || currentRH === null || currentRH === void 0 || !Number.isFinite(currentRH) || winnerRH >= currentRH;
+}
 async function selectWinningRhEvent(conn, componentId) {
   const rotDay = await latestRotationDay(conn, componentId);
   const params = [componentId];
@@ -7345,7 +7542,8 @@ async function selectWinningRhEvent(conn, componentId) {
     params.push(rotDay.toISOString().split("T")[0]);
   }
   const r = await conn.query(
-    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side
+    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side,
+            meter_replaced, is_renewal_reset
        FROM running_hours_audit
       WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
         AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
@@ -7369,7 +7567,14 @@ async function selectWinningRhEvent(conn, componentId) {
     originSide: row.origin_side
   });
   if (!day) return null;
-  return { rhauuid: row.rhauuid, rh, readingDay: day, dateUpdatedLocal: row.date_updated_local, originSide: row.origin_side ?? null };
+  return {
+    rhauuid: row.rhauuid,
+    rh,
+    readingDay: day,
+    dateUpdatedLocal: row.date_updated_local,
+    originSide: row.origin_side ?? null,
+    approvedReset: row.meter_replaced === true || row.is_renewal_reset === true
+  };
 }
 async function applyWinningRhToComponent(conn, componentId, context) {
   const winner = await selectWinningRhEvent(conn, componentId);
@@ -7390,12 +7595,21 @@ async function applyWinningRhToComponent(conn, componentId, context) {
   }
   const counterType = String(comp?.rh_counter_type || "").toUpperCase();
   const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
+  const currentLiveRH = parseFloat(String(
+    counterType === "MASTER" ? comp?.rh_current_master ?? comp?.current_cumulative_rh ?? "0" : comp?.current_cumulative_rh ?? "0"
+  ));
+  if (comp && !canApplyWinningRHToCurrent(currentLiveRH, winner.rh, winner.approvedReset)) {
+    console.warn(
+      `[RH-Derive:${context}] rejected lower non-reset winner for component=${componentId}: current=${currentLiveRH}, incoming=${winner.rh}, event=${winner.rhauuid}, reading=${winner.readingDay.toISOString().split("T")[0]}`
+    );
+    return "unchanged";
+  }
   if (counterType === "INHERITED" && masterRef) {
     let cache3 = null;
     let cacheDay = null;
     try {
       const m = await conn.query(
-        `SELECT cuuid, meter_replaced_last_rh FROM components
+        `SELECT cuuid, meter_replaced_last_rh, rh_current_master, current_cumulative_rh FROM components
           WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
             AND (is_deleted = false OR is_deleted IS NULL)
           ORDER BY (cuuid = $1) DESC LIMIT 1`,
@@ -7405,9 +7619,14 @@ async function applyWinningRhToComponent(conn, componentId, context) {
       if (master) {
         const baseline = parseFloat(master.meter_replaced_last_rh || "0") || 0;
         const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
-        if (masterWinner) {
+        const currentMasterRH = parseFloat(master.rh_current_master ?? master.current_cumulative_rh ?? "0");
+        if (masterWinner && canApplyWinningRHToCurrent(currentMasterRH, masterWinner.rh, masterWinner.approvedReset)) {
           cache3 = (baseline + masterWinner.rh).toFixed(2);
           cacheDay = masterWinner.readingDay;
+        } else if (masterWinner) {
+          console.warn(
+            `[RH-Derive:${context}] preserved INHERITED cache because master winner would roll back master=${master.cuuid}: current=${currentMasterRH}, incoming=${masterWinner.rh}`
+          );
         }
       }
     } catch (e) {
@@ -7694,12 +7913,12 @@ async function getColumnMeta(pool4, tableName) {
 async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
   try {
     const params = [componentId];
-    let sql25 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
+    let sql28 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
     if (excludeRhruuid) {
-      sql25 += ` AND rhruuid <> $2`;
+      sql28 += ` AND rhruuid <> $2`;
       params.push(excludeRhruuid);
     }
-    const res = await conn.query(sql25, params);
+    const res = await conn.query(sql28, params);
     const v = res.rows[0]?.latest;
     if (!v) return null;
     const d = v instanceof Date ? v : new Date(String(v));
@@ -7749,6 +7968,19 @@ function evaluateJobTrackingGuard(localRow, incomingRow) {
     const localVal = localRow[col];
     if (localVal !== null && localVal !== void 0 && localVal !== "") {
       strip.push(col);
+    }
+  }
+  const estimateColumns = ["rh_estimated_due_date", "rh_average_per_day", "rh_estimate_basis"];
+  const localRhCycleInitialized = [
+    "last_done_rh",
+    ...estimateColumns
+  ].some((col) => {
+    const value = localRow[col];
+    return value !== null && value !== void 0 && value !== "";
+  });
+  if (localRhCycleInitialized) {
+    for (const col of estimateColumns) {
+      if (!strip.includes(col)) strip.push(col);
     }
   }
   if (strip.length > 0) strip.push("tracking_rebaselined_at");
@@ -7858,7 +8090,7 @@ async function applyOneWayRows(tableName, rows) {
           result.softDeleted++;
         } else {
           let rowToApply = row;
-          if (tableName === "jobs" || tableName === "job_component_links") {
+          if (tableName === "jobs") {
             try {
               const localRes = await pool4.query(
                 `SELECT last_done_date, next_due_date, last_done_rh, next_due_rh, tracking_rebaselined_at
@@ -8212,6 +8444,26 @@ async function applyFieldLogInserts(fieldLogs, externalClient) {
       if (tableName === "work_orders" && (rowData["id"] === void 0 || rowData["id"] === null)) {
         rowData["id"] = `WO-SYNC-${rowUuid}`;
       }
+      if (tableName === "work_orders" && isCompletedWorkOrderStatus(rowData["status"])) {
+        if (!isValidCompletedWorkOrderDate(rowData["date_completed"])) {
+          if (isValidCompletedWorkOrderDate(rowData["completion_date_time"])) {
+            rowData["date_completed"] = rowData["completion_date_time"];
+          } else {
+            const msg = `${tableName}.${rowUuid}: Completed row has no valid date_completed or completion_date_time`;
+            errors.push(msg);
+            needsFullRows.push({ tableName, rowUuid });
+            failedRowUuids.push(rowUuid);
+            syncDiag(`FIELD-LOG-INSERT DEFER COMPLETED: ${msg}`);
+            if (externalClient) {
+              try {
+                await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+              } catch {
+              }
+            }
+            continue;
+          }
+        }
+      }
       if (meta && meta.requiredCols.size > 0) {
         const missingRequired = Array.from(meta.requiredCols).filter(
           (c) => !meta.identityAlwaysCols.has(c) && rowData[c] == null
@@ -8528,7 +8780,8 @@ async function applyFullRowsIfAbsent(tableName, rows) {
   const identityCol = config.identityColumn || "id";
   const pool4 = await getPool();
   const meta = await getColumnMeta(pool4, tableName);
-  for (const row of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+  for (const incomingRow of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+    let row = incomingRow;
     const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
     if (!identity) {
       out.errors.push(`${tableName}: row missing identity ${identityCol}`);
@@ -8543,6 +8796,17 @@ async function applyFullRowsIfAbsent(tableName, rows) {
         out.skipped++;
         syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
         continue;
+      }
+      if (tableName === "work_orders" && isCompletedWorkOrderStatus(row.status)) {
+        if (!isValidCompletedWorkOrderDate(row.date_completed ?? row.dateCompleted)) {
+          const executionDate = row.completion_date_time ?? row.completionDateTime;
+          if (!isValidCompletedWorkOrderDate(executionDate)) {
+            out.errors.push(`${tableName}.${identity}: Completed full row has no valid completion date`);
+            syncDiag(`SELF-HEAL DEFER COMPLETED: ${tableName}.${identity} has no valid completion date`);
+            continue;
+          }
+          row = { ...row, date_completed: executionDate };
+        }
       }
       const parts = buildInsertParts(
         row,
@@ -8700,8 +8964,17 @@ var init_oneWayApplier = __esm({
     init_db();
     init_syncConfig();
     init_syncDiagLogger();
+    init_completedWorkOrderDate();
     columnMetaCache = /* @__PURE__ */ new Map();
-    JOB_TRACKING_COLUMNS = ["last_done_date", "next_due_date", "last_done_rh", "next_due_rh"];
+    JOB_TRACKING_COLUMNS = [
+      "last_done_date",
+      "next_due_date",
+      "last_done_rh",
+      "next_due_rh",
+      "rh_estimated_due_date",
+      "rh_average_per_day",
+      "rh_estimate_basis"
+    ];
     SYNC_COLUMN_ALIASES = { location2: "location_2" };
     SKIP_UPDATE_COLUMNS = /* @__PURE__ */ new Set(["id", "created_at", "createdAt"]);
     SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
@@ -8768,9 +9041,9 @@ __export(repository_exports, {
   upsertInstanceMetadata: () => upsertInstanceMetadata
 });
 import { eq, and, ne, desc, asc, inArray, isNull, sql as sql4 } from "drizzle-orm";
-async function getInstanceMetadata(instanceId) {
+async function getInstanceMetadata(instanceId2) {
   const db2 = await getDb();
-  const rows = await db2.select().from(syncMetadata).where(eq(syncMetadata.instanceId, instanceId)).limit(1);
+  const rows = await db2.select().from(syncMetadata).where(eq(syncMetadata.instanceId, instanceId2)).limit(1);
   return rows[0];
 }
 async function upsertInstanceMetadata(data) {
@@ -8815,7 +9088,7 @@ function retryDelayMs(attempts) {
   const tier = RETRY_LADDER.find((t) => t.attempts === attempts);
   return tier ? map[tier.interval] : 7 * D;
 }
-async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e3) {
+async function getUnsyncedFieldLogs(instanceId2, vesselId, vesselCode, limit = 1e3) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -8837,7 +9110,7 @@ async function getUnsyncedFieldLogs(instanceId, vesselId, vesselCode, limit = 1e
      JOIN picked p ON s.table_name = p.table_name AND s.row_uuid = p.row_uuid
      WHERE s.instance_id = $1 AND s.vessel_id IN (${placeholders}) AND s.is_synced = false
      ORDER BY s.changed_at ASC, s.row_uuid, s.id`,
-    [instanceId, ...vesselValues]
+    [instanceId2, ...vesselValues]
   );
   return result.rows;
 }
@@ -9078,18 +9351,18 @@ async function getRecentBatches(vesselId, limit = 10) {
   const conditions = vesselId && vesselId !== "all" ? [eq(syncBatches.vesselId, vesselId)] : [];
   return db2.select().from(syncBatches).where(conditions.length > 0 ? and(...conditions) : void 0).orderBy(desc(syncBatches.startedAt)).limit(limit);
 }
-async function getTableCheckpoints(instanceId) {
+async function getTableCheckpoints(instanceId2) {
   const pool4 = await getPool();
   const r = await pool4.query(
     `SELECT table_name, last_checkpoint FROM sync_table_checkpoints
       WHERE instance_id = $1 AND last_checkpoint IS NOT NULL`,
-    [instanceId]
+    [instanceId2]
   );
   const out = {};
   for (const row of r.rows) out[row.table_name] = new Date(row.last_checkpoint);
   return out;
 }
-async function setTableCheckpoints(instanceId, checkpoints) {
+async function setTableCheckpoints(instanceId2, checkpoints) {
   const entries = Object.entries(checkpoints || {});
   if (entries.length === 0) return 0;
   const pool4 = await getPool();
@@ -9107,14 +9380,14 @@ async function setTableCheckpoints(instanceId, checkpoints) {
              updated_at = NOW()
        WHERE sync_table_checkpoints.last_checkpoint IS NULL
           OR EXCLUDED.last_checkpoint > sync_table_checkpoints.last_checkpoint`,
-      [instanceId, tableName, ts instanceof Date ? ts.toISOString() : ts]
+      [instanceId2, tableName, ts instanceof Date ? ts.toISOString() : ts]
     );
     written += r.rowCount ?? 0;
   }
   return written;
 }
-async function getConservativeFloor(instanceId, knownTables) {
-  const perTable = await getTableCheckpoints(instanceId);
+async function getConservativeFloor(instanceId2, knownTables) {
+  const perTable = await getTableCheckpoints(instanceId2);
   let min = null;
   for (const t of knownTables) {
     const cp = perTable[t];
@@ -9202,7 +9475,7 @@ async function getConnectivityLogs(vesselId, limit = 100, sinceHoursAgo) {
   const result = await pool4.query(query, params);
   return result.rows;
 }
-async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
+async function getUnsyncedFieldLogCount(instanceId2, vesselId, vesselCode) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9212,11 +9485,11 @@ async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
      WHERE instance_id = $1
        AND vessel_id IN (${placeholders})
        AND is_synced = false`,
-    [instanceId, ...vesselValues]
+    [instanceId2, ...vesselValues]
   );
   return result.rows[0]?.c ?? 0;
 }
-async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
+async function getDueFieldLogCount(instanceId2, vesselId, vesselCode) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9227,7 +9500,7 @@ async function getDueFieldLogCount(instanceId, vesselId, vesselCode) {
        AND vessel_id IN (${placeholders})
        AND is_synced = false
        AND ${retryDuePredicate()}`,
-    [instanceId, ...vesselValues]
+    [instanceId2, ...vesselValues]
   );
   return result.rows[0]?.c ?? 0;
 }
@@ -9245,7 +9518,7 @@ async function getShorePullRemainingCount(vesselId, excludeInstanceId, vesselCod
   );
   return result.rows[0]?.c ?? 0;
 }
-async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
+async function hasDeliveredSyncHistory(vesselId, instanceId2, vesselCode) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9259,11 +9532,11 @@ async function hasDeliveredSyncHistory(vesselId, instanceId, vesselCode) {
   const cp = await pool4.query(
     `SELECT 1 FROM sync_metadata
       WHERE instance_id = $1 AND last_sync_checkpoint IS NOT NULL LIMIT 1`,
-    [instanceId]
+    [instanceId2]
   );
   return cp.rows.length > 0;
 }
-async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, vesselCode, opts) {
+async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId2, vesselCode, opts) {
   const pool4 = await getPool();
   const vesselValues = [vesselId];
   if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
@@ -9272,7 +9545,7 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
   const tp = `$${vesselValues.length + 2}`;
   const batches = await pool4.query(
     `DELETE FROM sync_batches WHERE initiated_by_instance = $1`,
-    [instanceId]
+    [instanceId2]
   );
   const batchesDeleted = batches.rowCount ?? 0;
   const T = opts?.snapshotAt ?? null;
@@ -9280,15 +9553,15 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
     const fl = await pool4.query(
       `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
         WHERE vessel_id IN (${vp}) AND instance_id != ${ip} AND is_synced = true`,
-      [...vesselValues, instanceId]
+      [...vesselValues, instanceId2]
     );
     await pool4.query(
       `UPDATE sync_metadata SET last_sync_checkpoint = NULL, updated_at = NOW() WHERE instance_id = $1`,
-      [instanceId]
+      [instanceId2]
     );
     const postSnapshotUnsynced2 = fl.rowCount ?? 0;
     syncDiag(
-      `PROVISION-REPROVISION-RESET (blunt) instance=${instanceId} vessel=${vesselId}: allUnsynced=${postSnapshotUnsynced2} batchesDeleted=${batchesDeleted}`
+      `PROVISION-REPROVISION-RESET (blunt) instance=${instanceId2} vessel=${vesselId}: allUnsynced=${postSnapshotUnsynced2} batchesDeleted=${batchesDeleted}`
     );
     return { mode: "blunt", baselineMarkedSynced: 0, postSnapshotUnsynced: postSnapshotUnsynced2, batchesDeleted, checkpoint: null };
   }
@@ -9296,22 +9569,22 @@ async function resetInstanceDeliveryStateForReprovision(vesselId, instanceId, ve
     `UPDATE sync_field_log SET is_synced = true
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at <= ${tp} AND is_synced = false`,
-    [...vesselValues, instanceId, T]
+    [...vesselValues, instanceId2, T]
   );
   const a2 = await pool4.query(
     `UPDATE sync_field_log SET is_synced = false, sync_attempts = 0, last_attempt_at = NULL
       WHERE vessel_id IN (${vp}) AND instance_id != ${ip}
         AND changed_at > ${tp} AND is_synced = true`,
-    [...vesselValues, instanceId, T]
+    [...vesselValues, instanceId2, T]
   );
   await pool4.query(
     `UPDATE sync_metadata SET last_sync_checkpoint = $2, updated_at = NOW() WHERE instance_id = $1`,
-    [instanceId, T]
+    [instanceId2, T]
   );
   const baselineMarkedSynced = a1.rowCount ?? 0;
   const postSnapshotUnsynced = a2.rowCount ?? 0;
   syncDiag(
-    `PROVISION-REPROVISION-RESET (partition T=${T.toISOString()}) instance=${instanceId} vessel=${vesselId}: baselineMarkedSynced=${baselineMarkedSynced} postSnapshotUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
+    `PROVISION-REPROVISION-RESET (partition T=${T.toISOString()}) instance=${instanceId2} vessel=${vesselId}: baselineMarkedSynced=${baselineMarkedSynced} postSnapshotUnsynced=${postSnapshotUnsynced} batchesDeleted=${batchesDeleted}`
   );
   return { mode: "partition", baselineMarkedSynced, postSnapshotUnsynced, batchesDeleted, checkpoint: T.toISOString() };
 }
@@ -9339,7 +9612,7 @@ function canonicaliseBooleanSettings(settings) {
   }
   return changed;
 }
-async function recordDeliveryAttempt(rowUuids, instanceId) {
+async function recordDeliveryAttempt(rowUuids, instanceId2) {
   if (!rowUuids.length) return 0;
   const pool4 = await getPool();
   if (!pool4) return 0;
@@ -9349,11 +9622,11 @@ async function recordDeliveryAttempt(rowUuids, instanceId) {
             last_attempt_at = now(),
             updated_at = now()
       WHERE instance_id = $1 AND row_uuid = ANY($2::text[]) AND is_synced = false`,
-    [instanceId, rowUuids]
+    [instanceId2, rowUuids]
   );
   return res.rowCount ?? 0;
 }
-async function getRetryBacklog(instanceId) {
+async function getRetryBacklog(instanceId2) {
   const pool4 = await getPool();
   if (!pool4) return { total: 0, stuck: 0, maxAttempts: 0 };
   const tailFrom = RETRY_LADDER.length + 1;
@@ -9363,7 +9636,7 @@ async function getRetryBacklog(instanceId) {
             COALESCE(max(sync_attempts), 0)::int AS max_attempts
        FROM sync_field_log
       WHERE instance_id = $1 AND is_synced = false`,
-    [instanceId, tailFrom]
+    [instanceId2, tailFrom]
   );
   return { total: r.rows[0].total, stuck: r.rows[0].stuck, maxAttempts: r.rows[0].max_attempts };
 }
@@ -9489,7 +9762,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
     return 0;
   }
   const db2 = txConn || await getDb();
-  const instanceId = await getInstanceId();
+  const instanceId2 = await getInstanceId();
   const changedAt = /* @__PURE__ */ new Date();
   let logCount = 0;
   let failedFields = 0;
@@ -9524,7 +9797,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
           changedAt,
           changedByUserId: resolvedUserId,
           changedByDisplay: resolvedDisplay,
-          instanceId,
+          instanceId: instanceId2,
           isSynced: false
         });
         logCount++;
@@ -9554,7 +9827,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
           changedAt,
           changedByUserId: resolvedUserId,
           changedByDisplay: resolvedDisplay,
-          instanceId,
+          instanceId: instanceId2,
           isSynced: false
         });
         logCount++;
@@ -9568,7 +9841,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
     console.warn(`[FieldLogger] Hard delete detected on ${tableName}.${rowUuid} \u2014 not logging`);
   }
   if (logCount > 0) {
-    syncDiag(`FIELD-LOGGER: ${tableName} row=${rowUuid} \u2014 ${logCount} fields changed, isInsert=${oldRow === null}, vesselId=${vesselId}, instanceId=${instanceId}`);
+    syncDiag(`FIELD-LOGGER: ${tableName} row=${rowUuid} \u2014 ${logCount} fields changed, isInsert=${oldRow === null}, vesselId=${vesselId}, instanceId=${instanceId2}`);
     console.log(`[FieldLogger] Logged ${logCount} field change(s) for ${tableName}.${rowUuid}`);
   }
   if (failedFields > 0 && !txConn) {
@@ -9579,7 +9852,7 @@ async function logFieldChangesCore(tableName, rowUuid, vesselId, oldRow, newRow,
 async function logFieldChangesBatch(entries, txOrDb) {
   if (entries.length === 0) return 0;
   const db2 = txOrDb || await getDb();
-  const instanceId = await getInstanceId();
+  const instanceId2 = await getInstanceId();
   const changedAt = /* @__PURE__ */ new Date();
   const ctx = getRequestContext();
   const allRows = [];
@@ -9616,7 +9889,7 @@ async function logFieldChangesBatch(entries, txOrDb) {
         changedAt,
         changedByUserId: resolvedUserId,
         changedByDisplay: resolvedDisplay,
-        instanceId,
+        instanceId: instanceId2,
         isSynced: false
       });
     }
@@ -9682,8 +9955,8 @@ __export(syncRole_exports, {
   isShipInstance: () => isShipInstance,
   isShipInstanceId: () => isShipInstanceId
 });
-function isShipInstanceId(instanceId) {
-  return instanceId.toUpperCase().startsWith("SHIP-");
+function isShipInstanceId(instanceId2) {
+  return instanceId2.toUpperCase().startsWith("SHIP-");
 }
 async function getEffectiveInstanceId() {
   let dbInstanceId = null;
@@ -9778,8 +10051,8 @@ var init_fileSyncProcessor = __esm({
       instanceId;
       shoreUrl;
       syncApiKey;
-      constructor(shoreUrl, instanceId, syncApiKey) {
-        this.instanceId = instanceId || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+      constructor(shoreUrl, instanceId2, syncApiKey) {
+        this.instanceId = instanceId2 || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
         this.syncApiKey = syncApiKey || process.env.SYNC_API_KEY || "";
         this.shoreUrl = shoreUrl || process.env.SYNC_SHORE_URL || "";
         if (!fs2.existsSync(TEMP_DIR)) {
@@ -10269,8 +10542,8 @@ var init_fileSyncProcessor = __esm({
        */
       static async queueFileForSync(tableName, rowUuid, fileKey, fileName, fileSizeBytes, vesselId) {
         try {
-          const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-          const direction = isShipInstanceId(instanceId) ? "ship_to_shore" : "shore_to_ship";
+          const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+          const direction = isShipInstanceId(instanceId2) ? "ship_to_shore" : "shore_to_ship";
           let priority = 0;
           if (fileSizeBytes) {
             if (fileSizeBytes < 100 * 1024) priority = 10;
@@ -10305,7 +10578,7 @@ var init_fileSyncProcessor = __esm({
             fileHash,
             direction,
             vesselId,
-            instanceId,
+            instanceId: instanceId2,
             totalChunks,
             priority,
             status,
@@ -10319,50 +10592,6 @@ var init_fileSyncProcessor = __esm({
             `[FileSyncProcessor] Failed to queue file for sync: ${error.message}`
           );
         }
-      }
-    };
-  }
-});
-
-// server/modules/shared/errors.ts
-var errors_exports = {};
-__export(errors_exports, {
-  AppError: () => AppError,
-  ConflictError: () => ConflictError,
-  ForbiddenError: () => ForbiddenError,
-  NotFoundError: () => NotFoundError,
-  ValidationError: () => ValidationError
-});
-var AppError, NotFoundError, ValidationError, ConflictError, ForbiddenError;
-var init_errors = __esm({
-  "server/modules/shared/errors.ts"() {
-    "use strict";
-    AppError = class extends Error {
-      constructor(statusCode, message, details) {
-        super(message);
-        this.statusCode = statusCode;
-        this.details = details;
-        this.name = this.constructor.name;
-      }
-    };
-    NotFoundError = class extends AppError {
-      constructor(message = "Resource not found", details) {
-        super(404, message, details);
-      }
-    };
-    ValidationError = class extends AppError {
-      constructor(message = "Validation failed", details) {
-        super(400, message, details);
-      }
-    };
-    ConflictError = class extends AppError {
-      constructor(message = "Resource already exists", details) {
-        super(409, message, details);
-      }
-    };
-    ForbiddenError = class extends AppError {
-      constructor(message = "Forbidden", details) {
-        super(403, message, details);
       }
     };
   }
@@ -10663,8 +10892,8 @@ async function getExistingAlertDedupeKeys() {
 async function getWorkOrdersWithMissedCycles() {
   return storage.getWorkOrdersWithMissedCycles();
 }
-async function getAllVesselSpares() {
-  return storage.getAllVesselSpares();
+async function getLowCriticalSpareCandidates() {
+  return storage.getLowCriticalSpareCandidates();
 }
 async function getUnacknowledgedAlertEventsForRole(userRole, vesselId) {
   return storage.getUnacknowledgedAlertEventsForRole(userRole, vesselId);
@@ -10903,6 +11132,32 @@ function parseWorkOrderDate(value) {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
+function normalizeWorkOrderCalendarDate(value) {
+  const parsed = parseWorkOrderDate(value);
+  if (!parsed) return null;
+  return new Date(Date.UTC(
+    parsed.getUTCFullYear(),
+    parsed.getUTCMonth(),
+    parsed.getUTCDate()
+  ));
+}
+function formatWorkOrderCalendarDate(value) {
+  const date2 = normalizeWorkOrderCalendarDate(value);
+  return date2 ? date2.toISOString().slice(0, 10) : null;
+}
+function addWorkOrderCalendarDays(value, days) {
+  const date2 = normalizeWorkOrderCalendarDate(value);
+  if (!date2) return null;
+  date2.setUTCDate(date2.getUTCDate() + days);
+  return date2;
+}
+function currentWorkOrderCalendarDate(now = /* @__PURE__ */ new Date()) {
+  return new Date(Date.UTC(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ));
+}
 var MONTH_SHORT;
 var init_dateParse = __esm({
   "shared/workOrders/dateParse.ts"() {
@@ -10933,10 +11188,78 @@ __export(dateUtils_exports, {
   formatLocalDateTimeDDMMMYYYY: () => formatLocalDateTimeDDMMMYYYY,
   formatRHWithSeparators: () => formatRHWithSeparators,
   formatRelativeTime: () => formatRelativeTime,
+  formatWorkOrderDateDDMMYYYY: () => formatWorkOrderDateDDMMYYYY,
   normalizeDateToDDMMMYYYY: () => normalizeDateToDDMMMYYYY,
-  shouldGenerateWorkOrder: () => shouldGenerateWorkOrder
+  normalizeWorkOrderDateTyping: () => normalizeWorkOrderDateTyping,
+  parseWorkOrderDateDDMMYYYYInput: () => parseWorkOrderDateDDMMYYYYInput,
+  shouldGenerateWorkOrder: () => shouldGenerateWorkOrder,
+  workOrderDateInputValue: () => workOrderDateInputValue,
+  workOrderOverdueCompletionMessage: () => workOrderOverdueCompletionMessage
 });
 import { format, parse, add, isValid, differenceInCalendarDays, differenceInMonths, differenceInYears } from "date-fns";
+function validatedCalendarParts(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  const date2 = new Date(Date.UTC(year, month - 1, day));
+  if (date2.getUTCFullYear() !== year || date2.getUTCMonth() !== month - 1 || date2.getUTCDate() !== day) return null;
+  return [
+    String(day).padStart(2, "0"),
+    String(month).padStart(2, "0"),
+    year
+  ].join("-");
+}
+function formatWorkOrderDateDDMMYYYY(dateInput, fallback = "") {
+  if (dateInput === null || dateInput === void 0 || dateInput === "") return fallback;
+  const raw = String(dateInput).trim();
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
+  if (match) {
+    return validatedCalendarParts(Number(match[1]), Number(match[2]), Number(match[3])) ?? fallback;
+  }
+  match = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (match) {
+    return validatedCalendarParts(Number(match[3]), Number(match[2]), Number(match[1])) ?? fallback;
+  }
+  match = raw.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/ ](\d{4})$/);
+  if (match) {
+    const month = MONTH_NUMBER_BY_NAME[match[2].slice(0, 3).toLowerCase()];
+    if (month) {
+      return validatedCalendarParts(Number(match[3]), Number(month), Number(match[1])) ?? fallback;
+    }
+  }
+  const parsed = parseWorkOrderDate(dateInput);
+  if (!parsed) return fallback;
+  return [
+    String(parsed.getUTCDate()).padStart(2, "0"),
+    String(parsed.getUTCMonth() + 1).padStart(2, "0"),
+    parsed.getUTCFullYear()
+  ].join("-");
+}
+function workOrderDateInputValue(dateInput) {
+  const displayValue = formatWorkOrderDateDDMMYYYY(dateInput);
+  const match = displayValue.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return "";
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+function parseWorkOrderDateDDMMYYYYInput(value) {
+  const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+  const displayValue = validatedCalendarParts(
+    Number(match[3]),
+    Number(match[2]),
+    Number(match[1])
+  );
+  if (!displayValue) return null;
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+function normalizeWorkOrderDateTyping(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+}
+function workOrderOverdueCompletionMessage(dueDate) {
+  const displayedDueDate = formatWorkOrderDateDDMMYYYY(dueDate, String(dueDate ?? ""));
+  return `Work was completed after the scheduled due date (${displayedDueDate}). The record will be tagged as overdue.`;
+}
 function normalizeDateToDDMMMYYYY(dateInput) {
   if (!dateInput) return null;
   try {
@@ -11124,11 +11447,25 @@ function formatRHWithSeparators(value) {
   if (isNaN(num)) return String(value);
   return num.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
-var MONTH_ABBREV_3;
+var MONTH_NUMBER_BY_NAME, MONTH_ABBREV_3;
 var init_dateUtils = __esm({
   "shared/dateUtils.ts"() {
     "use strict";
     init_dateParse();
+    MONTH_NUMBER_BY_NAME = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
     MONTH_ABBREV_3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   }
 });
@@ -11136,15 +11473,47 @@ var init_dateUtils = __esm({
 // shared/workOrders/jobCycleCalc.ts
 var jobCycleCalc_exports = {};
 __export(jobCycleCalc_exports, {
-  computeJobCycleUpdates: () => computeJobCycleUpdates
+  computeJobCycleUpdates: () => computeJobCycleUpdates,
+  preserveNewerJobRhState: () => preserveNewerJobRhState
 });
+function finiteRh(value) {
+  if (value === null || value === void 0 || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function preserveNewerJobRhState(job, updates) {
+  const guarded = { ...updates };
+  const currentDate = parseWorkOrderDate(job.lastDoneDate);
+  const incomingDate = parseWorkOrderDate(guarded.lastDoneDate);
+  if (currentDate && incomingDate && incomingDate.getTime() <= currentDate.getTime()) {
+    delete guarded.lastDoneDate;
+    delete guarded.nextDueDate;
+  }
+  const currentLastDone = finiteRh(job.lastDoneRH);
+  const incomingLastDone = finiteRh(guarded.lastDoneRH);
+  if (currentLastDone !== null && incomingLastDone !== null && incomingLastDone <= currentLastDone) {
+    delete guarded.lastDoneRH;
+    delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
+    return guarded;
+  }
+  const currentNextDue = finiteRh(job.nextDueRH);
+  const incomingNextDue = finiteRh(guarded.nextDueRH);
+  if (currentNextDue !== null && incomingNextDue !== null && incomingNextDue < currentNextDue) {
+    delete guarded.nextDueRH;
+    delete guarded.rhEstimatedDueDate;
+    delete guarded.rhAveragePerDay;
+    delete guarded.rhEstimateBasis;
+  }
+  return guarded;
+}
 function computeJobCycleUpdates(input) {
   const { maintenanceBasis, dateOfCompletion, completionRH, originalDueDate, job } = input;
   const jobUpdates = {};
-  const linkUpdates = {};
   const applyCalendarLeg = () => {
     if (!dateOfCompletion) return;
-    linkUpdates.lastDoneDate = dateOfCompletion;
     jobUpdates.lastDoneDate = dateOfCompletion;
     if (job.frequencyValue && job.frequencyUnit) {
       const nextDue = calculateNextDueDate(
@@ -11154,7 +11523,6 @@ function computeJobCycleUpdates(input) {
         originalDueDate ?? void 0
       );
       if (nextDue) {
-        linkUpdates.nextDueDate = nextDue;
         jobUpdates.nextDueDate = nextDue;
       }
     }
@@ -11163,12 +11531,10 @@ function computeJobCycleUpdates(input) {
     if (!completionRH) return;
     const currentRH = parseInt(completionRH);
     if (isNaN(currentRH)) return;
-    linkUpdates.lastDoneRH = currentRH.toString();
     jobUpdates.lastDoneRH = currentRH;
     const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(String(job.frequencyValue)) : null);
     if (rhInterval && !isNaN(rhInterval)) {
       const nextDueRH = currentRH + rhInterval;
-      linkUpdates.nextDueRH = nextDueRH.toString();
       jobUpdates.nextDueRH = nextDueRH;
     }
   };
@@ -11179,15 +11545,152 @@ function computeJobCycleUpdates(input) {
     applyCalendarLeg();
     applyRhLeg();
   }
+  if (maintenanceBasis === "Running Hours" && dateOfCompletion) {
+    jobUpdates.lastDoneDate = dateOfCompletion;
+  }
   if (maintenanceBasis === "Running Hours" && completionRH) {
     applyRhLeg();
   }
-  return { jobUpdates, linkUpdates };
+  return { jobUpdates: preserveNewerJobRhState(job, jobUpdates) };
 }
 var init_jobCycleCalc = __esm({
   "shared/workOrders/jobCycleCalc.ts"() {
     "use strict";
     init_dateUtils();
+    init_dateParse();
+  }
+});
+
+// server/services/rhDueDateService.ts
+var rhDueDateService_exports = {};
+__export(rhDueDateService_exports, {
+  RH_ESTIMATE_BASIS_VERSION: () => RH_ESTIMATE_BASIS_VERSION,
+  calculateHistoricalRhAverage: () => calculateHistoricalRhAverage,
+  effectiveDueDate: () => effectiveDueDate,
+  estimateRhDueDate: () => estimateRhDueDate,
+  isCurrentRhEstimateBasis: () => isCurrentRhEstimateBasis,
+  resolveAuthoritativeRhComponent: () => resolveAuthoritativeRhComponent,
+  rhEstimateBasis: () => rhEstimateBasis
+});
+function isCurrentRhEstimateBasis(basis) {
+  return Boolean(basis?.startsWith(`${RH_ESTIMATE_BASIS_VERSION}_`));
+}
+function rhEstimateBasis(reason) {
+  return `${RH_ESTIMATE_BASIS_VERSION}_${reason}`;
+}
+function numeric3(value) {
+  if (value === null || value === void 0 || String(value).trim() === "") return null;
+  const result = Number(value);
+  return Number.isFinite(result) ? result : null;
+}
+function pointDate(point) {
+  return parseWorkOrderDate(point.dateUpdatedLocal);
+}
+function calculateHistoricalRhUtilization(points) {
+  const ordered = points.map((point) => ({
+    point,
+    date: pointDate(point),
+    rh: numeric3(point.cumulativeRH ?? point.newRH),
+    stamp: point.stampHolder || null
+  })).filter((item) => item.date !== null && item.point.isDeleted !== true).sort((a, b) => {
+    const byDate = a.date.getTime() - b.date.getTime();
+    if (byDate !== 0) return byDate;
+    return String(a.point.enteredAtUTC || "").localeCompare(String(b.point.enteredAtUTC || ""));
+  });
+  let lastBoundary = -1;
+  ordered.forEach((item, index3) => {
+    if (item.point.meterReplaced || item.point.isRenewalReset) lastBoundary = index3;
+  });
+  const valid = ordered.slice(Math.max(0, lastBoundary)).filter((item) => item.rh !== null);
+  if (valid.length < 2) return null;
+  const latest = valid[valid.length - 1];
+  let latestStampStart = valid.length - 1;
+  while (latestStampStart > 0 && valid[latestStampStart - 1].stamp === latest.stamp) {
+    latestStampStart--;
+  }
+  for (let startIndex = latestStampStart; startIndex < valid.length - 1; startIndex++) {
+    const start = valid[startIndex];
+    const days = (latest.date.getTime() - start.date.getTime()) / 864e5;
+    const delta = latest.rh - start.rh;
+    if (!(days > 0) || !(delta > 0)) continue;
+    return {
+      averagePerDay: delta / days,
+      latestDate: latest.date,
+      latestRh: latest.rh
+    };
+  }
+  return null;
+}
+function calculateHistoricalRhAverage(points) {
+  return calculateHistoricalRhUtilization(points)?.averagePerDay ?? null;
+}
+async function resolveAuthoritativeRhComponent(component, findById5, findByCode2, fallbackVesselId) {
+  if (!component) return null;
+  const expectedVesselId = component.vesselId || fallbackVesselId || null;
+  const isAuthoritativeMaster = (candidate) => Boolean(
+    candidate && String(candidate.rhCounterType || "").toUpperCase() === "MASTER" && (!expectedVesselId || candidate.vesselId === expectedVesselId)
+  );
+  if (String(component.rhCounterType || "").toUpperCase() !== "INHERITED") {
+    return isAuthoritativeMaster(component) ? component : null;
+  }
+  let master = null;
+  if (component.rhMasterComponentId) {
+    master = await findById5(String(component.rhMasterComponentId));
+  }
+  if (!isAuthoritativeMaster(master) && component.rhCounterSource && expectedVesselId) {
+    master = await findByCode2(component.rhCounterSource, expectedVesselId);
+  }
+  return isAuthoritativeMaster(master) ? master : null;
+}
+function estimateRhDueDate(completionDate, rhFrequency, points) {
+  const utilization = calculateHistoricalRhUtilization(points);
+  if (!utilization) {
+    return { dueDate: null, averagePerDay: null, basis: rhEstimateBasis("INSUFFICIENT_HISTORY") };
+  }
+  const completion = parseWorkOrderDate(completionDate);
+  if (!completion) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis("INVALID_COMPLETION_DATE")
+    };
+  }
+  const frequency = numeric3(rhFrequency);
+  if (frequency === null || frequency <= 0) {
+    return {
+      dueDate: null,
+      averagePerDay: utilization.averagePerDay,
+      basis: rhEstimateBasis("MISSING_RH_FREQUENCY")
+    };
+  }
+  const projectedDays = Math.max(0, Math.round(frequency / utilization.averagePerDay));
+  const due = new Date(Date.UTC(
+    completion.getUTCFullYear(),
+    completion.getUTCMonth(),
+    completion.getUTCDate() + projectedDays
+  ));
+  return {
+    dueDate: formatWorkOrderCalendarDate(due),
+    averagePerDay: utilization.averagePerDay,
+    basis: rhEstimateBasis("HISTORICAL")
+  };
+}
+function effectiveDueDate(calendarDueDate, rhDueDate) {
+  if (!calendarDueDate && !rhDueDate) return { date: null, basis: "UNAVAILABLE" };
+  if (!calendarDueDate) return { date: rhDueDate || null, basis: "RUNNING_HOURS" };
+  if (!rhDueDate) return { date: calendarDueDate, basis: "CALENDAR" };
+  const calendar = parseWorkOrderDate(calendarDueDate);
+  const rh = parseWorkOrderDate(rhDueDate);
+  if (!calendar || !rh) return { date: calendarDueDate, basis: "CALENDAR" };
+  if (calendar.getTime() === rh.getTime()) return { date: calendarDueDate, basis: "CALENDAR_AND_RUNNING_HOURS" };
+  return calendar < rh ? { date: calendarDueDate, basis: "CALENDAR" } : { date: rhDueDate, basis: "RUNNING_HOURS" };
+}
+var RH_ESTIMATE_BASIS_VERSION;
+var init_rhDueDateService = __esm({
+  "server/services/rhDueDateService.ts"() {
+    "use strict";
+    init_dateParse();
+    RH_ESTIMATE_BASIS_VERSION = "RH_COMPLETION_FIRST_LATEST_V2";
   }
 });
 
@@ -11197,8 +11700,171 @@ __export(shipCompletionLearner_exports, {
   collectCompletionWouuidsFromFullRows: () => collectCompletionWouuidsFromFullRows,
   collectCompletionWouuidsFromLogs: () => collectCompletionWouuidsFromLogs,
   filterAdvanceOnly: () => filterAdvanceOnly,
-  learnFromShipCompletions: () => learnFromShipCompletions
+  learnFromShipCompletions: () => learnFromShipCompletions,
+  refreshRhEstimatesFromAuditRows: () => refreshRhEstimatesFromAuditRows
 });
+async function refreshRhEstimatesFromAuditRows(client, auditRowUuids) {
+  if (auditRowUuids.length === 0) return 0;
+  const componentsRes = await client.query(
+    `SELECT DISTINCT
+            a.component_id,
+            c.cuuid AS component_cuuid,
+            c.id::text AS component_legacy_id,
+            c.component_code
+       FROM running_hours_audit a
+       LEFT JOIN components c
+         ON c.cuuid = a.component_id OR c.id::text = a.component_id
+      WHERE a.rhauuid = ANY($1::text[])`,
+    [auditRowUuids]
+  );
+  const componentIdentities = Array.from(new Set(
+    componentsRes.rows.flatMap((row) => [
+      row.component_id,
+      row.component_cuuid,
+      row.component_legacy_id
+    ].filter(Boolean).map(String))
+  ));
+  const componentCodes = Array.from(new Set(
+    componentsRes.rows.map((row) => row.component_code).filter(Boolean).map(String)
+  ));
+  if (componentIdentities.length === 0) return 0;
+  const jobsRes = await client.query(
+    `SELECT DISTINCT
+            j.juuid, j.vessel_id, j.component_id, j.component_code,
+            j.maintenance_basis, j.interval_running_hour,
+            j.last_done_date, j.last_done_rh, j.next_due_rh,
+            c.cuuid AS component_cuuid, c.id AS component_legacy_id,
+            c.vessel_id AS component_vessel_id, c.rh_counter_type,
+            c.rh_master_component_id, c.rh_counter_source
+       FROM jobs j
+       JOIN components c
+         ON c.cuuid = j.component_id
+         OR c.id::text = j.component_id
+         OR (c.component_code = j.component_code AND c.vessel_id = j.vessel_id)
+      WHERE j.maintenance_basis IN ('Running Hours', 'Dual Frequency')
+        AND j.next_due_rh IS NOT NULL
+        AND (
+          c.cuuid = ANY($1::text[])
+          OR c.id::text = ANY($1::text[])
+          OR c.rh_master_component_id = ANY($1::text[])
+          OR c.rh_counter_source = ANY($2::text[])
+         )
+       ORDER BY j.juuid`,
+    [componentIdentities, componentCodes]
+  );
+  let refreshed = 0;
+  for (let i = 0; i < jobsRes.rows.length; i++) {
+    const job = jobsRes.rows[i];
+    const sp = `rh_refresh_${i}`;
+    await client.query(`SAVEPOINT ${sp}`);
+    try {
+      const lockedJobRes = await client.query(
+        `SELECT last_done_date, last_done_rh, next_due_rh, interval_running_hour
+         FROM jobs
+        WHERE juuid = $1
+        FOR UPDATE`,
+        [job.juuid]
+      );
+      const lockedJob = lockedJobRes.rows[0];
+      if (!lockedJob) continue;
+      const toRhComponent = (row) => row ? {
+        id: row.id,
+        cuuid: row.cuuid,
+        vesselId: row.vessel_id,
+        rhCounterType: row.rh_counter_type,
+        rhMasterComponentId: row.rh_master_component_id,
+        rhCounterSource: row.rh_counter_source
+      } : null;
+      const findById5 = async (id) => {
+        const result = await client.query(
+          `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE cuuid = $1 OR id::text = $1 LIMIT 1`,
+          [id]
+        );
+        return toRhComponent(result.rows[0]);
+      };
+      const findByCode2 = async (code, vesselId) => {
+        const result = await client.query(
+          `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+           FROM components WHERE component_code = $1 AND vessel_id = $2 LIMIT 1`,
+          [code, vesselId]
+        );
+        return toRhComponent(result.rows[0]);
+      };
+      const source = await resolveAuthoritativeRhComponent(
+        {
+          id: job.component_legacy_id,
+          cuuid: job.component_cuuid,
+          vesselId: job.component_vessel_id,
+          rhCounterType: job.rh_counter_type,
+          rhMasterComponentId: job.rh_master_component_id,
+          rhCounterSource: job.rh_counter_source
+        },
+        findById5,
+        findByCode2,
+        job.vessel_id
+      );
+      let estimate = {
+        dueDate: null,
+        averagePerDay: null,
+        basis: rhEstimateBasis("MISSING_RH_SOURCE")
+      };
+      if (source?.cuuid) {
+        const audits = await client.query(
+          `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+           FROM running_hours_audit
+          WHERE component_id = $1
+            AND COALESCE(is_deleted, false) = false
+          ORDER BY entered_at_utc DESC`,
+          [source.cuuid]
+        );
+        estimate = estimateRhDueDate(
+          lockedJob.last_done_date,
+          lockedJob.interval_running_hour,
+          audits.rows.map((row) => ({
+            cumulativeRH: row.cumulative_rh,
+            newRH: row.new_rh,
+            previousRH: row.previous_rh,
+            dateUpdatedLocal: row.date_updated_local,
+            meterReplaced: row.meter_replaced,
+            isRenewalReset: row.is_renewal_reset,
+            stampHolder: row.stamp_holder,
+            enteredAtUTC: row.entered_at_utc,
+            isDeleted: row.is_deleted
+          }))
+        );
+      }
+      const update7 = await client.query(
+        `UPDATE jobs
+          SET rh_estimated_due_date = $2,
+              rh_average_per_day = $3,
+              rh_estimate_basis = $4,
+              updated_at = NOW()
+        WHERE juuid = $1
+          AND last_done_date IS NOT DISTINCT FROM $5
+          AND last_done_rh IS NOT DISTINCT FROM $6
+          AND next_due_rh IS NOT DISTINCT FROM $7`,
+        [
+          job.juuid,
+          estimate.dueDate,
+          estimate.averagePerDay,
+          estimate.basis,
+          lockedJob.last_done_date,
+          lockedJob.last_done_rh,
+          lockedJob.next_due_rh
+        ]
+      );
+      refreshed += update7.rowCount ?? 0;
+      await client.query(`RELEASE SAVEPOINT ${sp}`);
+    } catch (err) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+      await client.query(`RELEASE SAVEPOINT ${sp}`);
+      syncDiag(`RH-ESTIMATE REFRESH ERROR: job=${job.juuid}: ${String(err?.message || err).substring(0, 160)}`);
+    }
+  }
+  return refreshed;
+}
 function collectCompletionWouuidsFromLogs(logs) {
   const out = /* @__PURE__ */ new Set();
   for (const log2 of logs) {
@@ -11225,9 +11891,8 @@ function toNum(v) {
   const n = parseInt(String(v));
   return isNaN(n) ? null : n;
 }
-function filterAdvanceOnly(localJob, jobUpdates, linkUpdates) {
+function filterAdvanceOnly(localJob, jobUpdates) {
   const ju = { ...jobUpdates };
-  const lu = { ...linkUpdates };
   if (ju.lastDoneDate !== void 0) {
     const incoming = toDateMs(ju.lastDoneDate);
     const local = toDateMs(localJob.last_done_date);
@@ -11235,8 +11900,6 @@ function filterAdvanceOnly(localJob, jobUpdates, linkUpdates) {
     if (!advance) {
       delete ju.lastDoneDate;
       delete ju.nextDueDate;
-      delete lu.lastDoneDate;
-      delete lu.nextDueDate;
     }
   }
   if (ju.lastDoneRH !== void 0) {
@@ -11246,11 +11909,16 @@ function filterAdvanceOnly(localJob, jobUpdates, linkUpdates) {
     if (!advance) {
       delete ju.lastDoneRH;
       delete ju.nextDueRH;
-      delete lu.lastDoneRH;
-      delete lu.nextDueRH;
+      delete ju.rhEstimatedDueDate;
+      delete ju.rhAveragePerDay;
+      delete ju.rhEstimateBasis;
     }
+  } else if (ju.rhEstimatedDueDate !== void 0 || ju.rhAveragePerDay !== void 0 || ju.rhEstimateBasis !== void 0) {
+    delete ju.rhEstimatedDueDate;
+    delete ju.rhAveragePerDay;
+    delete ju.rhEstimateBasis;
   }
-  return Object.keys(ju).length > 0 ? { jobUpdates: ju, linkUpdates: lu } : null;
+  return Object.keys(ju).length > 0 ? ju : null;
 }
 function buildSet(updates, startIdx) {
   const parts = [];
@@ -11259,88 +11927,205 @@ function buildSet(updates, startIdx) {
   for (const [k, col] of Object.entries(COL_MAP)) {
     if (updates[k] !== void 0) {
       parts.push(`"${col}" = $${i++}`);
-      values.push(String(updates[k]));
+      values.push(updates[k] === null ? null : String(updates[k]));
     }
   }
   parts.push(`updated_at = NOW()`);
   return { sql: parts.join(", "), values };
 }
 async function learnFromShipCompletions(client, wouuids) {
-  const result = { candidates: wouuids.length, jobsAdvanced: 0, linksAdvanced: 0, skipped: 0, errors: 0 };
+  const result = { candidates: wouuids.length, jobsAdvanced: 0, skipped: 0, errors: 0, errorWouuids: [] };
+  await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
   for (let i = 0; i < wouuids.length; i++) {
     const wouuid = wouuids[i];
     const sp = `learn_wo_${i}`;
     try {
       await client.query(`SAVEPOINT ${sp}`);
       const woRes = await client.query(
-        `SELECT wouuid, status, job_id, component_id, vessel_id, maintenance_basis,
+        `SELECT wouuid, status, job_id, vessel_id, maintenance_basis,
                 date_completed, wo_completion_rh, completion_rh, current_reading,
                 next_due_date, due_date, work_order_no
            FROM work_orders WHERE wouuid = $1 LIMIT 1`,
         [wouuid]
       );
       const wo = woRes.rows[0];
-      if (!wo || !isCompletedStatus(wo.status) || !wo.job_id) {
+      if (!wo) {
         result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wouuid} is missing on shore`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (!isCompletedStatus(wo.status)) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} is not completed (status=${wo.status || "NULL"})`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (!wo.job_id) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: completed WO ${wo.work_order_no || wouuid} has no job_id`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
         continue;
       }
       const jobRes = await client.query(
-        `SELECT juuid, job_no, vessel_id, frequency_value, frequency_unit, interval_running_hour,
-                last_done_date, last_done_rh
+        `SELECT juuid, job_no, vessel_id, component_id, frequency_value, frequency_unit, interval_running_hour,
+                last_done_date, last_done_rh, next_due_rh
            FROM jobs WHERE juuid = $1 FOR UPDATE`,
         [wo.job_id]
       );
       const job = jobRes.rows[0];
       if (!job) {
         result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: completed WO ${wo.work_order_no || wouuid} references missing Job ${wo.job_id}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
+        continue;
+      }
+      if (wo.vessel_id && job.vessel_id && wo.vessel_id !== job.vessel_id) {
+        result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} vessel ${wo.vessel_id} does not match Job ${job.job_no} vessel ${job.vessel_id}`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
         continue;
       }
       const completionRH = wo.wo_completion_rh ?? wo.completion_rh ?? wo.current_reading;
-      const { jobUpdates, linkUpdates } = computeJobCycleUpdates({
+      const jobCompletionDate = getJobCompletionDate({ dateCompleted: wo.date_completed });
+      const { jobUpdates } = computeJobCycleUpdates({
         maintenanceBasis: wo.maintenance_basis,
-        dateOfCompletion: wo.date_completed,
+        dateOfCompletion: jobCompletionDate,
         completionRH: completionRH != null ? String(completionRH) : null,
         originalDueDate: wo.next_due_date || wo.due_date || null,
         job: {
           frequencyValue: job.frequency_value,
           frequencyUnit: job.frequency_unit,
-          intervalRunningHour: job.interval_running_hour
+          intervalRunningHour: job.interval_running_hour,
+          lastDoneDate: job.last_done_date,
+          lastDoneRH: job.last_done_rh
         }
       });
-      const filtered = filterAdvanceOnly(job, jobUpdates, linkUpdates);
+      const rhAdvance = jobUpdates.lastDoneRH !== void 0 && completionRH != null && (wo.maintenance_basis === "Running Hours" || wo.maintenance_basis === "Dual Frequency");
+      const filtered = filterAdvanceOnly(job, jobUpdates);
       if (!filtered) {
         result.skipped++;
+        syncDiag(`COMPLETION-LEARN SKIP: WO ${wo.work_order_no || wouuid} does not advance shore Job ${job.job_no}`);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
         continue;
       }
-      const jobSet = buildSet(filtered.jobUpdates, 2);
-      await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
-      result.jobsAdvanced++;
-      const vesselId = wo.vessel_id || job.vessel_id;
-      if (wo.component_id && vesselId && Object.keys(filtered.linkUpdates).length > 0) {
-        const linkSet = buildSet(filtered.linkUpdates, 4);
-        const linkRes = await client.query(
-          `UPDATE job_component_links SET ${linkSet.sql}
-            WHERE vessel_id = $1 AND job_id = $2 AND component_id = $3`,
-          [vesselId, job.juuid, wo.component_id, ...linkSet.values]
-        );
-        if ((linkRes.rowCount ?? 0) > 0) result.linksAdvanced++;
+      if (rhAdvance && filtered.lastDoneRH !== void 0) {
+        filtered.rhEstimatedDueDate = null;
+        filtered.rhAveragePerDay = null;
+        filtered.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
       }
-      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} \u2192 ${JSON.stringify(filtered.jobUpdates)}`);
+      const jobSet = buildSet(filtered, 2);
+      const coreWrite = await client.query(`UPDATE jobs SET ${jobSet.sql} WHERE juuid = $1`, [job.juuid, ...jobSet.values]);
+      if (coreWrite.rowCount === 0) throw new Error(`Job ${job.juuid} disappeared before core update`);
+      result.jobsAdvanced++;
+      syncDiag(`COMPLETION-LEARN: WO ${wo.work_order_no || wouuid} advanced shore job ${job.job_no} \u2192 ${JSON.stringify(filtered)}`);
+      if (rhAdvance && filtered.lastDoneRH !== void 0) {
+        const estimateSp = `learn_estimate_${i}`;
+        await client.query(`SAVEPOINT ${estimateSp}`);
+        try {
+          const toRhComponent = (row) => row ? {
+            id: row.id,
+            cuuid: row.cuuid,
+            vesselId: row.vessel_id,
+            rhCounterType: row.rh_counter_type,
+            rhMasterComponentId: row.rh_master_component_id,
+            rhCounterSource: row.rh_counter_source
+          } : null;
+          const findComponentById = async (id) => {
+            const result2 = await client.query(
+              `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE cuuid = $1 OR id::text = $1
+              LIMIT 1`,
+              [id]
+            );
+            return toRhComponent(result2.rows[0]);
+          };
+          const findComponentByCode3 = async (code, vesselId) => {
+            const result2 = await client.query(
+              `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+               FROM components
+              WHERE component_code = $1 AND vessel_id = $2
+              LIMIT 1`,
+              [code, vesselId]
+            );
+            return toRhComponent(result2.rows[0]);
+          };
+          const componentRes = await client.query(
+            `SELECT cuuid, id, vessel_id, rh_counter_type, rh_master_component_id, rh_counter_source
+             FROM components
+            WHERE cuuid = $1 OR id::text = $1
+            LIMIT 1`,
+            [job.component_id]
+          );
+          const sourceComponent = await resolveAuthoritativeRhComponent(
+            toRhComponent(componentRes.rows[0]),
+            findComponentById,
+            findComponentByCode3,
+            wo.vessel_id || job.vessel_id
+          );
+          const sourceId = sourceComponent?.cuuid;
+          if (sourceId) {
+            const auditsRes = await client.query(
+              `SELECT cumulative_rh, new_rh, previous_rh, date_updated_local,
+                    meter_replaced, is_renewal_reset, stamp_holder, entered_at_utc, is_deleted
+               FROM running_hours_audit
+               WHERE component_id = $1
+                 AND COALESCE(is_deleted, false) = false
+              ORDER BY entered_at_utc DESC`,
+              [sourceId]
+            );
+            const estimate = estimateRhDueDate(
+              jobCompletionDate,
+              job.interval_running_hour,
+              auditsRes.rows.map((row) => ({
+                cumulativeRH: row.cumulative_rh,
+                newRH: row.new_rh,
+                previousRH: row.previous_rh,
+                dateUpdatedLocal: row.date_updated_local,
+                meterReplaced: row.meter_replaced,
+                isRenewalReset: row.is_renewal_reset,
+                stampHolder: row.stamp_holder,
+                enteredAtUTC: row.entered_at_utc,
+                isDeleted: row.is_deleted
+              }))
+            );
+            await client.query(
+              `UPDATE jobs SET rh_estimated_due_date = $2, rh_average_per_day = $3, rh_estimate_basis = $4, updated_at = NOW()
+              WHERE juuid = $1 AND last_done_rh IS NOT DISTINCT FROM $5
+                AND last_done_date IS NOT DISTINCT FROM $6 AND next_due_rh IS NOT DISTINCT FROM $7`,
+              [
+                job.juuid,
+                estimate.dueDate,
+                estimate.averagePerDay,
+                estimate.basis,
+                String(filtered.lastDoneRH),
+                filtered.lastDoneDate ?? job.last_done_date,
+                String(filtered.nextDueRH ?? job.next_due_rh)
+              ]
+            );
+          }
+          await client.query(`RELEASE SAVEPOINT ${estimateSp}`);
+        } catch (estimateErr) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${estimateSp}`);
+          await client.query(`RELEASE SAVEPOINT ${estimateSp}`);
+          syncDiag(`COMPLETION-LEARN ESTIMATE ERROR: WO ${wouuid} job=${job.juuid}: ${String(estimateErr?.message || estimateErr).substring(0, 160)}`);
+        }
+      }
       await client.query(`RELEASE SAVEPOINT ${sp}`);
     } catch (err) {
       result.errors++;
+      result.errorWouuids.push(wouuid);
       try {
         await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
       } catch {
       }
       syncDiag(`COMPLETION-LEARN ERROR: WO ${wouuid}: ${String(err?.message || err).substring(0, 160)}`);
     }
   }
   if (wouuids.length > 0) {
-    syncDiag(`COMPLETION-LEARN SUMMARY: candidates=${result.candidates} jobsAdvanced=${result.jobsAdvanced} linksAdvanced=${result.linksAdvanced} skipped=${result.skipped} errors=${result.errors}`);
+    syncDiag(`COMPLETION-LEARN SUMMARY: candidates=${result.candidates} jobsAdvanced=${result.jobsAdvanced} skipped=${result.skipped} errors=${result.errors}`);
   }
   return result;
 }
@@ -11352,19 +12137,24 @@ var init_shipCompletionLearner = __esm({
     init_dateParse();
     init_workOrderStatus();
     init_syncDiagLogger();
+    init_completedWorkOrderDate();
+    init_rhDueDateService();
     COL_MAP = {
       lastDoneDate: "last_done_date",
       nextDueDate: "next_due_date",
       lastDoneRH: "last_done_rh",
-      nextDueRH: "next_due_rh"
+      nextDueRH: "next_due_rh",
+      rhEstimatedDueDate: "rh_estimated_due_date",
+      rhAveragePerDay: "rh_average_per_day",
+      rhEstimateBasis: "rh_estimate_basis"
     };
   }
 });
 
 // server/modules/sync/conflictReviewRepository.ts
 async function runPostResolutionLearning(pool4, wouuid) {
-  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-  if (isShipInstanceId(instanceId)) return;
+  const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  if (isShipInstanceId(instanceId2)) return;
   const stillOpen = await findWouuidsWithOpenDualConflicts(pool4, [wouuid]);
   if (stillOpen.has(wouuid)) {
     syncDiag(`DUAL-COMPLETION POST-RESOLUTION LEARNING DEFERRED: wouuid=${wouuid} \u2014 sibling field conflicts still open`);
@@ -11447,15 +12237,15 @@ function getFieldDisplayName(fieldName) {
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   }).join(" ");
 }
-function getInstanceLabel(instanceId, vesselName) {
-  if (!instanceId) return "Unknown";
-  if (isShipInstanceId(instanceId)) {
-    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
+function getInstanceLabel(instanceId2, vesselName) {
+  if (!instanceId2) return "Unknown";
+  if (isShipInstanceId(instanceId2)) {
+    return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId2})`;
   }
-  if (instanceId.toUpperCase().startsWith("SHORE")) {
+  if (instanceId2.toUpperCase().startsWith("SHORE")) {
     return "Shore \u2014 Office";
   }
-  return instanceId;
+  return instanceId2;
 }
 async function getRecordLabel(pool4, tableName, rowUuid) {
   const labelConfigs = {
@@ -11859,7 +12649,7 @@ async function getConflict2(id, source) {
 }
 async function resolveDualCompletionGroup(pool4, conflict, choice, userId) {
   const identityCol = getIdentityColumn(conflict.table_name) || "id";
-  const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+  const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
   const resolvedAction = choice === "incoming" ? "APPLY_INCOMING" : "DISMISS";
   const client = await pool4.connect();
   try {
@@ -11905,7 +12695,7 @@ async function resolveDualCompletionGroup(pool4, conflict, choice, userId) {
           chosenValue,
           vesselId,
           RESOLUTION_ACTOR,
-          instanceId
+          instanceId2
         ]
       );
       await client.query(
@@ -11962,7 +12752,7 @@ async function applyIncomingConflict(id, source, userId) {
        WHERE "${identityCol}" = $2`,
       [conflict.incoming_new_value, conflict.row_uuid]
     );
-    const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+    const instanceId2 = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
     await pool4.query(
       `INSERT INTO sync_field_log
         (table_name, row_uuid, field_name, old_value, new_value, vessel_id,
@@ -11976,7 +12766,7 @@ async function applyIncomingConflict(id, source, userId) {
         conflict.incoming_new_value,
         vesselId,
         userId,
-        instanceId
+        instanceId2
       ]
     );
     await pool4.query(
@@ -12111,6 +12901,215 @@ var init_conflictReviewRepository = __esm({
   }
 });
 
+// server/modules/sync/unknownColumnRetryPolicy.ts
+function shouldRetryUnknownSyncColumn(tableName, columnName) {
+  return tableName === "vessel_certificate_data" && columnName === "certificate_number";
+}
+var init_unknownColumnRetryPolicy = __esm({
+  "server/modules/sync/unknownColumnRetryPolicy.ts"() {
+    "use strict";
+  }
+});
+
+// server/modules/sync/completedWorkOrderDateSync.ts
+function toSnakeCase3(fieldName) {
+  return fieldName.includes("_") ? fieldName : fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+}
+async function ensureDateBeforeSyncedCompletedStatus(client, log2, incomingCompletionDate) {
+  if (log2.tableName !== "work_orders" || toSnakeCase3(log2.fieldName) !== "status" || !isCompletedWorkOrderStatus(log2.newValue)) {
+    return;
+  }
+  const rowResult = await client.query(
+    `SELECT date_completed, completion_date_time FROM work_orders WHERE wouuid = $1 LIMIT 1`,
+    [log2.rowUuid]
+  );
+  if (rowResult.rows.length === 0) return;
+  const row = rowResult.rows[0];
+  if (isValidCompletedWorkOrderDate(row.date_completed)) return;
+  const fallback = isValidCompletedWorkOrderDate(row.completion_date_time) ? row.completion_date_time : isValidCompletedWorkOrderDate(incomingCompletionDate) ? incomingCompletionDate : null;
+  if (!fallback) {
+    const error = new Error(
+      `Synced work order ${log2.rowUuid} cannot be marked Completed without a valid completion date.`
+    );
+    error.code = COMPLETED_DATE_SYNC_ERROR;
+    throw error;
+  }
+  await client.query(
+    `UPDATE work_orders SET date_completed = $1 WHERE wouuid = $2`,
+    [fallback, log2.rowUuid]
+  );
+}
+var COMPLETED_DATE_SYNC_ERROR;
+var init_completedWorkOrderDateSync = __esm({
+  "server/modules/sync/completedWorkOrderDateSync.ts"() {
+    "use strict";
+    init_completedWorkOrderDate();
+    COMPLETED_DATE_SYNC_ERROR = "COMPLETED_WORK_ORDER_DATE_REQUIRED";
+  }
+});
+
+// server/modules/work-orders/utils/workOrderPartADates.ts
+var workOrderPartADates_exports = {};
+__export(workOrderPartADates_exports, {
+  IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS: () => IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS,
+  buildRunningHoursWorkOrderSnapshots: () => buildRunningHoursWorkOrderSnapshots,
+  findAttemptedWorkOrderSnapshotFields: () => findAttemptedWorkOrderSnapshotFields,
+  getWorkOrderListDueHour: () => getWorkOrderListDueHour,
+  isImmutableWorkOrderSnapshotField: () => isImmutableWorkOrderSnapshotField,
+  normalizePartADateForInput: () => normalizePartADateForInput,
+  normalizePartARunningHours: () => normalizePartARunningHours,
+  resolveWorkOrderPartADates: () => resolveWorkOrderPartADates,
+  shouldApplySyncedWorkOrderSnapshot: () => shouldApplySyncedWorkOrderSnapshot
+});
+function buildRunningHoursWorkOrderSnapshots(source) {
+  const dueRH = firstNonEmptyRH(source.dueRH);
+  const lastDoneRH = firstNonEmptyRH(source.lastDoneRH);
+  const currentRH = firstNonEmptyRH(source.currentRH);
+  const interval = firstNonEmptyRH(source.intervalRunningHour);
+  return {
+    driverType: "RH",
+    cycleDueRhSnapshot: dueRH || null,
+    dueRhSnapshot: dueRH || null,
+    nextDueReading: dueRH || null,
+    rhLastDoneSnapshot: lastDoneRH || null,
+    lastDoneDateSnapshot: source.lastDoneDate?.trim() || null,
+    effectiveRhAtGeneration: currentRH || null,
+    currentReading: currentRH || null,
+    intervalRunningHour: interval || null
+  };
+}
+function findAttemptedWorkOrderSnapshotFields(input) {
+  return Object.keys(input).filter(
+    (key) => IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS.includes(key)
+  );
+}
+function isImmutableWorkOrderSnapshotField(fieldName) {
+  return IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS.includes(fieldName) || IMMUTABLE_WORK_ORDER_SNAPSHOT_COLUMNS.has(fieldName);
+}
+function shouldApplySyncedWorkOrderSnapshot(currentValue, senderOldValue) {
+  const receiverEmpty = currentValue === null || currentValue === void 0 || String(currentValue).trim() === "";
+  const senderCreatedField = senderOldValue === null || senderOldValue === void 0 || String(senderOldValue).trim() === "";
+  return receiverEmpty && senderCreatedField;
+}
+function firstNonEmptyDate(...values) {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+function firstNonEmptyRH(...values) {
+  for (const value of values) {
+    if (value === null || value === void 0) continue;
+    const trimmed = String(value).trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+function normalizePartARunningHours(value) {
+  const trimmed = value === null || value === void 0 ? "" : String(value).trim();
+  if (!trimmed) return "";
+  const numeric4 = Number(trimmed);
+  return Number.isFinite(numeric4) ? String(numeric4) : trimmed;
+}
+function normalizePartADateForInput(value) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const numericMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (numericMatch) {
+    return `${numericMatch[3]}-${numericMatch[2].padStart(2, "0")}-${numericMatch[1].padStart(2, "0")}`;
+  }
+  const namedMonthMatch = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (namedMonthMatch) {
+    const month = MONTH_NUMBER2[namedMonthMatch[2].toLowerCase()];
+    if (month) {
+      return `${namedMonthMatch[3]}-${month}-${namedMonthMatch[1].padStart(2, "0")}`;
+    }
+  }
+  return trimmed;
+}
+function resolveWorkOrderPartADates(workOrder) {
+  const normalizedBasis = workOrder.maintenanceBasis?.trim().toLowerCase();
+  const hasCalendarLeg = normalizedBasis !== "running hours";
+  const hasRunningHoursLeg = normalizedBasis === "running hours" || normalizedBasis === "dual frequency";
+  return {
+    lastCompletedOn: normalizePartADateForInput(
+      firstNonEmptyDate(workOrder.lastDoneDateSnapshot)
+    ),
+    nextDueDate: hasCalendarLeg ? normalizePartADateForInput(
+      firstNonEmptyDate(
+        workOrder.dueDateSnapshot,
+        workOrder.dueDate,
+        workOrder.nextDueDate
+      )
+    ) : "",
+    lastCompletedRH: normalizePartARunningHours(
+      firstNonEmptyRH(workOrder.rhLastDoneSnapshot)
+    ),
+    nextDueRH: hasRunningHoursLeg ? normalizePartARunningHours(
+      firstNonEmptyRH(
+        workOrder.dueRhSnapshot,
+        workOrder.cycleDueRhSnapshot,
+        workOrder.nextDueReading
+      )
+    ) : ""
+  };
+}
+function getWorkOrderListDueHour(workOrder) {
+  const dueRH = resolveWorkOrderPartADates(workOrder).nextDueRH;
+  if (!dueRH) return null;
+  const value = Number(dueRH);
+  return Number.isFinite(value) ? value : null;
+}
+var IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS, IMMUTABLE_WORK_ORDER_SNAPSHOT_COLUMNS, MONTH_NUMBER2;
+var init_workOrderPartADates = __esm({
+  "server/modules/work-orders/utils/workOrderPartADates.ts"() {
+    "use strict";
+    IMMUTABLE_WORK_ORDER_SNAPSHOT_FIELDS = [
+      "driverType",
+      "dualTriggerLeg",
+      "cycleDueRhSnapshot",
+      "generateRhSnapshot",
+      "dueRhSnapshot",
+      "effectiveRhAtGeneration",
+      "rhLastDoneSnapshot",
+      "cycleDueDateSnapshot",
+      "generateDateSnapshot",
+      "dueDateSnapshot",
+      "lastDoneDateSnapshot"
+    ];
+    IMMUTABLE_WORK_ORDER_SNAPSHOT_COLUMNS = /* @__PURE__ */ new Set([
+      "driver_type",
+      "dual_trigger_leg",
+      "cycle_due_rh_snapshot",
+      "generate_rh_snapshot",
+      "due_rh_snapshot",
+      "effective_rh_at_generation",
+      "rh_last_done_snapshot",
+      "cycle_due_date_snapshot",
+      "generate_date_snapshot",
+      "due_date_snapshot",
+      "last_done_date_snapshot"
+    ]);
+    MONTH_NUMBER2 = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
+  }
+});
+
 // server/modules/sync/service.ts
 var service_exports = {};
 __export(service_exports, {
@@ -12124,6 +13123,7 @@ __export(service_exports, {
   initiateSyncSession: () => initiateSyncSession,
   preparePullData: () => preparePullData,
   receivePushData: () => receivePushData,
+  refreshRhEstimatesSafely: () => refreshRhEstimatesSafely,
   resolveConflictAction: () => resolveConflictAction
 });
 async function getVesselCodeForUuid(vesselId) {
@@ -12141,23 +13141,38 @@ async function getVesselCodeForUuid(vesselId) {
     return null;
   }
 }
-async function initiateSyncSession(instanceId, vesselId, lastCheckpoint) {
+async function initiateSyncSession(instanceId2, vesselId, lastCheckpoint) {
   await upsertInstanceMetadata({
-    instanceId,
+    instanceId: instanceId2,
     vesselId,
     lastSyncStatus: "in_progress",
     syncDirection: "bidirectional"
   });
   const batch = await createBatch({
-    initiatedByInstance: instanceId,
+    initiatedByInstance: instanceId2,
     vesselId,
     checkpointBefore: lastCheckpoint
   });
-  console.log(`[Sync] Initiated batch ${batch.batchUuid} for ${instanceId} / ${vesselId}`);
+  console.log(`[Sync] Initiated batch ${batch.batchUuid} for ${instanceId2} / ${vesselId}`);
   return {
     batchUuid: batch.batchUuid,
     serverTimestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
+}
+async function refreshRhEstimatesSafely(client, auditIds, batchUuid, refresh) {
+  if (!auditIds.length) return 0;
+  await client.query("SAVEPOINT rh_refresh_batch");
+  try {
+    const count2 = await refresh(client, auditIds);
+    await client.query("RELEASE SAVEPOINT rh_refresh_batch");
+    syncDiag(`RH-ESTIMATE REFRESH: audits=${auditIds.length} jobs=${count2}`);
+    return count2;
+  } catch (err) {
+    await client.query("ROLLBACK TO SAVEPOINT rh_refresh_batch");
+    await client.query("RELEASE SAVEPOINT rh_refresh_batch");
+    syncDiag(`RH-ESTIMATE REFRESH ERROR: batch=${batchUuid}: ${String(err?.message || err).substring(0, 160)}`);
+    return 0;
+  }
 }
 async function receivePushData(batchUuid, vesselId, payload) {
   syncDiag(`RECEIVE-PUSH START: batch=${batchUuid}, vessel=${vesselId}, fieldLogs=${payload.fieldLogs?.length || 0}, oneWayRows=${payload.oneWayRows?.length || 0}, fullRows=${payload.fullRows?.length || 0}`);
@@ -12216,6 +13231,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
     }
   }
   const completionWouuids = /* @__PURE__ */ new Set();
+  const rhAuditRowUuids = /* @__PURE__ */ new Set();
   let selfHealInserted = 0;
   if (payload.fullRows && payload.fullRows.length > 0) {
     const { collectCompletionWouuidsFromFullRows: collectCompletionWouuidsFromFullRows2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
@@ -12226,6 +13242,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
         continue;
       }
       collectCompletionWouuidsFromFullRows2(t.tableName, t.rows).forEach((w) => completionWouuids.add(w));
+      if (t.tableName === "running_hours_audit") {
+        t.rows.forEach((row) => {
+          const id = row.rhauuid ?? row.Rhauuid;
+          if (id) rhAuditRowUuids.add(String(id));
+        });
+      }
       const r = await applyFullRowsIfAbsent(t.tableName, t.rows);
       selfHealInserted += r.inserted;
       if (r.errors.length > 0) r.errors.slice(0, 3).forEach((e) => syncDiag(`SELF-HEAL APPLY ERROR: ${e.substring(0, 150)}`));
@@ -12282,6 +13304,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
           const dropped = new Set(insertResult.failedRowUuids || []);
           const appliedInsertLogs = acceptedLogs.filter((l) => (l.oldValue === null || l.oldValue === void 0) && !deferred.has(l) && !dropped.has(l.rowUuid));
           collectCompletionWouuidsFromLogs2(appliedInsertLogs).forEach((w) => completionWouuids.add(w));
+          appliedInsertLogs.filter((log2) => log2.tableName === "running_hours_audit").forEach((log2) => rhAuditRowUuids.add(log2.rowUuid));
         }
         fieldLogApplyErrors += insertResult.errors.length;
         (insertResult.failedRowUuids || []).forEach((r) => droppedRowUuids.add(r));
@@ -12318,7 +13341,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
           const config = getTableSyncConfig(log2.tableName);
           if (!config) continue;
           const identityCol = config.identityColumn || "id";
-          const fieldNameSnake = toSnakeCase3(log2.fieldName);
+          const fieldNameSnake = toSnakeCase4(log2.fieldName);
           const pushSp = `push_upd_${pushUpdIdx++}`;
           try {
             await client.query(`SAVEPOINT ${pushSp}`);
@@ -12429,9 +13452,34 @@ async function receivePushData(batchUuid, vesselId, payload) {
             }
             const meta = await getColumnMeta(client, log2.tableName);
             if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+              if (shouldRetryUnknownSyncColumn(log2.tableName, fieldNameSnake)) {
+                droppedRowUuids.add(log2.rowUuid);
+                syncDiag(`UPDATE DEFER (unknown column): ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 receiver is pre-migration; left unacked for retry`);
+                continue;
+              }
               syncDiag(`UPDATE SKIP (unknown column): ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 column not in local schema (pre-migration instance); acked without apply`);
               fieldLogsApplied++;
               continue;
+            }
+            if (log2.tableName === "work_orders" && isImmutableWorkOrderSnapshotField(log2.fieldName)) {
+              const currentResult = await client.query(
+                `SELECT "${fieldNameSnake}" AS value FROM "work_orders" WHERE "${identityCol}" = $1 LIMIT 1`,
+                [log2.rowUuid]
+              );
+              if (currentResult.rows.length > 0 && !shouldApplySyncedWorkOrderSnapshot(
+                currentResult.rows[0]?.value,
+                log2.oldValue
+              )) {
+                fieldLogsApplied++;
+                syncDiag(
+                  `RECEIVE UPDATE SNAPSHOT-ACK immutable work_orders.${fieldNameSnake} row=${log2.rowUuid}`
+                );
+                try {
+                  await client.query(`RELEASE SAVEPOINT ${pushSp}`);
+                } catch {
+                }
+                continue;
+              }
             }
             let valueToApply = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
@@ -12441,6 +13489,11 @@ async function receivePushData(batchUuid, vesselId, payload) {
                 valueToApply = "[]";
               }
             }
+            await ensureDateBeforeSyncedCompletedStatus(
+              client,
+              log2,
+              dualCtxPush.incomingCompletionDateByRow.get(log2.rowUuid) ?? null
+            );
             const updateResult = await client.query(
               `UPDATE "${log2.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
               [valueToApply, log2.rowUuid, logChangedAt]
@@ -12450,6 +13503,8 @@ async function receivePushData(batchUuid, vesselId, payload) {
               droppedRowUuids.add(log2.rowUuid);
               console.warn(`[Sync Push] UPDATE skipped \u2014 row missing on receiver: ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} (change dropped; see FIELD-LOG-INSERT RECOVERY)`);
               syncDiag(`UPDATE-MISS: ${log2.tableName}.${fieldNameSnake} row=${log2.rowUuid} \u2014 row not found, UPDATE had no effect`);
+            } else if (log2.tableName === "running_hours_audit") {
+              rhAuditRowUuids.add(log2.rowUuid);
             }
             if (log2.tableName === "running_hours_audit" && (fieldNameSnake === "new_rh" || fieldNameSnake === "cumulative_rh") && valueToApply !== null) {
               try {
@@ -12506,6 +13561,9 @@ async function receivePushData(batchUuid, vesselId, payload) {
               syncDiag(`RECEIVE UPDATE IMMUTABLE-ACK (terminal): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 ${(err.message || "").substring(0, 120)}`);
               console.warn(`[Sync Push] Immutable-table UPDATE rejected \u2014 acked as terminal (not retried): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid}`);
             } else {
+              if (err.code === COMPLETED_DATE_SYNC_ERROR) {
+                droppedRowUuids.add(log2.rowUuid);
+              }
               console.error(`[Sync Push] Failed to apply field log ${log2.tableName}.${log2.fieldName} for ${log2.rowUuid}: ${err.message}`);
             }
           }
@@ -12639,6 +13697,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
         }
         {
           const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+          acceptedLogs.filter((log2) => log2.tableName === "work_orders" && !droppedRowUuids.has(log2.rowUuid)).forEach((log2) => completionWouuids.add(log2.rowUuid));
           dualConflictWouuids.forEach((w) => completionWouuids.delete(w));
           if (completionWouuids.size > 0) {
             const { findWouuidsWithOpenDualConflicts: findWouuidsWithOpenDualConflicts2 } = await Promise.resolve().then(() => (init_dualCompletionResolver(), dualCompletionResolver_exports));
@@ -12646,8 +13705,17 @@ async function receivePushData(batchUuid, vesselId, payload) {
             stillOpen.forEach((w) => completionWouuids.delete(w));
           }
           if (completionWouuids.size > 0) {
-            await learnFromShipCompletions2(client, Array.from(completionWouuids));
+            const learned = await learnFromShipCompletions2(client, Array.from(completionWouuids));
+            if (learned.errors > 0) {
+              syncDiag(`COMPLETION-LEARN CORE ERRORS: batch=${batchUuid} count=${learned.errors} \u2014 retaining affected WO logs for retry`);
+              learned.errorWouuids.forEach((w) => droppedRowUuids.add(w));
+            }
             completionWouuids.clear();
+          }
+          if (rhAuditRowUuids.size > 0) {
+            const { refreshRhEstimatesFromAuditRows: refreshRhEstimatesFromAuditRows2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+            await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows2);
+            rhAuditRowUuids.clear();
           }
         }
         await client.query("COMMIT");
@@ -12661,9 +13729,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
     }
     totalReceived += fieldLogsStored;
   }
-  if (completionWouuids.size > 0) {
+  if (completionWouuids.size > 0 || rhAuditRowUuids.size > 0) {
     try {
-      const { learnFromShipCompletions: learnFromShipCompletions2 } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
+      const {
+        learnFromShipCompletions: learnFromShipCompletions2,
+        refreshRhEstimatesFromAuditRows: refreshRhEstimatesFromAuditRows2
+      } = await Promise.resolve().then(() => (init_shipCompletionLearner(), shipCompletionLearner_exports));
       const pool4 = await getPool();
       const client = await pool4.connect();
       try {
@@ -12673,7 +13744,11 @@ async function receivePushData(batchUuid, vesselId, payload) {
         const stillOpen = await findWouuidsWithOpenDualConflicts2(client, Array.from(completionWouuids));
         stillOpen.forEach((w) => completionWouuids.delete(w));
         if (completionWouuids.size > 0) {
-          await learnFromShipCompletions2(client, Array.from(completionWouuids));
+          const learned = await learnFromShipCompletions2(client, Array.from(completionWouuids));
+          learned.errorWouuids.forEach((w) => droppedRowUuids.add(w));
+        }
+        if (rhAuditRowUuids.size > 0) {
+          await refreshRhEstimatesSafely(client, Array.from(rhAuditRowUuids), batchUuid, refreshRhEstimatesFromAuditRows2);
         }
         await client.query("COMMIT");
       } catch (learnErr) {
@@ -12686,6 +13761,7 @@ async function receivePushData(batchUuid, vesselId, payload) {
         client.release();
       }
       completionWouuids.clear();
+      rhAuditRowUuids.clear();
     } catch (learnOuterErr) {
       syncDiag(`COMPLETION-LEARN (fullRows-only) setup failed: ${String(learnOuterErr?.message || learnOuterErr).substring(0, 160)}`);
     }
@@ -12862,7 +13938,7 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
   const config = getTableSyncConfig(conflict.tableName);
   if (config) {
     const identityCol = config.identityColumn || "id";
-    const fieldNameSnake = toSnakeCase3(conflict.fieldName);
+    const fieldNameSnake = toSnakeCase4(conflict.fieldName);
     try {
       const pool4 = await getPool();
       await pool4.query(
@@ -12885,7 +13961,7 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
   console.log(`[Sync Resolve] Conflict ${conflictUuid}: ${resolution} \u2192 "${winningValue}"`);
   return { resolved: true, resolution, resolvedValue: winningValue };
 }
-async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUuids, failedOneWayTables, appliedTableCheckpoints) {
+async function completeSyncSession(batchUuid, vesselId, instanceId2, appliedRowUuids, failedOneWayTables, appliedTableCheckpoints) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
     throw Object.assign(new Error(`Batch ${batchUuid} not found`), { statusCode: 404 });
@@ -12900,11 +13976,11 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
   const startedAt = batch.startedAt instanceof Date ? batch.startedAt : new Date(batch.startedAt);
   const durationMs = now.getTime() - startedAt.getTime();
   const vesselCode = await getVesselCodeForUuid(vesselId);
-  syncDiag(`COMPLETE-SESSION: marking shore logs synced for vessel=${vesselId} checkpointBefore=${batch.checkpointBefore?.toISOString?.() || batch.checkpointBefore || "NONE"} excludeInstance=${instanceId}`);
+  syncDiag(`COMPLETE-SESSION: marking shore logs synced for vessel=${vesselId} checkpointBefore=${batch.checkpointBefore?.toISOString?.() || batch.checkpointBefore || "NONE"} excludeInstance=${instanceId2}`);
   const shoreLogsRaw = await getFieldLogsSinceCheckpoint(
     vesselId,
     batch.checkpointBefore,
-    instanceId,
+    instanceId2,
     // exclude ship's own
     vesselCode
   );
@@ -12921,7 +13997,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
       batchUuid
     );
   }
-  const shipLogsRaw = await getUnsyncedFieldLogs(instanceId, vesselId, vesselCode);
+  const shipLogsRaw = await getUnsyncedFieldLogs(instanceId2, vesselId, vesselCode);
   const shipLogs = shipLogsRaw.map(normalizeFieldLog);
   syncDiag(`COMPLETE-SESSION: found ${shipLogs.length} ship logs to mark synced`);
   if (shipLogs.length > 0) {
@@ -12937,7 +14013,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     for (const [t, iso] of Object.entries(appliedTableCheckpoints)) {
       if (!failedSet.has(t) && iso) advance[t] = iso;
     }
-    perTableWritten = await setTableCheckpoints(instanceId, advance);
+    perTableWritten = await setTableCheckpoints(instanceId2, advance);
     if (failedSet.size > 0) {
       syncDiag(
         `COMPLETE-SESSION PER-TABLE: advanced ${perTableWritten} table(s); held [${Array.from(failedSet).join(",")}] \u2014 other tables unaffected`
@@ -12955,7 +14031,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     syncDiag(`COMPLETE-SESSION ONE-WAY HOLDBACK: tables=[${failedOneWayTables.join(",")}] checkpoint held at ${held}`);
   }
   await upsertInstanceMetadata({
-    instanceId,
+    instanceId: instanceId2,
     vesselId,
     lastSyncCheckpoint: effectiveCheckpoint,
     lastSyncStatus: "success",
@@ -12968,7 +14044,7 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     durationMs
   });
   console.log(`[Sync Complete] Batch ${batchUuid}: ${durationMs}ms, checkpoint ${oneWayHoldback ? "HELD at" : "advanced to"} ${effectiveCheckpoint ? effectiveCheckpoint.toISOString() : "NULL"}`);
-  const remainingPull = await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+  const remainingPull = await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
   return {
     completed: true,
     // The EFFECTIVE checkpoint (held back on one-way failures) — the ship saves this
@@ -12979,14 +14055,14 @@ async function completeSyncSession(batchUuid, vesselId, instanceId, appliedRowUu
     // these; its `lastCheckpoint` for the NEXT pull is the MINIMUM of them (see
     // repo.getConservativeFloor). Absent from an old shore's response ⇒ the ship keeps
     // using the single newCheckpoint for everything.
-    newTableCheckpoints: await getTableCheckpoints(instanceId),
+    newTableCheckpoints: await getTableCheckpoints(instanceId2),
     perTableAdvanced: perTableWritten,
     durationMs,
     remainingPull
   };
 }
-async function getSyncStatus(vesselId, instanceId) {
-  const metadata = await getInstanceMetadata(instanceId);
+async function getSyncStatus(vesselId, instanceId2) {
+  const metadata = await getInstanceMetadata(instanceId2);
   const pendingChanges = await getFieldLogCount(vesselId, false);
   const unresolvedConflicts = await getUnresolvedConflicts(vesselId);
   const pendingFiles = await getPendingFileCount(vesselId);
@@ -13081,7 +14157,7 @@ async function gatherOneWayShoreRows(vesselId, sinceCheckpoint, tableCheckpoints
   }
   return { batches: results, tableMax };
 }
-function toSnakeCase3(str) {
+function toSnakeCase4(str) {
   return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 }
 function normalizeFieldLog(row) {
@@ -13191,14 +14267,18 @@ var init_service = __esm({
     init_syncDiagLogger();
     init_alertsRepository();
     init_conflictReviewRepository();
+    init_unknownColumnRetryPolicy();
+    init_completedWorkOrderDateSync();
+    init_workOrderPartADates();
     vesselCodeCache = /* @__PURE__ */ new Map();
   }
 });
 
 // shared/master/schema.ts
-import { pgTable as pgTable3, serial as serial3, text as text3, boolean as boolean3, timestamp as timestamp4 } from "drizzle-orm/pg-core";
+import { pgTable as pgTable3, serial as serial3, text as text3, boolean as boolean3, timestamp as timestamp4, integer as integer3, jsonb as jsonb2, uuid } from "drizzle-orm/pg-core";
+import { sql as sql5 } from "drizzle-orm";
 import { createInsertSchema as createInsertSchema3 } from "drizzle-zod";
-var tenants, insertTenantSchema, tenantInstances, insertTenantInstanceSchema;
+var tenants, insertTenantSchema, chatbotInteractions, tenantInstances, insertTenantInstanceSchema;
 var init_schema2 = __esm({
   "shared/master/schema.ts"() {
     "use strict";
@@ -13208,9 +14288,36 @@ var init_schema2 = __esm({
       tuid: text3("tuid").notNull(),
       databaseName: text3("database_name").notNull(),
       isActive: boolean3("is_active").notNull().default(true),
+      // Chatbot (Stage A): per-tenant AI assistant on/off. Default true = current behavior
+      // preserved (chatbot works today); disable specific tenants as needed. Checked before
+      // any LLM call so a disabled tenant incurs no LLM cost.
+      aiEnabled: boolean3("ai_enabled").notNull().default(true),
       createdAt: timestamp4("created_at").notNull().defaultNow()
     });
     insertTenantSchema = createInsertSchema3(tenants).omit({ id: true, createdAt: true });
+    chatbotInteractions = pgTable3("chatbot_interactions", {
+      id: uuid("id").primaryKey().default(sql5`gen_random_uuid()`),
+      tuid: text3("tuid"),
+      // tenant tag (null in single-tenant)
+      domain: text3("domain"),
+      userId: text3("user_id"),
+      userName: text3("user_name"),
+      userRole: text3("user_role"),
+      vesselId: text3("vessel_id"),
+      conversationId: text3("conversation_id"),
+      question: text3("question").notNull(),
+      answer: text3("answer").notNull(),
+      // FULL answer the user saw (admin-only store)
+      toolsUsed: jsonb2("tools_used"),
+      docsRetrieved: jsonb2("docs_retrieved"),
+      // null until RAG (Stage B)
+      tokensIn: integer3("tokens_in"),
+      tokensOut: integer3("tokens_out"),
+      latencyMs: integer3("latency_ms"),
+      model: text3("model"),
+      provider: text3("provider"),
+      createdAt: timestamp4("created_at", { withTimezone: true }).notNull().defaultNow()
+    });
     tenantInstances = pgTable3("tenant_instances", {
       instanceId: text3("instance_id").primaryKey(),
       vesselId: text3("vessel_id"),
@@ -13226,7 +14333,7 @@ var init_schema2 = __esm({
 });
 
 // server/migrations.ts
-import { sql as sql5 } from "drizzle-orm";
+import { sql as sql6 } from "drizzle-orm";
 import { drizzle as drizzle3 } from "drizzle-orm/node-postgres";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -13277,7 +14384,7 @@ async function cleanupOldBackups(backupDir, keepCount) {
   }
 }
 async function ensureMigrationsTable(db2) {
-  await db2.execute(sql5`
+  await db2.execute(sql6`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id VARCHAR(255) PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -13287,13 +14394,13 @@ async function ensureMigrationsTable(db2) {
   `);
 }
 async function getMigrationStatus(db2, migrationId) {
-  const result = await db2.execute(sql5`
+  const result = await db2.execute(sql6`
     SELECT id FROM schema_migrations WHERE id = ${migrationId}
   `);
   return result.rows.length > 0;
 }
 async function markMigrationComplete(db2, migration) {
-  await db2.execute(sql5`
+  await db2.execute(sql6`
     INSERT INTO schema_migrations (id, name, description, applied_at)
     VALUES (${migration.id}, ${migration.name}, ${migration.description}, NOW())
     ON CONFLICT (id) DO NOTHING
@@ -13325,7 +14432,7 @@ async function runMigrations(poolArg) {
         let skippedStmts = 0;
         for (const stmt of statements) {
           try {
-            await db2.execute(sql5.raw(stmt));
+            await db2.execute(sql6.raw(stmt));
             appliedStmts++;
           } catch (stmtError) {
             const safeError = stmtError.code === "42P07" || // duplicate_table
@@ -13347,7 +14454,7 @@ async function runMigrations(poolArg) {
         console.log(`  \u2705 Migration ${migration.id}: ${appliedStmts} statements applied, ${skippedStmts} skipped`);
       } else {
         try {
-          await db2.execute(sql5.raw(migration.sql));
+          await db2.execute(sql6.raw(migration.sql));
           await markMigrationComplete(db2, migration);
           applied++;
           console.log(`  \u2705 Migration ${migration.id} applied successfully`);
@@ -13409,7 +14516,7 @@ async function runDrizzleMigrations(poolArg) {
       let skippedStmts = 0;
       for (const stmt of statements) {
         try {
-          await db2.execute(sql5.raw(stmt));
+          await db2.execute(sql6.raw(stmt));
           appliedStmts++;
         } catch (error) {
           if (error.code === "42P07" || error.code === "42701" || error.code === "42704") {
@@ -13437,7 +14544,7 @@ async function runDrizzleMigrations(poolArg) {
       console.log(`  \u2705 Migration ${migrationId}: ${appliedStmts} statements applied, ${skippedStmts} skipped`);
     } else {
       try {
-        await db2.execute(sql5.raw(sqlContent));
+        await db2.execute(sql6.raw(sqlContent));
         const migration = {
           id: migrationId,
           name: `Drizzle SQL migration: ${sqlFile}`,
@@ -13473,7 +14580,7 @@ async function cleanupDuplicateFleetComponentMappings() {
   if (!postgres) return;
   const { db: db2 } = postgres;
   try {
-    const result = await db2.execute(sql5.raw(`
+    const result = await db2.execute(sql6.raw(`
       DELETE FROM fleet_component_mapping a
       USING fleet_component_mapping b
       WHERE a.id > b.id
@@ -16610,7 +17717,7 @@ var init_overdueReasons = __esm({
 });
 
 // server/initDb.ts
-import { sql as sql6 } from "drizzle-orm";
+import { sql as sql7 } from "drizzle-orm";
 import { drizzle as drizzle4 } from "drizzle-orm/node-postgres";
 async function ensureMaintenanceHistoryImmutability(poolArg) {
   console.log("\u{1F512} Ensuring immutability trigger for component_maintenance_history...");
@@ -16621,7 +17728,7 @@ async function ensureMaintenanceHistoryImmutability(poolArg) {
   }
   const { db: db2 } = postgres;
   try {
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE OR REPLACE FUNCTION prevent_maintenance_history_modification()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -16630,25 +17737,25 @@ async function ensureMaintenanceHistoryImmutability(poolArg) {
       END;
       $$ LANGUAGE plpgsql;
     `);
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       DROP TRIGGER IF EXISTS prevent_maintenance_history_update ON component_maintenance_history;
     `);
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TRIGGER prevent_maintenance_history_update
         BEFORE UPDATE ON component_maintenance_history
         FOR EACH ROW
         EXECUTE FUNCTION prevent_maintenance_history_modification();
     `);
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       DROP TRIGGER IF EXISTS prevent_maintenance_history_delete ON component_maintenance_history;
     `);
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TRIGGER prevent_maintenance_history_delete
         BEFORE DELETE ON component_maintenance_history
         FOR EACH ROW
         EXECUTE FUNCTION prevent_maintenance_history_modification();
     `);
-    const verifyResult = await db2.execute(sql6`
+    const verifyResult = await db2.execute(sql7`
       SELECT trigger_name 
       FROM information_schema.triggers 
       WHERE event_object_table = 'component_maintenance_history'
@@ -16676,7 +17783,7 @@ async function ensureCertApplicabilityIndex() {
   }
   const { db: db2 } = postgres;
   try {
-    const tableCheck = await db2.execute(sql6`
+    const tableCheck = await db2.execute(sql7`
       SELECT 1 FROM information_schema.tables
       WHERE table_name = 'vessel_certificate_applicability'
       LIMIT 1
@@ -16685,7 +17792,7 @@ async function ensureCertApplicabilityIndex() {
       console.log("\u26A0\uFE0F  vessel_certificate_applicability table does not exist yet \u2014 skipping index check");
       return;
     }
-    const before = await db2.execute(sql6`
+    const before = await db2.execute(sql7`
       SELECT 1 FROM pg_indexes
       WHERE indexname = 'uniq_vessel_certificate_applicability_live'
       LIMIT 1
@@ -16697,13 +17804,13 @@ async function ensureCertApplicabilityIndex() {
       );
     }
     try {
-      await db2.execute(sql6`
+      await db2.execute(sql7`
         CREATE UNIQUE INDEX IF NOT EXISTS uniq_vessel_certificate_applicability_live
           ON vessel_certificate_applicability (vessel_id, master_id)
           WHERE is_deleted = false
       `);
     } catch (createErr) {
-      const dupes = await db2.execute(sql6`
+      const dupes = await db2.execute(sql7`
         SELECT vessel_id, master_id, COUNT(*)::int AS live_count,
                ARRAY_AGG(id ORDER BY updated_at DESC NULLS LAST, id DESC) AS row_ids
         FROM vessel_certificate_applicability
@@ -16724,7 +17831,7 @@ Original CREATE INDEX error: ${createErr.message}`
       }
       throw createErr;
     }
-    const verify = await db2.execute(sql6`
+    const verify = await db2.execute(sql7`
       SELECT 1 FROM pg_indexes
       WHERE indexname = 'uniq_vessel_certificate_applicability_live'
       LIMIT 1
@@ -16748,12 +17855,12 @@ Original CREATE INDEX error: ${createErr.message}`
 async function runIndexMigrations(db2) {
   console.log("\u{1F504} Running index migrations...");
   try {
-    await db2.execute(sql6`ALTER TABLE spares DROP CONSTRAINT IF EXISTS unique_fleet_part_code`);
-    await db2.execute(sql6`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_part_code_vessel ON spares(fleet_part_code, data_scope, vessel_id)`);
-    await db2.execute(sql6`ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS unique_fleet_job_code`);
-    await db2.execute(sql6`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_job_code_vessel ON work_orders(fleet_job_code, data_scope, vessel_id)`);
+    await db2.execute(sql7`ALTER TABLE spares DROP CONSTRAINT IF EXISTS unique_fleet_part_code`);
+    await db2.execute(sql7`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_part_code_vessel ON spares(fleet_part_code, data_scope, vessel_id)`);
+    await db2.execute(sql7`ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS unique_fleet_job_code`);
+    await db2.execute(sql7`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_job_code_vessel ON work_orders(fleet_job_code, data_scope, vessel_id)`);
     try {
-      await db2.execute(sql6`
+      await db2.execute(sql7`
         DO $$
         DECLARE
           scl_cols text;
@@ -16797,9 +17904,9 @@ async function runIndexMigrations(db2) {
     } catch (sclErr) {
       console.error("\u26A0\uFE0F  Failed to ensure 3-col unique_spare_component_link constraint:", sclErr?.message || sclErr);
     }
-    await db2.execute(sql6`ALTER TABLE vessels ADD COLUMN IF NOT EXISTS vessel_sequence INTEGER`);
-    await db2.execute(sql6`ALTER TABLE components ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
-    await db2.execute(sql6`
+    await db2.execute(sql7`ALTER TABLE vessels ADD COLUMN IF NOT EXISTS vessel_sequence INTEGER`);
+    await db2.execute(sql7`ALTER TABLE components ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS defect_sequences (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         vessel_id TEXT NOT NULL,
@@ -16808,7 +17915,7 @@ async function runIndexMigrations(db2) {
         UNIQUE(vessel_id, year)
       )
     `);
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       WITH numbered_vessels AS (
         SELECT id, ROW_NUMBER() OVER (ORDER BY created_at, id) as seq
         FROM vessels
@@ -16819,7 +17926,7 @@ async function runIndexMigrations(db2) {
       FROM numbered_vessels nv
       WHERE v.id = nv.id
     `);
-    const oldFormatDefects = await db2.execute(sql6`
+    const oldFormatDefects = await db2.execute(sql7`
       SELECT d.id, d.vessel_id, d.created_at
       FROM defects d
       WHERE d.id LIKE 'DEF-%'
@@ -16852,7 +17959,7 @@ async function runIndexMigrations(db2) {
       for (const [vesselId, yearMap] of defectsByVesselYear) {
         for (const [year, defectList] of yearMap) {
           const yearShort = year % 100;
-          const existingSeq = await db2.execute(sql6`
+          const existingSeq = await db2.execute(sql7`
             SELECT last_sequence FROM defect_sequences 
             WHERE vessel_id = ${vesselId} AND year = ${year}
           `);
@@ -16864,12 +17971,12 @@ async function runIndexMigrations(db2) {
             const yearCode = String(yearShort).padStart(2, "0");
             const seqCode = String(seqNum).padStart(4, "0");
             const newId = `D${vesselCode}-${yearCode}-${seqCode}`;
-            await db2.execute(sql6`UPDATE defects SET id = ${newId} WHERE id = ${defect.oldId}`);
-            await db2.execute(sql6`UPDATE defect_actions SET defect_id = ${newId} WHERE defect_id = ${defect.oldId}`);
-            await db2.execute(sql6`UPDATE defect_attachments SET defect_id = ${newId} WHERE defect_id = ${defect.oldId}`);
+            await db2.execute(sql7`UPDATE defects SET id = ${newId} WHERE id = ${defect.oldId}`);
+            await db2.execute(sql7`UPDATE defect_actions SET defect_id = ${newId} WHERE defect_id = ${defect.oldId}`);
+            await db2.execute(sql7`UPDATE defect_attachments SET defect_id = ${newId} WHERE defect_id = ${defect.oldId}`);
           }
           const finalSeq = startSeq + defectList.length - 1;
-          await db2.execute(sql6`
+          await db2.execute(sql7`
             INSERT INTO defect_sequences (vessel_id, year, last_sequence)
             VALUES (${vesselId}, ${year}, ${finalSeq})
             ON CONFLICT (vessel_id, year) DO UPDATE SET last_sequence = ${finalSeq}
@@ -16880,7 +17987,7 @@ async function runIndexMigrations(db2) {
     }
     console.log("\u2705 Index migrations completed - unique constraints now include vessel_id");
     try {
-      const fillMissing = await db2.execute(sql6`
+      const fillMissing = await db2.execute(sql7`
         UPDATE work_orders wo
         SET assigned_to_rank_id = r.rank_id
         FROM adm_available_ranks r
@@ -16894,7 +18001,7 @@ async function runIndexMigrations(db2) {
             LOWER(BTRIM(r.label)) = LOWER(BTRIM(wo.assigned_to))
           )
       `);
-      const fixStale = await db2.execute(sql6`
+      const fixStale = await db2.execute(sql7`
         UPDATE work_orders wo
         SET assigned_to_rank_id = r.rank_id
         FROM adm_available_ranks r
@@ -16910,7 +18017,7 @@ async function runIndexMigrations(db2) {
             LOWER(BTRIM(r.label)) = LOWER(BTRIM(wo.assigned_to))
           )
       `);
-      const fillMissingText = await db2.execute(sql6`
+      const fillMissingText = await db2.execute(sql7`
         UPDATE work_orders wo
         SET assigned_to = COALESCE(NULLIF(BTRIM(r.label), ''), r.name)
         FROM adm_available_ranks r
@@ -16924,7 +18031,7 @@ async function runIndexMigrations(db2) {
             OR LOWER(BTRIM(wo.assigned_to)) = 'unassigned'
           )
       `);
-      const clearOnUnassign = await db2.execute(sql6`
+      const clearOnUnassign = await db2.execute(sql7`
         UPDATE work_orders
         SET assigned_to_rank_id = NULL
         WHERE assigned_to_rank_id IS NOT NULL
@@ -16962,7 +18069,7 @@ async function initializeDatabase(poolArg) {
     }
     const { db: db2 } = postgres;
     console.log("\u{1F527} Initializing database tables...");
-    const tablesQuery = await db2.execute(sql6`
+    const tablesQuery = await db2.execute(sql7`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public'
@@ -16982,7 +18089,7 @@ async function initializeDatabase(poolArg) {
           { key: "FFA", value: "FFA", order: 6 }
         ];
         for (const dept of departmentSeeds2) {
-          await db2.execute(sql6`
+          await db2.execute(sql7`
             INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
             VALUES ('department', ${dept.key}, ${dept.value}, ${dept.order}, true)
             ON CONFLICT (list_type, list_key) DO UPDATE SET display_order = ${dept.order}
@@ -16991,7 +18098,7 @@ async function initializeDatabase(poolArg) {
         console.log("\u2713 Ensured department master list (6 values)");
         for (let i = 0; i < POSTPONEMENT_REASONS.length; i++) {
           const reason = POSTPONEMENT_REASONS[i];
-          await db2.execute(sql6`
+          await db2.execute(sql7`
             INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
             VALUES ('postponementReason', ${reason}, ${reason}, ${i + 1}, true)
             ON CONFLICT (list_type, list_key) DO NOTHING
@@ -17000,21 +18107,21 @@ async function initializeDatabase(poolArg) {
         console.log(`\u2713 Ensured postponement reason master list (${POSTPONEMENT_REASONS.length} values)`);
         for (let i = 0; i < OVERDUE_REASONS.length; i++) {
           const reason = OVERDUE_REASONS[i];
-          await db2.execute(sql6`
+          await db2.execute(sql7`
             INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
             VALUES ('overdueReason', ${reason}, ${reason}, ${i + 1}, true)
             ON CONFLICT (list_type, list_key) DO NOTHING
           `);
         }
         console.log(`\u2713 Ensured overdue reason master list (${OVERDUE_REASONS.length} values)`);
-        await db2.execute(sql6`ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS overdue_reason TEXT`);
-        await db2.execute(sql6`ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS overdue_reason_details TEXT`);
+        await db2.execute(sql7`ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS overdue_reason TEXT`);
+        await db2.execute(sql7`ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS overdue_reason_details TEXT`);
         console.log("\u2713 Ensured overdue_reason and overdue_reason_details columns on work_orders");
       }
       return true;
     }
     console.log("\u{1F4DD} Creating database schema...");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         username TEXT NOT NULL UNIQUE,
@@ -17022,7 +18129,7 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created users table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS components (
         id TEXT PRIMARY KEY,
         name TEXT,
@@ -17068,11 +18175,11 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created components table");
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_comp_data_scope ON components(data_scope)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_comp_fleet_tree ON components(data_scope, parent_fleet_equipment_code)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_comp_vessel_tree ON components(data_scope, vessel_id, parent_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_comp_fleet_equipment_code ON components(fleet_equipment_code)`);
-    await db2.execute(sql6`
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_comp_data_scope ON components(data_scope)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_comp_fleet_tree ON components(data_scope, parent_fleet_equipment_code)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_comp_vessel_tree ON components(data_scope, vessel_id, parent_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_comp_fleet_equipment_code ON components(fleet_equipment_code)`);
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS work_orders (
         id TEXT PRIMARY KEY,
         vessel_id TEXT NOT NULL,
@@ -17133,11 +18240,11 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created work_orders table");
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_wo_vessel ON work_orders(vessel_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_wo_component ON work_orders(component_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_wo_status ON work_orders(status)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_wo_next_due ON work_orders(next_due_date)`);
-    await db2.execute(sql6`
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_wo_vessel ON work_orders(vessel_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_wo_component ON work_orders(component_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_wo_status ON work_orders(status)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_wo_next_due ON work_orders(next_due_date)`);
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS spares (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         part_code TEXT NOT NULL,
@@ -17178,13 +18285,13 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created spares table");
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_spare_component ON spares(component_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_spare_vessel ON spares(vessel_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_spare_code ON spares(vessel_id, component_spare_code)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_spare_data_scope ON spares(data_scope)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_spare_fleet_equipment ON spares(data_scope, fleet_equipment_code)`);
-    await db2.execute(sql6`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_part_code_vessel ON spares(fleet_part_code, data_scope, vessel_id)`);
-    await db2.execute(sql6`
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_spare_component ON spares(component_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_spare_vessel ON spares(vessel_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_spare_code ON spares(vessel_id, component_spare_code)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_spare_data_scope ON spares(data_scope)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_spare_fleet_equipment ON spares(data_scope, fleet_equipment_code)`);
+    await db2.execute(sql7`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_part_code_vessel ON spares(fleet_part_code, data_scope, vessel_id)`);
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS defects (
         id TEXT PRIMARY KEY,
         vessel_id TEXT NOT NULL,
@@ -17237,13 +18344,13 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created defects table");
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_defect_vessel ON defects(vessel_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_defect_component ON defects(component_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_defect_status ON defects(status)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_defect_priority ON defects(priority)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_defect_coc ON defects(is_coc)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_defect_equipment ON defects(equipment_key)`);
-    await db2.execute(sql6`
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_defect_vessel ON defects(vessel_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_defect_component ON defects(component_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_defect_status ON defects(status)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_defect_priority ON defects(priority)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_defect_coc ON defects(is_coc)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_defect_equipment ON defects(equipment_key)`);
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS running_hours_audit (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         vessel_id TEXT NOT NULL,
@@ -17263,10 +18370,10 @@ async function initializeDatabase(poolArg) {
         version INTEGER NOT NULL DEFAULT 1
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_component_entered ON running_hours_audit(component_id, entered_at_utc)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_component_date ON running_hours_audit(component_id, date_updated_local)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_component_entered ON running_hours_audit(component_id, entered_at_utc)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_component_date ON running_hours_audit(component_id, date_updated_local)`);
     console.log("\u2713 Created running_hours_audit table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS defect_actions (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         defect_id TEXT NOT NULL,
@@ -17280,9 +18387,9 @@ async function initializeDatabase(poolArg) {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_action_defect ON defect_actions(defect_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_action_defect ON defect_actions(defect_id)`);
     console.log("\u2713 Created defect_actions table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS defect_attachments (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         defect_id TEXT NOT NULL,
@@ -17294,9 +18401,9 @@ async function initializeDatabase(poolArg) {
         uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_attachment_defect ON defect_attachments(defect_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_attachment_defect ON defect_attachments(defect_id)`);
     console.log("\u2713 Created defect_attachments table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS change_request (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         vessel_id TEXT NOT NULL,
@@ -17318,10 +18425,10 @@ async function initializeDatabase(poolArg) {
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_cr_vessel ON change_request(vessel_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_cr_status ON change_request(status)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_cr_vessel ON change_request(vessel_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_cr_status ON change_request(status)`);
     console.log("\u2713 Created change_request table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS change_request_comment (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         change_request_id INTEGER NOT NULL,
@@ -17330,9 +18437,9 @@ async function initializeDatabase(poolArg) {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_comment_cr ON change_request_comment(change_request_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_comment_cr ON change_request_comment(change_request_id)`);
     console.log("\u2713 Created change_request_comment table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS form_definitions (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         name TEXT NOT NULL UNIQUE,
@@ -17340,7 +18447,7 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created form_definitions table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS form_versions (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         form_id INTEGER NOT NULL,
@@ -17352,10 +18459,10 @@ async function initializeDatabase(poolArg) {
         schema_json TEXT NOT NULL
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_form_id ON form_versions(form_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_status ON form_versions(status)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_form_id ON form_versions(form_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_status ON form_versions(status)`);
     console.log("\u2713 Created form_versions table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS spares_history (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         timestamp_utc TIMESTAMP NOT NULL,
@@ -17378,11 +18485,11 @@ async function initializeDatabase(poolArg) {
         place TEXT
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_history_timestamp ON spares_history(timestamp_utc)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_history_spare ON spares_history(spare_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_history_event ON spares_history(event_type)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_history_timestamp ON spares_history(timestamp_utc)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_history_spare ON spares_history(spare_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_history_event ON spares_history(event_type)`);
     console.log("\u2713 Created spares_history table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS makers (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         maker_code TEXT NOT NULL UNIQUE,
@@ -17393,7 +18500,7 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created makers table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS master_lists (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         list_type TEXT NOT NULL,
@@ -17403,7 +18510,7 @@ async function initializeDatabase(poolArg) {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_list_type ON master_lists(list_type)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_list_type ON master_lists(list_type)`);
     console.log("\u2713 Created master_lists table");
     const departmentSeeds = [
       { key: "Engine", value: "Engine", order: 1 },
@@ -17414,7 +18521,7 @@ async function initializeDatabase(poolArg) {
       { key: "FFA", value: "FFA", order: 6 }
     ];
     for (const dept of departmentSeeds) {
-      await db2.execute(sql6`
+      await db2.execute(sql7`
         INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
         VALUES ('department', ${dept.key}, ${dept.value}, ${dept.order}, true)
         ON CONFLICT (list_type, list_key) DO UPDATE SET display_order = ${dept.order}
@@ -17423,7 +18530,7 @@ async function initializeDatabase(poolArg) {
     console.log("\u2713 Seeded department master list (6 values)");
     for (let i = 0; i < POSTPONEMENT_REASONS.length; i++) {
       const reason = POSTPONEMENT_REASONS[i];
-      await db2.execute(sql6`
+      await db2.execute(sql7`
         INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
         VALUES ('postponementReason', ${reason}, ${reason}, ${i + 1}, true)
         ON CONFLICT (list_type, list_key) DO NOTHING
@@ -17432,14 +18539,14 @@ async function initializeDatabase(poolArg) {
     console.log(`\u2713 Seeded postponement reason master list (${POSTPONEMENT_REASONS.length} values)`);
     for (let i = 0; i < OVERDUE_REASONS.length; i++) {
       const reason = OVERDUE_REASONS[i];
-      await db2.execute(sql6`
+      await db2.execute(sql7`
         INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
         VALUES ('overdueReason', ${reason}, ${reason}, ${i + 1}, true)
         ON CONFLICT (list_type, list_key) DO NOTHING
       `);
     }
     console.log(`\u2713 Seeded overdue reason master list (${OVERDUE_REASONS.length} values)`);
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS alert_policies (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         vessel_id TEXT NOT NULL,
@@ -17455,7 +18562,7 @@ async function initializeDatabase(poolArg) {
       )
     `);
     console.log("\u2713 Created alert_policies table");
-    await db2.execute(sql6`
+    await db2.execute(sql7`
       CREATE TABLE IF NOT EXISTS alert_history (
         id INTEGER PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
         policy_id INTEGER NOT NULL,
@@ -17470,8 +18577,8 @@ async function initializeDatabase(poolArg) {
         acknowledged_at TIMESTAMP
       )
     `);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_alert_policy ON alert_history(policy_id)`);
-    await db2.execute(sql6`CREATE INDEX IF NOT EXISTS idx_alert_triggered ON alert_history(triggered_at)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_alert_policy ON alert_history(policy_id)`);
+    await db2.execute(sql7`CREATE INDEX IF NOT EXISTS idx_alert_triggered ON alert_history(triggered_at)`);
     console.log("\u2713 Created alert_history table");
     await ensureMaintenanceHistoryImmutability();
     console.log("\u2705 Database initialization complete! All tables created successfully.");
@@ -17494,7 +18601,7 @@ var init_initDb = __esm({
 // server/utils/tenantConnectionManager.ts
 import { Pool as Pool3 } from "pg";
 import { drizzle as drizzle5 } from "drizzle-orm/node-postgres";
-import { eq as eq2, and as and2 } from "drizzle-orm";
+import { eq as eq2, and as and2, sql as sql8 } from "drizzle-orm";
 import * as fs4 from "fs";
 import * as path4 from "path";
 function maskTuid(tuid) {
@@ -17508,7 +18615,7 @@ function captureTenantFromReq(req) {
   const tuid = req?.tenantTuid;
   return (fn) => tuid ? tenantConnectionManager.runInTenantContext(tuid, fn) : fn();
 }
-var TenantNotFoundError, TenantInactiveError, TenantDatabaseError, CACHE_TTL_MS, IDLE_EVICTION_MS, EVICTION_CHECK_INTERVAL_MS, CIRCUIT_BREAKER_THRESHOLD, CIRCUIT_BREAKER_COOLDOWN_MS, TenantConnectionManager, tenantConnectionManager;
+var chatLogTableEnsured, TenantNotFoundError, TenantInactiveError, TenantDatabaseError, CACHE_TTL_MS, IDLE_EVICTION_MS, EVICTION_CHECK_INTERVAL_MS, CIRCUIT_BREAKER_THRESHOLD, CIRCUIT_BREAKER_COOLDOWN_MS, TenantConnectionManager, tenantConnectionManager;
 var init_tenantConnectionManager = __esm({
   "server/utils/tenantConnectionManager.ts"() {
     "use strict";
@@ -17517,6 +18624,8 @@ var init_tenantConnectionManager = __esm({
     init_asyncLocalStorage();
     init_migrations();
     init_initDb();
+    init_postgresClient();
+    chatLogTableEnsured = false;
     TenantNotFoundError = class extends Error {
       constructor(domain) {
         super(`No active tenant for domain '${domain}'.`);
@@ -17629,6 +18738,61 @@ var init_tenantConnectionManager = __esm({
         this.tenantCache.set(domain, { ...out, expiresAt: Date.now() + CACHE_TTL_MS });
         return out;
       }
+      /**
+       * Chatbot Stage A: per-tenant AI assistant on/off (multi-tenant mode). Defaults TRUE
+       * (fail-open) so a missing column or a lookup hiccup never silently breaks the working
+       * chatbot. Single-tenant mode does not call this — the controller uses the CHATBOT_ENABLED env.
+       */
+      async isTenantAiEnabled(domain) {
+        if (!this._isMultiTenantEnabled || !this.masterDb || !domain) return true;
+        try {
+          const rows = await this.masterDb.select({ aiEnabled: tenants.aiEnabled }).from(tenants).where(eq2(tenants.domain, domain)).limit(1);
+          if (rows.length === 0) return true;
+          return rows[0].aiEnabled !== false;
+        } catch {
+          return true;
+        }
+      }
+      /**
+       * Chatbot Stage A: write ONE central, tenant-tagged interaction row. Multi-tenant → the
+       * MASTER database; single-tenant → the single/default database (tuid null). NEVER writes a
+       * tenant DB (uses masterDb / resolvePostgres explicitly, not the ALS getDb). The table is
+       * ensured once per process (covers single-tenant, where the master migration doesn't run).
+       * Callers MUST invoke this fire-and-forget AFTER the response and .catch() any error — a
+       * logging failure must never slow or break the answer.
+       */
+      async logChatInteraction(row) {
+        const opsDb = this._isMultiTenantEnabled && this.masterDb ? this.masterDb : (await resolvePostgres())?.db;
+        if (!opsDb) return;
+        if (!chatLogTableEnsured) {
+          await opsDb.execute(sql8`
+        CREATE TABLE IF NOT EXISTS chatbot_interactions (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tuid            TEXT,
+          domain          TEXT,
+          user_id         TEXT,
+          user_name       TEXT,
+          user_role       TEXT,
+          vessel_id       TEXT,
+          conversation_id TEXT,
+          question        TEXT NOT NULL,
+          answer          TEXT NOT NULL,
+          tools_used      JSONB,
+          docs_retrieved  JSONB,
+          tokens_in       INTEGER,
+          tokens_out      INTEGER,
+          latency_ms      INTEGER,
+          model           TEXT,
+          provider        TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+          await opsDb.execute(sql8`CREATE INDEX IF NOT EXISTS idx_chatbot_interactions_tuid ON chatbot_interactions (tuid)`);
+          await opsDb.execute(sql8`CREATE INDEX IF NOT EXISTS idx_chatbot_interactions_created_at ON chatbot_interactions (created_at)`);
+          chatLogTableEnsured = true;
+        }
+        await opsDb.insert(chatbotInteractions).values(row);
+      }
       /** True if the tuid maps to an active tenant (used by the optional x-tenant-id header path, Phase 2). */
       async validateTuid(tuid) {
         if (!this._isMultiTenantEnabled || !this.masterDb) return false;
@@ -17641,9 +18805,9 @@ var init_tenantConnectionManager = __esm({
        * No-op when multi-tenant is disabled (single-tenant deploys have no master DB).
        * `syncApiKey` is omitted (left unchanged) when undefined.
        */
-      async upsertTenantInstance(instanceId, vesselId, domain, syncApiKey) {
+      async upsertTenantInstance(instanceId2, vesselId, domain, syncApiKey) {
         if (!this._isMultiTenantEnabled || !this.masterDb) return;
-        await this.masterDb.insert(tenantInstances).values({ instanceId, vesselId, domain, syncApiKey: syncApiKey ?? null }).onConflictDoUpdate({
+        await this.masterDb.insert(tenantInstances).values({ instanceId: instanceId2, vesselId, domain, syncApiKey: syncApiKey ?? null }).onConflictDoUpdate({
           target: tenantInstances.instanceId,
           set: {
             vesselId,
@@ -17658,9 +18822,9 @@ var init_tenantConnectionManager = __esm({
        * { domain, syncApiKey } from the master map, WITHOUT opening any tenant DB. Returns
        * null when the instance is not registered (=> shore rejects 403, never default-routes).
        */
-      async resolveInstanceDomain(instanceId) {
+      async resolveInstanceDomain(instanceId2) {
         if (!this._isMultiTenantEnabled || !this.masterDb) return null;
-        const rows = await this.masterDb.select({ domain: tenantInstances.domain, syncApiKey: tenantInstances.syncApiKey }).from(tenantInstances).where(eq2(tenantInstances.instanceId, instanceId)).limit(1);
+        const rows = await this.masterDb.select({ domain: tenantInstances.domain, syncApiKey: tenantInstances.syncApiKey }).from(tenantInstances).where(eq2(tenantInstances.instanceId, instanceId2)).limit(1);
         if (rows.length === 0) return null;
         return { domain: rows[0].domain, syncApiKey: rows[0].syncApiKey ?? null };
       }
@@ -17851,6 +19015,9 @@ var init_syncEngine = __esm({
     init_db();
     init_syncDiagLogger();
     init_syncRole();
+    init_unknownColumnRetryPolicy();
+    init_completedWorkOrderDateSync();
+    init_workOrderPartADates();
     CHUNK_SIZE = 200;
     MAX_RETRIES = 3;
     RETRY_DELAYS = [5e3, 15e3, 45e3];
@@ -18579,6 +19746,11 @@ var init_syncEngine = __esm({
                     }
                   }
                 }
+                await ensureDateBeforeSyncedCompletedStatus(
+                  client,
+                  log2,
+                  dualCtxPull.incomingCompletionDateByRow.get(log2.rowUuid) ?? null
+                );
                 await this.applyFieldLog(log2, client);
                 try {
                   await client.query(`RELEASE SAVEPOINT ${updSp}`);
@@ -18714,8 +19886,26 @@ var init_syncEngine = __esm({
         const identityCol = config.identityColumn || "id";
         const fieldNameSnake = SYNC_COLUMN_ALIASES[log2.fieldName] ?? camelToSnake(log2.fieldName);
         const conn = client || await getPool();
+        if (log2.tableName === "work_orders" && isImmutableWorkOrderSnapshotField(log2.fieldName)) {
+          const currentResult = await conn.query(
+            `SELECT "${fieldNameSnake}" AS value FROM "work_orders" WHERE "${identityCol}" = $1 LIMIT 1`,
+            [log2.rowUuid]
+          );
+          const currentValue = currentResult.rows[0]?.value;
+          if (currentResult.rows.length > 0 && !shouldApplySyncedWorkOrderSnapshot(currentValue, log2.oldValue)) {
+            syncDiag(
+              `APPLY-FIELD-LOG SNAPSHOT-ACK immutable work_orders.${fieldNameSnake} row=${log2.rowUuid}`
+            );
+            return;
+          }
+        }
         const meta = await getColumnMeta(conn, log2.tableName);
         if (meta.allCols.size > 0 && !meta.allCols.has(fieldNameSnake)) {
+          if (shouldRetryUnknownSyncColumn(log2.tableName, fieldNameSnake)) {
+            throw new Error(
+              `Retryable unknown column ${log2.tableName}.${fieldNameSnake}; receiver migration pending`
+            );
+          }
           syncDiag(`APPLY-FIELD-LOG SKIP unknown column ${log2.tableName}.${fieldNameSnake}`);
           return;
         }
@@ -19361,9 +20551,9 @@ async function importProvisioningBundle(bundle) {
     }
   }
   try {
-    const instanceId = resolvedInstanceId;
+    const instanceId2 = resolvedInstanceId;
     await upsertInstanceMetadata({
-      instanceId,
+      instanceId: instanceId2,
       vesselId: bundle.manifest.vesselId,
       lastSyncCheckpoint: new Date(bundle.manifest.generatedAt),
       lastSyncStatus: "provisioned",
@@ -19750,7 +20940,7 @@ var init_autoSyncScheduler = __esm({
       // tables; genuinely-delivered rows re-apply as idempotent no-op updates on the shore, while
       // stranded rows re-fail there and trigger the full-row self-heal (needsFullRows → next push
       // delivers the complete row → fragments apply). Bounded: 2 tables × 30-day window.
-      async maybeRunSelfHealReofferSweep(settings, instanceId) {
+      async maybeRunSelfHealReofferSweep(settings, instanceId2) {
         const MARKER = "selfheal_reoffer_v1";
         if ((settings[MARKER] || "") === "done") return;
         try {
@@ -19760,7 +20950,7 @@ var init_autoSyncScheduler = __esm({
           WHERE instance_id = $1 AND is_synced = true
             AND table_name IN ('work_orders','superintendent_notifications')
             AND changed_at >= NOW() - interval '30 days'`,
-            [instanceId]
+            [instanceId2]
           );
           const upd = await pool4.query(
             `UPDATE sync_settings SET setting_value = 'done', updated_at = NOW() WHERE setting_key = $1`,
@@ -19773,7 +20963,7 @@ var init_autoSyncScheduler = __esm({
             );
           }
           console.log(`[AutoSync] \u{1FA79} Self-heal re-offer sweep: ${r.rowCount ?? 0} log(s) re-offered (one-time, marker set).`);
-          syncDiag(`SELF-HEAL REOFFER SWEEP: ${r.rowCount ?? 0} log(s) re-offered for instance=${instanceId} (work_orders, superintendent_notifications, 30d window). Marker '${MARKER}' set.`);
+          syncDiag(`SELF-HEAL REOFFER SWEEP: ${r.rowCount ?? 0} log(s) re-offered for instance=${instanceId2} (work_orders, superintendent_notifications, 30d window). Marker '${MARKER}' set.`);
         } catch (err) {
           console.warn(`[AutoSync] Self-heal re-offer sweep failed (will retry next tick): ${err?.message || err}`);
         }
@@ -19798,20 +20988,20 @@ var init_autoSyncScheduler = __esm({
             console.log(`[AutoSync] Detected interval change in settings \u2192 applying live (${this.tickIntervalMs / 6e4}min \u2192 ${intervalMinutes}min)`);
             this.restartWithNewInterval(intervalMinutes);
           }
-          const instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
-          if (!instanceId) {
+          const instanceId2 = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
+          if (!instanceId2) {
             console.warn("[AutoSync] No instance_id configured \u2014 cannot determine vessel. Skipping.");
             return;
           }
-          await this.maybeRunSelfHealReofferSweep(settings, instanceId);
-          const metadata = await getInstanceMetadata(instanceId);
+          await this.maybeRunSelfHealReofferSweep(settings, instanceId2);
+          const metadata = await getInstanceMetadata(instanceId2);
           const vesselId = metadata?.vesselId;
           if (!vesselId) {
-            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId}. Skipping.`);
+            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId2}. Skipping.`);
             return;
           }
           const maxCatchUp = parseInt(settings["catch_up_max_cycles"] || String(DEFAULT_CATCH_UP_MAX_CYCLES), 10);
-          await this.runWithCatchUp(instanceId, vesselId, maxCatchUp);
+          await this.runWithCatchUp(instanceId2, vesselId, maxCatchUp);
         } catch (error) {
           console.error("[AutoSync] Tick failed:", error.message);
         }
@@ -19819,12 +21009,12 @@ var init_autoSyncScheduler = __esm({
       // ────────────────────────────────────────────────
       // Run sync + catch-up cycles
       // ────────────────────────────────────────────────
-      async runWithCatchUp(instanceId, vesselId, maxCatchUpCycles) {
+      async runWithCatchUp(instanceId2, vesselId, maxCatchUpCycles) {
         const engine = getSyncEngine();
         if (this.syncInProgress.get(vesselId) || !engine.tryAcquireVessel(vesselId)) {
           console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} \u2014 skipping`);
           await insertConnectivityLog({
-            instanceId,
+            instanceId: instanceId2,
             vesselId,
             outcome: "skipped_reentrant",
             triggerType: "auto"
@@ -19834,26 +21024,26 @@ var init_autoSyncScheduler = __esm({
         this.syncInProgress.set(vesselId, true);
         let cycleNumber = 0;
         try {
-          const primaryResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "auto");
+          const primaryResult = await this.executeSingleCycle(instanceId2, vesselId, cycleNumber, "auto");
           if (!primaryResult.success) {
             return;
           }
           if (maxCatchUpCycles <= 0) return;
           const vesselCode = await getVesselCode(vesselId);
-          let remaining = await getDueFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+          let remaining = await getDueFieldLogCount(instanceId2, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
           while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
             cycleNumber++;
             console.log(`[AutoSync] Catch-up cycle ${cycleNumber}/${maxCatchUpCycles} \u2014 ${remaining} unsynced records remain`);
             syncDiag(`[AutoSync] catch-up cycle=${cycleNumber}, remaining=${remaining}, cap=${maxCatchUpCycles}`);
-            const catchUpResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "catch_up");
+            const catchUpResult = await this.executeSingleCycle(instanceId2, vesselId, cycleNumber, "catch_up");
             if (!catchUpResult.success) {
               console.log(`[AutoSync] Catch-up cycle ${cycleNumber} failed \u2014 stopping catch-up`);
               break;
             }
-            remaining = await getDueFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+            remaining = await getDueFieldLogCount(instanceId2, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
           }
           if (cycleNumber > 0) {
-            const finalRemaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId, vesselCode);
+            const finalRemaining = await getUnsyncedFieldLogCount(instanceId2, vesselId, vesselCode) + await getShorePullRemainingCount(vesselId, instanceId2, vesselCode);
             const heldBack = finalRemaining - remaining;
             console.log(
               `[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced` + (heldBack > 0 ? ` (${heldBack} waiting on retry backoff \u2014 not an error)` : "")
@@ -19867,7 +21057,7 @@ var init_autoSyncScheduler = __esm({
       // ────────────────────────────────────────────────
       // Execute one sync cycle + log connectivity
       // ────────────────────────────────────────────────
-      async executeSingleCycle(instanceId, vesselId, cycleNumber, triggerType) {
+      async executeSingleCycle(instanceId2, vesselId, cycleNumber, triggerType) {
         const startMs = Date.now();
         let result;
         try {
@@ -19877,7 +21067,7 @@ var init_autoSyncScheduler = __esm({
           const latencyMs2 = Date.now() - startMs;
           const outcome2 = classifyError(error);
           await insertConnectivityLog({
-            instanceId,
+            instanceId: instanceId2,
             vesselId,
             outcome: outcome2,
             errorMessage: error.message?.substring(0, 500),
@@ -19907,7 +21097,7 @@ var init_autoSyncScheduler = __esm({
         const latencyMs = Date.now() - startMs;
         const outcome = result.success ? "success" : classifyError({ message: result.error || "" });
         await insertConnectivityLog({
-          instanceId,
+          instanceId: instanceId2,
           vesselId,
           outcome,
           errorMessage: result.error?.substring(0, 500) ?? null,
@@ -20197,8 +21387,8 @@ async function runDriftScan(opts = {}) {
       );
       const rowByUuid = /* @__PURE__ */ new Map();
       for (const r of rows.rows) rowByUuid.set(String(r[t.identityColumn]), r);
-      for (const [uuid, logs] of Array.from(byRow.entries())) {
-        const row = rowByUuid.get(uuid);
+      for (const [uuid2, logs] of Array.from(byRow.entries())) {
+        const row = rowByUuid.get(uuid2);
         if (!row) continue;
         rowsCompared++;
         for (const log2 of logs) {
@@ -20208,7 +21398,7 @@ async function runDriftScan(opts = {}) {
           if (!valuesEqual(row[col], log2.new_value)) {
             findings.push({
               tableName: t.tableName,
-              rowUuid: uuid,
+              rowUuid: uuid2,
               fieldName: log2.field_name,
               expected: log2.new_value,
               actual: row[col] === null || row[col] === void 0 ? null : String(row[col]),
@@ -20713,12 +21903,12 @@ import * as fs5 from "fs";
 import * as path5 from "path";
 async function initiateSyncHandler(req, res) {
   try {
-    const { instanceId, vesselId, lastCheckpoint } = req.body;
-    if (!instanceId || !vesselId) {
+    const { instanceId: instanceId2, vesselId, lastCheckpoint } = req.body;
+    if (!instanceId2 || !vesselId) {
       return res.status(400).json({ error: "instanceId and vesselId are required" });
     }
     const result = await initiateSyncSession(
-      instanceId,
+      instanceId2,
       vesselId,
       lastCheckpoint ? new Date(lastCheckpoint) : null
     );
@@ -20751,8 +21941,8 @@ async function pushHandler(req, res) {
 }
 async function pullHandler(req, res) {
   try {
-    const { batchUuid, vesselId, instanceId, lastCheckpoint } = req.body;
-    if (!batchUuid || !vesselId || !instanceId) {
+    const { batchUuid, vesselId, instanceId: instanceId2, lastCheckpoint } = req.body;
+    if (!batchUuid || !vesselId || !instanceId2) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
     const rawTableCps = req.body.tableCheckpoints;
@@ -20769,7 +21959,7 @@ async function pullHandler(req, res) {
     const result = await preparePullData(
       batchUuid,
       vesselId,
-      instanceId,
+      instanceId2,
       lastCheckpoint ? new Date(lastCheckpoint) : null,
       tableCheckpoints
     );
@@ -20807,8 +21997,8 @@ async function resolveConflictHandler(req, res) {
 }
 async function completeSyncHandler(req, res) {
   try {
-    const { batchUuid, vesselId, instanceId, appliedRowUuids } = req.body;
-    if (!batchUuid || !vesselId || !instanceId) {
+    const { batchUuid, vesselId, instanceId: instanceId2, appliedRowUuids } = req.body;
+    if (!batchUuid || !vesselId || !instanceId2) {
       return res.status(400).json({ error: "batchUuid, vesselId, and instanceId are required" });
     }
     const failedOneWayTables = Array.isArray(req.body.failedOneWayTables) ? req.body.failedOneWayTables.filter((t) => typeof t === "string") : void 0;
@@ -20823,7 +22013,7 @@ async function completeSyncHandler(req, res) {
     const result = await completeSyncSession(
       batchUuid,
       vesselId,
-      instanceId,
+      instanceId2,
       Array.isArray(appliedRowUuids) ? appliedRowUuids : void 0,
       failedOneWayTables,
       appliedTableCheckpoints
@@ -20844,11 +22034,11 @@ async function completeSyncHandler(req, res) {
 async function statusHandler(req, res) {
   try {
     const vesselId = req.query.vesselId || "";
-    const instanceId = req.query.instanceId || "";
-    if (!vesselId || !instanceId) {
+    const instanceId2 = req.query.instanceId || "";
+    if (!vesselId || !instanceId2) {
       return res.status(400).json({ error: "vesselId and instanceId query params are required" });
     }
-    const result = await getSyncStatus(vesselId, instanceId);
+    const result = await getSyncStatus(vesselId, instanceId2);
     let fieldLogFailures = {
       session: getFieldLogFailureSessionCount(),
       unresolved: null
@@ -20862,7 +22052,7 @@ async function statusHandler(req, res) {
     const insertLogSkips = { session: getInsertLogSkipCount() };
     let retryBacklog = null;
     try {
-      retryBacklog = await getRetryBacklog(instanceId);
+      retryBacklog = await getRetryBacklog(instanceId2);
     } catch {
     }
     const build = getBuildInfo();
@@ -20921,8 +22111,8 @@ async function triggerSyncHandler(req, res) {
 }
 async function fetchRowsHandler(req, res) {
   try {
-    const { vesselId, instanceId, requests } = req.body || {};
-    if (!vesselId || !instanceId || !Array.isArray(requests)) {
+    const { vesselId, instanceId: instanceId2, requests } = req.body || {};
+    if (!vesselId || !instanceId2 || !Array.isArray(requests)) {
       return res.status(400).json({ error: "vesselId, instanceId, and requests[] are required" });
     }
     const tables = await fetchFullRowsForHeal(requests);
@@ -21480,8 +22670,8 @@ function requireOfflineAdmin(req, res, next) {
     return res.status(401).json({ error: "Unauthorized \u2014 authentication required" });
   }
   const role = req.user.role || "";
-  const allowedRoles = ["Sail Admin", "PMS Admin", "Offline Admin"];
-  if (!allowedRoles.includes(role)) {
+  const allowedRoles2 = ["Sail Admin", "PMS Admin", "Offline Admin"];
+  if (!allowedRoles2.includes(role)) {
     return res.status(403).json({
       error: "Access denied. Offline Admin, PMS Admin, or Sail Admin role required.",
       currentRole: role
@@ -21501,7 +22691,7 @@ function header(req, name) {
   const v = Array.isArray(raw) ? raw[0] : raw;
   return typeof v === "string" ? v.trim() : "";
 }
-async function batchInstanceMatches(req, instanceId) {
+async function batchInstanceMatches(req, instanceId2) {
   const batchUuid = req.body && req.body.batchUuid;
   if (!batchUuid) return true;
   const pool4 = await getPool();
@@ -21510,17 +22700,17 @@ async function batchInstanceMatches(req, instanceId) {
     [batchUuid]
   );
   if (r.rows.length === 0) return true;
-  return r.rows[0].initiated_by_instance === instanceId;
+  return r.rows[0].initiated_by_instance === instanceId2;
 }
 function syncTenantGuard(req, res, next) {
   if (!tenantConnectionManager.isMultiTenantEnabled) return next();
-  const instanceId = header(req, "x-sync-instance-id");
+  const instanceId2 = header(req, "x-sync-instance-id");
   const apiKey = header(req, "x-sync-api-key");
-  if (!instanceId) {
+  if (!instanceId2) {
     res.status(401).json({ error: "missing_instance", message: "X-Sync-Instance-Id required" });
     return;
   }
-  tenantConnectionManager.resolveInstanceDomain(instanceId).then((entry) => {
+  tenantConnectionManager.resolveInstanceDomain(instanceId2).then((entry) => {
     if (!entry) {
       res.status(403).json({ error: "unknown_instance", message: "Instance not registered" });
       return;
@@ -21533,12 +22723,12 @@ function syncTenantGuard(req, res, next) {
     }
     if (!perTenantOk && legacyOk) {
       console.warn(
-        `[syncTenantGuard] LEGACY-KEY TOLERANCE: instance '${instanceId}' authenticated on the shared SYNC_API_KEY (per-tenant key not yet set). Migrate it, then disable SYNC_LEGACY_KEY_TOLERANCE.`
+        `[syncTenantGuard] LEGACY-KEY TOLERANCE: instance '${instanceId2}' authenticated on the shared SYNC_API_KEY (per-tenant key not yet set). Migrate it, then disable SYNC_LEGACY_KEY_TOLERANCE.`
       );
     }
     return tenantConnectionManager.resolveTenant(entry.domain).then(
       (tenant) => tenantConnectionManager.runInTenantContext(tenant.tuid, async () => {
-        const okBatch = await batchInstanceMatches(req, instanceId);
+        const okBatch = await batchInstanceMatches(req, instanceId2);
         if (!okBatch) {
           if (!res.headersSent) {
             res.status(403).json({ error: "instance_mismatch", message: "Batch belongs to a different instance" });
@@ -21591,6 +22781,15 @@ function rbacMatches(identity, allowed) {
   if (identity.userType === "Ship" && allowed.includes("Ship")) return true;
   return false;
 }
+function canAccessVessel(user, vesselId) {
+  if (!user) return false;
+  if (user.role === "PMS Admin" || user.role === "Sail Admin" || user.role === "Office") return true;
+  if (user.role === "Ship") {
+    if (!vesselId) return false;
+    return user.vesselId === vesselId;
+  }
+  return false;
+}
 async function initMockAuthRankId() {
   console.log(
     `\u2705 Mock auth resolves rank_name per-request (x-rank header \u2192 body.rank \u2192 "${DEFAULT_MOCK_RANK_NAME}")`
@@ -21624,12 +22823,12 @@ var init_auth = __esm({
         if (!req.user) {
           return res.status(401).json({ error: "Unauthorized - Authentication required" });
         }
-        const allowedRoles = Array.isArray(roles) ? roles : [roles];
+        const allowedRoles2 = Array.isArray(roles) ? roles : [roles];
         const identity = getRbacIdentity(req);
-        if (!rbacMatches(identity, allowedRoles)) {
+        if (!rbacMatches(identity, allowedRoles2)) {
           return res.status(403).json({
             error: "Forbidden - Insufficient permissions",
-            required: allowedRoles,
+            required: allowedRoles2,
             current: identity.role ?? "anonymous"
           });
         }
@@ -21839,9 +23038,9 @@ var init_sync = __esm({
 });
 
 // server/modules/running-hours/repositories/dateUpdatedLocalSql.ts
-import { sql as sql7 } from "drizzle-orm";
+import { sql as sql9 } from "drizzle-orm";
 function readingDayLocalExpr() {
-  return sql7`safe_rh_reading_day(${runningHoursAudit.dateUpdatedLocal})`;
+  return sql9`safe_rh_reading_day(${runningHoursAudit.dateUpdatedLocal})`;
 }
 function targetReadingDay(targetDate) {
   return targetDate.toISOString().split("T")[0];
@@ -21850,6 +23049,170 @@ var init_dateUpdatedLocalSql = __esm({
   "server/modules/running-hours/repositories/dateUpdatedLocalSql.ts"() {
     "use strict";
     init_schema();
+  }
+});
+
+// server/modules/running-hours/utils/rhValidation.ts
+function validateRHMonotonicity(input) {
+  const currentRHDate = input.currentRHDate ?? null;
+  const submittedRHDate = input.submittedRHDate ?? null;
+  const delta = input.submittedRH - input.currentRH;
+  if (input.approvedReset) {
+    return {
+      allowed: true,
+      reason: "APPROVED_RESET",
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: "Approved running-hours reset or meter replacement."
+    };
+  }
+  if (delta < 0) {
+    const dateContext = currentRHDate ? ` recorded on ${currentRHDate}` : "";
+    return {
+      allowed: false,
+      reason: "LOWER_THAN_CURRENT_RH",
+      currentRH: input.currentRH,
+      submittedRH: input.submittedRH,
+      delta,
+      currentRHDate,
+      submittedRHDate,
+      message: `Current Reading (${input.submittedRH} RH) cannot be lower than the latest Running Hours value (${input.currentRH} RH${dateContext}). Correct the reading before continuing.`
+    };
+  }
+  return {
+    allowed: true,
+    reason: delta === 0 ? "EQUAL_CURRENT_RH" : "VALID_INCREASE",
+    currentRH: input.currentRH,
+    submittedRH: input.submittedRH,
+    delta,
+    currentRHDate,
+    submittedRHDate,
+    message: delta === 0 ? `Running Hours is already ${input.currentRH} RH; no update is required.` : `Running Hours increases by ${delta} RH.`
+  };
+}
+function getCalendarDate(dateStr) {
+  const strict = parseReadingDayStrict(dateStr);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(dateStr);
+  return canonical ? parseReadingDayStrict(canonical) : null;
+}
+function getDaysBetweenCalendarDates(date1, date2) {
+  const msPerDay = 24 * 60 * 60 * 1e3;
+  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
+}
+function formatDMY(dateStr) {
+  if (!dateStr) return dateStr;
+  const d = getCalendarDate(dateStr);
+  if (!d) return dateStr;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
+function validateRunningHoursIncrease(input) {
+  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
+  const requestedIncrease = newRH - currentRH;
+  let daysSinceLastUpdate = 0;
+  let sameDayUpdate = false;
+  const lastCalendarDate = componentLastUpdated ? getCalendarDate(componentLastUpdated) : null;
+  const newCalendarDate = getCalendarDate(newUpdateDate);
+  if (lastCalendarDate && newCalendarDate) {
+    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
+    if (daysSinceLastUpdate < 0) {
+      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+      return {
+        allowed: canOverride2,
+        maxAllowedIncrease: 0,
+        requestedIncrease,
+        daysSinceLastUpdate,
+        lastUpdateDate: componentLastUpdated,
+        backdatedLower: requestedIncrease <= 0,
+        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated || "")}). Running hours can only be recorded on or after the latest reading.`,
+        requiresAdminOverride: !canOverride2
+      };
+    }
+    if (daysSinceLastUpdate === 0) {
+      sameDayUpdate = true;
+    }
+  } else {
+    daysSinceLastUpdate = 1;
+  }
+  if (requestedIncrease <= 0) {
+    return {
+      allowed: true,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: "No increase or decrease - no validation needed",
+      requiresAdminOverride: false
+    };
+  }
+  let maxAllowedIncrease;
+  if (sameDayUpdate) {
+    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
+    return {
+      allowed: canOverride2,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
+      requiresAdminOverride: !canOverride2
+    };
+  } else {
+    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY;
+  }
+  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
+  if (isWithinLimit) {
+    return {
+      allowed: true,
+      maxAllowedIncrease,
+      requestedIncrease,
+      daysSinceLastUpdate,
+      lastUpdateDate: componentLastUpdated,
+      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
+      requiresAdminOverride: false
+    };
+  }
+  const canOverride = userRole === "Sail Admin" && adminOverride === true;
+  return {
+    allowed: canOverride,
+    maxAllowedIncrease,
+    requestedIncrease,
+    daysSinceLastUpdate,
+    lastUpdateDate: componentLastUpdated,
+    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
+    requiresAdminOverride: !canOverride
+  };
+}
+function canAdminOverride(userRole) {
+  return userRole === "Sail Admin";
+}
+function safeParseDate(value) {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
+  }
+  const strict = parseReadingDayStrict(trimmed);
+  if (strict) return strict;
+  const canonical = canonicalizeReadingDateInput(trimmed);
+  return canonical ? parseReadingDayStrict(canonical) : null;
+}
+var MAX_HOURS_PER_DAY;
+var init_rhValidation = __esm({
+  "server/modules/running-hours/utils/rhValidation.ts"() {
+    "use strict";
+    init_readingDate();
+    MAX_HOURS_PER_DAY = 25;
   }
 });
 
@@ -21869,7 +23232,7 @@ __export(rotationalItemRepository_exports, {
   softDelete: () => softDelete,
   update: () => update
 });
-import { and as and3, eq as eq3, isNotNull, sql as sql8 } from "drizzle-orm";
+import { and as and3, eq as eq3, isNotNull, sql as sql10 } from "drizzle-orm";
 async function listByVessel(vesselId, status) {
   const db2 = await getDb();
   const conditions = [eq3(rotationalItems.vesselId, vesselId), notDeleted];
@@ -21960,10 +23323,10 @@ async function create(data) {
 }
 async function claimStamp(riuuid, userUuid) {
   const db2 = await getDb();
-  const rows = await db2.update(rotationalItems).set({ status: "Installed", updatedByUuid: userUuid ?? void 0, updatedAt: sql8`NOW()` }).where(and3(
+  const rows = await db2.update(rotationalItems).set({ status: "Installed", updatedByUuid: userUuid ?? void 0, updatedAt: sql10`NOW()` }).where(and3(
     eq3(rotationalItems.riuuid, riuuid),
     notDeleted,
-    sql8`${rotationalItems.status} IN ('Spare', 'In Store')`
+    sql10`${rotationalItems.status} IN ('Spare', 'In Store')`
   )).returning();
   return rows[0];
 }
@@ -21974,7 +23337,7 @@ async function releaseStamp(riuuid, rhSnapshot, userUuid) {
     updatedByUuid: userUuid ?? void 0,
     ...rhSnapshot.currentRh != null ? { currentRh: rhSnapshot.currentRh } : {},
     ...rhSnapshot.rhLastUpdated != null ? { rhLastUpdated: rhSnapshot.rhLastUpdated } : {},
-    updatedAt: sql8`NOW()`
+    updatedAt: sql10`NOW()`
   }).where(and3(
     eq3(rotationalItems.riuuid, riuuid),
     notDeleted,
@@ -21984,12 +23347,12 @@ async function releaseStamp(riuuid, rhSnapshot, userUuid) {
 }
 async function update(riuuid, data) {
   const db2 = await getDb();
-  const rows = await db2.update(rotationalItems).set({ ...data, updatedAt: sql8`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
+  const rows = await db2.update(rotationalItems).set({ ...data, updatedAt: sql10`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
   return rows[0];
 }
 async function softDelete(riuuid, userUuid) {
   const db2 = await getDb();
-  const rows = await db2.update(rotationalItems).set({ isDeleted: true, updatedByUuid: userUuid ?? void 0, updatedAt: sql8`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
+  const rows = await db2.update(rotationalItems).set({ isDeleted: true, updatedByUuid: userUuid ?? void 0, updatedAt: sql10`NOW()` }).where(and3(eq3(rotationalItems.riuuid, riuuid), notDeleted)).returning();
   return rows[0];
 }
 var notDeleted;
@@ -23187,7 +24550,22 @@ var init_componentService = __esm({
 
 // server/postgresStorage.ts
 import { randomUUID as randomUUID2 } from "crypto";
-import { eq as eq7, and as and6, desc as desc2, sql as sql9, inArray as inArray2, or, ilike as ilike2, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
+import { eq as eq7, and as and6, desc as desc2, sql as sql11, inArray as inArray2, or, ilike as ilike2, asc as asc2, gte, lte, lt, gt as gt2, isNull as isNull2, getTableColumns } from "drizzle-orm";
+function enforceFreshRHMonotonicity(input) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: "LOWER_THAN_CURRENT_RH",
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result
+    });
+  }
+  return result;
+}
 async function getRhOriginSide() {
   if (cachedRhOriginSide !== void 0) return cachedRhOriginSide;
   try {
@@ -23218,6 +24596,8 @@ var init_postgresStorage = __esm({
     init_sync();
     init_dateUpdatedLocalSql();
     init_readingDate();
+    init_rhValidation();
+    init_errors();
     init_requestContext();
     _woNumericFields = null;
     PostgresStorage = class {
@@ -23232,7 +24612,7 @@ var init_postgresStorage = __esm({
           );
           const db2 = await getDb();
           await db2.execute(
-            sql9.raw(
+            sql11.raw(
               `SELECT setval('${tableName}_id_seq', (SELECT COALESCE(MAX(id), 0) FROM "${tableName}"))`
             )
           );
@@ -23567,7 +24947,7 @@ var init_postgresStorage = __esm({
       }
       async countMasterListItemsByType(listTypeKey) {
         const db2 = await getDb();
-        const result = await db2.select({ count: sql9`count(*)::int` }).from(masterLists).where(eq7(masterLists.listType, listTypeKey));
+        const result = await db2.select({ count: sql11`count(*)::int` }).from(masterLists).where(eq7(masterLists.listType, listTypeKey));
         return Number(result[0]?.count || 0);
       }
       // ============= MODULE 2: MAKER LIST =============
@@ -24263,10 +25643,19 @@ var init_postgresStorage = __esm({
         }
         const rhStr = params.newRHValue.toFixed(2);
         return db2.transaction(async (tx) => {
-          await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+          await tx.execute(sql11`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
           const freshRows = await tx.select().from(components).where(eq7(components.cuuid, component.cuuid)).limit(1);
           const fresh = freshRows[0] || component;
           const previousRH = parseFloat(fresh.currentCumulativeRH || "0");
+          const monotonicity = enforceFreshRHMonotonicity({
+            currentRH: previousRH,
+            submittedRH: params.newRHValue,
+            currentRHDate: fresh.lastUpdated || null,
+            submittedRHDate: params.readingDateIso
+          });
+          if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+            return { previousRH, changed: false };
+          }
           await tx.update(components).set({
             currentCumulativeRH: rhStr,
             runningHours: rhStr,
@@ -24274,7 +25663,7 @@ var init_postgresStorage = __esm({
             updatedAt: /* @__PURE__ */ new Date()
           }).where(eq7(components.cuuid, component.cuuid));
           await this.accrueStampRhDelta(tx, fresh.vesselId, fresh.currentStamp, params.newRHValue - previousRH, params.readingDateIso, params.userId);
-          return { previousRH };
+          return { previousRH, changed: true };
         });
       }
       async updateMasterRunningHours(params) {
@@ -24296,11 +25685,41 @@ var init_postgresStorage = __esm({
           inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
         }
         const txResult = await db2.transaction(async (tx) => {
-          await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+          await tx.execute(sql11`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
           const freshMaster = await tx.select().from(components).where(eq7(components.cuuid, component.cuuid)).limit(1);
           const freshComponent = freshMaster[0] || component;
           const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || "0");
           const delta = params.newRHValue - previousMasterRH;
+          const monotonicity = validateRHMonotonicity({
+            currentRH: previousMasterRH,
+            submittedRH: params.newRHValue,
+            currentRHDate: freshComponent.lastUpdated || null,
+            submittedRHDate: readingDateLocal
+          });
+          if (!monotonicity.allowed) {
+            if (params.allowLowerWorkOrderApprovalSkip && params.updateSource === "WORKORDER") {
+              return {
+                masterUpdated: freshComponent,
+                inheritedUpdated: 0,
+                rhSkipped: {
+                  reason: "LOWER_THAN_LIVE_RH",
+                  submittedRH: params.newRHValue,
+                  currentRH: previousMasterRH,
+                  currentRHDate: freshComponent.lastUpdated || null,
+                  submittedRHDate: readingDateLocal
+                }
+              };
+            }
+            enforceFreshRHMonotonicity({
+              currentRH: previousMasterRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: readingDateLocal
+            });
+          }
+          if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+            return { masterUpdated: freshComponent, inheritedUpdated: 0, noChange: true };
+          }
           if (inheritedComponents.length > 0) {
             inheritedComponents = await tx.select().from(components).where(inArray2(components.cuuid, inheritedComponents.map((i) => i.cuuid)));
           }
@@ -24417,7 +25836,7 @@ var init_postgresStorage = __esm({
         const readingIso = lastUpdatedValue;
         let inheritedComponentsPre = component.rhCounterType === "MASTER" && component.vesselId ? await this.getInheritedComponents(component.cuuid, component.vesselId) : [];
         return db2.transaction(async (tx) => {
-          await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
+          await tx.execute(sql11`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
           const freshRows = await tx.select().from(components).where(eq7(components.cuuid, component.cuuid)).limit(1);
           const freshComponent = freshRows[0] || component;
           if (inheritedComponentsPre.length > 0) {
@@ -24426,6 +25845,15 @@ var init_postgresStorage = __esm({
           if (component.rhCounterType === "MASTER") {
             const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || "0");
             const delta = params.newRHValue - previousMasterRH;
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH: previousMasterRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: lastUpdatedValue
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { component: freshComponent, inheritedUpdated: 0 };
+            }
             const result = await tx.update(components).set({
               rhCurrentMaster: rhValueStr,
               currentCumulativeRH: rhValueStr,
@@ -24461,6 +25889,16 @@ var init_postgresStorage = __esm({
             }
             return { component: result[0], inheritedUpdated };
           } else if (component.rhCounterType === "INHERITED") {
+            const previousInheritedRH = parseFloat(freshComponent.currentCumulativeRH || "0");
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH: previousInheritedRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: lastUpdatedValue
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { component: freshComponent, inheritedUpdated: 0 };
+            }
             const result = await tx.update(components).set({
               currentCumulativeRH: rhValueStr,
               rhInheritedUpdatedAt: now,
@@ -24470,10 +25908,20 @@ var init_postgresStorage = __esm({
             if (!result[0]) {
               throw new Error(`Failed to update INHERITED component ${params.componentId}`);
             }
-            const inheritedDelta = params.newRHValue - parseFloat(freshComponent.currentCumulativeRH || "0");
+            const inheritedDelta = params.newRHValue - previousInheritedRH;
             await this.accrueStampRhDelta(tx, freshComponent.vesselId, freshComponent.currentStamp, inheritedDelta, readingIso, params.userId);
             return { component: result[0], inheritedUpdated: 0 };
           } else {
+            const previousFallbackRH = parseFloat(freshComponent.currentCumulativeRH || "0");
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH: previousFallbackRH,
+              submittedRH: params.newRHValue,
+              currentRHDate: freshComponent.lastUpdated || null,
+              submittedRHDate: lastUpdatedValue
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { component: freshComponent, inheritedUpdated: 0 };
+            }
             const result = await tx.update(components).set({
               currentCumulativeRH: rhValueStr,
               lastUpdated: lastUpdatedValue,
@@ -24482,7 +25930,7 @@ var init_postgresStorage = __esm({
             if (!result[0]) {
               throw new Error(`Failed to update component ${params.componentId}`);
             }
-            const fallbackDelta = params.newRHValue - parseFloat(component.currentCumulativeRH || "0");
+            const fallbackDelta = params.newRHValue - previousFallbackRH;
             await this.accrueStampRhDelta(tx, component.vesselId, component.currentStamp, fallbackDelta, readingIso, params.userId);
             return { component: result[0], inheritedUpdated: 0 };
           }
@@ -24603,7 +26051,7 @@ var init_postgresStorage = __esm({
         }).from(workOrderAnomalies).where(
           and6(
             eq7(workOrderAnomalies.anomalyType, "BACKDATING"),
-            sql9`${workOrderAnomalies.workOrderId} = ANY(ARRAY[${sql9.join(workOrderIds.map((id) => sql9`${id}`), sql9`, `)}]::text[])`
+            sql11`${workOrderAnomalies.workOrderId} = ANY(ARRAY[${sql11.join(workOrderIds.map((id) => sql11`${id}`), sql11`, `)}]::text[])`
           )
         );
         const backdatingMap = /* @__PURE__ */ new Map();
@@ -24694,14 +26142,17 @@ var init_postgresStorage = __esm({
       }
       async getEarliestAuditTimestamp(vesselId) {
         const db2 = await getDb();
-        const result = await db2.select({ earliest: sql9`MIN(${runningHoursAudit.enteredAtUTC})` }).from(runningHoursAudit).where(eq7(runningHoursAudit.vesselId, vesselId));
+        const result = await db2.select({ earliest: sql11`MIN(${runningHoursAudit.enteredAtUTC})` }).from(runningHoursAudit).where(eq7(runningHoursAudit.vesselId, vesselId));
         return result[0]?.earliest || null;
       }
       async getRunningHoursAudits(componentId, limit) {
         const db2 = await getDb();
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
-        let query = db2.select().from(runningHoursAudit).where(or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId))).orderBy(desc2(runningHoursAudit.enteredAtUTC));
+        let query = db2.select().from(runningHoursAudit).where(and6(
+          or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId)),
+          or(eq7(runningHoursAudit.isDeleted, false), isNull2(runningHoursAudit.isDeleted))
+        )).orderBy(desc2(runningHoursAudit.enteredAtUTC));
         if (limit) {
           return await query.limit(limit);
         }
@@ -24722,7 +26173,7 @@ var init_postgresStorage = __esm({
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
         const result = await db2.select({
-          total: sql9`COALESCE(SUM(CASE WHEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) > 0 THEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) ELSE 0 END), 0)`
+          total: sql11`COALESCE(SUM(CASE WHEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) > 0 THEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) ELSE 0 END), 0)`
         }).from(runningHoursAudit).where(and6(
           or(eq7(runningHoursAudit.componentId, resolvedId), eq7(runningHoursAudit.componentId, componentId)),
           gte(runningHoursAudit.enteredAtUTC, startDate),
@@ -24742,8 +26193,8 @@ var init_postgresStorage = __esm({
           enteredAtUTC: runningHoursAudit.enteredAtUTC
         }).from(runningHoursAudit).where(and6(
           idCondition,
-          sql9`${parsedDateExpr} <= ${targetDay}::date`
-        )).orderBy(sql9`${parsedDateExpr} DESC`).limit(1);
+          sql11`${parsedDateExpr} <= ${targetDay}::date`
+        )).orderBy(sql11`${parsedDateExpr} DESC`).limit(1);
         if (result.length > 0) {
           return {
             runningHours: parseFloat(result[0].runningHours || "0"),
@@ -24756,8 +26207,8 @@ var init_postgresStorage = __esm({
           enteredAtUTC: runningHoursAudit.enteredAtUTC
         }).from(runningHoursAudit).where(and6(
           idCondition,
-          sql9`${parsedDateExpr} > ${targetDay}::date`
-        )).orderBy(sql9`${parsedDateExpr} ASC`).limit(1);
+          sql11`${parsedDateExpr} > ${targetDay}::date`
+        )).orderBy(sql11`${parsedDateExpr} ASC`).limit(1);
         if (fallback.length > 0) {
           return {
             runningHours: parseFloat(fallback[0].runningHours || "0"),
@@ -24943,6 +26394,13 @@ var init_postgresStorage = __esm({
         return map;
       }
       // ============= MODULE 5: WORK ORDERS =============
+      // Light projection for WO numbering — one indexed column instead of full rows.
+      // Full-row getWorkOrders here cost ~930 rows read per WO generated (perf probe 02-Sep-2026).
+      async getWorkOrderNumbers(vesselId) {
+        const db2 = await getDb();
+        const rows = vesselId ? await db2.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders).where(eq7(workOrders.vesselId, vesselId)) : await db2.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders);
+        return rows.map((r) => r.workOrderNo).filter((n) => !!n);
+      }
       async getWorkOrders(vesselId, vesselIds) {
         const db2 = await getDb();
         if (vesselIds && vesselIds.length > 0) {
@@ -26477,7 +27935,7 @@ var init_postgresStorage = __esm({
           today.setHours(0, 0, 0, 0);
           const todayStr = today.toISOString().split("T")[0];
           conditions.push(lt(defects.targetCloseDate, todayStr));
-          conditions.push(sql9`(${defects.verified} IS NULL OR ${defects.verified} = false)`);
+          conditions.push(sql11`(${defects.verified} IS NULL OR ${defects.verified} = false)`);
         } else if (filters?.dueOverdue === "due") {
           const today = /* @__PURE__ */ new Date();
           today.setHours(0, 0, 0, 0);
@@ -26518,7 +27976,7 @@ var init_postgresStorage = __esm({
         if (filters?.isCoC !== void 0) {
           conditions.push(eq7(defects.is_coc, filters.isCoC));
         }
-        let query = db2.select({ count: sql9`count(*)` }).from(defects);
+        let query = db2.select({ count: sql11`count(*)` }).from(defects);
         if (conditions.length > 0) {
           query = query.where(and6(...conditions));
         }
@@ -26545,12 +28003,12 @@ var init_postgresStorage = __esm({
         const vesselResult = await db2.select({ vesselSequence: vessels.vesselSequence }).from(vessels).where(eq7(vessels.vuuid, vesselId));
         let vesselSeq = vesselResult[0]?.vesselSequence;
         if (vesselResult.length > 0 && !vesselSeq) {
-          const maxSeqResult = await db2.select({ max: sql9`COALESCE(MAX(vessel_sequence), 0)` }).from(vessels);
+          const maxSeqResult = await db2.select({ max: sql11`COALESCE(MAX(vessel_sequence), 0)` }).from(vessels);
           vesselSeq = (maxSeqResult[0]?.max || 0) + 1;
           await db2.update(vessels).set({ vesselSequence: vesselSeq }).where(eq7(vessels.vuuid, vesselId));
         }
         if (!vesselSeq) {
-          const existingVesselSeqs = await db2.execute(sql9`
+          const existingVesselSeqs = await db2.execute(sql11`
         SELECT DISTINCT vessel_id FROM defect_sequences ORDER BY vessel_id
       `);
           const vesselIds = existingVesselSeqs.rows.map((r) => r.vessel_id);
@@ -26907,9 +28365,9 @@ var init_postgresStorage = __esm({
         }
         if (filters?.acknowledged !== void 0) {
           if (filters.acknowledged) {
-            conditions.push(sql9`${alertEvents.ackBy} IS NOT NULL`);
+            conditions.push(sql11`${alertEvents.ackBy} IS NOT NULL`);
           } else {
-            conditions.push(sql9`${alertEvents.ackBy} IS NULL`);
+            conditions.push(sql11`${alertEvents.ackBy} IS NULL`);
           }
         }
         if (conditions.length > 0) {
@@ -27012,8 +28470,50 @@ var init_postgresStorage = __esm({
       async getWorkOrdersWithMissedCycles() {
         const db2 = await getDb();
         return await db2.select().from(workOrders).where(and6(
-          sql9`${workOrders.missedCycles} > 0`,
+          sql11`${workOrders.missedCycles} > 0`,
           eq7(workOrders.dataScope, "vessel")
+        ));
+      }
+      // Alert-scan candidate WOs: only rows whose authored status can still compute to a
+      // derived band. Excludes exactly the statuses computeWorkOrderStatus passes through
+      // unchanged (shared/workOrders/status.ts): the FINALIZED set (lowercased/trimmed
+      // compare) and the exact-match workflow statuses. On a mature fleet this drops the
+      // completed history — the bulk of the table — before the 5-minute alert scan
+      // enriches anything. NULL status = candidate.
+      async getAlertCandidateWorkOrders() {
+        const db2 = await getDb();
+        return await db2.select().from(workOrders).where(and6(
+          eq7(workOrders.dataScope, "vessel"),
+          sql11`${workOrders.isDeleted} IS NOT TRUE`,
+          sql11`(${workOrders.status} IS NULL OR (
+          lower(trim(${workOrders.status})) NOT IN ('completed','approved','closed','cancelled','canceled')
+          AND ${workOrders.status} NOT IN ('Pending Approval','Pending Office Review','Postponed','Awaiting Office Approval','Postponement Approved','Postponement Rejected','Rejected')
+        ))`
+        ));
+      }
+      // Alert-scan candidate spares: SQL mirror of evaluateLowSpares' preconditions
+      // (lowSparesEvaluator.ts) with only the columns it reads — instead of loading
+      // every spare of the fleet, full rows, every 5 minutes.
+      async getLowCriticalSpareCandidates() {
+        const db2 = await getDb();
+        return await db2.select({
+          suuid: spares.suuid,
+          partCode: spares.partCode,
+          partName: spares.partName,
+          rob: spares.rob,
+          min: spares.min,
+          critical: spares.critical,
+          componentCode: spares.componentCode,
+          componentName: spares.componentName,
+          vesselId: spares.vesselId
+        }).from(spares).where(and6(
+          eq7(spares.dataScope, "vessel"),
+          eq7(spares.deleted, false),
+          or(eq7(spares.isDeleted, false), isNull2(spares.isDeleted)),
+          sql11`${spares.vesselId} IS NOT NULL`,
+          sql11`lower(${spares.critical}) IN ('critical','yes')`,
+          sql11`${spares.min} > 0`,
+          sql11`${spares.rob} < ${spares.min}`
         ));
       }
       async getAllVesselSpares() {
@@ -27027,7 +28527,7 @@ var init_postgresStorage = __esm({
       async getUnacknowledgedAlertEventsForRole(userRole, vesselId) {
         const db2 = await getDb();
         const conditions = [
-          sql9`${alertEvents.ackBy} IS NULL`
+          sql11`${alertEvents.ackBy} IS NULL`
         ];
         if (vesselId) {
           conditions.push(eq7(alertEvents.vesselId, vesselId));
@@ -27054,7 +28554,7 @@ var init_postgresStorage = __esm({
           return [];
         }
         conditions.push(
-          sql9`${alertEvents.policyUuid} IN (${sql9.join(allowedPolicyUuids.map((u) => sql9`${u}`), sql9`, `)})`
+          sql11`${alertEvents.policyUuid} IN (${sql11.join(allowedPolicyUuids.map((u) => sql11`${u}`), sql11`, `)})`
         );
         return await db2.select().from(alertEvents).where(and6(...conditions)).orderBy(desc2(alertEvents.createdAt));
       }
@@ -28252,7 +29752,7 @@ var init_postgresStorage = __esm({
       async getImportHistory(type, limit = 20, offset = 0) {
         const db2 = await getDb();
         let query = db2.select().from(importHistory);
-        let countQuery = db2.select({ count: sql9`count(*)` }).from(importHistory);
+        let countQuery = db2.select({ count: sql11`count(*)` }).from(importHistory);
         if (type) {
           query = query.where(eq7(importHistory.type, type));
           countQuery = countQuery.where(eq7(importHistory.type, type));
@@ -28426,11 +29926,11 @@ var init_postgresStorage = __esm({
         if (filters.source) conditions.push(eq7(auditLog.source, filters.source));
         if (filters.actor) {
           const a = `%${filters.actor}%`;
-          conditions.push(sql9`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
+          conditions.push(sql11`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
         }
         if (filters.entityCode) {
           const c = `%${filters.entityCode}%`;
-          conditions.push(sql9`(${auditLog.componentCode} ILIKE ${c} OR ${auditLog.entityId} ILIKE ${c} OR ${auditLog.payload}->>'workOrderNo' ILIKE ${c} OR ${auditLog.payload}->>'componentCode' ILIKE ${c})`);
+          conditions.push(sql11`(${auditLog.componentCode} ILIKE ${c} OR ${auditLog.entityId} ILIKE ${c} OR ${auditLog.payload}->>'workOrderNo' ILIKE ${c} OR ${auditLog.payload}->>'componentCode' ILIKE ${c})`);
         }
         if (filters.startDate) conditions.push(gte(auditLog.timestamp, filters.startDate));
         if (filters.endDate) conditions.push(lte(auditLog.timestamp, filters.endDate));
@@ -28439,7 +29939,7 @@ var init_postgresStorage = __esm({
       async countAuditLogs(filters) {
         const db2 = await getDb();
         const conditions = this.buildAuditLogConditions(filters);
-        let q = db2.select({ n: sql9`count(*)::int` }).from(auditLog);
+        let q = db2.select({ n: sql11`count(*)::int` }).from(auditLog);
         if (conditions.length > 0) q = q.where(and6(...conditions));
         const r = await q;
         return Number(r[0]?.n ?? 0);
@@ -28484,7 +29984,10 @@ var init_postgresStorage = __esm({
       }
       async getSuperintendentNotifications(vesselName) {
         const db2 = await getDb();
-        const conditions = [eq7(superintendentNotifications.isAcknowledged, false)];
+        const conditions = [
+          eq7(superintendentNotifications.isAcknowledged, false),
+          or(eq7(superintendentNotifications.isDeleted, false), isNull2(superintendentNotifications.isDeleted))
+        ];
         if (vesselName) {
           conditions.push(eq7(superintendentNotifications.vesselName, vesselName));
         }
@@ -28492,7 +29995,11 @@ var init_postgresStorage = __esm({
       }
       async getAllSuperintendentNotifications(vesselName) {
         const db2 = await getDb();
-        return await db2.select().from(superintendentNotifications).where(vesselName ? eq7(superintendentNotifications.vesselName, vesselName) : void 0).orderBy(desc2(superintendentNotifications.createdAt));
+        const activeCondition = or(
+          eq7(superintendentNotifications.isDeleted, false),
+          isNull2(superintendentNotifications.isDeleted)
+        );
+        return await db2.select().from(superintendentNotifications).where(vesselName ? and6(activeCondition, eq7(superintendentNotifications.vesselName, vesselName)) : activeCondition).orderBy(desc2(superintendentNotifications.createdAt));
       }
       async acknowledgeSuperintendentNotification(id) {
         const db2 = await getDb();
@@ -28526,18 +30033,18 @@ var init_postgresStorage = __esm({
           conditions.push(eq7(workOrderAnomalies.vesselId, filters.vesselId));
         }
         if (filters?.dateFrom) {
-          conditions.push(sql9`${workOrderAnomalies.detectedAt} >= ${filters.dateFrom}`);
+          conditions.push(sql11`${workOrderAnomalies.detectedAt} >= ${filters.dateFrom}`);
         }
         if (filters?.dateTo) {
-          conditions.push(sql9`${workOrderAnomalies.detectedAt} <= ${filters.dateTo}`);
+          conditions.push(sql11`${workOrderAnomalies.detectedAt} <= ${filters.dateTo}`);
         }
         const query = db2.select().from(workOrderAnomalies);
         const whereClause = conditions.length > 0 ? and6(...conditions) : void 0;
         const results = whereClause ? await query.where(whereClause).orderBy(
-          sql9`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
+          sql11`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
           desc2(workOrderAnomalies.detectedAt)
         ).limit(filters?.limit || 50) : await query.orderBy(
-          sql9`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
+          sql11`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
           desc2(workOrderAnomalies.detectedAt)
         ).limit(filters?.limit || 50);
         return results;
@@ -28786,7 +30293,7 @@ var init_postgresStorage = __esm({
       }
       async getWorkOrderPostponementCount(workOrderId) {
         const db2 = await getDb();
-        const result = await db2.select({ count: sql9`count(*)` }).from(workOrderPostponements).where(eq7(workOrderPostponements.workOrderId, workOrderId));
+        const result = await db2.select({ count: sql11`count(*)` }).from(workOrderPostponements).where(eq7(workOrderPostponements.workOrderId, workOrderId));
         return Number(result[0]?.count || 0);
       }
       async createWorkOrderPostponement(postponement) {
@@ -28984,6 +30491,14 @@ var init_postgresStorage = __esm({
         if (parentResult.length > 0) {
           const parent = parentResult[0];
           currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || "0");
+          const requestedRH = meterReplaced ? value : mode === "addDelta" ? currentRH + value : value;
+          enforceFreshRHMonotonicity({
+            currentRH,
+            submittedRH: requestedRH,
+            currentRHDate: parent.lastUpdated || null,
+            submittedRHDate: dateUpdated,
+            approvedReset: !!meterReplaced || !!isRenewalReset
+          });
           if (!rhValidationBypassed) {
             {
               const { selectWinningRhEvent: selectWinningRhEvent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
@@ -28997,7 +30512,7 @@ var init_postgresStorage = __esm({
                 }
               }
             }
-            if (mode === "setTotal" && value < currentRH && !isRenewalReset) {
+            if (mode === "setTotal" && value < currentRH && !meterReplaced && !isRenewalReset) {
               throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
             }
             if (mode === "setTotal" && value === 0 && !isRenewalReset) {
@@ -29030,12 +30545,22 @@ var init_postgresStorage = __esm({
           let updatedComponents = 0;
           let auditsCreated = 0;
           if (parentResult.length > 0) {
-            await tx.execute(sql9`SELECT pg_advisory_xact_lock(hashtext(${resolvedParentId}))`);
+            await tx.execute(sql11`SELECT pg_advisory_xact_lock(hashtext(${resolvedParentId}))`);
             const freshParentResult = await tx.select().from(components).where(eq7(components.cuuid, resolvedParentId)).limit(1);
             if (freshParentResult.length > 0) {
               computeDerived(freshParentResult[0]);
             }
             const freshParent = freshParentResult[0] || parentResult[0];
+            const monotonicity = enforceFreshRHMonotonicity({
+              currentRH,
+              submittedRH: newRH,
+              currentRHDate: freshParent.lastUpdated || null,
+              submittedRHDate: dateUpdated,
+              approvedReset: !!meterReplaced || !!isRenewalReset
+            });
+            if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+              return { updatedComponents: 0, auditsCreated: 0 };
+            }
             if (inheritedComponents.length > 0) {
               inheritedComponents = await tx.select().from(components).where(inArray2(components.cuuid, inheritedComponents.map((i) => i.cuuid)));
             }
@@ -29234,14 +30759,14 @@ var init_postgresStorage = __esm({
       }
       async archiveWorkOrder(id) {
         const db2 = await getDb();
-        const existingWO2 = await this.getWorkOrder(id);
+        const existingWO = await this.getWorkOrder(id);
         const result = await db2.update(workOrders).set({ isActive: false }).where(or(eq7(workOrders.wouuid, id), eq7(workOrders.id, id))).returning();
         if (result.length === 0) {
           throw new Error(`WorkOrder not found: ${id}`);
         }
-        if (existingWO2) {
+        if (existingWO) {
           try {
-            await logFieldChanges("work_orders", result[0].wouuid, result[0].vesselId || null, existingWO2, result[0], "system");
+            await logFieldChanges("work_orders", result[0].wouuid, result[0].vesselId || null, existingWO, result[0], "system");
           } catch (e) {
             console.error("[FieldLogger] WO archive:", e);
           }
@@ -29313,10 +30838,10 @@ var init_postgresStorage = __esm({
       }
       async getFleetAdminMetrics() {
         const db2 = await getDb();
-        const makersResult = await db2.select({ count: sql9`count(*)` }).from(makers);
-        const masterListsResult = await db2.select({ count: sql9`count(*)` }).from(masterLists);
-        const fleetComponentsResult = await db2.select({ count: sql9`count(*)` }).from(components).where(eq7(components.dataScope, "fleet"));
-        const modelsResult = await db2.select({ count: sql9`count(distinct model)` }).from(components).where(sql9`model is not null`);
+        const makersResult = await db2.select({ count: sql11`count(*)` }).from(makers);
+        const masterListsResult = await db2.select({ count: sql11`count(*)` }).from(masterLists);
+        const fleetComponentsResult = await db2.select({ count: sql11`count(*)` }).from(components).where(eq7(components.dataScope, "fleet"));
+        const modelsResult = await db2.select({ count: sql11`count(distinct model)` }).from(components).where(sql11`model is not null`);
         return {
           totalMakers: Number(makersResult[0]?.count || 0),
           totalModels: Number(modelsResult[0]?.count || 0),
@@ -29504,7 +31029,7 @@ var init_postgresStorage = __esm({
         const normalizedName = locationName.trim().toUpperCase();
         const result = await db2.select().from(locations).where(and6(
           eq7(locations.vesselId, vesselId),
-          sql9`UPPER(TRIM(${locations.locationName})) = ${normalizedName}`
+          sql11`UPPER(TRIM(${locations.locationName})) = ${normalizedName}`
         ));
         return result[0];
       }
@@ -29566,7 +31091,7 @@ var init_postgresStorage = __esm({
       }
       async getSpareComponentLinkCountByVessel(vesselId) {
         const db2 = await getDb();
-        const result = await db2.select({ count: sql9`count(*)` }).from(spareComponentLinks).where(eq7(spareComponentLinks.vesselId, vesselId));
+        const result = await db2.select({ count: sql11`count(*)` }).from(spareComponentLinks).where(eq7(spareComponentLinks.vesselId, vesselId));
         return Number(result[0]?.count ?? 0);
       }
       async getSpareComponentLinksByComponent(componentId) {
@@ -29623,7 +31148,7 @@ var init_postgresStorage = __esm({
         if (!comp[0] || !comp[0].parentId) return [];
         const siblings = await db2.select({ cuuid: components.cuuid, name: components.name }).from(components).where(and6(
           eq7(components.parentId, comp[0].parentId),
-          sql9`${components.cuuid} != ${componentId}`
+          sql11`${components.cuuid} != ${componentId}`
         ));
         return siblings;
       }
@@ -29654,7 +31179,7 @@ var init_postgresStorage = __esm({
       }
       async backfillSiblingLinks(vesselId) {
         const db2 = await getDb();
-        const result = await db2.execute(sql9`
+        const result = await db2.execute(sql11`
       WITH existing_links AS (
         SELECT scl.spare_id, scl.spare_uuid, scl.component_id, scl.vessel_id, c.parent_id
         FROM spare_component_links scl
@@ -29776,16 +31301,12 @@ var init_postgresStorage = __esm({
         const links = await db2.select({
           componentId: jobComponentLinks.componentId,
           componentCode: components.componentCode,
-          componentName: components.name,
-          lastDoneRH: jobComponentLinks.lastDoneRH,
-          nextDueRH: jobComponentLinks.nextDueRH
+          componentName: components.name
         }).from(jobComponentLinks).innerJoin(components, eq7(jobComponentLinks.componentId, components.cuuid)).where(eq7(jobComponentLinks.jobId, jobId));
         return links.map((l) => ({
           componentId: l.componentId,
           componentCode: l.componentCode || "",
-          componentName: l.componentName || "",
-          lastDoneRH: l.lastDoneRH,
-          nextDueRH: l.nextDueRH
+          componentName: l.componentName || ""
         }));
       }
       /**
@@ -29802,18 +31323,14 @@ var init_postgresStorage = __esm({
           jobId: jobComponentLinks.jobId,
           componentId: jobComponentLinks.componentId,
           componentCode: components.componentCode,
-          componentName: components.name,
-          lastDoneRH: jobComponentLinks.lastDoneRH,
-          nextDueRH: jobComponentLinks.nextDueRH
+          componentName: components.name
         }).from(jobComponentLinks).innerJoin(components, eq7(jobComponentLinks.componentId, components.cuuid)).where(inArray2(jobComponentLinks.jobId, jobIds));
         for (const l of links) {
           const arr = result.get(l.jobId) ?? [];
           arr.push({
             componentId: l.componentId,
             componentCode: l.componentCode || "",
-            componentName: l.componentName || "",
-            lastDoneRH: l.lastDoneRH,
-            nextDueRH: l.nextDueRH
+            componentName: l.componentName || ""
           });
           result.set(l.jobId, arr);
         }
@@ -29831,33 +31348,6 @@ var init_postgresStorage = __esm({
           jobNo: l.jobNo || "",
           jobTitle: l.jobTitle || ""
         }));
-      }
-      // Component-specific tracking updates (prevents data mixing between components sharing the same job)
-      // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-      async updateJobComponentLinkTracking(vesselId, jobId, componentId, updates) {
-        if (!vesselId) {
-          throw new Error("vesselId is required for updateJobComponentLinkTracking to ensure vessel isolation");
-        }
-        const db2 = await getDb();
-        const result = await db2.update(jobComponentLinks).set(updates).where(and6(
-          eq7(jobComponentLinks.vesselId, vesselId),
-          eq7(jobComponentLinks.jobId, jobId),
-          eq7(jobComponentLinks.componentId, componentId)
-        )).returning();
-        return result[0] || null;
-      }
-      // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
-      async getJobComponentLinkWithTracking(vesselId, jobId, componentId) {
-        if (!vesselId) {
-          throw new Error("vesselId is required for getJobComponentLinkWithTracking to ensure vessel isolation");
-        }
-        const db2 = await getDb();
-        const result = await db2.select().from(jobComponentLinks).where(and6(
-          eq7(jobComponentLinks.vesselId, vesselId),
-          eq7(jobComponentLinks.jobId, jobId),
-          eq7(jobComponentLinks.componentId, componentId)
-        ));
-        return result[0] || null;
       }
       // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============
       async getSpareLocationStock(spareId) {
@@ -30005,7 +31495,7 @@ var init_postgresStorage = __esm({
         const result = await db2.select({
           id: locations.id,
           locationName: locations.locationName,
-          sparesCount: sql9`count(distinct ${spareLocationStock.spareId})`.as("spares_count")
+          sparesCount: sql11`count(distinct ${spareLocationStock.spareId})`.as("spares_count")
         }).from(spareLocationStock).innerJoin(locations, eq7(spareLocationStock.locationId, locations.id)).innerJoin(spares, eq7(spareLocationStock.spareUuid, spares.suuid)).where(and6(
           eq7(spares.vesselId, vesselId),
           eq7(spares.deleted, false),
@@ -30268,7 +31758,7 @@ var init_postgresStorage = __esm({
       }
       async getSparesWithInventoryByVessel(vesselId) {
         const db2 = await getDb();
-        const result = await db2.execute(sql9`
+        const result = await db2.execute(sql11`
       SELECT s.*,
         COALESCE(json_agg(DISTINCT jsonb_build_object(
           'locationId', sls.location_id,
@@ -30285,7 +31775,7 @@ var init_postgresStorage = __esm({
       LEFT JOIN locations l ON sls.location_id = l.id
       LEFT JOIN spare_component_links scl ON scl.spare_id = s.id
       LEFT JOIN components c ON scl.component_id = c.cuuid
-      WHERE ${vesselId === "all" ? sql9`TRUE` : sql9`s.vessel_id = ${vesselId}`}
+      WHERE ${vesselId === "all" ? sql11`TRUE` : sql11`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
         AND (s.is_deleted IS NULL OR s.is_deleted = false)
         AND s.data_scope = 'vessel'
@@ -30374,22 +31864,22 @@ var init_postgresStorage = __esm({
         const page = Math.max(1, Math.floor(opts.page || 1));
         const pageSize = Math.min(200, Math.max(1, Math.floor(opts.pageSize || 50)));
         const offset = (page - 1) * pageSize;
-        const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql9.raw("DESC") : sql9.raw("ASC");
+        const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql11.raw("DESC") : sql11.raw("ASC");
         const filters = [
-          sql9`s.deleted = false`,
-          sql9`(s.is_deleted IS NULL OR s.is_deleted = false)`,
-          sql9`s.data_scope = 'vessel'`
+          sql11`s.deleted = false`,
+          sql11`(s.is_deleted IS NULL OR s.is_deleted = false)`,
+          sql11`s.data_scope = 'vessel'`
         ];
         if (vesselId !== "all") {
-          filters.push(sql9`s.vessel_id = ${vesselId}`);
+          filters.push(sql11`s.vessel_id = ${vesselId}`);
         } else if (opts.vesselIds && opts.vesselIds.length > 0) {
           filters.push(
-            sql9`s.vessel_id = ANY(ARRAY[${sql9.join(opts.vesselIds.map((id) => sql9`${id}`), sql9`, `)}]::text[])`
+            sql11`s.vessel_id = ANY(ARRAY[${sql11.join(opts.vesselIds.map((id) => sql11`${id}`), sql11`, `)}]::text[])`
           );
         }
         if (opts.search && opts.search.trim()) {
           const q = `%${opts.search.trim()}%`;
-          filters.push(sql9`(
+          filters.push(sql11`(
         s.part_code ILIKE ${q} OR
         s.part_name ILIKE ${q} OR
         s.component_code ILIKE ${q} OR
@@ -30399,29 +31889,29 @@ var init_postgresStorage = __esm({
       )`);
         }
         if (opts.criticality === "Critical") {
-          filters.push(sql9`(s.critical = 'Critical' OR s.critical = 'Yes')`);
+          filters.push(sql11`(s.critical = 'Critical' OR s.critical = 'Yes')`);
         } else if (opts.criticality === "Non-critical") {
-          filters.push(sql9`(s.critical IS NULL OR (s.critical <> 'Critical' AND s.critical <> 'Yes'))`);
+          filters.push(sql11`(s.critical IS NULL OR (s.critical <> 'Critical' AND s.critical <> 'Yes'))`);
         }
         if (opts.rotation === "Rotation Items") {
-          filters.push(sql9`s.is_rotation_item = true`);
+          filters.push(sql11`s.is_rotation_item = true`);
         } else if (opts.rotation === "Non-Rotation Items") {
-          filters.push(sql9`(s.is_rotation_item IS NULL OR s.is_rotation_item = false)`);
+          filters.push(sql11`(s.is_rotation_item IS NULL OR s.is_rotation_item = false)`);
         }
         if (opts.stockStatus === "Low") {
-          filters.push(sql9`COALESCE(s.rob, 0) < COALESCE(s.min, 0)`);
+          filters.push(sql11`COALESCE(s.rob, 0) < COALESCE(s.min, 0)`);
         } else if (opts.stockStatus === "At Min") {
-          filters.push(sql9`COALESCE(s.rob, 0) = COALESCE(s.min, 0)`);
+          filters.push(sql11`COALESCE(s.rob, 0) = COALESCE(s.min, 0)`);
         } else if (opts.stockStatus === "OK") {
-          filters.push(sql9`COALESCE(s.rob, 0) > COALESCE(s.min, 0)`);
+          filters.push(sql11`COALESCE(s.rob, 0) > COALESCE(s.min, 0)`);
         }
         if (opts.activeOnly) {
-          filters.push(sql9`(s.is_active IS NULL OR s.is_active = true)`);
+          filters.push(sql11`(s.is_active IS NULL OR s.is_active = true)`);
         }
         if (opts.componentId && opts.componentId.trim()) {
           const cid = opts.componentId.trim();
           const cidPrefix = `${cid}.%`;
-          filters.push(sql9`(
+          filters.push(sql11`(
         s.component_code = ${cid}
         OR s.component_code LIKE ${cidPrefix}
         OR EXISTS (
@@ -30435,13 +31925,13 @@ var init_postgresStorage = __esm({
         }
         let whereClause = filters[0];
         for (let i = 1; i < filters.length; i++) {
-          whereClause = sql9`${whereClause} AND ${filters[i]}`;
+          whereClause = sql11`${whereClause} AND ${filters[i]}`;
         }
-        const countResult = await db2.execute(sql9`
+        const countResult = await db2.execute(sql11`
       SELECT COUNT(*)::int AS total FROM spares s WHERE ${whereClause}
     `);
         const total = Number(countResult.rows[0]?.total || 0);
-        const pageResult = await db2.execute(sql9`
+        const pageResult = await db2.execute(sql11`
       WITH filtered AS (
         SELECT * FROM spares s WHERE ${whereClause}
         ORDER BY s.part_code ${dir} NULLS LAST, s.id ASC
@@ -30797,9 +32287,9 @@ var init_postgresStorage = __esm({
           }).onConflictDoUpdate({
             target: [approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName],
             set: {
-              level1Enabled: sql9`EXCLUDED.level1_enabled`,
-              level2Enabled: sql9`EXCLUDED.level2_enabled`,
-              updatedByUuid: sql9`EXCLUDED.updated_by_uuid`,
+              level1Enabled: sql11`EXCLUDED.level1_enabled`,
+              level2Enabled: sql11`EXCLUDED.level2_enabled`,
+              updatedByUuid: sql11`EXCLUDED.updated_by_uuid`,
               updatedAt: /* @__PURE__ */ new Date()
             }
           }).returning();
@@ -31521,7 +33011,15 @@ __export(workOrderNumbering_exports, {
   isValidJobNumber: () => isValidJobNumber,
   resolveVesselCode: () => resolveVesselCode
 });
-async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, vesselId) {
+async function getWorkOrderNos(storage2, vesselId, preloaded) {
+  if (preloaded) return preloaded;
+  if (typeof storage2.getWorkOrderNumbers === "function") {
+    return storage2.getWorkOrderNumbers(vesselId);
+  }
+  const allWorkOrders = await storage2.getWorkOrders(vesselId);
+  return allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
+}
+async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, vesselId, preloadedWorkOrderNos) {
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
   if (!componentCode || !componentCode.trim()) {
     throw new Error("Component code is required for planned work order numbering");
@@ -31530,7 +33028,7 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage2, vesselId);
   const prefix = vesselCode ? `${vesselCode}-` : "";
-  const allWorkOrders = await storage2.getWorkOrders(vesselId);
+  const workOrderNos = await getWorkOrderNos(storage2, vesselId, preloadedWorkOrderNos);
   const legacyPattern = new RegExp(
     `^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
@@ -31538,7 +33036,7 @@ async function generatePlannedWorkOrderNumber(storage2, jobCode, componentCode, 
     vesselCode ? `^${escapeRegex(vesselCode)}-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
-    allWorkOrders.map((wo) => wo.workOrderNo),
+    workOrderNos,
     [legacyPattern, vesselPrefixedPattern]
   );
   const nextRunningNumber = maxRunningNumber + 1;
@@ -31553,7 +33051,7 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
   const safeComponentCode = componentCode.trim();
   const vesselCode = await resolveVesselCode(storage2, vesselId);
   const prefix = vesselCode ? `${vesselCode}-` : "";
-  const allWorkOrders = await storage2.getWorkOrders(vesselId);
+  const unplannedWorkOrderNos = await getWorkOrderNos(storage2, vesselId);
   const legacyPattern = new RegExp(
     `^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
@@ -31561,7 +33059,7 @@ async function generateUnplannedWorkOrderNumber(storage2, vesselId, componentCod
     vesselCode ? `^${escapeRegex(vesselCode)}-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$` : `^.+-UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`
   );
   const maxRunningNumber = findMaxSequence(
-    allWorkOrders.map((wo) => wo.workOrderNo),
+    unplannedWorkOrderNos,
     [legacyPattern, vesselPrefixedPattern]
   );
   const nextRunningNumber = maxRunningNumber + 1;
@@ -31964,7 +33462,7 @@ var init_jobService = __esm({
 });
 
 // server/modules/running-hours/repositories/runningHoursRepository.ts
-import { desc as desc3, asc as asc3, eq as eq8, and as and7, gte as gte2, lte as lte2, or as or2, ilike as ilike3, sql as sql10, inArray as inArray3 } from "drizzle-orm";
+import { desc as desc3, asc as asc3, eq as eq8, and as and7, gte as gte2, lte as lte2, or as or2, ilike as ilike3, sql as sql12, inArray as inArray3 } from "drizzle-orm";
 async function getComponents(vesselId, vesselIds) {
   return storage.getComponents(vesselId, vesselIds);
 }
@@ -32037,11 +33535,11 @@ async function getRunningHoursAtDateBatch(masters, targetDate) {
     componentId: runningHoursAudit.componentId,
     runningHours: runningHoursAudit.cumulativeRH,
     enteredAtUTC: runningHoursAudit.enteredAtUTC,
-    parsedAt: sql10`${parsedDateExpr}`
+    parsedAt: sql12`${parsedDateExpr}`
   }).from(runningHoursAudit).where(and7(
     inArray3(runningHoursAudit.componentId, identifiers),
-    sql10`${parsedDateExpr} <= ${targetDay}::date`
-  )).orderBy(runningHoursAudit.componentId, sql10`${parsedDateExpr} DESC`);
+    sql12`${parsedDateExpr} <= ${targetDay}::date`
+  )).orderBy(runningHoursAudit.componentId, sql12`${parsedDateExpr} DESC`);
   for (const row of primary) {
     const cuuid = idToCuuid.get(row.componentId);
     if (!cuuid) continue;
@@ -32061,11 +33559,11 @@ async function getRunningHoursAtDateBatch(masters, targetDate) {
       componentId: runningHoursAudit.componentId,
       runningHours: runningHoursAudit.cumulativeRH,
       enteredAtUTC: runningHoursAudit.enteredAtUTC,
-      parsedAt: sql10`${parsedDateExpr}`
+      parsedAt: sql12`${parsedDateExpr}`
     }).from(runningHoursAudit).where(and7(
       inArray3(runningHoursAudit.componentId, missingIds),
-      sql10`${parsedDateExpr} > ${targetDay}::date`
-    )).orderBy(runningHoursAudit.componentId, sql10`${parsedDateExpr} ASC`);
+      sql12`${parsedDateExpr} > ${targetDay}::date`
+    )).orderBy(runningHoursAudit.componentId, sql12`${parsedDateExpr} ASC`);
     for (const row of fallback) {
       const cuuid = idToCuuid.get(row.componentId);
       if (!cuuid) continue;
@@ -32196,7 +33694,7 @@ async function getRunningHoursHistory(query) {
     );
   }
   const whereClause = conditions.length > 0 ? and7(...conditions) : void 0;
-  const [countResult] = await db2.select({ count: sql10`count(*)` }).from(runningHoursAudit).where(whereClause);
+  const [countResult] = await db2.select({ count: sql12`count(*)` }).from(runningHoursAudit).where(whereClause);
   const total = Number(countResult?.count || 0);
   const totalPages = Math.ceil(total / query.pageSize);
   const offset = (query.page - 1) * query.pageSize;
@@ -32255,7 +33753,7 @@ function getDaysBetween(date1, date2) {
   const msPerDay = 24 * 60 * 60 * 1e3;
   return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
 }
-function formatDMY(isoDate) {
+function formatDMY2(isoDate) {
   if (!isoDate) return isoDate;
   const m = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return isoDate;
@@ -32363,10 +33861,10 @@ async function getValidRange(machineryId, completionDate) {
   }
   const daysToPrev = getDaysBetween(parseDate2(previousEntry.date), targetDate);
   let minRH = previousEntry.runningHours;
-  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY;
+  let maxRH = previousEntry.runningHours + daysToPrev * MAX_HOURS_PER_DAY2;
   if (nextEntry) {
     const daysToNext = getDaysBetween(targetDate, parseDate2(nextEntry.date));
-    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY;
+    const minFromForward = nextEntry.runningHours - daysToNext * MAX_HOURS_PER_DAY2;
     minRH = Math.max(minRH, minFromForward);
     maxRH = Math.min(maxRH, nextEntry.runningHours);
   }
@@ -32393,7 +33891,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKDATED",
-      errorMessage: `Completion Date ${formatDMY(completionDate)} is earlier than the component's last running-hours update (${formatDMY(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
+      errorMessage: `Completion Date ${formatDMY2(completionDate)} is earlier than the component's last running-hours update (${formatDMY2(range.baselineDate || "")}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -32415,7 +33913,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   if (range.previousEntry) {
     daysBetweenPrevious = getDaysBetween(parseDate2(range.previousEntry.date), targetDate);
     actualIncrease = enteredRH - range.previousEntry.runningHours;
-    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY;
+    maxPossibleIncrease = daysBetweenPrevious * MAX_HOURS_PER_DAY2;
   }
   if (range.nextEntry) {
     daysBetweenNext = getDaysBetween(targetDate, parseDate2(range.nextEntry.date));
@@ -32441,7 +33939,7 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
     return {
       isValid: false,
       validationStatus: "INVALID_BACKWARD",
-      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
+      errorMessage: `This is physically impossible because: Previous RH entry: ${range.previousEntry.runningHours} hours on ${range.previousEntry.date}. Days between: ${daysBetweenPrevious} days. Maximum possible increase: ${maxPossibleIncrease} hours (${daysBetweenPrevious} days \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Your entered increase: ${actualIncrease} hours. Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours.`,
       validRange: { min: range.minRH, max: range.maxRH },
       utilizationRate: 0,
       requiresJustification: false,
@@ -32473,12 +33971,12 @@ async function validateRHEntry(machineryId, completionDate, enteredRH) {
   }
   if (range.nextEntry) {
     const requiredIncrease = range.nextEntry.runningHours - enteredRH;
-    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY;
+    const maxForwardIncrease = daysBetweenNext * MAX_HOURS_PER_DAY2;
     if (requiredIncrease > maxForwardIncrease && daysBetweenNext > 0) {
       return {
         isValid: false,
         validationStatus: "INVALID_FORWARD",
-        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY} hours per day to reach the next recorded value.`,
+        errorMessage: `This conflicts with future RH data: Next RH entry: ${range.nextEntry.runningHours} hours on ${range.nextEntry.date}. Days between: ${daysBetweenNext} days. Required increase from your entry: ${requiredIncrease.toFixed(0)} hours. Maximum possible in ${daysBetweenNext} days: ${maxForwardIncrease} hours (${daysBetweenNext} \xD7 ${MAX_HOURS_PER_DAY2} hrs/day). Valid RH range for ${completionDate}: ${range.minRH.toFixed(0)} to ${range.maxRH.toFixed(0)} hours. Your entry would require the machinery to run more than ${MAX_HOURS_PER_DAY2} hours per day to reach the next recorded value.`,
         validRange: { min: range.minRH, max: range.maxRH },
         utilizationRate: 0,
         requiresJustification: false,
@@ -32626,13 +34124,13 @@ async function getCurrentRH(machineryId) {
     rhCounterType: (component.rhCounterType || "MASTER").toUpperCase()
   };
 }
-var MAX_HOURS_PER_DAY, HIGH_UTILIZATION_THRESHOLD;
+var MAX_HOURS_PER_DAY2, HIGH_UTILIZATION_THRESHOLD;
 var init_rhTimelineValidationService = __esm({
   "server/modules/running-hours/services/rhTimelineValidationService.ts"() {
     "use strict";
     init_runningHoursRepository();
     init_readingDate();
-    MAX_HOURS_PER_DAY = 25;
+    MAX_HOURS_PER_DAY2 = 25;
     HIGH_UTILIZATION_THRESHOLD = 20;
   }
 });
@@ -32642,7 +34140,7 @@ function isJobCritical(job) {
   const priority = job.jobPriority?.toLowerCase() || "";
   return priority === "critical" || priority === "high";
 }
-var WorkOrderService, workOrderService;
+var WO_GEN_VERBOSE, WorkOrderService, workOrderService;
 var init_workOrderService = __esm({
   "server/services/workOrderService.ts"() {
     "use strict";
@@ -32654,7 +34152,9 @@ var init_workOrderService = __esm({
     init_jobService();
     init_sync();
     init_dateParse();
+    init_completedWorkOrderDate();
     init_workOrderStatus();
+    WO_GEN_VERBOSE = process.env.WO_GEN_VERBOSE_LOGS === "true";
     WorkOrderService = class {
       /**
        * Get all work orders with optional vessel filter and computed status
@@ -32760,11 +34260,12 @@ var init_workOrderService = __esm({
           throw new Error("Job title is required");
         }
         if (workOrderData.jobId) {
-          const existingWOs = await storage.getWorkOrders(workOrderData.vesselId);
+          const existingWOs = await storage.getWorkOrdersByJobId(workOrderData.jobId);
           const newComponentCode = workOrderData.componentCode || null;
           const existingActiveWO = existingWOs.find((wo) => {
             if (wo.isDeleted === true) return false;
             if (wo.jobId !== workOrderData.jobId) return false;
+            if (workOrderData.vesselId && wo.vesselId !== workOrderData.vesselId) return false;
             if (!isBlockingStatus(wo.status)) return false;
             const existingComponentCode = wo.componentCode || null;
             return existingComponentCode === newComponentCode;
@@ -32782,6 +34283,7 @@ var init_workOrderService = __esm({
           workOrderData.workOrderNo = await generateUnplannedWorkOrderNumber(storage, workOrderData.vesselId, componentCode);
           workOrderData.templateCode = workOrderData.workOrderNo;
         }
+        ensureCompletedWorkOrderDate(null, workOrderData);
         const createdWO = await storage.createWorkOrder(workOrderData);
         try {
           const actor = workOrderData.userId || workOrderData.performedBy || "auto-generation";
@@ -32796,6 +34298,8 @@ var init_workOrderService = __esm({
        */
       async updateWorkOrder(id, updates) {
         const updatesAny = updates;
+        const existingWO = await storage.getWorkOrder(id);
+        ensureCompletedWorkOrderDate(existingWO, updatesAny);
         if (updatesAny.status === "Pending Approval" && updatesAny.currentReading) {
           const runningHours = parseInt(updatesAny.currentReading);
           if (!isNaN(runningHours) && runningHours > 0) {
@@ -32808,7 +34312,7 @@ var init_workOrderService = __esm({
               updatesAny.rhJustificationDate = /* @__PURE__ */ new Date();
             }
             try {
-              const wo = await storage.getWorkOrder(id);
+              const wo = existingWO;
               if (wo) {
                 const { validateRHEntry: validateRHEntry3, getCurrentRH: getCurrentRH3 } = await Promise.resolve().then(() => (init_rhTimelineValidationService(), rhTimelineValidationService_exports));
                 const allComponents = wo.vesselId ? await storage.getComponents(wo.vesselId) : [];
@@ -32915,40 +34419,57 @@ var init_workOrderService = __esm({
        * - Today >= GENERATE_DATE
        * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same DUE_DATE cycle
        */
-      async autoGenerateWorkOrdersFromJobs(vesselId) {
-        const allJobs = await jobService.getJobs(vesselId);
+      async autoGenerateWorkOrdersFromJobs(vesselId, preloaded) {
+        const allJobs = preloaded?.jobs ?? await jobService.getJobs(vesselId);
         const calendarJobs = allJobs.filter(
           (job) => job.maintenanceBasis === "Calendar" && job.isActive !== false && // Job must be active
           job.nextDueDate
           // Must have valid due date
         );
-        const allWorkOrders = await this.getWorkOrders(vesselId);
+        const allWorkOrders = preloaded?.workOrders ?? await this.getWorkOrders(vesselId);
+        const workOrderNos = allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
         const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders, vesselId);
         const existingCycleWOs = buildCalendarCycleWOMap(allWorkOrders, vesselId);
+        const calendarLinksMap = await storage.getLinkedComponentsForJobs(calendarJobs.map((j) => j.juuid));
+        const componentCache = /* @__PURE__ */ new Map();
+        const vesselComponentsFetched = /* @__PURE__ */ new Set();
+        const getComponentFromCache = async (componentId, jobVesselId) => {
+          if (jobVesselId && !vesselComponentsFetched.has(jobVesselId)) {
+            const vesselComponents = await storage.getComponents(jobVesselId);
+            vesselComponents.forEach((c) => {
+              componentCache.set(c.id, c);
+              if (c.cuuid) componentCache.set(c.cuuid, c);
+            });
+            vesselComponentsFetched.add(jobVesselId);
+          }
+          const cached2 = componentCache.get(componentId);
+          if (cached2) return cached2;
+          return storage.getComponent(componentId);
+        };
         const results = {
           checked: calendarJobs.length,
           generated: 0,
           workOrders: []
         };
-        const today = /* @__PURE__ */ new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = currentWorkOrderCalendarDate();
         for (const job of calendarJobs) {
-          const dueDate = parseWorkOrderDate(job.nextDueDate);
+          const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate);
           if (!dueDate) {
             console.warn(`\u26A0\uFE0F [Calendar WO Gen] Job ${job.jobNo} has unparseable nextDueDate "${job.nextDueDate}" \u2014 skipping (fix the job's due date)`);
             continue;
           }
-          dueDate.setHours(0, 0, 0, 0);
-          const generateDate = new Date(dueDate);
-          generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+          const generateDate = addWorkOrderCalendarDays(
+            dueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
           if (today < generateDate) {
             continue;
           }
-          const dueDateStr = dueDate.toISOString().split("T")[0];
-          const generateDateStr = generateDate.toISOString().split("T")[0];
-          const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
+          const dueDateStr = formatWorkOrderCalendarDate(dueDate);
+          const generateDateStr = formatWorkOrderCalendarDate(generateDate);
+          const linkedComponents = [...calendarLinksMap.get(job.juuid) ?? []];
           if (linkedComponents.length === 0 && job.componentId) {
-            const primaryComponent = await storage.getComponent(job.componentId);
+            const primaryComponent = await getComponentFromCache(job.componentId, job.vesselId);
             if (primaryComponent) {
               linkedComponents.push({
                 componentId: primaryComponent.cuuid,
@@ -32980,7 +34501,7 @@ var init_workOrderService = __esm({
             if (existingCycleWOs.has(componentCycleKey)) {
               continue;
             }
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0);
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0, workOrderNos);
             const workOrderData = {
               vesselId: job.vesselId,
               component: componentName,
@@ -33017,11 +34538,14 @@ var init_workOrderService = __esm({
               const createdWO = await this.createWorkOrder(workOrderData);
               results.generated++;
               results.workOrders.push(createdWO);
+              workOrderNos.push(workOrderNo);
               existingCycleWOs.set(componentCycleKey, workOrderData);
               const priorityLabel = isJobCritical(job) ? "Critical" : "Non-Critical";
               console.log(`\u2705 [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
-              console.log(`   last_done=${job.lastDoneDate || "N/A"}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
-              console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split("T")[0]}`);
+              if (WO_GEN_VERBOSE) {
+                console.log(`   last_done=${job.lastDoneDate || "N/A"}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
+                console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split("T")[0]}`);
+              }
             } catch (error) {
               console.warn(`\u26A0\uFE0F Failed to create WO for job ${job.jobNo} + component ${componentCode}: ${error.message}`);
             }
@@ -33054,6 +34578,28 @@ async function resolveOriginInstance() {
     return null;
   }
 }
+function buildLegacyBlockingSets(allWorkOrders) {
+  const byJobId = /* @__PURE__ */ new Set();
+  const byVesselJobNo = /* @__PURE__ */ new Set();
+  for (const wo of allWorkOrders) {
+    if (wo.isDeleted === true) continue;
+    if (!isBlockingStatus(wo.status)) continue;
+    if (wo.componentCode && wo.componentCode !== "") continue;
+    if (wo.jobId) byJobId.add(wo.jobId);
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    if (woJobNo) byVesselJobNo.add(`${wo.vesselId}|${woJobNo}`);
+  }
+  return { byJobId, byVesselJobNo };
+}
+function buildJobComponentBlockingSet(allWorkOrders) {
+  const set = /* @__PURE__ */ new Set();
+  for (const wo of allWorkOrders) {
+    if (wo.isDeleted === true) continue;
+    if (!isBlockingStatus(wo.status)) continue;
+    if (wo.jobId && wo.componentCode) set.add(`${wo.jobId}|${wo.componentCode}`);
+  }
+  return set;
+}
 function isJobCritical2(job) {
   const priority = job.jobPriority?.toLowerCase() || "";
   return priority === "critical" || priority === "high";
@@ -33064,7 +34610,7 @@ function getRhLeadHours(job, settings) {
   }
   return isJobCritical2(job) ? settings.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL : settings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL;
 }
-var JobDueScannerService, jobDueScanner;
+var WO_GEN_VERBOSE2, JobDueScannerService, jobDueScanner;
 var init_jobDueScanner = __esm({
   "server/services/jobDueScanner.ts"() {
     "use strict";
@@ -33076,6 +34622,7 @@ var init_jobDueScanner = __esm({
     init_workOrderStatus();
     init_dateParse();
     init_syncRole();
+    WO_GEN_VERBOSE2 = process.env.WO_GEN_VERBOSE_LOGS === "true";
     JobDueScannerService = class {
       isRunning = false;
       // guards double-start() of the scheduler
@@ -33201,13 +34748,16 @@ var init_jobDueScanner = __esm({
           dualWOsGenerated: 0
         };
         try {
-          const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs(scopeVesselId);
+          const allJobs = await storage.getJobs(scopeVesselId);
+          const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+          const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs(scopeVesselId, { jobs: allJobs, workOrders: allWorkOrders });
           results.calendarJobsChecked = calendarResults.checked;
           results.calendarWOsGenerated = calendarResults.generated;
-          const rhResults = await this.processRunningHoursJobs(scopeVesselId);
+          allWorkOrders.push(...calendarResults.workOrders);
+          const rhResults = await this.processRunningHoursJobs(scopeVesselId, allJobs, allWorkOrders);
           results.rhJobsChecked = rhResults.checked;
           results.rhWOsGenerated = rhResults.generated;
-          const dualResults = await this.processDualFrequencyJobs(scopeVesselId);
+          const dualResults = await this.processDualFrequencyJobs(scopeVesselId, allJobs, allWorkOrders);
           results.dualJobsChecked = dualResults.checked;
           results.dualWOsGenerated = dualResults.generated;
           console.log(`[JobDueScanner] Scan complete (${scopeLabel}): Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs), Dual (${results.dualWOsGenerated}/${results.dualJobsChecked} WOs)`);
@@ -33240,7 +34790,7 @@ var init_jobDueScanner = __esm({
        * - RH_effective_current >= RH_generate
        * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same RH_due cycle
        */
-      async processRunningHoursJobs(scopeVesselId) {
+      async processRunningHoursJobs(scopeVesselId, preloadedJobs, preloadedWorkOrders) {
         const skipReasons = {
           noComponentId: 0,
           componentNotFound: 0,
@@ -33251,13 +34801,16 @@ var init_jobDueScanner = __esm({
           existingWO: 0,
           cycleExists: 0
         };
-        const allJobs = await storage.getJobs(scopeVesselId);
+        const allJobs = preloadedJobs ?? await storage.getJobs(scopeVesselId);
         const rhJobs = allJobs.filter(
           (job) => job.maintenanceBasis === "Running Hours" && job.isActive !== false && // Job must be active
           job.intervalRunningHour && job.intervalRunningHour > 0
           // Must have valid frequency
         );
-        const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+        const allWorkOrders = preloadedWorkOrders ?? await storage.getWorkOrders(scopeVesselId);
+        const workOrderNos = allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
+        const legacyBlocking = buildLegacyBlockingSets(allWorkOrders);
+        const jobComponentBlocking = buildJobComponentBlockingSet(allWorkOrders);
         const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
         const existingCycleWOs = buildRhCycleWOMap(allWorkOrders);
         const componentCache = /* @__PURE__ */ new Map();
@@ -33304,16 +34857,7 @@ var init_jobDueScanner = __esm({
           const frequencyRH = job.intervalRunningHour || 0;
           if (frequencyRH <= 0) continue;
           const generationAdvanceRH = WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS;
-          const legacyBlockingWO = allWorkOrders.find((wo) => {
-            if (wo.isDeleted === true) return false;
-            if (!isBlockingStatus(wo.status)) return false;
-            if (wo.componentCode && wo.componentCode !== "") return false;
-            if (wo.jobId === job.juuid) return true;
-            const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-            if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
-            return false;
-          });
-          if (legacyBlockingWO) {
+          if (legacyBlocking.byJobId.has(job.juuid) || legacyBlocking.byVesselJobNo.has(`${job.vesselId}|${job.jobNo}`)) {
             skipReasons.legacyBlocking++;
             continue;
           }
@@ -33336,7 +34880,7 @@ var init_jobDueScanner = __esm({
               console.warn(`\u26A0\uFE0F No component code for linked component of RH job ${job.jobNo} - skipping`);
               continue;
             }
-            const rhLastDone = parseFloat(linkedComponent.lastDoneRH || job.lastDoneRH || "0");
+            const rhLastDone = parseFloat(job.lastDoneRH || "0");
             let componentCurrentRH = rhEffectiveCurrent;
             const linkedComp = await getComponentFromCache(linkedComponent.componentId, job.vesselId);
             if (linkedComp) {
@@ -33358,11 +34902,7 @@ var init_jobDueScanner = __esm({
               skipReasons.belowThreshold++;
               continue;
             }
-            const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
-              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
-            );
-            if (existingWOForComponent) {
+            if (jobComponentBlocking.has(`${job.juuid}|${componentCode}`)) {
               skipReasons.existingWO++;
               continue;
             }
@@ -33371,7 +34911,7 @@ var init_jobDueScanner = __esm({
               skipReasons.cycleExists++;
               continue;
             }
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0);
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0, workOrderNos);
             const workOrderData = {
               generatedByInstance: await resolveOriginInstance(),
               vesselId: job.vesselId,
@@ -33414,17 +34954,22 @@ var init_jobDueScanner = __esm({
               generateRhSnapshot: String(rhGenerate),
               dueRhSnapshot: String(rhDue),
               effectiveRhAtGeneration: String(rhEffectiveCurrent),
-              rhLastDoneSnapshot: String(rhLastDone)
+              rhLastDoneSnapshot: String(rhLastDone),
+              lastDoneDateSnapshot: job.lastDoneDate || null
             };
             try {
               const createdWO = await workOrderService.createWorkOrder(workOrderData);
               generated++;
               existingCycleWOs.set(componentCycleKey, createdWO);
               allWorkOrders.push(createdWO);
+              workOrderNos.push(workOrderNo);
+              jobComponentBlocking.add(`${job.juuid}|${componentCode}`);
               const priorityLabel = isJobCritical2(job) ? "Critical" : "Non-Critical";
               console.log(`\u2705 [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
-              console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${generationAdvanceRH}hrs`);
-              console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+              if (WO_GEN_VERBOSE2) {
+                console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${generationAdvanceRH}hrs`);
+                console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+              }
             } catch (error) {
               console.warn(`\u26A0\uFE0F Failed to create WO for RH job ${job.jobNo} + component ${componentCode}: ${error.message}`);
             }
@@ -33448,7 +34993,7 @@ var init_jobDueScanner = __esm({
        * - job.isActive = true
        * - job.intervalRunningHour > 0 AND job.nextDueDate set
        */
-      async processDualFrequencyJobs(scopeVesselId) {
+      async processDualFrequencyJobs(scopeVesselId, preloadedJobs, preloadedWorkOrders) {
         const skipReasons = {
           noComponentId: 0,
           componentNotFound: 0,
@@ -33460,14 +35005,17 @@ var init_jobDueScanner = __esm({
           missingCalendarData: 0,
           missingRHData: 0
         };
-        const allJobs = await storage.getJobs(scopeVesselId);
+        const allJobs = preloadedJobs ?? await storage.getJobs(scopeVesselId);
         const dualJobs = allJobs.filter(
           (job) => job.maintenanceBasis === "Dual Frequency" && job.isActive !== false && job.intervalRunningHour && job.intervalRunningHour > 0 && job.nextDueDate
         );
         if (dualJobs.length === 0) {
           return { checked: 0, generated: 0 };
         }
-        const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
+        const allWorkOrders = preloadedWorkOrders ?? await storage.getWorkOrders(scopeVesselId);
+        const workOrderNos = allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n);
+        const legacyBlocking = buildLegacyBlockingSets(allWorkOrders);
+        const jobComponentBlocking = buildJobComponentBlockingSet(allWorkOrders);
         const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
         const componentCache = /* @__PURE__ */ new Map();
         const vesselComponentsFetched = /* @__PURE__ */ new Set();
@@ -33484,8 +35032,7 @@ var init_jobDueScanner = __esm({
         };
         const dualLinksMap = await storage.getLinkedComponentsForJobs(dualJobs.map((j) => j.juuid));
         let generated = 0;
-        const today = /* @__PURE__ */ new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = currentWorkOrderCalendarDate();
         for (const job of dualJobs) {
           if (!job.componentId) {
             skipReasons.noComponentId++;
@@ -33501,14 +35048,15 @@ var init_jobDueScanner = __esm({
             skipReasons.wrongCounterType++;
             continue;
           }
-          const dueDate = parseWorkOrderDate(job.nextDueDate);
+          const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate);
           if (!dueDate) {
             skipReasons.missingCalendarData++;
             continue;
           }
-          dueDate.setHours(0, 0, 0, 0);
-          const generateDate = new Date(dueDate);
-          generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+          const generateDate = addWorkOrderCalendarDays(
+            dueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
           const calendarDue = today >= generateDate;
           let rhEffectiveCurrent;
           if (rhCounterType === "MASTER") {
@@ -33531,16 +35079,7 @@ var init_jobDueScanner = __esm({
             continue;
           }
           const triggerLeg = calendarDue ? "CALENDAR" : "RH";
-          const legacyBlockingWO = allWorkOrders.find((wo) => {
-            if (wo.isDeleted === true) return false;
-            if (!isBlockingStatus(wo.status)) return false;
-            if (wo.componentCode && wo.componentCode !== "") return false;
-            if (wo.jobId === job.juuid) return true;
-            const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-            if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
-            return false;
-          });
-          if (legacyBlockingWO) {
+          if (legacyBlocking.byJobId.has(job.juuid) || legacyBlocking.byVesselJobNo.has(`${job.vesselId}|${job.jobNo}`)) {
             skipReasons.legacyBlocking++;
             continue;
           }
@@ -33556,21 +35095,17 @@ var init_jobDueScanner = __esm({
             skipReasons.noLinkedComponents++;
             continue;
           }
-          const dueDateStr = dueDate.toISOString().split("T")[0];
-          const generateDateStr = generateDate.toISOString().split("T")[0];
+          const dueDateStr = formatWorkOrderCalendarDate(dueDate);
+          const generateDateStr = formatWorkOrderCalendarDate(generateDate);
           for (const linkedComponent of linkedComponents) {
             const componentCode = linkedComponent.componentCode;
             const componentName = linkedComponent.componentName;
             if (!componentCode) continue;
-            const existingWOForComponent = allWorkOrders.find(
-              (wo) => wo.isDeleted !== true && // archived rows never block (corpse fix)
-              wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
-            );
-            if (existingWOForComponent) {
+            if (jobComponentBlocking.has(`${job.juuid}|${componentCode}`)) {
               skipReasons.existingWO++;
               continue;
             }
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0);
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0, workOrderNos);
             const workOrderData = {
               generatedByInstance: await resolveOriginInstance(),
               vesselId: job.vesselId,
@@ -33623,10 +35158,14 @@ var init_jobDueScanner = __esm({
               const createdWO = await workOrderService.createWorkOrder(workOrderData);
               generated++;
               allWorkOrders.push(createdWO);
+              workOrderNos.push(workOrderNo);
+              jobComponentBlocking.add(`${job.juuid}|${componentCode}`);
               const priorityLabel = isJobCritical2(job) ? "Critical" : "Non-Critical";
               console.log(`\u2705 [Dual Trigger] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (trigger: ${triggerLeg})`);
-              console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
-              console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+              if (WO_GEN_VERBOSE2) {
+                console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
+                console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+              }
             } catch (error) {
               console.warn(`\u26A0\uFE0F Failed to create WO for Dual job ${job.jobNo} + component ${componentCode}: ${error.message}`);
             }
@@ -33767,14 +35306,14 @@ var init_jobDueScanner = __esm({
           const dualRhDueValue = dualRhLastDone + dualFrequencyRH;
           const dualRhGenerate = Math.max(0, dualRhDueValue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
           dueRH = dualRhDueValue;
-          const dualDueDate = parseWorkOrderDate(job.nextDueDate) ?? /* @__PURE__ */ new Date();
-          dualDueDate.setHours(0, 0, 0, 0);
-          const dualDueDateStr = dualDueDate.toISOString().split("T")[0];
-          const dualGenerateDate = new Date(dualDueDate);
-          dualGenerateDate.setDate(dualGenerateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
-          const dualGenerateDateStr = dualGenerateDate.toISOString().split("T")[0];
-          const dualToday = /* @__PURE__ */ new Date();
-          dualToday.setHours(0, 0, 0, 0);
+          const dualDueDate = normalizeWorkOrderCalendarDate(job.nextDueDate) ?? currentWorkOrderCalendarDate();
+          const dualDueDateStr = formatWorkOrderCalendarDate(dualDueDate);
+          const dualGenerateDate = addWorkOrderCalendarDays(
+            dualDueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
+          const dualGenerateDateStr = formatWorkOrderCalendarDate(dualGenerateDate);
+          const dualToday = currentWorkOrderCalendarDate();
           const calLegDue = dualToday >= dualGenerateDate;
           const rhLegDue = currentRH >= dualRhGenerate;
           const dualTriggerLeg = calLegDue ? "CALENDAR" : rhLegDue ? "RH" : "CALENDAR";
@@ -33843,6 +35382,7 @@ var init_jobDueScanner = __esm({
             dueRhSnapshot: String(rhDueValue),
             effectiveRhAtGeneration: String(currentRH),
             rhLastDoneSnapshot: String(rhLastDone),
+            lastDoneDateSnapshot: job.lastDoneDate || null,
             nextDueReading: String(rhDueValue),
             currentReading: String(currentRH),
             intervalRunningHour: job.intervalRunningHour
@@ -33850,12 +35390,13 @@ var init_jobDueScanner = __esm({
           console.log(`[Manual Trigger 3] RH Job: RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS}hrs, Vessel LT=${rhLeadTimeHours}hrs`);
           console.log(`   RH_due=${rhDueValue}, RH_generate=${rhGenerate}, RH_current=${currentRH}`);
         } else {
-          const dueDate = parseWorkOrderDate(job.nextDueDate) ?? /* @__PURE__ */ new Date();
-          dueDate.setHours(0, 0, 0, 0);
-          const dueDateStr = dueDate.toISOString().split("T")[0];
-          const generateDate = new Date(dueDate);
-          generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
-          const generateDateStr = generateDate.toISOString().split("T")[0];
+          const dueDate = normalizeWorkOrderCalendarDate(job.nextDueDate) ?? currentWorkOrderCalendarDate();
+          const dueDateStr = formatWorkOrderCalendarDate(dueDate);
+          const generateDate = addWorkOrderCalendarDays(
+            dueDate,
+            -WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS
+          );
+          const generateDateStr = formatWorkOrderCalendarDate(generateDate);
           const calVesselId = job.vesselId || "unknown";
           const calCompCode = effectiveComponentCode || "unknown";
           const calCycleKey = `${calVesselId}|${job.jobNo}|${calCompCode}|${dueDateStr}`;
@@ -33913,7 +35454,13 @@ var init_jobDueScanner = __esm({
           dbStatus = computedStatusResult;
         }
         console.log(`   Computed status: ${computedStatusResult} \u2192 DB status: ${dbStatus}`);
-        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, effectiveComponentCode, job.vesselId || void 0);
+        const workOrderNo = await generatePlannedWorkOrderNumber(
+          storage,
+          job.jobNo,
+          effectiveComponentCode,
+          job.vesselId || void 0,
+          allWorkOrders.map((wo) => wo.workOrderNo).filter((n) => !!n)
+        );
         const workOrderData = {
           generatedByInstance: await resolveOriginInstance(),
           vesselId: job.vesselId,
@@ -33994,6 +35541,9 @@ var init_jsonHelpers = __esm({
 // server/modules/work-orders/repositories/workOrderRepository.ts
 async function findWorkOrders2(vesselId, vesselIds) {
   return storage.getWorkOrders(vesselId, vesselIds);
+}
+async function findAlertCandidateWorkOrders() {
+  return storage.getAlertCandidateWorkOrders();
 }
 async function findById3(id) {
   return storage.getWorkOrder(id);
@@ -34099,12 +35649,6 @@ async function findMaintenanceHistoryByWorkOrderId(woId) {
 }
 async function findMaintenanceHistoryByJobId2(jobId) {
   return storage.getMaintenanceHistoryByJobId(jobId);
-}
-async function updateJobComponentLinkTracking(vesselId, jobId, componentId, data) {
-  return storage.updateJobComponentLinkTracking(vesselId, jobId, componentId, data);
-}
-async function findAllJobComponentLinks() {
-  return storage.getAllJobComponentLinks();
 }
 async function findUser(userId) {
   return storage.getUser(parseInt(userId, 10));
@@ -34453,6 +35997,57 @@ var init_complianceAnomalyService = __esm({
 });
 
 // shared/utils/workOrderFilters.ts
+var workOrderFilters_exports = {};
+__export(workOrderFilters_exports, {
+  WORK_ORDER_TABS: () => WORK_ORDER_TABS,
+  compareWorkOrders: () => compareWorkOrders,
+  computeApprovalTierCounts: () => computeApprovalTierCounts,
+  computeWorkOrderTabCounts: () => computeWorkOrderTabCounts,
+  filterAndSortWorkOrders: () => filterAndSortWorkOrders,
+  getDisplayStatus: () => getDisplayStatus,
+  getDisplayedWorkOrderDueDate: () => getDisplayedWorkOrderDueDate,
+  getEffectiveStatus: () => getEffectiveStatus,
+  isDisplayedWorkOrderDueDateExpected: () => isDisplayedWorkOrderDueDateExpected,
+  isStoredCompleted: () => isStoredCompleted,
+  matchesCriticality: () => matchesCriticality,
+  matchesPeriod: () => matchesPeriod,
+  matchesPostponementReason: () => matchesPostponementReason,
+  matchesRank: () => matchesRank,
+  matchesSearch: () => matchesSearch,
+  matchesTab: () => matchesTab,
+  shouldShowNextDueHourColumn: () => shouldShowNextDueHourColumn
+});
+function resolveDisplayedWorkOrderDueDate(wo) {
+  const basis = String(wo.maintenanceBasis || "").trim().toLowerCase();
+  const calendarDueDate = wo.dueDate || null;
+  const expectedRhDueDate = wo.rhEstimatedDueDate || null;
+  if (basis === "running hours") {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (basis !== "dual frequency") {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
+  if (!calendarDueDate) {
+    return { date: expectedRhDueDate, isExpectedRhDate: Boolean(expectedRhDueDate) };
+  }
+  if (!expectedRhDueDate) {
+    return { date: calendarDueDate, isExpectedRhDate: false };
+  }
+  const calendar = parseWorkOrderDate(calendarDueDate);
+  const expectedRh = parseWorkOrderDate(expectedRhDueDate);
+  if (!calendar) return { date: expectedRhDueDate, isExpectedRhDate: true };
+  if (!expectedRh) return { date: calendarDueDate, isExpectedRhDate: false };
+  return expectedRh.getTime() < calendar.getTime() ? { date: expectedRhDueDate, isExpectedRhDate: true } : { date: calendarDueDate, isExpectedRhDate: false };
+}
+function getDisplayedWorkOrderDueDate(wo) {
+  return resolveDisplayedWorkOrderDueDate(wo).date;
+}
+function isDisplayedWorkOrderDueDateExpected(wo) {
+  return resolveDisplayedWorkOrderDueDate(wo).isExpectedRhDate;
+}
+function shouldShowNextDueHourColumn(activeTab) {
+  return ["Planned", "Due", "Overdue", "Postponed"].includes(activeTab);
+}
 function isStoredCompleted(wo) {
   return !!wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
 }
@@ -34654,9 +36249,12 @@ function compareWorkOrders(a, b, field, dir, activeTab = "") {
       break;
     case "dueDate": {
       const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
-      const aVal = useSubmitted ? a.submittedDate || "" : a.dueDate || "";
-      const bVal = useSubmitted ? b.submittedDate || "" : b.dueDate || "";
-      cmp = aVal.localeCompare(bVal);
+      const aVal = useSubmitted ? a.submittedDate || "" : getDisplayedWorkOrderDueDate(a) || "";
+      const bVal = useSubmitted ? b.submittedDate || "" : getDisplayedWorkOrderDueDate(b) || "";
+      const aDate = parseWorkOrderDate(aVal);
+      const bDate = parseWorkOrderDate(bVal);
+      if (aDate && bDate) cmp = aDate.getTime() - bDate.getTime();
+      else cmp = aVal.localeCompare(bVal);
       break;
     }
     case "status": {
@@ -34708,12 +36306,223 @@ function filterAndSortWorkOrders(list, params) {
   }
   return result;
 }
-var FINALIZED_STATUSES;
+var WORK_ORDER_TABS, FINALIZED_STATUSES;
 var init_workOrderFilters = __esm({
   "shared/utils/workOrderFilters.ts"() {
     "use strict";
     init_dateParse();
+    WORK_ORDER_TABS = [
+      "Planned",
+      "Due",
+      "Overdue",
+      "Postponed",
+      "Unplanned",
+      "Pending Approval",
+      "Completed"
+    ];
     FINALIZED_STATUSES = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
+  }
+});
+
+// server/modules/work-orders/utils/approvalTransition.ts
+function classifyApprovalTransition(input) {
+  const pendingToCompleted = input.existingStatus === "Pending Approval" && input.requestedStatus === "Completed";
+  const explicitApproval = pendingToCompleted && input.approvalAction === "approved";
+  const explicitRejection = input.existingStatus === "Pending Approval" && input.requestedStatus === "Rejected" && input.approvalAction === "rejected";
+  const recognizedActionStatus = input.approvalAction == null || input.approvalAction === "approved" && input.requestedStatus === "Completed" || input.approvalAction === "rejected" && input.requestedStatus === "Rejected" || (input.approvalAction === "submitted" || input.approvalAction === "submit") && input.requestedStatus === "Pending Approval";
+  return {
+    pendingToCompleted,
+    explicitApproval,
+    explicitRejection,
+    missingExplicitApproval: pendingToCompleted && !explicitApproval,
+    invalidActionStatus: !recognizedActionStatus
+  };
+}
+var init_approvalTransition = __esm({
+  "server/modules/work-orders/utils/approvalTransition.ts"() {
+    "use strict";
+  }
+});
+
+// shared/workOrderPayload.ts
+function normalizeRhCounterType(rhCounterType) {
+  const value = String(rhCounterType || "").trim().toUpperCase();
+  return value === "NOT RH DRIVEN" ? "NOT_RH_DRIVEN" : value;
+}
+function isWorkOrderB3Applicable(rhCounterType) {
+  const normalizedCounterType = normalizeRhCounterType(rhCounterType);
+  return normalizedCounterType === "MASTER" || normalizedCounterType === "INHERITED";
+}
+function sanitizeWorkOrderB3Fields(input, rhCounterType) {
+  const output = { ...input };
+  if (!isWorkOrderB3Applicable(rhCounterType)) {
+    for (const field of WORK_ORDER_B3_FIELDS) {
+      delete output[field];
+    }
+  } else {
+    delete output.previousReading;
+  }
+  return output;
+}
+var WORK_ORDER_B3_FIELDS;
+var init_workOrderPayload = __esm({
+  "shared/workOrderPayload.ts"() {
+    "use strict";
+    WORK_ORDER_B3_FIELDS = [
+      "runningHours",
+      "previousReading",
+      "runningHoursDifference",
+      "readingDate",
+      "currentReadingDate",
+      "currentReading"
+    ];
+  }
+});
+
+// shared/workOrders/woCompletionRhRequirement.ts
+function requiresWoCompletionRh(maintenanceBasis, rhCounterType) {
+  const normalizedBasis = String(maintenanceBasis || "").trim().toUpperCase();
+  const normalizedCounterType = normalizeRhCounterType(rhCounterType);
+  return normalizedBasis === "RUNNING HOURS" && (normalizedCounterType === "MASTER" || normalizedCounterType === "INHERITED");
+}
+var init_woCompletionRhRequirement = __esm({
+  "shared/workOrders/woCompletionRhRequirement.ts"() {
+    "use strict";
+    init_workOrderPayload();
+  }
+});
+
+// shared/workOrders/workOrderB2Validation.ts
+function normalizeWorkOrderB2Date(value) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const numeric4 = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (numeric4) {
+    return `${numeric4[3]}-${numeric4[2].padStart(2, "0")}-${numeric4[1].padStart(2, "0")}`;
+  }
+  const named = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+  if (named) {
+    const month = MONTH_NUMBER3[named[2].toLowerCase()];
+    if (month) return `${named[3]}-${month}-${named[1].padStart(2, "0")}`;
+  }
+  return null;
+}
+function finiteNumber(value) {
+  if (value === null || value === void 0 || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function validateWorkOrderB2Baselines(input) {
+  const errors = [];
+  const basis = String(input.maintenanceBasis || "").trim().toUpperCase();
+  const validatesStartDate = basis === "CALENDAR" || basis === "RUNNING HOURS" || basis === "DUAL FREQUENCY";
+  if (validatesStartDate) {
+    const startDate = normalizeWorkOrderB2Date(input.startDateTime);
+    const lastCompletedOn = normalizeWorkOrderB2Date(input.lastDoneDateSnapshot);
+    if (startDate && lastCompletedOn && startDate <= lastCompletedOn) {
+      errors.push({
+        code: "START_DATE_NOT_AFTER_LAST_COMPLETED",
+        field: "startDateTime",
+        message: `Start Date must be after Last Completed On (${lastCompletedOn}).`
+      });
+    }
+  }
+  if (basis === "RUNNING HOURS") {
+    const completionRH = finiteNumber(input.woCompletionRh);
+    const lastCompletedRH = finiteNumber(input.rhLastDoneSnapshot);
+    if (completionRH !== null && lastCompletedRH !== null && completionRH <= lastCompletedRH) {
+      errors.push({
+        code: "WO_COMPLETION_RH_NOT_AFTER_LAST_COMPLETED",
+        field: "woCompletionRh",
+        message: `WO Completion RH must be greater than Last Completed At (${lastCompletedRH} Hours).`
+      });
+    }
+  }
+  return errors;
+}
+function getWorkOrderB2PatchValidationScope(context) {
+  const requestedStatus = String(context.requestedStatus || "").trim().toLowerCase();
+  const isStoredPendingApproval = context.existingStatus === "Pending Approval" && requestedStatus === "completed" && context.approvalAction === "approved";
+  const isSubmittingForApproval = requestedStatus === "pending approval" && context.existingStatus !== "Pending Approval";
+  const isFinalizing = (requestedStatus === "approved" || requestedStatus === "completed") && context.existingStatus !== "Approved" && context.existingStatus !== "Completed";
+  return {
+    startDate: context.startDateChanged === true || isSubmittingForApproval || isFinalizing && !isStoredPendingApproval,
+    completionRh: context.completionRhChanged === true || isSubmittingForApproval || isFinalizing && !isStoredPendingApproval
+  };
+}
+var MONTH_NUMBER3;
+var init_workOrderB2Validation = __esm({
+  "shared/workOrders/workOrderB2Validation.ts"() {
+    "use strict";
+    MONTH_NUMBER3 = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
+  }
+});
+
+// server/modules/work-orders/utils/workOrderListHydration.ts
+function buildHydrationJobIndexes(jobs2) {
+  const byVesselJobAndComponentCode = /* @__PURE__ */ new Map();
+  const byVesselJobAndComponentId = /* @__PURE__ */ new Map();
+  const jobsByVesselAndNumber = /* @__PURE__ */ new Map();
+  for (const job of jobs2) {
+    if (job.vesselId && job.jobNo) {
+      const baseKey = `${job.vesselId}:${job.jobNo}`;
+      const matches = jobsByVesselAndNumber.get(baseKey) ?? [];
+      matches.push(job);
+      jobsByVesselAndNumber.set(baseKey, matches);
+      if (job.componentCode) {
+        byVesselJobAndComponentCode.set(`${baseKey}:${job.componentCode}`, job);
+      }
+      if (job.componentId) {
+        byVesselJobAndComponentId.set(`${baseKey}:${job.componentId}`, job);
+      }
+    }
+  }
+  const uniqueByVesselAndJob = /* @__PURE__ */ new Map();
+  jobsByVesselAndNumber.forEach((matches, key) => {
+    if (matches.length === 1) uniqueByVesselAndJob.set(key, matches[0]);
+  });
+  return {
+    byVesselJobAndComponentCode,
+    byVesselJobAndComponentId,
+    uniqueByVesselAndJob
+  };
+}
+function resolveWorkOrderHydrationJob(workOrder, jobsById, indexes) {
+  if (workOrder.jobId) {
+    return jobsById.get(workOrder.jobId) ?? null;
+  }
+  if (workOrder.vesselId && workOrder.templateCode) {
+    const baseKey = `${workOrder.vesselId}:${workOrder.templateCode}`;
+    if (workOrder.componentCode) {
+      const byCode = indexes.byVesselJobAndComponentCode.get(`${baseKey}:${workOrder.componentCode}`);
+      if (byCode) return byCode;
+    }
+    if (workOrder.component) {
+      const byId = indexes.byVesselJobAndComponentId.get(`${baseKey}:${workOrder.component}`);
+      if (byId) return byId;
+    }
+    return indexes.uniqueByVesselAndJob.get(baseKey) ?? null;
+  }
+  return null;
+}
+var init_workOrderListHydration = __esm({
+  "server/modules/work-orders/utils/workOrderListHydration.ts"() {
+    "use strict";
   }
 });
 
@@ -35136,10 +36945,10 @@ async function resolveHierarchyScopeByRankId(vesselId, userRankId) {
     const visited = /* @__PURE__ */ new Set();
     const queue = [...rootUuids];
     while (queue.length > 0) {
-      const uuid = queue.pop();
-      if (visited.has(uuid)) continue;
-      visited.add(uuid);
-      const children = childrenMap.get(uuid) || [];
+      const uuid2 = queue.pop();
+      if (visited.has(uuid2)) continue;
+      visited.add(uuid2);
+      const children = childrenMap.get(uuid2) || [];
       for (const child of children) {
         queue.push(child.nodeUuid);
       }
@@ -35150,8 +36959,8 @@ async function resolveHierarchyScopeByRankId(vesselId, userRankId) {
   const meRankIds = new Set(meNodes.map((n) => n.rankId));
   const teamUuids = collectDescendants(meUuids);
   const teamRankIds = /* @__PURE__ */ new Set();
-  for (const uuid of teamUuids) {
-    const node = nodeByUuid.get(uuid);
+  for (const uuid2 of teamUuids) {
+    const node = nodeByUuid.get(uuid2);
     if (node) teamRankIds.add(node.rankId);
   }
   const hasDescendants = teamUuids.size > meUuids.length;
@@ -35356,130 +37165,6 @@ var init_hodResolutionService = __esm({
   }
 });
 
-// server/modules/running-hours/utils/rhValidation.ts
-function getCalendarDate(dateStr) {
-  const strict = parseReadingDayStrict(dateStr);
-  if (strict) return strict;
-  const canonical = canonicalizeReadingDateInput(dateStr);
-  return canonical ? parseReadingDayStrict(canonical) : null;
-}
-function getDaysBetweenCalendarDates(date1, date2) {
-  const msPerDay = 24 * 60 * 60 * 1e3;
-  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
-}
-function formatDMY2(dateStr) {
-  if (!dateStr) return dateStr;
-  const d = getCalendarDate(dateStr);
-  if (!d) return dateStr;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
-}
-function validateRunningHoursIncrease(input) {
-  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
-  const requestedIncrease = newRH - currentRH;
-  let daysSinceLastUpdate = 0;
-  let sameDayUpdate = false;
-  const lastCalendarDate = componentLastUpdated ? getCalendarDate(componentLastUpdated) : null;
-  const newCalendarDate = getCalendarDate(newUpdateDate);
-  if (lastCalendarDate && newCalendarDate) {
-    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
-    if (daysSinceLastUpdate < 0) {
-      const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-      return {
-        allowed: canOverride2,
-        maxAllowedIncrease: 0,
-        requestedIncrease,
-        daysSinceLastUpdate,
-        lastUpdateDate: componentLastUpdated,
-        backdatedLower: requestedIncrease <= 0,
-        message: canOverride2 ? "Sail Admin override applied for backdated running-hours entry." : `Completion Date (${formatDMY2(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY2(componentLastUpdated || "")}). Running hours can only be recorded on or after the latest reading.`,
-        requiresAdminOverride: !canOverride2
-      };
-    }
-    if (daysSinceLastUpdate === 0) {
-      sameDayUpdate = true;
-    }
-  } else {
-    daysSinceLastUpdate = 1;
-  }
-  if (requestedIncrease <= 0) {
-    return {
-      allowed: true,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: "No increase or decrease - no validation needed",
-      requiresAdminOverride: false
-    };
-  }
-  let maxAllowedIncrease;
-  if (sameDayUpdate) {
-    const canOverride2 = userRole === "Sail Admin" && adminOverride === true;
-    return {
-      allowed: canOverride2,
-      maxAllowedIncrease: 0,
-      requestedIncrease,
-      daysSinceLastUpdate: 0,
-      lastUpdateDate: componentLastUpdated,
-      message: canOverride2 ? "Sail Admin override applied for same-day duplicate update" : "Same-day update already performed. Only one update of max 25 hours is allowed per day.",
-      requiresAdminOverride: !canOverride2
-    };
-  } else {
-    maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY2;
-  }
-  const isWithinLimit = requestedIncrease <= maxAllowedIncrease;
-  if (isWithinLimit) {
-    return {
-      allowed: true,
-      maxAllowedIncrease,
-      requestedIncrease,
-      daysSinceLastUpdate,
-      lastUpdateDate: componentLastUpdated,
-      message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
-      requiresAdminOverride: false
-    };
-  }
-  const canOverride = userRole === "Sail Admin" && adminOverride === true;
-  return {
-    allowed: canOverride,
-    maxAllowedIncrease,
-    requestedIncrease,
-    daysSinceLastUpdate,
-    lastUpdateDate: componentLastUpdated,
-    message: canOverride ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days \xD7 25 hours/day).` : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) \xD7 25 hours/day = ${maxAllowedIncrease} hours.`,
-    requiresAdminOverride: !canOverride
-  };
-}
-function canAdminOverride(userRole) {
-  return userRole === "Sail Admin";
-}
-function safeParseDate(value) {
-  if (value == null) return null;
-  if (value instanceof Date) {
-    return isNaN(value.getTime()) ? null : value;
-  }
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}/.test(trimmed)) {
-    const d = new Date(trimmed);
-    if (!isNaN(d.getTime())) return d;
-  }
-  const strict = parseReadingDayStrict(trimmed);
-  if (strict) return strict;
-  const canonical = canonicalizeReadingDateInput(trimmed);
-  return canonical ? parseReadingDayStrict(canonical) : null;
-}
-var MAX_HOURS_PER_DAY2;
-var init_rhValidation = __esm({
-  "server/modules/running-hours/utils/rhValidation.ts"() {
-    "use strict";
-    init_readingDate();
-    MAX_HOURS_PER_DAY2 = 25;
-  }
-});
-
 // server/modules/running-hours/services/runningHoursService.ts
 var runningHoursService_exports = {};
 __export(runningHoursService_exports, {
@@ -35506,12 +37191,27 @@ function isRhValidationEnabledForVessel(settings) {
   return settings?.rhValidationEnabled !== false;
 }
 function validateCascadePolicyRules(data, vesselValidationEnabled, validationBypassAuthorized) {
-  if (data.mode === "addDelta" && data.value <= 0 && (!validationBypassAuthorized || data.meterReplaced)) {
+  if (data.mode === "addDelta" && data.value <= 0) {
     throw new ValidationError("addDelta mode requires value > 0");
   }
   if (data.mode === "setTotal" && data.value === 0 && (vesselValidationEnabled || data.meterReplaced) && !(data.isRenewalReset === true && !!data.renewalActionType && !!data.renewalReason && data.renewalReason.trim().length > 0)) {
     throw new ValidationError("When setting RH to 0, renewal confirmation with action type and reason is required");
   }
+}
+function enforceRHMonotonicity(input) {
+  const result = validateRHMonotonicity(input);
+  if (!result.allowed) {
+    throw new ValidationError(result.message, {
+      code: "LOWER_THAN_CURRENT_RH",
+      currentRH: result.currentRH,
+      submittedRH: result.submittedRH,
+      delta: result.delta,
+      currentRHDate: result.currentRHDate,
+      submittedRHDate: result.submittedRHDate,
+      monotonicity: result
+    });
+  }
+  return result;
 }
 function resolveLastUpdated(component) {
   const own = canonicalizeReadingDateInput(component.lastUpdated ?? null);
@@ -35572,6 +37272,26 @@ async function cascadeUpdate(body, authenticatedRole) {
   }
   if (!Number.isFinite(targetRH) || targetRH < 0) {
     throw new ValidationError("Resulting Running Hours cannot be negative.");
+  }
+  const monotonicity = enforceRHMonotonicity({
+    currentRH,
+    submittedRH: targetRH,
+    currentRHDate: resolveLastUpdated(parentComponent),
+    submittedRHDate: validatedData.dateUpdated,
+    approvedReset: validatedData.meterReplaced || validatedData.isRenewalReset
+  });
+  if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+    return {
+      updatedComponents: 0,
+      auditsCreated: 0,
+      workOrdersGenerated: 0,
+      workOrders: [],
+      noChange: true,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0
+      }
+    };
   }
   if (!validatedData.meterReplaced && !validationBypassAuthorized) {
     const componentLastUpdated = resolveLastUpdated(parentComponent);
@@ -35812,6 +37532,25 @@ async function updateChildRH(componentId, body, authenticatedRole) {
   const currentRHValue = parseFloat(previousRH);
   const componentLastUpdated = resolveLastUpdated(component);
   const canonicalDay = requireReadingDayInput(dateUpdated ?? null) ?? todayReadingDay();
+  const monotonicity = enforceRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: componentLastUpdated,
+    submittedRHDate: canonicalDay
+  });
+  if (monotonicity.reason === "EQUAL_CURRENT_RH") {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      previousRH,
+      newRH: newRHValue.toFixed(2),
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0
+      }
+    };
+  }
   let validation = null;
   if (!validationBypassAuthorized) {
     validation = validateRunningHoursIncrease({
@@ -35847,6 +37586,19 @@ async function updateChildRH(componentId, body, authenticatedRole) {
     readingDateIso: canonicalDay,
     userId: userId || null
   });
+  if (!atomicResult.changed) {
+    return {
+      success: true,
+      noChange: true,
+      message: `Running Hours is already ${newRHFormatted} for ${component.name}`,
+      previousRH: atomicResult.previousRH.toFixed(2),
+      newRH: newRHFormatted,
+      validation: {
+        maxAllowedIncrease: 0,
+        actualIncrease: 0
+      }
+    };
+  }
   const committedPreviousRH = atomicResult.previousRH.toFixed(2);
   const auditDateLocal = canonicalDay;
   await createRunningHoursAudit({
@@ -36010,7 +37762,7 @@ async function updateRHConfig2(componentId, body) {
     component: updatedComponent
   };
 }
-async function updateMasterRH(componentId, body) {
+async function updateMasterRH(componentId, body, internalOptions) {
   const parseResult = updateMasterRHSchema2.safeParse(body);
   if (!parseResult.success) {
     throw new ValidationError("Invalid request body", { details: parseResult.error.format() });
@@ -36024,9 +37776,34 @@ async function updateMasterRH(componentId, body) {
   if (component.rhCounterType !== "MASTER") {
     throw new ValidationError("Running hours can only be updated for MASTER counter type components");
   }
-  if (updateSource === "MANUAL" || updateSource === "WORKORDER") {
-    const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || "0");
-    const lastUpdate = resolveLastUpdated(component);
+  const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || "0");
+  const lastUpdate = resolveLastUpdated(component);
+  const monotonicity = validateRHMonotonicity({
+    currentRH: currentRHValue,
+    submittedRH: newRHValue,
+    currentRHDate: lastUpdate,
+    submittedRHDate: canonicalDay
+  });
+  const lowerApprovalSkipAllowed = internalOptions?.allowLowerWorkOrderApprovalSkip === true && updateSource === "WORKORDER";
+  if (!monotonicity.allowed && !lowerApprovalSkipAllowed) {
+    enforceRHMonotonicity({
+      currentRH: currentRHValue,
+      submittedRH: newRHValue,
+      currentRHDate: lastUpdate,
+      submittedRHDate: canonicalDay
+    });
+  }
+  if (monotonicity.reason === "EQUAL_CURRENT_RH" && !lowerApprovalSkipAllowed) {
+    return {
+      success: true,
+      noChange: true,
+      message: monotonicity.message,
+      masterUpdated: component,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 }
+    };
+  }
+  if ((updateSource === "MANUAL" || updateSource === "WORKORDER") && !(lowerApprovalSkipAllowed && !monotonicity.allowed)) {
     const validation = validateRunningHoursIncrease({
       currentRH: currentRHValue,
       newRH: newRHValue,
@@ -36058,8 +37835,24 @@ async function updateMasterRH(componentId, body) {
     // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
     // reading and the component's last-updated reflect when the hours were observed, not "now".
     // Task #427: canonical YYYY-MM-DD only.
-    dateUpdated: canonicalDay
+    dateUpdated: canonicalDay,
+    allowLowerWorkOrderApprovalSkip: lowerApprovalSkipAllowed
   });
+  if (result.rhSkipped) {
+    return {
+      success: true,
+      rhSkipped: true,
+      rhSkipReason: result.rhSkipped.reason,
+      submittedRH: result.rhSkipped.submittedRH,
+      currentRH: result.rhSkipped.currentRH,
+      currentRHDate: result.rhSkipped.currentRHDate,
+      submittedRHDate: result.rhSkipped.submittedRHDate,
+      message: `Work Order approved without updating Running Hours because ${result.rhSkipped.submittedRH} RH is lower than the latest live value of ${result.rhSkipped.currentRH} RH.`,
+      masterUpdated: result.masterUpdated,
+      inheritedUpdated: 0,
+      woGeneration: { rhJobsChecked: 0, rhWOsGenerated: 0 }
+    };
+  }
   let woGenerationResult = { rhJobsChecked: 0, rhWOsGenerated: 0 };
   try {
     if (component.vesselId) {
@@ -36078,6 +37871,7 @@ async function updateMasterRH(componentId, body) {
   }
   return {
     success: true,
+    noChange: result.noChange === true,
     message: `Master RH updated to ${newRHValue}. Cascaded to ${result.inheritedUpdated} inherited components.`,
     masterUpdated: result.masterUpdated,
     inheritedUpdated: result.inheritedUpdated,
@@ -36336,6 +38130,7 @@ __export(workOrderService_exports, {
   deleteWorkOrder: () => deleteWorkOrder,
   editPostponeRequest: () => editPostponeRequest,
   editRePostponeRequest: () => editRePostponeRequest,
+  getOverdueVesselWorkOrdersForAlerts: () => getOverdueVesselWorkOrdersForAlerts,
   getRejectionHistory: () => getRejectionHistory,
   getScopedOperationData: () => getScopedOperationData,
   getWorkOrder: () => getWorkOrder,
@@ -36499,8 +38294,8 @@ async function createSuperintendentNotificationForWO(wo, daysLate, missedCycles,
     console.error(`\u26A0\uFE0F Failed to create superintendent notification: ${err.message}`);
   }
 }
-async function listWorkOrders(vesselId, vesselIds) {
-  const allRows = await findWorkOrders2(vesselId, vesselIds);
+async function listWorkOrders(vesselId, vesselIds, preloadedRows) {
+  const allRows = preloadedRows ?? await findWorkOrders2(vesselId, vesselIds);
   const workOrders2 = allRows.filter((wo) => wo.isDeleted !== true);
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
@@ -36516,6 +38311,7 @@ async function listWorkOrders(vesselId, vesselIds) {
     allJobs = await findJobs2(vesselId);
   }
   const jobsMap = new Map(allJobs.map((job) => [job.juuid, job]));
+  const hydrationJobIndexes = buildHydrationJobIndexes(allJobs);
   const componentsByCodeMap = /* @__PURE__ */ new Map();
   const componentsMap = /* @__PURE__ */ new Map();
   if (isAllVessels) {
@@ -36543,16 +38339,6 @@ async function listWorkOrders(vesselId, vesselIds) {
     const vesselSettings = await findPmsVesselSettings2(vesselId);
     if (vesselSettings) {
       vesselSettingsMap.set(vesselId, vesselSettings);
-    }
-  }
-  const allLinks = await findAllJobComponentLinks();
-  const linksByJobComponent = /* @__PURE__ */ new Map();
-  for (const link of allLinks) {
-    if (link.lastDoneRH || link.nextDueRH) {
-      linksByJobComponent.set(`${link.jobId}:${link.componentId}`, {
-        lastDoneRH: link.lastDoneRH,
-        nextDueRH: link.nextDueRH
-      });
     }
   }
   const rankLabelMap = await buildRankLabelMap();
@@ -36589,17 +38375,17 @@ async function listWorkOrders(vesselId, vesselIds) {
       rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
       rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
     } : void 0;
-    const job = wo.jobId ? jobsMap.get(wo.jobId) : wo.templateCode ? allJobs.find((j) => j.jobNo === wo.templateCode) : null;
+    const job = resolveWorkOrderHydrationJob(wo, jobsMap, hydrationJobIndexes);
+    const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || null;
+    const isRhBased = maintenanceBasis === "Running Hours" || maintenanceBasis === "Dual Frequency";
     const component = wo.componentCode ? componentsByCodeMap.get(`${woVesselId}:${wo.componentCode}`) : wo.component ? componentsMap.get(wo.component) : null;
     const componentId = component?.cuuid || component?.id;
-    const linkKey = wo.jobId && componentId ? `${wo.jobId}:${componentId}` : null;
-    const linkData = linkKey ? linksByJobComponent.get(linkKey) : null;
     let dueRH;
-    if (wo.maintenanceBasis === "Running Hours") {
-      dueRH = parseRH3(linkData?.nextDueRH);
+    if (maintenanceBasis === "Running Hours") {
+      dueRH = parseRH3(job?.nextDueRH);
       if (dueRH == null) {
         const woNextDue = parseRH3(wo.nextDueReading);
-        const lastDone = parseRH3(linkData?.lastDoneRH) ?? parseRH3(job?.lastDoneRH);
+        const lastDone = parseRH3(job?.lastDoneRH);
         const interval = parseRH3(job?.intervalRunningHour);
         const computed = lastDone != null && interval != null && interval > 0 ? lastDone + interval : void 0;
         if (woNextDue != null && computed != null && computed > woNextDue) {
@@ -36609,7 +38395,9 @@ async function listWorkOrders(vesselId, vesselIds) {
         }
       }
     }
-    const currentRH = wo.maintenanceBasis === "Running Hours" ? parseRH3(component?.currentCumulativeRH) ?? parseRH3(wo.currentReading) : void 0;
+    const nextDueHour = getWorkOrderListDueHour({ ...wo, maintenanceBasis });
+    const rhEstimatedDueDate = isRhBased ? job?.rhEstimatedDueDate ?? null : null;
+    const currentRH = isRhBased ? parseRH3(component?.currentCumulativeRH) ?? parseRH3(wo.currentReading) : void 0;
     const isJobCritical3 = job?.jobPriority === "Critical" || job?.classRelated === "true" || job?.classRelated === true;
     const rhLeadTimeHours = wo.maintenanceBasis === "Running Hours" ? isJobCritical3 ? vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL : vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL : void 0;
     const calendarLeadTimeDays = wo.maintenanceBasis !== "Running Hours" && vesselSettings ? isJobCritical3 ? vesselSettings.calendarLeadDaysCritical : vesselSettings.calendarLeadDaysNonCritical : void 0;
@@ -36651,6 +38439,7 @@ async function listWorkOrders(vesselId, vesselIds) {
     }
     return {
       ...wo,
+      maintenanceBasis,
       assignedTo: resolvedAssignedTo,
       assignedToRankId: resolvedAssignedToRankId,
       criticality: wo.criticality || job?.criticality || null,
@@ -36660,7 +38449,11 @@ async function listWorkOrders(vesselId, vesselIds) {
       leadTimeUnit: job?.leadTimeUnit ?? null,
       componentCritical: component?.critical === true,
       dueRH: dueRH ?? null,
+      nextDueHour,
+      rhEstimatedDueDate,
       currentRH: currentRH ?? null,
+      rhLeadTimeHours: rhLeadTimeHours ?? null,
+      // additive (23-Sep-2026): the lead time the status was computed with, for consumers that explain a Due
       plannedDate
     };
   });
@@ -36692,6 +38485,11 @@ async function listWorkOrders(vesselId, vesselIds) {
 async function getWorkOrdersWithComputedStatus(vesselId, vesselIds) {
   const enriched = await listWorkOrders(vesselId, vesselIds);
   return enriched.map((wo) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
+}
+async function getOverdueVesselWorkOrdersForAlerts() {
+  const candidates = await findAlertCandidateWorkOrders();
+  const enriched = await listWorkOrders(void 0, void 0, candidates);
+  return enriched.map((wo) => ({ ...wo, status: wo.computedStatus ?? wo.status })).filter((wo) => wo.status === "Overdue" && wo.dataScope === "vessel");
 }
 async function computeVesselAwareApprovalTierCounts(workOrders2) {
   const vesselSettings = await findAllPmsVesselSettings();
@@ -36782,25 +38580,12 @@ async function getWorkOrder(id) {
     const num = Number(value);
     return isNaN(num) ? void 0 : num;
   };
-  let linkNextDueRH = null;
-  let linkLastDoneRH = null;
-  const compId = component?.cuuid || component?.id;
-  if (workOrder.maintenanceBasis === "Running Hours" && workOrder.jobId && compId) {
-    const links = await storage.getJobComponentLinksByJob(workOrder.jobId);
-    const link = links.find((l) => l.componentId === compId);
-    if (link?.nextDueRH) {
-      linkNextDueRH = link.nextDueRH;
-    }
-    if (link?.lastDoneRH) {
-      linkLastDoneRH = link.lastDoneRH;
-    }
-  }
   let dueRH;
   if (workOrder.maintenanceBasis === "Running Hours") {
-    dueRH = parseRH3(linkNextDueRH);
+    dueRH = parseRH3(job?.nextDueRH);
     if (dueRH == null) {
       const woNextDue = parseRH3(workOrder.nextDueReading);
-      const lastDone = parseRH3(linkLastDoneRH) ?? parseRH3(job?.lastDoneRH);
+      const lastDone = parseRH3(job?.lastDoneRH);
       const interval = parseRH3(job?.intervalRunningHour);
       const computed = lastDone != null && interval != null && interval > 0 ? lastDone + interval : void 0;
       if (woNextDue != null && computed != null && computed > woNextDue) {
@@ -36844,6 +38629,7 @@ async function getWorkOrder(id) {
 async function createWorkOrder(body) {
   const { insertWorkOrderSchema: insertWorkOrderSchema2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   let workOrderData = insertWorkOrderSchema2.parse(body);
+  let resolvedRhCounterType;
   if (!workOrderData.vesselId) {
     throw new ValidationError("Vessel ID is required to generate a work order number", {
       code: "VESSEL_ID_REQUIRED_FOR_WO_NUMBER"
@@ -36862,6 +38648,7 @@ async function createWorkOrder(body) {
       resolvedComponent = vesselComponents.find((c) => c.name === workOrderData.component);
     }
     if (resolvedComponent) {
+      resolvedRhCounterType = resolvedComponent.rhCounterType;
       if (workOrderData.componentCode && workOrderData.componentCode !== resolvedComponent.componentCode) {
         console.warn(`\u26A0\uFE0F AUTO-CORRECTING componentCode mismatch: passed "${workOrderData.componentCode}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
       }
@@ -36869,6 +38656,7 @@ async function createWorkOrder(body) {
       console.log(`\u2705 Auto-resolved componentCode: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
     }
   }
+  workOrderData = sanitizeWorkOrderB3Fields(workOrderData, resolvedRhCounterType);
   if (workOrderData.dueDate && workOrderData.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
     const [year, month, day] = workOrderData.dueDate.split("-");
     workOrderData.dueDate = `${day}-${month}-${year}`;
@@ -36881,11 +38669,26 @@ async function createWorkOrder(body) {
         (j) => j.componentId === workOrderData.component && j.jobTitle === workOrderData.jobTitle
       );
       if (matchingJob) {
-        workOrderData = { ...workOrderData, jobId: matchingJob.id };
-        console.log(`Auto-resolved jobId: ${matchingJob.id} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
+        const resolvedJobId = matchingJob.juuid || matchingJob.id;
+        workOrderData = { ...workOrderData, jobId: resolvedJobId };
+        console.log(`Auto-resolved jobId: ${resolvedJobId} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
       }
     } catch (error) {
       console.error("Failed to auto-resolve jobId:", error);
+    }
+  }
+  if (workOrderData.maintenanceBasis === "Running Hours" && workOrderData.jobId) {
+    const sourceJob = await findJob(workOrderData.jobId);
+    if (sourceJob) {
+      const dueRh = workOrderData.dueRhSnapshot ?? workOrderData.cycleDueRhSnapshot ?? workOrderData.nextDueReading ?? sourceJob.nextDueRH ?? null;
+      workOrderData = {
+        ...workOrderData,
+        lastDoneDateSnapshot: workOrderData.lastDoneDateSnapshot ?? sourceJob.lastDoneDate ?? null,
+        rhLastDoneSnapshot: workOrderData.rhLastDoneSnapshot ?? sourceJob.lastDoneRH ?? null,
+        dueRhSnapshot: workOrderData.dueRhSnapshot ?? dueRh,
+        cycleDueRhSnapshot: workOrderData.cycleDueRhSnapshot ?? dueRh,
+        nextDueReading: workOrderData.nextDueReading ?? (dueRh != null ? String(dueRh) : null)
+      };
     }
   }
   if (!workOrderData.workOrderNo) {
@@ -36985,6 +38788,7 @@ async function createWorkOrder(body) {
     }
   }
   workOrderData = await applyAssignmentSync({ ...workOrderData });
+  ensureCompletedWorkOrderDate(null, workOrderData);
   const workOrder = await create6(workOrderData);
   try {
     await logFieldChanges("work_orders", workOrder.wouuid, workOrder.vesselId || null, null, workOrder, body.userId || body.performedBy || "system");
@@ -37014,25 +38818,71 @@ async function createWorkOrder(body) {
 async function updateWorkOrder(id, body) {
   console.log("\u{1F4DD} PATCH work order request body keys:", Object.keys(body));
   let rhBackdatedApproval = false;
+  let rhUpdateOutcomeApproval = null;
+  let rhSkipReasonApproval = null;
+  let submittedRHApproval = null;
   let latestRHApproval = null;
   let latestRHDateApproval = null;
-  const existingWO2 = await findById3(id);
-  if (!existingWO2) {
+  const existingWO = await findById3(id);
+  if (!existingWO) {
     throw new NotFoundError("Work order not found");
   }
+  const { findAttemptedWorkOrderSnapshotFields: findAttemptedWorkOrderSnapshotFields2 } = await Promise.resolve().then(() => (init_workOrderPartADates(), workOrderPartADates_exports));
+  const attemptedSnapshotFields = findAttemptedWorkOrderSnapshotFields2(body);
+  if (attemptedSnapshotFields.length > 0) {
+    throw new ValidationError(
+      `Cannot modify immutable Work Order snapshot fields: ${attemptedSnapshotFields.join(", ")}`,
+      {
+        code: "WORK_ORDER_SNAPSHOT_FIELDS_READ_ONLY",
+        disallowedFields: attemptedSnapshotFields
+      }
+    );
+  }
+  const SERVER_OWNED_RH_FIELDS = [
+    "rhSyncedAt",
+    "rhUpdateOutcome",
+    "rhSkipReason",
+    "rhSkipSubmittedRh",
+    "rhSkipLatestRh",
+    "rhSkipLatestRhDate"
+  ];
+  const forgedRhFields = Object.keys(body).filter((key) => SERVER_OWNED_RH_FIELDS.includes(key));
+  if (forgedRhFields.length > 0) {
+    throw new ValidationError(
+      `Cannot modify server-managed Running Hours fields: ${forgedRhFields.join(", ")}`,
+      { code: "RH_OUTCOME_FIELDS_READ_ONLY", disallowedFields: forgedRhFields }
+    );
+  }
   if (body.partBOfficeEdit === true) {
-    if (existingWO2.status !== "Pending Approval") {
+    if (existingWO.status !== "Pending Approval") {
       throw new ValidationError("Part B office edit is only permitted when the work order is in Pending Approval status.");
     }
     const PART_B_EDIT_ALLOWED_ROLES = ["Office", "PMS Admin", "Sail Admin"];
     if (!PART_B_EDIT_ALLOWED_ROLES.includes(body.userRole)) {
       throw new ValidationError("Only Office, PMS Admin, or Sail Admin users can edit Part B on a Pending Approval work order.");
     }
-    if (existingWO2.approvalTier === "superintendent_locked" && await isSuperintendentLockEnabled(existingWO2.vesselId)) {
+    if (existingWO.approvalTier === "superintendent_locked" && await isSuperintendentLockEnabled(existingWO.vesselId)) {
       throw new ValidationError("This work order is superintendent-locked. The superintendent must act on it before Part B can be edited.");
     }
     const B3_FIELDS = ["runningHours", "previousReading", "runningHoursDifference", "readingDate", "currentReadingDate", "currentReading"];
-    const PROTECTED_FIELDS = ["status", "approvalAction", "approvalDate", "submittedDate", "rhSyncedAt", "wasRejected", "approvalTier", "rejectionComments", "missedCycles", "dateCompleted", "isDeleted"];
+    const PROTECTED_FIELDS = [
+      "status",
+      "approvalAction",
+      "approvalDate",
+      "submittedDate",
+      "rhSyncedAt",
+      "rhUpdateOutcome",
+      "rhSkipReason",
+      "rhSkipSubmittedRh",
+      "rhSkipLatestRh",
+      "rhSkipLatestRhDate",
+      "wasRejected",
+      "approvalTier",
+      "rejectionComments",
+      "missedCycles",
+      "dateCompleted",
+      "isDeleted"
+    ];
     const attempted = Object.keys(body);
     const blockedB3 = attempted.filter((f) => B3_FIELDS.includes(f));
     const blockedProtected = attempted.filter((f) => PROTECTED_FIELDS.includes(f));
@@ -37069,12 +38919,55 @@ async function updateWorkOrder(id, body) {
       if (key === "partBOfficeEdit") continue;
       if (ALLOWED_FIELDS.has(key)) updateData2[key] = value;
     }
-    console.log(`\u{1F4DD} Part B office edit \u2014 WO ${existingWO2.workOrderNo}: updating [${Object.keys(updateData2).filter((k) => !["userId", "userRole", "userUuid"].includes(k)).join(", ")}]`);
+    const b2BaselineError2 = validateWorkOrderB2Baselines({
+      maintenanceBasis: existingWO.maintenanceBasis,
+      startDateTime: updateData2.startDateTime ?? existingWO.startDateTime,
+      lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+      woCompletionRh: existingWO.woCompletionRh,
+      rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot
+    })[0];
+    if (b2BaselineError2) {
+      throw new ValidationError(b2BaselineError2.message, {
+        code: b2BaselineError2.code,
+        field: b2BaselineError2.field
+      });
+    }
+    console.log(`\u{1F4DD} Part B office edit \u2014 WO ${existingWO.workOrderNo}: updating [${Object.keys(updateData2).filter((k) => !["userId", "userRole", "userUuid"].includes(k)).join(", ")}]`);
     const workOrder2 = await update6(id, updateData2);
     return workOrder2;
   }
-  if (existingWO2.status === "Pending Approval" && !body.approvalAction && !body.partBOfficeEdit && !body.superintendentAck) {
-    const PENDING_APPROVAL_BLOCKED_FIELDS = [
+  if (existingWO.status === "Pending Approval" && !body.partBOfficeEdit) {
+    const actionClassification = classifyApprovalTransition({
+      existingStatus: existingWO.status,
+      requestedStatus: body.status,
+      approvalAction: body.approvalAction
+    });
+    if (actionClassification.invalidActionStatus) {
+      throw new ValidationError(
+        "The approval action does not match the requested Work Order status.",
+        { code: "INVALID_APPROVAL_ACTION_STATUS" }
+      );
+    }
+    const PENDING_APPROVAL_SUBMITTED_FIELDS = [
+      // B1 — submitted checklist / document decisions
+      "riskAssessmentStatus",
+      "safetyChecklistsStatus",
+      "operationalFormsStatus",
+      "uploadedDocuments",
+      // B2 — submitted execution details
+      "startDateTime",
+      "completionDateTime",
+      "dateCompleted",
+      "dateOfCompletion",
+      "executionAssignedTo",
+      "performedBy",
+      "noOfPersons",
+      "totalTimeHours",
+      "manhours",
+      "workCarriedOut",
+      "jobExperienceNotes",
+      "remarks",
+      "completionRemarks",
       // B3 Running Hours — drive the delta cascade at approval; immutable post-submission
       "runningHours",
       "previousReading",
@@ -37082,45 +38975,127 @@ async function updateWorkOrder(id, body) {
       "readingDate",
       "currentReadingDate",
       "currentReading",
+      "completionRH",
       "woCompletionRh",
+      "completionRHSource",
+      "completionRHValidationDetails",
+      "completionRHValidated",
+      "rhJustification",
+      "rhJustificationProvidedBy",
+      "rhJustificationDate",
+      "rhBackdatedEntry",
+      // Execution identity is assigned before submission and must not change at approval.
+      "woExecutionId",
       // B4 Consumed Spare Parts — inventory already applied; reversal requires reject/resubmit
-      "consumedSpareParts",
-      // Status transitions must use explicit approval actions, not raw field writes
-      "status",
-      "approvalDate",
-      "submittedDate",
-      "approvalTier"
+      "consumedSpareParts"
     ];
-    const attempted = Object.keys(body).filter((k) => PENDING_APPROVAL_BLOCKED_FIELDS.includes(k));
-    if (attempted.length > 0) {
-      console.warn(`\u26A0\uFE0F Blocked attempt to modify protected fields on Pending Approval WO ${existingWO2.workOrderNo}: ${attempted.join(", ")}`);
+    const sameSubmittedValue = (field, incoming) => {
+      if (field === "dateOfCompletion" || field === "dateCompleted" || field === "completionDateTime") {
+        const incomingDate = parseWorkOrderDate(incoming);
+        if (!incomingDate) return false;
+        const storedDates = [
+          parseWorkOrderDate(existingWO.completionDateTime),
+          parseWorkOrderDate(existingWO.dateCompleted)
+        ].filter((value) => value !== null);
+        if (field === "dateOfCompletion") {
+          const incomingDay = incomingDate.toISOString().slice(0, 10);
+          return storedDates.some(
+            (storedDate) => storedDate.toISOString().slice(0, 10) === incomingDay
+          );
+        }
+        return storedDates.some(
+          (storedDate) => storedDate.getTime() === incomingDate.getTime()
+        );
+      }
+      const stored = existingWO[field];
+      if (stored === incoming) return true;
+      if (stored == null || incoming == null) return stored == null && incoming == null;
+      if (typeof stored === "object" || typeof incoming === "object") {
+        try {
+          return JSON.stringify(stored) === JSON.stringify(incoming);
+        } catch {
+          return false;
+        }
+      }
+      return String(stored) === String(incoming);
+    };
+    const submittedFieldsInPayload = Object.keys(body).filter((key) => PENDING_APPROVAL_SUBMITTED_FIELDS.includes(key));
+    const changedSubmittedFields = submittedFieldsInPayload.filter((key) => !sameSubmittedValue(key, body[key]));
+    if (changedSubmittedFields.length > 0) {
+      console.warn(`\u26A0\uFE0F Blocked attempt to modify submitted fields on Pending Approval WO ${existingWO.workOrderNo}: ${changedSubmittedFields.join(", ")}`);
       throw new ValidationError(
-        `Cannot modify [${attempted.join(", ")}] on a Pending Approval work order. Running Hours and consumed spare parts are locked until the work order is approved or rejected.`
+        `Cannot modify [${changedSubmittedFields.join(", ")}] on a Pending Approval work order. Submitted execution data is locked until the work order is approved or rejected.`,
+        {
+          code: "PENDING_APPROVAL_EXECUTION_FIELDS_READ_ONLY",
+          disallowedFields: changedSubmittedFields
+        }
+      );
+    }
+    if (actionClassification.explicitApproval) {
+      for (const key of submittedFieldsInPayload) {
+        delete body[key];
+      }
+    }
+    if (body.superintendentAck) {
+      const ACK_ALLOWED_FIELDS = /* @__PURE__ */ new Set([
+        "superintendentAck",
+        "superintendentAcknowledged",
+        "superintendentAcknowledgedAt",
+        "approvalTier",
+        "approvalBlockReason"
+      ]);
+      const strayAckFields = Object.keys(body).filter((key) => !ACK_ALLOWED_FIELDS.has(key));
+      if (strayAckFields.length > 0) {
+        throw new ValidationError(
+          `Unexpected fields in Superintendent acknowledgment: ${strayAckFields.join(", ")}`,
+          { code: "INVALID_SUPERINTENDENT_ACK_PAYLOAD", disallowedFields: strayAckFields }
+        );
+      }
+    } else {
+      const SERVER_MANAGED_APPROVAL_FIELDS = [
+        "approvalTier",
+        "superintendentAcknowledged",
+        "superintendentAcknowledgedAt",
+        "approvalBlockReason"
+      ];
+      const forgedApprovalFields = Object.keys(body).filter((key) => SERVER_MANAGED_APPROVAL_FIELDS.includes(key));
+      if (forgedApprovalFields.length > 0) {
+        throw new ValidationError(
+          `Cannot modify server-managed approval fields: ${forgedApprovalFields.join(", ")}`,
+          { code: "APPROVAL_FIELDS_READ_ONLY", disallowedFields: forgedApprovalFields }
+        );
+      }
+    }
+    const hasRawStatusTransition = body.status !== void 0 && body.status !== "Pending Approval" && !actionClassification.explicitApproval && !actionClassification.explicitRejection;
+    if (hasRawStatusTransition) {
+      throw new ValidationError(
+        "Pending Approval status changes require an explicit approved or rejected action.",
+        { code: "APPROVAL_ACTION_REQUIRED" }
       );
     }
   }
   const { isCompletedStatus: isCompletedStatus3 } = await Promise.resolve().then(() => (init_workOrderStatus(), workOrderStatus_exports));
-  const woIsCompleted = isCompletedStatus3(existingWO2.status);
+  const woIsCompleted = isCompletedStatus3(existingWO.status);
   if (woIsCompleted) {
     const allowedFieldsForCompletedWO = ["remarks", "completionRemarks", "jobExperienceNotes"];
     const requestedFields = Object.keys(body);
     const disallowedFields = requestedFields.filter((f) => !allowedFieldsForCompletedWO.includes(f));
     if (disallowedFields.length > 0) {
-      const storedStatus = existingWO2.status || "Completed";
-      const dueDate = existingWO2.dueDate;
+      const storedStatus = existingWO.status || "Completed";
+      const dueDate = existingWO.dueDate;
       if (dueDate) {
         const parsedDue = parseWorkOrderDate(dueDate);
         if (parsedDue && parsedDue < /* @__PURE__ */ new Date()) {
           console.warn(
-            `\u26A0\uFE0F Data inconsistency: WO ${existingWO2.workOrderNo} has stored status "${storedStatus}" but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
+            `\u26A0\uFE0F Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
           );
         }
       }
-      console.warn(`\u26A0\uFE0F Attempted to modify completed WO ${existingWO2.workOrderNo}: ${disallowedFields.join(", ")}`);
+      console.warn(`\u26A0\uFE0F Attempted to modify completed WO ${existingWO.workOrderNo}: ${disallowedFields.join(", ")}`);
       throw new ValidationError(
         `Cannot modify work order: This work order is marked as "${storedStatus}" and cannot be modified. Only remarks can be added. If you need to re-complete this work order, please contact your administrator.`,
         {
-          message: `Work Order ${existingWO2.workOrderNo} is marked as "${storedStatus}" and cannot be modified.`,
+          message: `Work Order ${existingWO.workOrderNo} is marked as "${storedStatus}" and cannot be modified.`,
           storedStatus,
           disallowedFields
         }
@@ -37137,6 +39112,31 @@ async function updateWorkOrder(id, body) {
       delete updateData[key];
     }
   });
+  const componentRef = updateData.component || existingWO.component;
+  const componentCodeRef = updateData.componentCode || existingWO.componentCode;
+  const vesselId = updateData.vesselId || existingWO.vesselId;
+  let resolvedComponent = null;
+  if (vesselId && (componentRef || componentCodeRef)) {
+    if (componentRef) resolvedComponent = await findComponent2(componentRef);
+    if (!resolvedComponent && componentCodeRef) {
+      resolvedComponent = await findComponentByCode2(componentCodeRef, vesselId);
+    }
+    if (!resolvedComponent && componentRef) {
+      const vesselComponents = await findComponents2(vesselId);
+      resolvedComponent = vesselComponents.find((c) => c.name === componentRef);
+    }
+    if (resolvedComponent) {
+      updateData.componentCode = resolvedComponent.componentCode;
+    }
+  }
+  const effectiveRhCounterType = resolvedComponent?.rhCounterType;
+  if (updateData.draftExecutionData && typeof updateData.draftExecutionData === "object" && !Array.isArray(updateData.draftExecutionData)) {
+    updateData.draftExecutionData = sanitizeWorkOrderB3Fields(
+      updateData.draftExecutionData,
+      effectiveRhCounterType
+    );
+  }
+  updateData = sanitizeWorkOrderB3Fields(updateData, effectiveRhCounterType);
   const draftDoc = updateData.draftExecutionData;
   const isDraftOnlySave = draftDoc != null && typeof draftDoc === "object" && !Array.isArray(draftDoc) && updateData.status === void 0 && updateData.completionDateTime === void 0 && updateData.dateOfCompletion === void 0;
   if (isDraftOnlySave) {
@@ -37150,11 +39150,11 @@ async function updateWorkOrder(id, body) {
     }
     const workOrder2 = await update6(id, { draftExecutionData: draftDoc });
     try {
-      await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, workOrder2, body.userId || body.performedBy || "system");
+      await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, workOrder2, body.userId || body.performedBy || "system");
     } catch (err) {
       console.error("[FieldLogger] WO draft save:", err);
     }
-    console.log(`\u{1F4DD} Draft saved for WO ${existingWO2.workOrderNo || id} (draft-only update, status/tab unchanged)`);
+    console.log(`\u{1F4DD} Draft saved for WO ${existingWO.workOrderNo || id} (draft-only update, status/tab unchanged)`);
     return workOrder2;
   }
   const validateNumericField = (value, fieldName, opts = {}) => {
@@ -37199,6 +39199,9 @@ async function updateWorkOrder(id, body) {
   if (updateData.currentReading !== void 0) {
     validateNumericField(updateData.currentReading, "Current Reading", { maxDecimals: 2 });
   }
+  if (updateData.woCompletionRh !== void 0) {
+    validateNumericField(updateData.woCompletionRh, "WO Completion RH", { maxDecimals: 2 });
+  }
   if (updateData.noOfPersons !== void 0) {
     validateNumericField(updateData.noOfPersons, "Number of Persons", { integerOnly: true });
   }
@@ -37215,29 +39218,6 @@ async function updateWorkOrder(id, body) {
         `${config.field} exceeds maximum length`,
         { message: `${config.field} must be ${config.max} characters or fewer (currently ${updateData[key].length} characters).` }
       );
-    }
-  }
-  const componentRef = updateData.component || existingWO2.component;
-  const componentCodeRef = updateData.componentCode || existingWO2.componentCode;
-  const vesselId = updateData.vesselId || existingWO2.vesselId;
-  if (vesselId && (componentRef || componentCodeRef)) {
-    let resolvedComponent = null;
-    if (componentRef) {
-      resolvedComponent = await findComponent2(componentRef);
-    }
-    if (!resolvedComponent && componentCodeRef) {
-      resolvedComponent = await findComponentByCode2(componentCodeRef, vesselId);
-    }
-    if (!resolvedComponent && componentRef) {
-      const vesselComponents = await findComponents2(vesselId);
-      resolvedComponent = vesselComponents.find((c) => c.name === componentRef);
-    }
-    if (resolvedComponent) {
-      if (componentCodeRef && componentCodeRef !== resolvedComponent.componentCode) {
-        console.warn(`\u26A0\uFE0F AUTO-CORRECTING WO PATCH componentCode mismatch: current "${componentCodeRef}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
-      }
-      updateData.componentCode = resolvedComponent.componentCode;
-      console.log(`\u2705 Auto-resolved componentCode in PATCH: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
     }
   }
   const hasCompletionData = !!(updateData.completionDateTime || updateData.dateOfCompletion);
@@ -37283,9 +39263,38 @@ async function updateWorkOrder(id, body) {
       console.log("\u{1F4DD} Auto-setting status to Pending Approval (completion data provided without explicit status)");
     }
   }
-  if (updateData.woCompletionRh !== void 0 && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== "") {
+  const isSubmittingForApproval = updateData.status === "Pending Approval" && existingWO.status !== "Pending Approval";
+  const effectiveCompletionRh = updateData.woCompletionRh ?? existingWO.woCompletionRh;
+  const effectiveCounterType = resolvedComponent?.rhCounterType || "MASTER";
+  if (isSubmittingForApproval && requiresWoCompletionRh(existingWO.maintenanceBasis, effectiveCounterType) && (effectiveCompletionRh === null || effectiveCompletionRh === void 0 || String(effectiveCompletionRh).trim() === "")) {
+    throw new ValidationError(
+      "WO Completion RH is required for Running Hours-based Work Orders",
+      { code: "WO_COMPLETION_RH_REQUIRED" }
+    );
+  }
+  const validationScope = getWorkOrderB2PatchValidationScope({
+    existingStatus: existingWO.status,
+    requestedStatus: updateData.status,
+    approvalAction: updateData.approvalAction,
+    startDateChanged: updateData.startDateTime !== void 0,
+    completionRhChanged: updateData.woCompletionRh !== void 0
+  });
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: existingWO.maintenanceBasis,
+    startDateTime: validationScope.startDate ? updateData.startDateTime ?? existingWO.startDateTime : null,
+    lastDoneDateSnapshot: existingWO.lastDoneDateSnapshot,
+    woCompletionRh: validationScope.completionRh ? effectiveCompletionRh : null,
+    rhLastDoneSnapshot: existingWO.rhLastDoneSnapshot
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field
+    });
+  }
+  if (isWorkOrderB3Applicable(effectiveCounterType) && updateData.woCompletionRh !== void 0 && updateData.woCompletionRh !== null && String(updateData.woCompletionRh).trim() !== "") {
     const woRhNum = parseFloat(String(updateData.woCompletionRh));
-    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO2.runningHours ?? existingWO2.currentReading;
+    const readingRaw = updateData.runningHours ?? updateData.currentReading ?? existingWO.runningHours ?? existingWO.currentReading;
     const readingNum = readingRaw !== void 0 && readingRaw !== null && String(readingRaw).trim() !== "" ? parseFloat(String(readingRaw)) : NaN;
     if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
       throw new ValidationError(
@@ -37294,7 +39303,7 @@ async function updateWorkOrder(id, body) {
       );
     }
   }
-  if (updateData.currentReadingDate) {
+  if (isWorkOrderB3Applicable(effectiveCounterType) && updateData.currentReadingDate) {
     const rdParsed = new Date(String(updateData.currentReadingDate));
     const todayEnd = /* @__PURE__ */ new Date();
     todayEnd.setHours(23, 59, 59, 999);
@@ -37319,7 +39328,7 @@ async function updateWorkOrder(id, body) {
     updateData.superintendentAcknowledged = null;
     console.log("\u{1F4DD} Work order rejected - setting status to Due, wasRejected=true, clearing approval tier for rework");
   }
-  const isRejectedWO = existingWO2.wasRejected === true || existingWO2.status === "Rejected";
+  const isRejectedWO = existingWO.wasRejected === true || existingWO.status === "Rejected";
   if (isRejectedWO && hasCompletionData && !hasExplicitStatus) {
     updateData.status = "Pending Approval";
     updateData.rejectionComments = null;
@@ -37327,7 +39336,7 @@ async function updateWorkOrder(id, body) {
     updateData.approvalAction = null;
     updateData.wasRejected = false;
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
-    if (existingWO2.status === "Rejected") {
+    if (existingWO.status === "Rejected") {
       updateData.superintendentRejectionRemarks = null;
     }
     console.log("\u{1F4DD} Previously rejected WO resubmitted - transitioning to Pending Approval");
@@ -37341,36 +39350,36 @@ async function updateWorkOrder(id, body) {
     console.log("\u{1F4DD} Reviewer-reopened WO explicitly resubmitted to Pending Approval - clearing rejection flags");
   }
   const isSubmissionAction = updateData.approvalAction === "submitted" || updateData.approvalAction === "submit" || updateData.status === "Pending Approval";
-  if (isSubmissionAction && !existingWO2.submittedDate) {
+  if (isSubmissionAction && !existingWO.submittedDate) {
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
     console.log("\u{1F4DD} Capturing submittedDate for audit trail on submission/Pending Approval");
   }
-  if ((isSubmissionAction || hasCompletionData || updateData.status === "Completed") && updateData.draftExecutionData === void 0 && existingWO2.draftExecutionData != null) {
+  if ((isSubmissionAction || hasCompletionData || updateData.status === "Completed") && updateData.draftExecutionData === void 0 && existingWO.draftExecutionData != null) {
     updateData.draftExecutionData = null;
     console.log("\u{1F4DD} Clearing draftExecutionData on submission");
   }
   if (isSubmissionAction || updateData.status === "Pending Approval") {
-    const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted || existingWO2.completionDateTime || existingWO2.dateCompleted;
-    const dueDateForCalc = existingWO2.nextDueDate || existingWO2.dueDate;
-    if (completionDateForCalc && dueDateForCalc && existingWO2.maintenanceBasis !== "Running Hours") {
+    const completionDateForCalc = updateData.completionDateTime || updateData.dateCompleted || existingWO.completionDateTime || existingWO.dateCompleted;
+    const dueDateForCalc = existingWO.nextDueDate || existingWO.dueDate;
+    if (completionDateForCalc && dueDateForCalc && existingWO.maintenanceBasis !== "Running Hours") {
       const preCalcMissed = calculateMissedCycles(
         dueDateForCalc,
         completionDateForCalc,
-        existingWO2.frequencyValue || updateData.frequencyValue,
-        existingWO2.frequencyUnit || updateData.frequencyUnit
+        existingWO.frequencyValue || updateData.frequencyValue,
+        existingWO.frequencyUnit || updateData.frequencyUnit
       );
       updateData.missedCycles = preCalcMissed;
       updateData.originalDueDate = dueDateForCalc;
       console.log(`\u{1F4DD} Pre-calculated missedCycles at submission: ${preCalcMissed} (dueDate: ${dueDateForCalc}, completionDate: ${completionDateForCalc})`);
     }
-    const tierCompDate = updateData.completionDateTime || updateData.dateCompleted || existingWO2.completionDateTime || existingWO2.dateCompleted;
-    const tierDueDate = existingWO2.nextDueDate || existingWO2.dueDate;
-    const tierMissedCycles = updateData.missedCycles ?? existingWO2.missedCycles ?? 0;
+    const tierCompDate = updateData.completionDateTime || updateData.dateCompleted || existingWO.completionDateTime || existingWO.dateCompleted;
+    const tierDueDate = existingWO.nextDueDate || existingWO.dueDate;
+    const tierMissedCycles = updateData.missedCycles ?? existingWO.missedCycles ?? 0;
     const tierBackdatingDays = calculateBackdatingDaysForApproval(
       tierCompDate,
-      updateData.submittedDate || existingWO2.submittedDate
+      updateData.submittedDate || existingWO.submittedDate
     );
-    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO2.vesselId);
+    const lockEnabledAtSubmit = await isSuperintendentLockEnabled(existingWO.vesselId);
     const tierResult = calculateApprovalTier(tierDueDate, tierCompDate, tierMissedCycles, tierBackdatingDays, lockEnabledAtSubmit);
     updateData.daysLate = tierResult.daysLate;
     updateData.approvalTier = tierResult.approvalTier;
@@ -37379,47 +39388,70 @@ async function updateWorkOrder(id, body) {
     updateData.approvalBlockReason = tierResult.approvalBlockReason;
     console.log(`\u{1F4DD} Layer 5: approvalTier=${tierResult.approvalTier}, daysLate=${tierResult.daysLate}, missedCycles=${tierMissedCycles}, backdatingDays=${tierBackdatingDays}`);
     if (tierResult.approvalTier === "superintendent_locked" || tierResult.approvalTier === "superintendent_notification") {
-      const woForNotification = { ...existingWO2, ...updateData };
+      const woForNotification = { ...existingWO, ...updateData };
       await createSuperintendentNotificationForWO(woForNotification, tierResult.daysLate, tierMissedCycles, tierResult.approvalTier, tierBackdatingDays);
     }
     const { resolveHodForDepartment: resolveHodAtSubmit } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
     const submissionHod = await resolveHodAtSubmit(
-      existingWO2.vesselId,
-      existingWO2.department,
-      updateData.approver || existingWO2.approver
+      existingWO.vesselId,
+      existingWO.department,
+      updateData.approver || existingWO.approver
     );
     if (submissionHod.resolved) {
       if (updateData.approver && updateData.approver !== submissionHod.rankName && submissionHod.source !== "fallback") {
-        console.warn(`[Submission] Client approver "${updateData.approver}" differs from org chart HOD "${submissionHod.rankName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Submission] Client approver "${updateData.approver}" differs from org chart HOD "${submissionHod.rankName}" for dept "${existingWO.department}". Using org chart value.`);
       }
       updateData.approver = submissionHod.rankName;
       console.log(`\u{1F4DD} Set approver from org chart: ${submissionHod.rankName} (source: ${submissionHod.source})`);
     }
   }
   console.log("\u{1F4DD} Cleaned update data keys:", Object.keys(updateData));
-  const isApprovalTransition = updateData.approvalAction === "approved" && updateData.status === "Completed" || updateData.status === "Completed" && existingWO2.status === "Pending Approval";
+  const approvalTransition = classifyApprovalTransition({
+    existingStatus: existingWO.status,
+    // Use the immutable request values. Rejection normalization above changes
+    // updateData.status from Rejected to Due for rework, but that must not make
+    // the original explicit rejection look like an invalid action/status pair.
+    requestedStatus: body.status,
+    approvalAction: body.approvalAction
+  });
+  if (approvalTransition.missingExplicitApproval) {
+    throw new ValidationError(
+      "Completing a Pending Approval Work Order requires an explicit approval action.",
+      { code: "APPROVAL_ACTION_REQUIRED" }
+    );
+  }
+  if (approvalTransition.invalidActionStatus) {
+    throw new ValidationError(
+      "The approval action does not match the requested Work Order status.",
+      { code: "INVALID_APPROVAL_ACTION_STATUS" }
+    );
+  }
+  const isApprovalTransition = approvalTransition.explicitApproval;
+  if (isApprovalTransition && existingWO.dateCompleted) {
+    updateData.dateCompleted = existingWO.dateCompleted;
+  }
   let interceptedForL2Review = false;
   if (isApprovalTransition) {
     const { resolveHodForDepartment: resolveHodForDepartment2, getHodShortLabel: getHodShortLabel2 } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
     const hodResolution = await resolveHodForDepartment2(
-      existingWO2.vesselId,
-      existingWO2.department,
-      existingWO2.approver
+      existingWO.vesselId,
+      existingWO.department,
+      existingWO.approver
     );
     const hodName = hodResolution.rankName;
     const hodShort = getHodShortLabel2(hodName);
     if (hodResolution.resolved) {
       if (updateData.approver && updateData.approver !== hodName && hodResolution.source !== "fallback") {
-        console.warn(`[Approval] Client provided approver "${updateData.approver}" differs from org chart HOD "${hodName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Approval] Client provided approver "${updateData.approver}" differs from org chart HOD "${hodName}" for dept "${existingWO.department}". Using org chart value.`);
       }
       updateData.approver = hodName;
     }
-    let woMissedCycles = existingWO2.missedCycles || 0;
-    if (woMissedCycles === 0 && existingWO2.maintenanceBasis !== "Running Hours") {
-      const approvalCompDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
-      const approvalDueDate = existingWO2.nextDueDate || existingWO2.dueDate;
-      if (approvalCompDate && approvalDueDate && existingWO2.frequencyValue && existingWO2.frequencyUnit) {
-        woMissedCycles = calculateMissedCycles(approvalDueDate, approvalCompDate, existingWO2.frequencyValue, existingWO2.frequencyUnit);
+    let woMissedCycles = existingWO.missedCycles || 0;
+    if (woMissedCycles === 0 && existingWO.maintenanceBasis !== "Running Hours") {
+      const approvalCompDate = existingWO.completionDateTime || existingWO.dateCompleted;
+      const approvalDueDate = existingWO.nextDueDate || existingWO.dueDate;
+      if (approvalCompDate && approvalDueDate && existingWO.frequencyValue && existingWO.frequencyUnit) {
+        woMissedCycles = calculateMissedCycles(approvalDueDate, approvalCompDate, existingWO.frequencyValue, existingWO.frequencyUnit);
         if (woMissedCycles > 0) {
           updateData.missedCycles = woMissedCycles;
           updateData.originalDueDate = approvalDueDate;
@@ -37436,10 +39468,10 @@ async function updateWorkOrder(id, body) {
         );
       }
     }
-    const currentTier = existingWO2.approvalTier || "standard";
+    const currentTier = existingWO.approvalTier || "standard";
     const ceRemarks = (updateData.ceApprovalRemarks || "").trim();
     if (currentTier === "superintendent_locked") {
-      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
       if (lockEnabled) {
         throw new ValidationError(
           `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
@@ -37470,17 +39502,17 @@ async function updateWorkOrder(id, body) {
       }
     }
   }
-  if (isApprovalTransition && existingWO2.jobId) {
+  if (isApprovalTransition && existingWO.jobId) {
     try {
-      const linkedJob = await findJob(existingWO2.jobId);
+      const linkedJob = await findJob(existingWO.jobId);
       if (linkedJob && linkedJob.level2ReviewerRankId) {
         interceptedForL2Review = true;
         updateData.status = "Pending Office Review";
         updateData.approvalDate = (/* @__PURE__ */ new Date()).toISOString();
-        console.log(`\u{1F512} [L2 Review] WO ${existingWO2.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
+        console.log(`\u{1F512} [L2 Review] WO ${existingWO.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
       }
     } catch (err) {
-      console.warn(`[L2 Review] Could not load linked job ${existingWO2.jobId} for L2 check \u2014 proceeding without interception:`, err);
+      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check \u2014 proceeding without interception:`, err);
     }
   }
   const isBeingPostponed = updateData.status === "Postponed";
@@ -37496,100 +39528,99 @@ async function updateWorkOrder(id, body) {
       { code: "OTHER_REASON_REMARKS_REQUIRED" }
     );
   }
+  ensureCompletedWorkOrderDate(existingWO, updateData);
   const { isShipInstance: isShipInstanceForRH } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
   const isShipForRhWrite = await isShipInstanceForRH();
   let officeRhEntryAllowed = false;
-  if (!isShipForRhWrite && existingWO2.vesselId) {
+  if (!isShipForRhWrite && existingWO.vesselId) {
     const { isOfficeRhEntryEnabled: isOfficeRhEntryEnabled2 } = await Promise.resolve().then(() => (init_workOrderGenerationGate(), workOrderGenerationGate_exports));
-    officeRhEntryAllowed = await isOfficeRhEntryEnabled2(existingWO2.vesselId);
+    officeRhEntryAllowed = await isOfficeRhEntryEnabled2(existingWO.vesselId);
   }
-  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO2.rhSyncedAt && (isShipForRhWrite || officeRhEntryAllowed)) {
-    const rhRaw = existingWO2.runningHours || updateData.runningHours;
+  if (isApprovalTransition && !interceptedForL2Review && updateData.status === "Completed" && !existingWO.rhSyncedAt && (isShipForRhWrite || officeRhEntryAllowed)) {
+    const rhRaw = existingWO.runningHours || updateData.runningHours;
     if (rhRaw) {
-      let rhComp = await findComponent2(existingWO2.component);
-      if (!rhComp && existingWO2.componentCode && existingWO2.vesselId) {
-        rhComp = await findComponentByCode2(existingWO2.componentCode, existingWO2.vesselId);
+      let rhComp = await findComponent2(existingWO.component);
+      if (!rhComp && existingWO.componentCode && existingWO.vesselId) {
+        rhComp = await findComponentByCode2(existingWO.componentCode, existingWO.vesselId);
       }
       const rhCounterType = (rhComp?.rhCounterType || "MASTER").toUpperCase();
       const rhValue = parseInt(rhRaw);
       const { requireReadingDayInput: requireReadingDayInput2 } = await Promise.resolve().then(() => (init_readingDate(), readingDate_exports));
       const normRhDate = (d) => requireReadingDayInput2(d ?? null, "reading/completion date") ?? void 0;
-      const completionDateNorm = normRhDate(existingWO2.completionDateTime || existingWO2.dateCompleted || updateData.completionDateTime);
-      const readingDateNorm = normRhDate(existingWO2.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
+      const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
+      const readingDateNorm = normRhDate(existingWO.currentReadingDate || updateData.currentReadingDate) || completionDateNorm;
       if (!isShipForRhWrite && !readingDateNorm) {
         throw new ValidationError(
           "Office RH entry requires the reading date (Current Reading Date or Completion Date). Enter the date the counter was actually read.",
-          { code: "RH_READING_DATE_REQUIRED", workOrderNo: existingWO2.workOrderNo }
+          { code: "RH_READING_DATE_REQUIRED", workOrderNo: existingWO.workOrderNo }
         );
       }
       if (rhComp && rhCounterType === "MASTER" && !isNaN(rhValue)) {
-        let rhBackdatedSkippedApproval = false;
-        const masterCurrentRHApproval = parseFloat((rhComp.rhCurrentMaster ?? rhComp.currentCumulativeRH) || "0");
-        if (rhValue <= masterCurrentRHApproval && readingDateNorm) {
-          const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-          const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const stampFallbackApproval = rhComp.rhMasterUpdatedAt ?? (rhComp.lastUpdated ? new Date(rhComp.lastUpdated) : null);
-          const stampFallbackDateApproval = stampFallbackApproval instanceof Date ? stampFallbackApproval : stampFallbackApproval ? new Date(stampFallbackApproval) : null;
-          const masterUpdDateApproval = await resolveRhBaselineDay2(
-            await getPool2(),
-            rhComp.cuuid,
-            stampFallbackDateApproval && !isNaN(stampFallbackDateApproval.getTime()) ? stampFallbackDateApproval : null
-          );
-          if (masterUpdDateApproval && !isNaN(masterUpdDateApproval.getTime())) {
-            const approvalCompletionDate = new Date(readingDateNorm);
-            const masterDay = Date.UTC(masterUpdDateApproval.getUTCFullYear(), masterUpdDateApproval.getUTCMonth(), masterUpdDateApproval.getUTCDate());
-            const woDay = Date.UTC(approvalCompletionDate.getUTCFullYear(), approvalCompletionDate.getUTCMonth(), approvalCompletionDate.getUTCDate());
-            if (woDay < masterDay) {
-              rhBackdatedSkippedApproval = true;
-              updateData.rhBackdatedEntry = true;
+        const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+        const { getPool: getPoolForClaim } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const claimPool = await getPoolForClaim();
+        if (!await claimWoRhSync2(claimPool, existingWO.wouuid)) {
+          console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
+          rhUpdateOutcomeApproval = "already_processed";
+          updateData.rhUpdateOutcome = "already_processed";
+        } else {
+          const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+          try {
+            const rhResult = await updateMasterRH3(rhComp.cuuid, {
+              newRHValue: rhValue,
+              updateSource: "WORKORDER",
+              userId: body.userId || existingWO.performedBy || "system",
+              userUuid: body.userUuid,
+              userRole: body.userRole || "Ship",
+              adminOverride: body.adminOverride || false,
+              comments: `RH update via work order completion ${existingWO.workOrderNo}`,
+              dateUpdated: readingDateNorm
+            }, {
+              allowLowerWorkOrderApprovalSkip: true
+            });
+            if (rhResult.rhSkipped) {
+              await releaseWoRhSync2(claimPool, existingWO.wouuid);
               rhBackdatedApproval = true;
-              latestRHApproval = masterCurrentRHApproval;
-              latestRHDateApproval = masterUpdDateApproval.toISOString().split("T")[0];
-              console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower MASTER entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master current ${masterCurrentRHApproval} (${latestRHDateApproval}). RH module NOT updated.`);
-            }
-          }
-        }
-        if (!rhBackdatedSkippedApproval) {
-          const { claimWoRhSync: claimWoRhSync2, releaseWoRhSync: releaseWoRhSync2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-          const { getPool: getPoolForClaim } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const claimPool = await getPoolForClaim();
-          if (!await claimWoRhSync2(claimPool, existingWO2.wouuid)) {
-            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance`);
-          } else {
-            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-            try {
-              await updateMasterRH3(rhComp.cuuid, {
-                newRHValue: rhValue,
-                updateSource: "MANUAL",
-                userId: body.userId || existingWO2.performedBy || "system",
-                userUuid: body.userUuid,
-                userRole: body.userRole || "Ship",
-                adminOverride: body.adminOverride || false,
-                comments: `RH update via work order completion ${existingWO2.workOrderNo}`,
-                dateUpdated: readingDateNorm
-              });
+              rhUpdateOutcomeApproval = "skipped_lower";
+              rhSkipReasonApproval = "LOWER_THAN_LIVE_RH";
+              submittedRHApproval = rhResult.submittedRH;
+              latestRHApproval = rhResult.currentRH;
+              latestRHDateApproval = rhResult.currentRHDate;
+              updateData.rhUpdateOutcome = "skipped_lower";
+              updateData.rhSkipReason = "LOWER_THAN_LIVE_RH";
+              updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
+              updateData.rhSkipLatestRh = rhResult.currentRH.toString();
+              updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
+              console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for WO ${existingWO.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live ${rhResult.currentRH} RH. RH module was not updated.`);
+            } else {
               updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO2.workOrderNo} (cascaded to INHERITED children)`);
-            } catch (masterErr) {
-              await releaseWoRhSync2(claimPool, existingWO2.wouuid);
-              if (masterErr instanceof ValidationError) {
-                const det = masterErr.details || {};
-                throw new ValidationError(masterErr.message, {
-                  code: "RH_OVERRIDE_REQUIRED",
-                  ...det,
-                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                  canOverride: det.validation?.canOverride ?? false,
-                  componentId: rhComp.cuuid,
-                  componentCode: rhComp.componentCode || existingWO2.componentCode,
-                  rhCounterType: "MASTER"
-                });
-              }
-              throw masterErr;
+              rhUpdateOutcomeApproval = rhResult.noChange ? "no_change" : "applied";
+              updateData.rhUpdateOutcome = rhUpdateOutcomeApproval;
+              updateData.rhSkipReason = null;
+              updateData.rhSkipSubmittedRh = null;
+              updateData.rhSkipLatestRh = null;
+              updateData.rhSkipLatestRhDate = null;
+              console.log(`\u2705 [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} processed ${rhValue} RH via WO ${existingWO.workOrderNo} (cascaded to INHERITED children when increased)`);
             }
+          } catch (masterErr) {
+            await releaseWoRhSync2(claimPool, existingWO.wouuid);
+            if (masterErr instanceof ValidationError) {
+              const det = masterErr.details || {};
+              throw new ValidationError(masterErr.message, {
+                code: "RH_OVERRIDE_REQUIRED",
+                ...det,
+                requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                canOverride: det.validation?.canOverride ?? false,
+                componentId: rhComp.cuuid,
+                componentCode: rhComp.componentCode || existingWO.componentCode,
+                rhCounterType: "MASTER"
+              });
+            }
+            throw masterErr;
           }
         }
       } else if (rhComp && rhCounterType === "INHERITED" && !isNaN(rhValue)) {
-        const vesselIdForLookup = existingWO2.vesselId || rhComp.vesselId;
+        const vesselIdForLookup = existingWO.vesselId || rhComp.vesselId;
         let masterComp = null;
         if (rhComp.rhMasterComponentId && vesselIdForLookup) {
           const allVesselComps = await findComponents2(vesselIdForLookup);
@@ -37598,69 +39629,67 @@ async function updateWorkOrder(id, body) {
           ) ?? null;
         }
         if (masterComp) {
-          let rhBackdatedSkippedInherited = false;
-          const inhMasterCurrentRH = parseFloat((masterComp.rhCurrentMaster ?? masterComp.currentCumulativeRH) || "0");
-          if (rhValue <= inhMasterCurrentRH && readingDateNorm) {
-            const { resolveRhBaselineDay: resolveRhBaselineDay2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-            const { getPool: getPool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-            const inhMasterUpdRaw = masterComp.rhMasterUpdatedAt ?? (masterComp.lastUpdated ? new Date(masterComp.lastUpdated) : null);
-            const inhStampFallback = inhMasterUpdRaw instanceof Date ? inhMasterUpdRaw : inhMasterUpdRaw ? new Date(inhMasterUpdRaw) : null;
-            const inhMasterUpdDate = await resolveRhBaselineDay2(
-              await getPool2(),
-              masterComp.cuuid,
-              inhStampFallback && !isNaN(inhStampFallback.getTime()) ? inhStampFallback : null
-            );
-            if (inhMasterUpdDate && !isNaN(inhMasterUpdDate.getTime())) {
-              const inhCompletionDate = new Date(readingDateNorm);
-              const masterDay = Date.UTC(inhMasterUpdDate.getUTCFullYear(), inhMasterUpdDate.getUTCMonth(), inhMasterUpdDate.getUTCDate());
-              const woDay = Date.UTC(inhCompletionDate.getUTCFullYear(), inhCompletionDate.getUTCMonth(), inhCompletionDate.getUTCDate());
-              if (woDay < masterDay) {
-                rhBackdatedSkippedInherited = true;
-                updateData.rhBackdatedEntry = true;
+          const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimPoolInh = await getPoolInh();
+          if (!await claimInh(claimPoolInh, existingWO.wouuid)) {
+            console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
+            rhUpdateOutcomeApproval = "already_processed";
+            updateData.rhUpdateOutcome = "already_processed";
+          } else {
+            const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
+            try {
+              const rhResult = await updateMasterRH3(masterComp.cuuid, {
+                newRHValue: rhValue,
+                updateSource: "WORKORDER",
+                userId: body.userId || existingWO.performedBy || "system",
+                userUuid: body.userUuid,
+                userRole: body.userRole || "Ship",
+                adminOverride: body.adminOverride || false,
+                comments: `WO ${existingWO.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
+                dateUpdated: readingDateNorm
+              }, {
+                allowLowerWorkOrderApprovalSkip: true
+              });
+              if (rhResult.rhSkipped) {
+                await releaseInh(claimPoolInh, existingWO.wouuid);
                 rhBackdatedApproval = true;
-                latestRHApproval = inhMasterCurrentRH;
-                latestRHDateApproval = inhMasterUpdDate.toISOString().split("T")[0];
-                console.warn(`\u26A0\uFE0F [RH Sync] Back-dated lower INHERITED entry (approval path): WO ${existingWO2.workOrderNo} entered RH ${rhValue} (reading date ${readingDateNorm}) is older and lower than master ${masterComp.componentCode || masterComp.cuuid} current ${inhMasterCurrentRH} (${latestRHDateApproval}). RH module NOT updated.`);
-              }
-            }
-          }
-          if (!rhBackdatedSkippedInherited) {
-            const { claimWoRhSync: claimInh, releaseWoRhSync: releaseInh } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-            const { getPool: getPoolInh } = await Promise.resolve().then(() => (init_db(), db_exports));
-            const claimPoolInh = await getPoolInh();
-            if (!await claimInh(claimPoolInh, existingWO2.wouuid)) {
-              console.warn(`\u26A0\uFE0F [RH Sync] WO ${existingWO2.workOrderNo} RH already claimed/applied by a concurrent completion \u2014 skipping duplicate RH advance (INHERITED)`);
-            } else {
-              const { updateMasterRH: updateMasterRH3 } = await Promise.resolve().then(() => (init_runningHoursService(), runningHoursService_exports));
-              try {
-                await updateMasterRH3(masterComp.cuuid, {
-                  newRHValue: rhValue,
-                  updateSource: "WORKORDER",
-                  userId: body.userId || existingWO2.performedBy || "system",
-                  userUuid: body.userUuid,
-                  userRole: body.userRole || "Ship",
-                  adminOverride: body.adminOverride || false,
-                  comments: `WO ${existingWO2.workOrderNo} (INHERITED \u2192 cascaded via master ${masterComp.componentCode || masterComp.cuuid})`,
-                  dateUpdated: readingDateNorm
-                });
+                rhUpdateOutcomeApproval = "skipped_lower";
+                rhSkipReasonApproval = "LOWER_THAN_LIVE_RH";
+                submittedRHApproval = rhResult.submittedRH;
+                latestRHApproval = rhResult.currentRH;
+                latestRHDateApproval = rhResult.currentRHDate;
+                updateData.rhUpdateOutcome = "skipped_lower";
+                updateData.rhSkipReason = "LOWER_THAN_LIVE_RH";
+                updateData.rhSkipSubmittedRh = rhResult.submittedRH.toString();
+                updateData.rhSkipLatestRh = rhResult.currentRH.toString();
+                updateData.rhSkipLatestRhDate = rhResult.currentRHDate;
+                console.warn(`\u26A0\uFE0F [RH Sync] Approval continued for INHERITED WO ${existingWO.workOrderNo}; submitted ${rhResult.submittedRH} RH is lower than locked live master ${rhResult.currentRH} RH. RH module was not updated.`);
+              } else {
                 updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}, cascaded to all siblings via WO ${existingWO2.workOrderNo}`);
-              } catch (masterErr) {
-                await releaseInh(claimPoolInh, existingWO2.wouuid);
-                if (masterErr instanceof ValidationError) {
-                  const det = masterErr.details || {};
-                  throw new ValidationError(masterErr.message, {
-                    code: "RH_OVERRIDE_REQUIRED",
-                    ...det,
-                    requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
-                    canOverride: det.validation?.canOverride ?? false,
-                    componentId: masterComp.cuuid,
-                    componentCode: masterComp.componentCode || existingWO2.componentCode,
-                    rhCounterType: "INHERITED"
-                  });
-                }
-                throw masterErr;
+                rhUpdateOutcomeApproval = rhResult.noChange ? "no_change" : "applied";
+                updateData.rhUpdateOutcome = rhUpdateOutcomeApproval;
+                updateData.rhSkipReason = null;
+                updateData.rhSkipSubmittedRh = null;
+                updateData.rhSkipLatestRh = null;
+                updateData.rhSkipLatestRhDate = null;
+                console.log(`\u2705 [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} routed through MASTER ${masterComp.componentCode || masterComp.cuuid}; ${rhValue} RH processed via WO ${existingWO.workOrderNo}`);
               }
+            } catch (masterErr) {
+              await releaseInh(claimPoolInh, existingWO.wouuid);
+              if (masterErr instanceof ValidationError) {
+                const det = masterErr.details || {};
+                throw new ValidationError(masterErr.message, {
+                  code: "RH_OVERRIDE_REQUIRED",
+                  ...det,
+                  requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+                  canOverride: det.validation?.canOverride ?? false,
+                  componentId: masterComp.cuuid,
+                  componentCode: masterComp.componentCode || existingWO.componentCode,
+                  rhCounterType: "INHERITED"
+                });
+              }
+              throw masterErr;
             }
           }
         } else {
@@ -37674,7 +39703,7 @@ async function updateWorkOrder(id, body) {
                 previousEntry: backdateCheck.previousEntry,
                 nextEntry: backdateCheck.nextEntry,
                 componentId: rhComp.cuuid,
-                componentCode: rhComp.componentCode || existingWO2.componentCode,
+                componentCode: rhComp.componentCode || existingWO.componentCode,
                 rhCounterType: "INHERITED"
               });
             }
@@ -37683,7 +39712,7 @@ async function updateWorkOrder(id, body) {
             const prevRH = parseInt(rhComp.currentCumulativeRH || "0");
             await createRunningHoursAudit2({
               componentId: rhComp.cuuid,
-              vesselId: existingWO2.vesselId || rhComp.vesselId || "V001",
+              vesselId: existingWO.vesselId || rhComp.vesselId || "V001",
               previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
               newRH: rhValue.toString(),
               cumulativeRH: rhValue.toString(),
@@ -37692,32 +39721,32 @@ async function updateWorkOrder(id, body) {
               dateUpdatedLocal: readingDateNorm || completionDateNorm || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
               dateUpdatedTZ: "UTC",
               enteredAtUTC: /* @__PURE__ */ new Date(),
-              userId: body.userId || existingWO2.performedBy || "System",
+              userId: body.userId || existingWO.performedBy || "System",
               source: "workorder",
-              notes: `WO ${existingWO2.workOrderNo} (INHERITED \u2014 no master link, child-only record)`,
+              notes: `WO ${existingWO.workOrderNo} (INHERITED \u2014 no master link, child-only record)`,
               meterReplaced: false
             });
           } catch (auditErr) {
             console.error("[RH Sync] Failed to write INHERITED audit snapshot:", auditErr);
           }
           updateData.rhSyncedAt = /* @__PURE__ */ new Date();
-          console.warn(`\u26A0\uFE0F [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} has no valid master link \u2014 recorded on child only (WO ${existingWO2.workOrderNo})`);
+          console.warn(`\u26A0\uFE0F [RH Sync] INHERITED component ${rhComp.componentCode || rhComp.cuuid} has no valid master link \u2014 recorded on child only (WO ${existingWO.workOrderNo})`);
         }
       }
     }
   }
   const workOrder = await update6(id, updateData);
   try {
-    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, workOrder, body.userId || body.approver || body.performedBy || "system");
+    await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, workOrder, body.userId || body.approver || body.performedBy || "system");
   } catch (err) {
     console.error("[FieldLogger] WO update:", err);
   }
-  if (isBeingPostponed && existingWO2.status !== "Postponed") {
+  if (isBeingPostponed && existingWO.status !== "Postponed") {
     try {
       const existingCount = await storage.getWorkOrderPostponementCount(workOrder.wouuid);
       const postponementNumber = existingCount + 1;
       const postponementId = `pp-${workOrder.id}-${Date.now()}`;
-      const originalDueDate = existingWO2.dueDate || null;
+      const originalDueDate = existingWO.dueDate || null;
       const newDueDate = workOrder.postponementEndDate || workOrder.dueDate || null;
       let durationDays = null;
       if (originalDueDate && newDueDate) {
@@ -37730,7 +39759,7 @@ async function updateWorkOrder(id, body) {
       await storage.createWorkOrderPostponement({
         id: postponementId,
         workOrderId: workOrder.wouuid,
-        vesselId: workOrder.vesselId || existingWO2.vesselId || "",
+        vesselId: workOrder.vesselId || existingWO.vesselId || "",
         postponementNumber,
         originalDueDate,
         newDueDate,
@@ -37749,9 +39778,9 @@ async function updateWorkOrder(id, body) {
   const isApprovalAction = updateData.approvalAction === "approved" && updateData.status === "Completed";
   if (!isApprovalAction && !isBeingRejected && !woIsCompleted && !interceptedForL2Review) {
     const currentConsumed = ensureArray(updateData.consumedSpareParts);
-    const previousConsumed = ensureArray(existingWO2.consumedSpareParts);
+    const previousConsumed = ensureArray(existingWO.consumedSpareParts);
     const sparesToProcess = computeSpareConsumptionDelta(currentConsumed, previousConsumed);
-    const woVesselId = existingWO2.vesselId || "V001";
+    const woVesselId = existingWO.vesselId || "V001";
     if (sparesToProcess.length > 0) {
       const allSpares = await findSpares2(woVesselId);
       const updatedConsumedSpareParts = [...currentConsumed];
@@ -37778,11 +39807,11 @@ async function updateWorkOrder(id, body) {
               eventType: "ADJUST",
               qtyChange: item.reverseQty,
               referenceType: "WORK_ORDER",
-              referenceId: existingWO2.wouuid,
-              referenceNote: `WO Save Reversal: ${existingWO2.workOrderNo} - Qty adjusted due to work order re-save`,
+              referenceId: existingWO.wouuid,
+              referenceNote: `WO Save Reversal: ${existingWO.workOrderNo} - Qty adjusted due to work order re-save`,
               userId: updateData.userId || updateData.performedBy || "system"
             });
-            console.log(`\u{1F504} [Save Consumption] Reversed ${item.reverseQty} units of ${item.partKey} at ${item.locationName} (WO: ${existingWO2.workOrderNo})`);
+            console.log(`\u{1F504} [Save Consumption] Reversed ${item.reverseQty} units of ${item.partKey} at ${item.locationName} (WO: ${existingWO.workOrderNo})`);
           }
           if (item.qty > 0) {
             await performInventoryTransaction({
@@ -37792,11 +39821,11 @@ async function updateWorkOrder(id, body) {
               eventType: "CONSUME",
               qtyChange: -Math.abs(item.qty),
               referenceType: "WORK_ORDER",
-              referenceId: existingWO2.wouuid,
-              referenceNote: `WO Save: ${existingWO2.workOrderNo} - ${item.spare.comments || "Consumed on work order save"}`,
+              referenceId: existingWO.wouuid,
+              referenceNote: `WO Save: ${existingWO.workOrderNo} - ${item.spare.comments || "Consumed on work order save"}`,
               userId: updateData.userId || updateData.performedBy || "system"
             });
-            console.log(`\u2705 [Save Consumption] Deducted ${item.qty} units of ${item.partKey} from ${item.locationName} (WO: ${existingWO2.workOrderNo})`);
+            console.log(`\u2705 [Save Consumption] Deducted ${item.qty} units of ${item.partKey} from ${item.locationName} (WO: ${existingWO.workOrderNo})`);
           }
           if (item.lineIndex >= 0 && item.lineIndex < updatedConsumedSpareParts.length) {
             const currentQty = typeof updatedConsumedSpareParts[item.lineIndex].quantityConsumed === "string" ? parseFloat(updatedConsumedSpareParts[item.lineIndex].quantityConsumed) : updatedConsumedSpareParts[item.lineIndex].quantityConsumed;
@@ -37812,7 +39841,7 @@ async function updateWorkOrder(id, body) {
       }
       try {
         await update6(id, { consumedSpareParts: updatedConsumedSpareParts });
-        console.log(`\u2705 [Save Consumption] Updated _deductedQty flags for WO ${existingWO2.workOrderNo}`);
+        console.log(`\u2705 [Save Consumption] Updated _deductedQty flags for WO ${existingWO.workOrderNo}`);
       } catch (updateError) {
         console.error(`\u274C [Save Consumption] Failed to update _deductedQty flags:`, updateError);
       }
@@ -37822,7 +39851,7 @@ async function updateWorkOrder(id, body) {
     const auditActionType = isBeingRejected ? "reject" : updateData.approvalAction === "approved" && updateData.status === "Completed" ? "approve" : "update";
     const changedFields = {};
     for (const key of Object.keys(body)) {
-      const oldVal = existingWO2[key];
+      const oldVal = existingWO[key];
       const newVal = body[key];
       if (oldVal !== newVal && newVal !== void 0) {
         changedFields[key] = { old: oldVal ?? null, new: newVal };
@@ -37830,24 +39859,24 @@ async function updateWorkOrder(id, body) {
     }
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || id,
+      entityId: existingWO.wouuid || id,
       actionType: auditActionType,
       userId: body.userId || body.approver || body.performedBy || "system",
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         changedFields,
-        status: updateData.status || existingWO2.status,
+        status: updateData.status || existingWO.status,
         ...auditActionType === "approve" && { approvedAt: (/* @__PURE__ */ new Date()).toISOString() },
         ...auditActionType === "reject" && { rejectedAt: (/* @__PURE__ */ new Date()).toISOString(), rejectionComments: body.rejectionComments || null }
       }
     });
-    console.log(`Audit log created for WO ${existingWO2.workOrderNo} (action: ${auditActionType})`);
+    console.log(`Audit log created for WO ${existingWO.workOrderNo} (action: ${auditActionType})`);
   } catch (auditError) {
     console.error("Failed to create audit log entry:", auditError);
   }
@@ -37978,7 +40007,7 @@ async function updateWorkOrder(id, body) {
             }
           }
           if (job) {
-            const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
+            const rawJobCompletionDate = getJobCompletionDate(freshWorkOrder);
             const runningHours = freshWorkOrder.woCompletionRh ?? freshWorkOrder.runningHours;
             const normalizeJobDate = (dateStr) => {
               if (!dateStr) return null;
@@ -37993,51 +40022,45 @@ async function updateWorkOrder(id, body) {
             if (freshWorkOrder.maintenanceBasis === "Calendar" && dateOfCompletionNorm) {
               const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
               const calendarUpdates = { lastDoneDate: dateOfCompletionNorm };
-              const linkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   calendarUpdates.nextDueDate = nextDue;
-                  linkUpdates.nextDueDate = nextDue;
                   console.log(`\u2705 Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
               }
-              const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && updateVesselId) {
-                await updateJobComponentLinkTracking(updateVesselId, job.juuid, component.cuuid, linkUpdates);
-                console.log(`\u2705 Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneDate: ${dateOfCompletionNorm}`);
-              }
               await updateJob3(job.juuid, calendarUpdates);
+            }
+            if (freshWorkOrder.maintenanceBasis === "Running Hours" && dateOfCompletionNorm) {
+              await updateJob3(job.juuid, { lastDoneDate: dateOfCompletionNorm });
             }
             if (freshWorkOrder.maintenanceBasis === "Running Hours" && runningHours) {
               const currentRH = parseInt(runningHours);
               if (!isNaN(currentRH)) {
                 const rhUpdates = { lastDoneRH: currentRH };
-                const rhLinkUpdates = { lastDoneRH: currentRH.toString(), updatedAt: /* @__PURE__ */ new Date() };
+                if (dateOfCompletionNorm) {
+                  rhUpdates.lastDoneDate = dateOfCompletionNorm;
+                }
                 const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                 if (rhInterval && !isNaN(rhInterval)) {
                   rhUpdates.nextDueRH = currentRH + rhInterval;
-                  rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
                   console.log(`\u2705 Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
                 }
-                const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-                if (component.cuuid && rhUpdateVesselId) {
-                  await updateJobComponentLinkTracking(rhUpdateVesselId, job.juuid, component.cuuid, rhLinkUpdates);
-                  console.log(`\u2705 Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid} with lastDoneRH: ${currentRH}`);
+                const { preserveNewerJobRhState: preserveNewerJobRhState2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+                const guardedRhUpdates = preserveNewerJobRhState2(job, rhUpdates);
+                if (Object.keys(guardedRhUpdates).length > 0) {
+                  await updateJob3(job.juuid, guardedRhUpdates);
                 }
-                await updateJob3(job.juuid, rhUpdates);
                 console.log(`\u{1F4CB} [Layer 7] RH snapshot ${currentRH} recorded for WO ${freshWorkOrder.workOrderNo || freshWorkOrder.id}. Component RH NOT modified (isolation).`);
               }
             }
             if (freshWorkOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletionNorm) {
               const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
               const dualUpdates = { lastDoneDate: dateOfCompletionNorm };
-              const dualLinkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
               if (job.frequencyValue && job.frequencyUnit) {
                 const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
                 if (nextDue) {
                   dualUpdates.nextDueDate = nextDue;
-                  dualLinkUpdates.nextDueDate = nextDue;
                   console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                 }
               }
@@ -38045,23 +40068,20 @@ async function updateWorkOrder(id, body) {
                 const dualCurrentRH = parseInt(runningHours);
                 if (!isNaN(dualCurrentRH)) {
                   dualUpdates.lastDoneRH = dualCurrentRH;
-                  dualLinkUpdates.lastDoneRH = dualCurrentRH.toString();
                   const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                   if (dualRhInterval && !isNaN(dualRhInterval)) {
                     dualUpdates.nextDueRH = dualCurrentRH + dualRhInterval;
-                    dualLinkUpdates.nextDueRH = (dualCurrentRH + dualRhInterval).toString();
                     console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueRH: ${dualUpdates.nextDueRH}`);
                   }
                 }
               } else {
                 console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
               }
-              const dualUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
-              if (component.cuuid && dualUpdateVesselId) {
-                await updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, component.cuuid, dualLinkUpdates);
-                console.log(`\u2705 [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid}`);
+              const { preserveNewerJobRhState: preserveNewerJobRhState2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+              const guardedDualUpdates = preserveNewerJobRhState2(job, dualUpdates);
+              if (Object.keys(guardedDualUpdates).length > 0) {
+                await updateJob3(job.juuid, guardedDualUpdates);
               }
-              await updateJob3(job.juuid, dualUpdates);
               console.log(`\u2705 [Dual] Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletionNorm}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
             }
           }
@@ -38223,16 +40243,20 @@ async function updateWorkOrder(id, body) {
   return {
     workOrder,
     rhBackdated: rhBackdatedApproval,
+    rhUpdateOutcome: rhUpdateOutcomeApproval,
+    rhUpdateSkipped: rhUpdateOutcomeApproval === "skipped_lower",
+    rhSkipReason: rhSkipReasonApproval,
+    submittedRH: submittedRHApproval,
     latestRH: latestRHApproval,
     latestRHDate: latestRHDateApproval
   };
 }
 async function deleteWorkOrder(id) {
-  const existingWO2 = await findById3(id);
+  const existingWO = await findById3(id);
   await remove5(id);
-  if (existingWO2) {
+  if (existingWO) {
     try {
-      await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
+      await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
     } catch (err) {
       console.error("[FieldLogger] WO delete:", err);
     }
@@ -38350,12 +40374,12 @@ async function getScopedOperationData(vesselId, userRankId, mode, userRole, user
   };
 }
 async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
-  let existingWO2 = await findById3(id);
-  if (!existingWO2) existingWO2 = await findByCode(id);
-  if (!existingWO2) throw new NotFoundError("Work order not found");
-  if (existingWO2.status !== "Completed") {
+  let existingWO = await findById3(id);
+  if (!existingWO) existingWO = await findByCode(id);
+  if (!existingWO) throw new NotFoundError("Work order not found");
+  if (existingWO.status !== "Completed") {
     throw new ValidationError(
-      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO2.status}`
+      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO.status}`
     );
   }
   if (!remarks || !remarks.trim()) {
@@ -38372,26 +40396,26 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   const updatedWO = await update6(id, updatePayload);
   await logFieldChanges(
     "work_orders",
-    existingWO2.wouuid,
-    existingWO2.vesselId || null,
-    existingWO2,
+    existingWO.wouuid,
+    existingWO.vesselId || null,
+    existingWO,
     updatedWO,
     actorUserUuid
   );
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || id,
+      entityId: existingWO.wouuid || id,
       actionType: "superintendent_reject_completion",
       userId: actorUserUuid,
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         rejectedAt,
         rejectedByName: actorName || actorUserUuid,
         rejectionRemarks: remarks.trim(),
@@ -38401,13 +40425,13 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   } catch (err) {
     console.error("[AuditLog] Completed WO rejection:", err);
   }
-  if (existingWO2.jobId && existingWO2.vesselId) {
+  if (existingWO.jobId && existingWO.vesselId) {
     try {
-      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
-      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const siblings = await findWorkOrdersByJobId2(existingWO.jobId);
+      const referenceDate = existingWO.completionDateTime || existingWO.dueDate || "";
       const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
       const toCancel = siblings.filter(
-        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+        (wo) => wo.id !== existingWO.id && wo.vesselId === existingWO.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
       );
       for (const sibling of toCancel) {
         const cancelled = await update6(sibling.id, { isDeleted: true, isActive: false });
@@ -38429,11 +40453,11 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
       console.error("[Rejection] Error cancelling sibling WOs:", err);
     }
   }
-  if (existingWO2.jobId && existingWO2.dueDate) {
+  if (existingWO.jobId && existingWO.dueDate) {
     try {
       const db2 = await getDb();
-      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq12(jobs.juuid, existingWO2.jobId));
-      console.log(`\u{1F4C5} [Rejection] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+      await db2.update(jobs).set({ nextDueDate: existingWO.dueDate }).where(eq12(jobs.juuid, existingWO.jobId));
+      console.log(`\u{1F4C5} [Rejection] Reset job nextDueDate to ${existingWO.dueDate} for job ${existingWO.jobId}`);
     } catch (err) {
       console.error("[Rejection] Error resetting job nextDueDate:", err);
     }
@@ -39017,12 +41041,12 @@ async function rejectRePostponement(id, body) {
   return updatedWO;
 }
 async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
-  let existingWO2 = await findById3(id);
-  if (!existingWO2) existingWO2 = await findByCode(id);
-  if (!existingWO2) throw new NotFoundError("Work order not found");
-  if (existingWO2.status !== "Completed") {
+  let existingWO = await findById3(id);
+  if (!existingWO) existingWO = await findByCode(id);
+  if (!existingWO) throw new NotFoundError("Work order not found");
+  if (existingWO.status !== "Completed") {
     throw new ValidationError(
-      `Only Completed work orders can be reopened. Current status: ${existingWO2.status}`
+      `Only Completed work orders can be reopened. Current status: ${existingWO.status}`
     );
   }
   if (!remarks || !remarks.trim()) {
@@ -39039,26 +41063,26 @@ async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   const updatedWO = await update6(id, updatePayload);
   await logFieldChanges(
     "work_orders",
-    existingWO2.wouuid,
-    existingWO2.vesselId || null,
-    existingWO2,
+    existingWO.wouuid,
+    existingWO.vesselId || null,
+    existingWO,
     updatedWO,
     actorUserUuid
   );
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || id,
+      entityId: existingWO.wouuid || id,
       actionType: "superintendent_reopen_completion",
       userId: actorUserUuid,
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         reopenedAt,
         reopenedByName: actorName || actorUserUuid,
         reopenRemarks: remarks.trim(),
@@ -39068,13 +41092,13 @@ async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   } catch (err) {
     console.error("[AuditLog] Completed WO reopen:", err);
   }
-  if (existingWO2.jobId && existingWO2.vesselId) {
+  if (existingWO.jobId && existingWO.vesselId) {
     try {
-      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
-      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const siblings = await findWorkOrdersByJobId2(existingWO.jobId);
+      const referenceDate = existingWO.completionDateTime || existingWO.dueDate || "";
       const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
       const toCancel = siblings.filter(
-        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+        (wo) => wo.id !== existingWO.id && wo.vesselId === existingWO.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
       );
       for (const sibling of toCancel) {
         const cancelled = await update6(sibling.id, { isDeleted: true, isActive: false });
@@ -39096,11 +41120,11 @@ async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
       console.error("[Reopen] Error cancelling sibling WOs:", err);
     }
   }
-  if (existingWO2.jobId && existingWO2.dueDate) {
+  if (existingWO.jobId && existingWO.dueDate) {
     try {
       const db2 = await getDb();
-      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq12(jobs.juuid, existingWO2.jobId));
-      console.log(`\u{1F4C5} [Reopen] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+      await db2.update(jobs).set({ nextDueDate: existingWO.dueDate }).where(eq12(jobs.juuid, existingWO.jobId));
+      console.log(`\u{1F4C5} [Reopen] Reset job nextDueDate to ${existingWO.dueDate} for job ${existingWO.jobId}`);
     } catch (err) {
       console.error("[Reopen] Error resetting job nextDueDate:", err);
     }
@@ -39125,6 +41149,13 @@ var init_workOrderService2 = __esm({
     init_sync();
     init_workOrderFilters();
     init_workOrderStatus();
+    init_approvalTransition();
+    init_woCompletionRhRequirement();
+    init_workOrderPayload();
+    init_workOrderB2Validation();
+    init_completedWorkOrderDate();
+    init_workOrderListHydration();
+    init_workOrderPartADates();
   }
 });
 
@@ -39140,7 +41171,7 @@ __export(certificateRepository_exports, {
   insertCertificateData: () => insertCertificateData,
   updateCertificateData: () => updateCertificateData
 });
-import { eq as eq16, and as and13, asc as asc4, inArray as inArray4, or as or3, isNull as isNull3, sql as sql12 } from "drizzle-orm";
+import { eq as eq16, and as and13, asc as asc4, inArray as inArray4, or as or3, isNull as isNull3, sql as sql14 } from "drizzle-orm";
 function getDb3() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -39224,7 +41255,7 @@ async function insertCertificateData(data) {
   if (!db2) return null;
   const inserted = await db2.insert(vesselCertificateData).values(data).onConflictDoNothing({
     target: [vesselCertificateData.vesselId, vesselCertificateData.masterId],
-    where: sql12`${vesselCertificateData.isDeleted} = false`
+    where: sql14`${vesselCertificateData.isDeleted} = false`
   }).returning();
   if (inserted.length > 0) return inserted;
   const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
@@ -39258,7 +41289,7 @@ __export(surveyRepository_exports, {
   insertSurveyData: () => insertSurveyData,
   updateSurveyData: () => updateSurveyData
 });
-import { eq as eq17, and as and14, asc as asc5, inArray as inArray5, or as or4, sql as sql13 } from "drizzle-orm";
+import { eq as eq17, and as and14, asc as asc5, inArray as inArray5, or as or4, sql as sql15 } from "drizzle-orm";
 function getDb4() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -39269,7 +41300,7 @@ async function getApplicableSurveys() {
   if (!db2) return null;
   return db2.select().from(vesselSurveyApplicability).where(and14(
     eq17(vesselSurveyApplicability.isApplicable, true),
-    or4(eq17(vesselSurveyApplicability.isDeleted, false), sql13`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or4(eq17(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getMasterSurveysByIds(masterIds) {
@@ -39350,7 +41381,7 @@ var init_surveyRepository = __esm({
 });
 
 // server/modules/reports/repositories/reportRepository.ts
-import { eq as eq22, and as and19, gte as gte3, desc as desc4, sql as sql16 } from "drizzle-orm";
+import { eq as eq22, and as and19, gte as gte3, desc as desc4, sql as sql18 } from "drizzle-orm";
 async function getVessels6() {
   return storage.getVessels();
 }
@@ -39427,7 +41458,7 @@ __export(monthlySnapshotService_exports, {
   getSnapshotDetail: () => getSnapshotDetail,
   regenerateSnapshots: () => regenerateSnapshots
 });
-import { eq as eq24, and as and21, sql as sql18 } from "drizzle-orm";
+import { eq as eq24, and as and21, sql as sql20 } from "drizzle-orm";
 function buildVesselGraceSettings2(vesselSettings) {
   if (!vesselSettings) {
     return {
@@ -39596,9 +41627,9 @@ async function ensureSnapshotsExist(vesselId, year, month) {
       }).onConflictDoUpdate({
         target: [monthlySnapshots.vesselId, monthlySnapshots.snapshotMonth, monthlySnapshots.snapshotType, monthlySnapshots.category],
         set: {
-          count: sql18`excluded.count`,
-          workOrderIds: sql18`excluded.work_order_ids`,
-          generatedAt: sql18`NOW()`
+          count: sql20`excluded.count`,
+          workOrderIds: sql20`excluded.work_order_ids`,
+          generatedAt: sql20`NOW()`
         }
       });
     }
@@ -39617,9 +41648,9 @@ async function ensureSnapshotsExist(vesselId, year, month) {
       }).onConflictDoUpdate({
         target: [monthlySnapshots.vesselId, monthlySnapshots.snapshotMonth, monthlySnapshots.snapshotType, monthlySnapshots.category],
         set: {
-          count: sql18`excluded.count`,
-          workOrderIds: sql18`excluded.work_order_ids`,
-          generatedAt: sql18`NOW()`
+          count: sql20`excluded.count`,
+          workOrderIds: sql20`excluded.work_order_ids`,
+          generatedAt: sql20`NOW()`
         }
       });
     }
@@ -40381,9 +42412,8 @@ var init_pmsAlertEngine = __esm({
           const overduePolicy = policyMap.get("critical_job_overdue");
           if (overduePolicy) {
             try {
-              const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
-              const allComputed = await getWorkOrdersWithComputedStatus2();
-              const overdueWOs = allComputed.filter((wo) => wo.status === "Overdue" && wo.dataScope === "vessel");
+              const { getOverdueVesselWorkOrdersForAlerts: getOverdueVesselWorkOrdersForAlerts2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
+              const overdueWOs = await getOverdueVesselWorkOrdersForAlerts2();
               const alerts = evaluateOverdueJobs(overdueWOs, overduePolicy, existingDedupeKeys);
               for (const alert of alerts) {
                 await this.createAlertEvent(overduePolicy, alert);
@@ -40397,8 +42427,8 @@ var init_pmsAlertEngine = __esm({
           const lowSparesPolicy = policyMap.get("low_critical_spares");
           if (lowSparesPolicy) {
             try {
-              const allSpares = await getAllVesselSpares();
-              const alerts = evaluateLowSpares(allSpares, lowSparesPolicy, existingDedupeKeys);
+              const candidateSpares = await getLowCriticalSpareCandidates();
+              const alerts = evaluateLowSpares(candidateSpares, lowSparesPolicy, existingDedupeKeys);
               for (const alert of alerts) {
                 await this.createAlertEvent(lowSparesPolicy, alert);
                 existingDedupeKeys.add(alert.dedupeKey);
@@ -40613,14 +42643,14 @@ var init_identityGuard = __esm({
 });
 
 // server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
-import { eq as eq30 } from "drizzle-orm";
+import { eq as eq31 } from "drizzle-orm";
 async function getAllMappings() {
   const db2 = await getDb();
   return db2.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
 }
 async function getMappingForSailRole(sailRole) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartRoleMappings).where(eq30(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  const rows = await db2.select().from(shipskartRoleMappings).where(eq31(shipskartRoleMappings.sailRole, sailRole)).limit(1);
   return rows[0];
 }
 async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartRoleId) {
@@ -40632,7 +42662,7 @@ async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartR
 }
 async function deleteMapping(sailRole) {
   const db2 = await getDb();
-  await db2.delete(shipskartRoleMappings).where(eq30(shipskartRoleMappings.sailRole, sailRole));
+  await db2.delete(shipskartRoleMappings).where(eq31(shipskartRoleMappings.sailRole, sailRole));
 }
 var init_shipskartRoleMappingRepository = __esm({
   "server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts"() {
@@ -40661,10 +42691,10 @@ __export(shipskartB2bRepository_exports, {
   upsertUserLink: () => upsertUserLink,
   upsertVesselLink: () => upsertVesselLink
 });
-import { and as and27, eq as eq31, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
+import { and as and28, eq as eq32, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
 async function getTenantConfig(tenantId) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartTenantConfig).where(eq31(shipskartTenantConfig.tenantId, tenantId)).limit(1);
+  const rows = await db2.select().from(shipskartTenantConfig).where(eq32(shipskartTenantConfig.tenantId, tenantId)).limit(1);
   return rows[0];
 }
 async function upsertTokenState(tenantId, state) {
@@ -40699,7 +42729,7 @@ async function setReconcilerEnabled(tenantId, enabled) {
 }
 async function getUserLink(userUuid) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartUserLinks).where(eq31(shipskartUserLinks.userUuid, userUuid)).limit(1);
+  const rows = await db2.select().from(shipskartUserLinks).where(eq32(shipskartUserLinks.userUuid, userUuid)).limit(1);
   return rows[0];
 }
 async function upsertUserLink(userUuid, patch) {
@@ -40729,7 +42759,7 @@ async function upsertUserLink(userUuid, patch) {
 }
 async function getVesselLink(vesselVuuid) {
   const db2 = await getDb();
-  const rows = await db2.select().from(shipskartVesselLinks).where(eq31(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
+  const rows = await db2.select().from(shipskartVesselLinks).where(eq32(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
   return rows[0];
 }
 async function upsertVesselLink(vesselVuuid, patch) {
@@ -40757,7 +42787,7 @@ async function upsertVesselLink(vesselVuuid, patch) {
 }
 async function getAssignment(userUuid, vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select().from(masterUserVessels).where(and27(eq31(masterUserVessels.userUuid, userUuid), eq31(masterUserVessels.vesselId, vesselId))).limit(1);
+  const rows = await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.userUuid, userUuid), eq32(masterUserVessels.vesselId, vesselId))).limit(1);
   return rows[0];
 }
 async function upsertAssignment(userUuid, vesselId, patch) {
@@ -40802,21 +42832,21 @@ async function replaceAssignmentsForUser(userUuid, vesselVuuids) {
     activated++;
   }
   const keep = vesselVuuids.length > 0 ? vesselVuuids : ["__none__"];
-  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and27(
-    eq31(masterUserVessels.userUuid, userUuid),
-    eq31(masterUserVessels.isActive, true),
+  const deactivatedRows = await db2.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and28(
+    eq32(masterUserVessels.userUuid, userUuid),
+    eq32(masterUserVessels.isActive, true),
     notInArray3(masterUserVessels.vesselId, keep)
   )).returning({ id: masterUserVessels.id });
   return { activated, deactivated: deactivatedRows.length };
 }
 async function getActiveVesselIdsForUser(userUuid) {
   const db2 = await getDb();
-  const rows = await db2.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and27(eq31(masterUserVessels.userUuid, userUuid), eq31(masterUserVessels.isActive, true)));
+  const rows = await db2.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and28(eq32(masterUserVessels.userUuid, userUuid), eq32(masterUserVessels.isActive, true)));
   return rows.map((r) => r.v);
 }
 async function getPendingAssignmentWork(userUuid) {
   const db2 = await getDb();
-  const rows = await db2.select().from(masterUserVessels).where(eq31(masterUserVessels.userUuid, userUuid));
+  const rows = await db2.select().from(masterUserVessels).where(eq32(masterUserVessels.userUuid, userUuid));
   return {
     // 'error' is IN this list on purpose (migration 164): a transient failure — rate
     // limit, 5xx, network — used to strand the row forever, because NO retry path
@@ -40846,7 +42876,7 @@ async function failingRows(limit = 100) {
     vesselId: masterUserVessels.vesselId,
     mapStatus: masterUserVessels.mapStatus,
     lastError: masterUserVessels.lastError
-  }).from(masterUserVessels).where(and27(eq31(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
+  }).from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
   return { users: users2, vessels: vessels2, assignments };
 }
 async function resetForRetry(kind, id) {
@@ -40855,13 +42885,13 @@ async function resetForRetry(kind, id) {
     const existing2 = await getUserLink(id);
     if (!existing2) return { reset: false, reason: "no link row" };
     if (existing2.shipskartUserId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
-    await db2.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(shipskartUserLinks.userUuid, id));
+    await db2.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq32(shipskartUserLinks.userUuid, id));
     return { reset: true };
   }
   const existing = await getVesselLink(id);
   if (!existing) return { reset: false, reason: "no link row" };
   if (existing.shipskartVesselId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
-  await db2.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq31(shipskartVesselLinks.vesselVuuid, id));
+  await db2.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq32(shipskartVesselLinks.vesselVuuid, id));
   return { reset: true };
 }
 async function linkStatusCounts() {
@@ -41234,7 +43264,7 @@ __export(shipskartReconcilerService_exports, {
   settleAssignmentChanges: () => settleAssignmentChanges
 });
 import crypto6 from "crypto";
-import { inArray as inArray8, eq as eq32, and as and28 } from "drizzle-orm";
+import { inArray as inArray8, eq as eq33, and as and29 } from "drizzle-orm";
 function resolveCallSign(v) {
   return v.imoNumber;
 }
@@ -41360,7 +43390,7 @@ async function diagnoseUserBlock(userUuid, sailRole) {
       email: masterUsers.email,
       role: masterUsers.role,
       fullName: masterUsers.fullName
-    }).from(masterUsers).where(eq32(masterUsers.id, userUuid)).limit(1);
+    }).from(masterUsers).where(eq33(masterUsers.id, userUuid)).limit(1);
     const mu = rows[0];
     if (!mu) {
       return {
@@ -41594,7 +43624,7 @@ async function ensureUserPushed(userUuid, sailRole) {
     email: masterUsers.email,
     role: masterUsers.role,
     designation: masterUsers.designation
-  }).from(masterUsers).where(eq32(masterUsers.id, userUuid)).limit(1);
+  }).from(masterUsers).where(eq33(masterUsers.id, userUuid)).limit(1);
   const mu = rows[0];
   if (!mu) {
     await upsertUserLink(userUuid, {
@@ -41657,14 +43687,14 @@ async function runReconciliationInner(opts = {}) {
   }
   summary.ran = true;
   const db2 = await getDb();
-  const pushedVessels = await db2.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq32(shipskartVesselLinks.pushStatus, "pushed"));
+  const pushedVessels = await db2.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq33(shipskartVesselLinks.pushStatus, "pushed"));
   const pushedVesselSet = new Set(pushedVessels.map((r) => r.v));
   const vesselRows = await db2.select({
     vuuid: vessels.vuuid,
     name: vessels.name,
     imoNumber: vessels.imoNumber,
     vesselType: vessels.vesselType
-  }).from(vessels).where(eq32(vessels.isActive, true));
+  }).from(vessels).where(eq33(vessels.isActive, true));
   for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
     const st = (await pushVessel(v)).status;
     tally(summary.vessels, st);
@@ -41679,7 +43709,7 @@ async function runReconciliationInner(opts = {}) {
     email: masterUsers.email,
     role: masterUsers.role,
     designation: masterUsers.designation
-  }).from(masterUsers).where(eq32(masterUsers.isDeleted, false));
+  }).from(masterUsers).where(eq33(masterUsers.isDeleted, false));
   for (const mu of userRows.filter((r) => retryUuids.has(r.id)).slice(0, limit)) {
     const st = (await pushUser(mu)).status;
     if (st === "pushed" || st === "already_pushed") clearJitAttempts(mu.id);
@@ -41694,7 +43724,7 @@ async function runReconciliationInner(opts = {}) {
   const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
   const now = /* @__PURE__ */ new Date();
   const pendingAssignments = orderAssignmentsForRetry(
-    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
+    (await db2.select().from(masterUserVessels).where(and29(eq33(masterUserVessels.isActive, true), inArray8(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
   );
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
@@ -41702,7 +43732,7 @@ async function runReconciliationInner(opts = {}) {
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
   const revokedAssignments = orderAssignmentsForRetry(
-    (await db2.select().from(masterUserVessels).where(and28(eq32(masterUserVessels.isActive, false), eq32(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
+    (await db2.select().from(masterUserVessels).where(and29(eq33(masterUserVessels.isActive, false), eq33(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
   );
   for (const a of revokedAssignments.slice(0, limit)) {
     if (!a.shipskartMappingId) {
@@ -42819,7 +44849,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq35, and as and30, isNull as isNull4, ne as ne3, desc as desc7, inArray as inArray10 } from "drizzle-orm";
+import { eq as eq36, and as and31, isNull as isNull4, ne as ne3, desc as desc7, inArray as inArray10 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -42841,7 +44871,7 @@ async function ruleConsumptionSpike(report) {
   const db2 = await getDb();
   const todayTotal = (toNum2(report.hfoConsumption) ?? 0) + (toNum2(report.lsmgoConsumption) ?? 0) + (toNum2(report.mgoConsumption) ?? 0) + (toNum2(report.vlsfoConsumption) ?? 0) + (toNum2(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq36(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -42871,7 +44901,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq36(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum2(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -42904,9 +44934,9 @@ async function ruleAeHoursSpike(report) {
   const db2 = await getDb();
   const currentAeHours = toNum2(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
-  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and30(
-    eq35(nrNoonReports.vesselId, report.vesselId),
-    eq35(nrNoonReports.status, "submitted"),
+  const prior = await db2.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and31(
+    eq36(nrNoonReports.vesselId, report.vesselId),
+    eq36(nrNoonReports.status, "submitted"),
     ne3(nrNoonReports.id, report.id)
   )).orderBy(desc7(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum2(r.aeRunningHours)).filter((v) => v !== null && v > 0);
@@ -42929,7 +44959,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db2 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and30(eq35(nrCiiTracking.vesselId, report.vesselId), eq35(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and31(eq36(nrCiiTracking.vesselId, report.vesselId), eq36(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -42973,7 +45003,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db2 = await getDb();
-  const robRows = await db2.select().from(nrFuelRob).where(eq35(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db2.select().from(nrFuelRob).where(eq36(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum2(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -42996,25 +45026,25 @@ async function autoResolveCleared(report) {
   await db2.update(nrAlerts).set({
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
-  }).where(and30(
-    eq35(nrAlerts.vesselId, report.vesselId),
+  }).where(and31(
+    eq36(nrAlerts.vesselId, report.vesselId),
     isNull4(nrAlerts.acknowledgedAt),
     inArray10(nrAlerts.alertType, toResolve)
   ));
 }
 async function resolveOpenAlert(vesselId, alertType) {
   const db2 = await getDb();
-  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and30(
-    eq35(nrAlerts.vesselId, vesselId),
-    eq35(nrAlerts.alertType, alertType),
+  await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and31(
+    eq36(nrAlerts.vesselId, vesselId),
+    eq36(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and30(
-    eq35(nrAlerts.vesselId, vesselId),
-    eq35(nrAlerts.alertType, alertType),
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(and31(
+    eq36(nrAlerts.vesselId, vesselId),
+    eq36(nrAlerts.alertType, alertType),
     isNull4(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -43024,7 +45054,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq35(nrAlerts.id, existing[0].id));
+    }).where(eq36(nrAlerts.id, existing[0].id));
   } else {
     await db2.insert(nrAlerts).values({
       vesselId,
@@ -43181,7 +45211,9 @@ var init_maintenanceOrchestrator = __esm({
     sleep3 = (ms) => new Promise((r) => setTimeout(r, ms));
     MaintenanceOrchestrator = class {
       tasks = [
-        { name: "alerts", intervalMs: 5 * 6e4, timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
+        // Interval env-tunable like the sweep's SHORE_WO_SWEEP_INTERVAL_MS (ops ask,
+        // 02-Sep-2026: run alerts every 12h → MAINT_ALERTS_INTERVAL_MS=43200000).
+        { name: "alerts", intervalMs: Math.max(6e4, envInt("MAINT_ALERTS_INTERVAL_MS", 5 * 6e4)), timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
         { name: "health", intervalMs: 6 * 60 * 6e4, timeoutMs: TIMEOUT_HEALTH_MS, run: () => runHealthCheck() },
         { name: "pruning", intervalMs: 24 * 60 * 6e4, timeoutMs: TIMEOUT_PRUNING_MS, run: () => runPruning() },
         // Drift = row value vs its OWN newest field log (local only; ship and shore both).
@@ -45744,14 +47776,12 @@ init_errors();
 async function listJobs(vesselId, componentId, vesselIds) {
   const jobs2 = await findJobs(vesselId, componentId, vesselIds);
   let jobLinksMap = /* @__PURE__ */ new Map();
-  let jobLinkTrackingMap = /* @__PURE__ */ new Map();
   if (vesselId && vesselId !== "all") {
     const allLinks = await findJobComponentLinks(vesselId);
     for (const link of allLinks) {
       const existing = jobLinksMap.get(link.jobId) || [];
       existing.push(link.componentCode);
       jobLinksMap.set(link.jobId, existing);
-      jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
     }
   } else if (jobs2.length > 0) {
     const vesselIds2 = Array.from(new Set(jobs2.map((j) => j.vesselId).filter((v) => v != null)));
@@ -45761,7 +47791,6 @@ async function listJobs(vesselId, componentId, vesselIds) {
         const existing = jobLinksMap.get(link.jobId) || [];
         existing.push(link.componentCode);
         jobLinksMap.set(link.jobId, existing);
-        jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
       }
     }
   }
@@ -45785,41 +47814,10 @@ async function listJobs(vesselId, componentId, vesselIds) {
     if (job.componentCode && !linkedComponentCodes.includes(job.componentCode)) {
       linkedComponentCodes.push(job.componentCode);
     }
-    const componentTracking = {};
-    for (const [linkKey, link] of Array.from(jobLinkTrackingMap.entries())) {
-      if (linkKey.startsWith(`${job.juuid}:`)) {
-        const compCode = link.componentCode;
-        if (compCode) {
-          componentTracking[compCode] = {
-            lastDoneDate: link.lastDoneDate || null,
-            nextDueDate: link.nextDueDate || null,
-            lastDoneRH: link.lastDoneRH || null,
-            nextDueRH: link.nextDueRH || null
-          };
-        }
-      }
-    }
     let hydratedJob = {
       ...job,
-      linkedComponentCodes,
-      componentTracking
+      linkedComponentCodes
     };
-    const hasMultipleComponents = Object.keys(componentTracking).length > 1;
-    if (hasMultipleComponents) {
-      hydratedJob.lastDoneDate = null;
-      hydratedJob.nextDueDate = null;
-      hydratedJob.lastDoneRH = null;
-      hydratedJob.nextDueRH = null;
-    } else if (componentId) {
-      const linkKey = `${job.juuid}:${componentId}`;
-      const componentLink = jobLinkTrackingMap.get(linkKey);
-      if (componentLink) {
-        if (componentLink.lastDoneDate) hydratedJob.lastDoneDate = componentLink.lastDoneDate;
-        if (componentLink.nextDueDate) hydratedJob.nextDueDate = componentLink.nextDueDate;
-        if (componentLink.lastDoneRH) hydratedJob.lastDoneRH = componentLink.lastDoneRH;
-        if (componentLink.nextDueRH) hydratedJob.nextDueRH = componentLink.nextDueRH;
-      }
-    }
     if (job.maintenanceBasis === "Running Hours" && job.componentId) {
       const component = await getComponentCached(job.componentId);
       if (component) {
@@ -45845,7 +47843,24 @@ async function createJob(body) {
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   const { z: z8 } = await import("zod");
   const jobCreateSchema = insertJobSchema2.extend({ juuid: z8.string().optional() });
-  let jobData = jobCreateSchema.parse(body);
+  const createInput = { ...body };
+  if (!Object.prototype.hasOwnProperty.call(createInput, "lastDoneDate")) {
+    if (Object.prototype.hasOwnProperty.call(createInput, "lastCompletedDate")) {
+      createInput.lastDoneDate = createInput.lastCompletedDate;
+    } else if (Object.prototype.hasOwnProperty.call(createInput, "lastCompletedOn")) {
+      createInput.lastDoneDate = createInput.lastCompletedOn;
+    }
+  }
+  delete createInput.lastCompletedDate;
+  delete createInput.lastCompletedOn;
+  let jobData = jobCreateSchema.parse(createInput);
+  if (jobData.lastDoneDate) {
+    const normalizedLastDoneDate = normalizeDateToDDMMMYYYY2(jobData.lastDoneDate);
+    if (!normalizedLastDoneDate) {
+      throw new ValidationError("Last Completed Date is invalid");
+    }
+    jobData = { ...jobData, lastDoneDate: normalizedLastDoneDate };
+  }
   let component = null;
   if (jobData.componentId) {
     component = await findComponent(jobData.componentId);
@@ -45984,6 +47999,22 @@ async function createJob(body) {
 async function updateJob(id, body) {
   const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
   let updateData = { ...body };
+  if (!Object.prototype.hasOwnProperty.call(updateData, "lastDoneDate")) {
+    if (Object.prototype.hasOwnProperty.call(updateData, "lastCompletedDate")) {
+      updateData.lastDoneDate = updateData.lastCompletedDate;
+    } else if (Object.prototype.hasOwnProperty.call(updateData, "lastCompletedOn")) {
+      updateData.lastDoneDate = updateData.lastCompletedOn;
+    }
+  }
+  delete updateData.lastCompletedDate;
+  delete updateData.lastCompletedOn;
+  if (updateData.lastDoneDate) {
+    const normalizedLastDoneDate = normalizeDateToDDMMMYYYY2(updateData.lastDoneDate);
+    if (!normalizedLastDoneDate) {
+      throw new ValidationError("Last Completed Date is invalid");
+    }
+    updateData.lastDoneDate = normalizedLastDoneDate;
+  }
   if (Object.prototype.hasOwnProperty.call(updateData, "isDeleted") || Object.prototype.hasOwnProperty.call(updateData, "is_deleted")) {
     throw new ValidationError("Job deletion status can only be changed through the Delete Job action");
   }
@@ -46036,6 +48067,19 @@ async function updateJob(id, body) {
   const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
   const basisChangingToDual = updateData.maintenanceBasis === "Dual Frequency" && existingJob.maintenanceBasis !== "Dual Frequency";
   const componentChangingOnDual = effectiveBasis === "Dual Frequency" && updateData.componentId !== void 0 && updateData.componentId !== existingJob.componentId;
+  if (effectiveBasis === "Running Hours" && Object.prototype.hasOwnProperty.call(updateData, "frequencyValue")) {
+    if (!Object.prototype.hasOwnProperty.call(updateData, "intervalRunningHour")) {
+      updateData.intervalRunningHour = updateData.frequencyValue;
+    }
+    delete updateData.frequencyValue;
+  }
+  if (effectiveBasis === "Running Hours" && Object.prototype.hasOwnProperty.call(updateData, "intervalRunningHour")) {
+    const normalizedIntervalRH = Number(updateData.intervalRunningHour);
+    if (!Number.isInteger(normalizedIntervalRH) || normalizedIntervalRH <= 0) {
+      throw new ValidationError("Running Hours jobs require Frequency (Hours) to be a whole number greater than 0");
+    }
+    updateData.intervalRunningHour = normalizedIntervalRH;
+  }
   if (basisChangingToDual || componentChangingOnDual) {
     if (!component && effectiveComponentId) {
       component = await findComponent(effectiveComponentId);
@@ -46071,8 +48115,8 @@ async function updateJob(id, body) {
   const rhFieldsChanged = updateData.lastDoneRH !== void 0 || updateData.intervalRunningHour !== void 0 || updateData.maintenanceBasis !== void 0;
   if (mergedData.maintenanceBasis === "Running Hours") {
     const intervalRH = Number(mergedData.intervalRunningHour);
-    if (isNaN(intervalRH) || intervalRH <= 0) {
-      throw new ValidationError("Running Hours jobs require a valid numeric intervalRunningHour greater than 0");
+    if (!Number.isInteger(intervalRH) || intervalRH <= 0) {
+      throw new ValidationError("Running Hours jobs require Frequency (Hours) to be a whole number greater than 0");
     }
     if (!component && mergedData.componentId) {
       component = await findComponent(mergedData.componentId);
@@ -46147,12 +48191,8 @@ async function rebaselineJobTracking(jobId, username) {
     `UPDATE jobs SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE juuid = $1`,
     [jobId]
   );
-  const linkRes = await pool4.query(
-    `UPDATE job_component_links SET tracking_rebaselined_at = NOW(), updated_at = NOW() WHERE job_id = $1`,
-    [jobId]
-  );
-  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username} (links: ${linkRes.rowCount ?? 0})`);
-  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0, linksStamped: linkRes.rowCount ?? 0 };
+  console.log(`[Rebaseline] job ${job.jobNo || jobId} tracking rebaselined by ${username}`);
+  return { success: true, jobId, jobStamped: (jobRes.rowCount ?? 0) > 0 };
 }
 async function generateWorkOrder(jobId, reason, activeComponentCode) {
   if (!reason || !["Planning", "Breakdown", "Other"].includes(reason)) {
@@ -46879,6 +48919,7 @@ init_workOrderService2();
 init_workOrderRepository();
 init_errors();
 init_jsonHelpers();
+init_workOrderPartADates();
 function convertToIsoDate2(dateStr) {
   if (!dateStr) return "";
   const monthMap = {
@@ -47120,6 +49161,14 @@ async function getWorkOrderContext(workOrderId) {
   if (!lastCompletedCurrentReading && lastCompletedRH) {
     lastCompletedCurrentReading = lastCompletedRH;
   }
+  const resolvedPartADates = resolveWorkOrderPartADates({
+    ...workOrder,
+    maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis
+  });
+  const partALastCompletedOn = resolvedPartADates.lastCompletedOn;
+  const partANextDueDate = resolvedPartADates.nextDueDate;
+  const partALastCompletedRH = resolvedPartADates.lastCompletedRH;
+  const partANextDueRH = resolvedPartADates.nextDueRH;
   const rawSpareParts = ensureArray(job?.requiredSpareParts);
   const enrichedSpareParts = await enrichSparePartsWithROB(rawSpareParts, workOrder.vesselId);
   const templateData = job ? {
@@ -47130,7 +49179,7 @@ async function getWorkOrderContext(workOrderId) {
     componentCode: workOrder.componentCode || component.componentCode,
     componentName: component.name,
     sfiCode: job.sfiCode || job.componentCode || component.componentCode,
-    maintenanceBasis: job.maintenanceBasis,
+    maintenanceBasis: workOrder.maintenanceBasis || job.maintenanceBasis,
     maintenanceType: job.maintenanceType,
     frequencyValue: job.frequencyValue?.toString() || "",
     frequencyUnit: job.frequencyUnit || "Months",
@@ -47150,6 +49199,10 @@ async function getWorkOrderContext(workOrderId) {
     lastCompletedRH,
     lastCompletedDateForRH,
     lastCompletedCurrentReading,
+    partALastCompletedOn,
+    partANextDueDate,
+    partALastCompletedRH,
+    partANextDueRH,
     briefWorkDescription: job.briefWorkDescription || job.jobDescription,
     jobDescription: job.jobDescription,
     requiredSpareParts: enrichedSpareParts,
@@ -47185,6 +49238,10 @@ async function getWorkOrderContext(workOrderId) {
     lastCompletedRH,
     lastCompletedDateForRH,
     lastCompletedCurrentReading,
+    partALastCompletedOn,
+    partANextDueDate,
+    partALastCompletedRH,
+    partANextDueRH,
     briefWorkDescription: workOrder.briefWorkDescription,
     jobDescription: workOrder.briefWorkDescription,
     requiredSpareParts: [],
@@ -47237,6 +49294,11 @@ async function getWorkOrderContext(workOrderId) {
     woCompletionRh: correctedWorkOrder.woCompletionRh?.toString() || "",
     currentReadingDate: correctedWorkOrder.currentReadingDate || "",
     rhBackdatedEntry: !!correctedWorkOrder.rhBackdatedEntry,
+    rhUpdateOutcome: correctedWorkOrder.rhUpdateOutcome || null,
+    rhSkipReason: correctedWorkOrder.rhSkipReason || null,
+    rhSkipSubmittedRh: correctedWorkOrder.rhSkipSubmittedRh?.toString() || null,
+    rhSkipLatestRh: correctedWorkOrder.rhSkipLatestRh?.toString() || null,
+    rhSkipLatestRhDate: correctedWorkOrder.rhSkipLatestRhDate || null,
     // B4 - Spare Parts Consumed
     consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),
     // Metadata
@@ -47466,6 +49528,11 @@ init_rhTimelineValidationService();
 init_sync();
 init_syncRole();
 init_workOrderStatus();
+init_woCompletionRhRequirement();
+init_workOrderPayload();
+init_workOrderB2Validation();
+init_completedWorkOrderDate();
+init_rhDueDateService();
 async function completeWorkOrder(workOrderId, body) {
   const {
     runningHours,
@@ -47486,6 +49553,23 @@ async function completeWorkOrder(workOrderId, body) {
   const workOrder = await findById3(workOrderId);
   if (!workOrder) {
     throw new NotFoundError("Work order not found");
+  }
+  const finalCompletionDate = ensureCompletedWorkOrderDate(workOrder, {
+    status: "Completed",
+    dateCompleted: dateOfCompletion
+  }).dateCompleted;
+  const b2BaselineError = validateWorkOrderB2Baselines({
+    maintenanceBasis: workOrder.maintenanceBasis,
+    startDateTime: executionData.startDateTime ?? workOrder.startDateTime,
+    lastDoneDateSnapshot: workOrder.lastDoneDateSnapshot,
+    woCompletionRh,
+    rhLastDoneSnapshot: workOrder.rhLastDoneSnapshot
+  })[0];
+  if (b2BaselineError) {
+    throw new ValidationError(b2BaselineError.message, {
+      code: b2BaselineError.code,
+      field: b2BaselineError.field
+    });
   }
   const vesselCode = workOrder.vesselId ? (await getStorage2().getVessel(workOrder.vesselId))?.vCode : void 0;
   let component = await findComponent2(workOrder.component);
@@ -47531,11 +49615,18 @@ async function completeWorkOrder(workOrderId, body) {
       console.warn("[RULE #19] Department validation skipped due to error:", deptError);
     }
   }
-  const counterType = (component.rhCounterType || "MASTER").toUpperCase();
+  const counterType = normalizeRhCounterType(component.rhCounterType);
+  const isB3Applicable = isWorkOrderB3Applicable(counterType);
   if (workOrder.maintenanceBasis === "Running Hours" && counterType !== "NOT_RH_DRIVEN" && !runningHours) {
     throw new ValidationError("Running hours is required for RH-based maintenance work orders");
   }
-  if (woCompletionRh && runningHours) {
+  if (requiresWoCompletionRh(workOrder.maintenanceBasis, counterType) && woCompletionRh === null) {
+    throw new ValidationError(
+      "WO Completion RH is required for Running Hours-based Work Orders",
+      { code: "WO_COMPLETION_RH_REQUIRED" }
+    );
+  }
+  if (isB3Applicable && woCompletionRh && runningHours) {
     const woRhNum = parseFloat(woCompletionRh);
     const readingNum = parseFloat(runningHours);
     if (!isNaN(woRhNum) && !isNaN(readingNum) && woRhNum > readingNum) {
@@ -47545,7 +49636,7 @@ async function completeWorkOrder(workOrderId, body) {
       );
     }
   }
-  if (currentReadingDate) {
+  if (isB3Applicable && currentReadingDate) {
     const readingDateParsed = new Date(currentReadingDate);
     const todayEnd = /* @__PURE__ */ new Date();
     todayEnd.setHours(23, 59, 59, 999);
@@ -47623,7 +49714,7 @@ async function completeWorkOrder(workOrderId, body) {
             try {
               await updateMasterRH3(component.cuuid, {
                 newRHValue: newRH,
-                updateSource: "MANUAL",
+                updateSource: "WORKORDER",
                 userId: bodyUserId || executionData.performedBy || "system",
                 userUuid: bodyUserUuid,
                 userRole: userRole || "Ship",
@@ -47637,6 +49728,15 @@ async function completeWorkOrder(workOrderId, body) {
               await releaseWoRhSync2(claimPool, workOrder.wouuid);
               if (masterErr instanceof ValidationError) {
                 const det = masterErr.details || {};
+                if (det.code === "LOWER_THAN_CURRENT_RH") {
+                  throw new ValidationError(masterErr.message, {
+                    ...det,
+                    componentId: component.cuuid,
+                    componentCode: component.componentCode || workOrder.componentCode,
+                    workOrderNo: workOrder.workOrderNo,
+                    rhCounterType: "MASTER"
+                  });
+                }
                 throw new ValidationError(masterErr.message, {
                   code: "RH_OVERRIDE_REQUIRED",
                   ...det,
@@ -47710,6 +49810,15 @@ async function completeWorkOrder(workOrderId, body) {
                 await releaseInh(claimPoolInh, workOrder.wouuid);
                 if (masterErr instanceof ValidationError) {
                   const det = masterErr.details || {};
+                  if (det.code === "LOWER_THAN_CURRENT_RH") {
+                    throw new ValidationError(masterErr.message, {
+                      ...det,
+                      componentId: masterComp.cuuid,
+                      componentCode: masterComp.componentCode || workOrder.componentCode,
+                      workOrderNo: workOrder.workOrderNo,
+                      rhCounterType: "INHERITED"
+                    });
+                  }
                   throw new ValidationError(masterErr.message, {
                     code: "RH_OVERRIDE_REQUIRED",
                     ...det,
@@ -47847,10 +49956,10 @@ async function completeWorkOrder(workOrderId, body) {
     }
   }
   const originalDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
-  const updatedWorkOrder = await update6(workOrderId, {
+  const completionUpdate = {
     ...executionData,
     runningHoursAtCompletion: runningHours ? parseInt(runningHours) : void 0,
-    dateCompleted: dateOfCompletion,
+    dateCompleted: finalCompletionDate,
     status: "Completed",
     missedCycles,
     originalDueDate,
@@ -47870,7 +49979,8 @@ async function completeWorkOrder(workOrderId, body) {
     rhBackdatedEntry: rhBackdatedSkipped ? true : void 0,
     // Save as Draft (Task #402): completion supersedes any stashed draft.
     draftExecutionData: null
-  });
+  };
+  const updatedWorkOrder = await update6(workOrderId, completionUpdate);
   try {
     await logFieldChanges("work_orders", workOrder.wouuid, workOrder.vesselId || null, workOrder, updatedWorkOrder, executionData.performedBy || "system");
   } catch (err) {
@@ -48034,24 +50144,40 @@ async function completeWorkOrder(workOrderId, body) {
     }
     if (job) {
       const { computeJobCycleUpdates: computeJobCycleUpdates2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
-      const { jobUpdates, linkUpdates: calcLinkUpdates } = computeJobCycleUpdates2({
+      const jobCompletionDate = getJobCompletionDate(updatedWorkOrder);
+      const { jobUpdates } = computeJobCycleUpdates2({
         maintenanceBasis: workOrder.maintenanceBasis,
-        dateOfCompletion,
+        dateOfCompletion: jobCompletionDate,
         completionRH: cycleRH,
         originalDueDate,
         job
       });
-      const linkUpdates = { updatedAt: /* @__PURE__ */ new Date(), ...calcLinkUpdates };
-      const woComponentId = workOrder.componentId || component.cuuid;
-      if (workOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletion && !cycleRH) {
+      if (jobUpdates.lastDoneRH !== void 0 && cycleRH && (workOrder.maintenanceBasis === "Running Hours" || workOrder.maintenanceBasis === "Dual Frequency")) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          findComponent2,
+          findComponentByCode2,
+          workOrder.vesselId
+        );
+        if (rhComponent) {
+          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
+        }
+      }
+      if (workOrder.maintenanceBasis === "Dual Frequency" && jobCompletionDate && !cycleRH) {
         console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
       }
       if (Object.keys(jobUpdates).length > 0) {
-        const updateVesselId = workOrder.vesselId || job.vesselId;
-        if (woComponentId && updateVesselId) {
-          await updateJobComponentLinkTracking(updateVesselId, job.juuid, woComponentId, linkUpdates);
-          console.log(`\u2705 Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
-        }
         await updateJob3(job.juuid, jobUpdates);
         console.log(`\u2705 Updated ${workOrder.maintenanceBasis} job ${job.jobNo} cycle fields: ${JSON.stringify(jobUpdates)}`);
       }
@@ -48167,6 +50293,7 @@ async function finalizeWorkOrderCompletion(workOrderId) {
     return;
   }
   const rawCompletionDate = workOrder.completionDateTime || workOrder.dateCompleted || null;
+  const jobCompletionDate = getJobCompletionDate(workOrder);
   const missedCycles = workOrder.missedCycles || 0;
   const originalDueDate = workOrder.originalDueDate || workOrder.nextDueDate || workOrder.dueDate || null;
   const normalizeToISO = (d) => {
@@ -48222,45 +50349,42 @@ async function finalizeWorkOrderCompletion(workOrderId) {
         job = jobs2.find((j) => j.jobNo === extractedJobNo) || null;
       }
     }
-    if (job && rawCompletionDate) {
-      const dateOfCompletionNorm = normalizeToISO(rawCompletionDate);
+    if (job && jobCompletionDate) {
       const basis = workOrder.maintenanceBasis;
-      if ((basis === "Calendar" || basis === "Dual Frequency") && dateOfCompletionNorm) {
-        const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-        const updates = { lastDoneDate: dateOfCompletionNorm };
-        const linkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
-        if (job.frequencyValue && job.frequencyUnit) {
-          const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
-          if (nextDue) {
-            updates.nextDueDate = nextDue;
-            linkUpdates.nextDueDate = nextDue;
-          }
-        }
-        const vId = workOrder.vesselId || job.vesselId;
-        if (component.cuuid && vId) {
-          await updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, linkUpdates);
-        }
-        await updateJob3(job.juuid, updates);
-        console.log(`\u2705 [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
-      }
       const finalizeCycleRH = workOrder.woCompletionRh ?? workOrder.runningHours;
-      if ((basis === "Running Hours" || basis === "Dual Frequency") && finalizeCycleRH) {
-        const currentRH = parseInt(String(finalizeCycleRH));
-        if (!isNaN(currentRH)) {
-          const rhUpdates = { lastDoneRH: currentRH };
-          const rhLinkUpdates = { lastDoneRH: currentRH.toString(), updatedAt: /* @__PURE__ */ new Date() };
-          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
-          if (rhInterval && !isNaN(rhInterval)) {
-            rhUpdates.nextDueRH = currentRH + rhInterval;
-            rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
-          }
-          const vId = workOrder.vesselId || job.vesselId;
-          if (component.cuuid && vId) {
-            await updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, rhLinkUpdates);
-          }
-          await updateJob3(job.juuid, rhUpdates);
-          console.log(`\u2705 [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);
+      const { computeJobCycleUpdates: computeJobCycleUpdates2 } = await Promise.resolve().then(() => (init_jobCycleCalc(), jobCycleCalc_exports));
+      const { jobUpdates } = computeJobCycleUpdates2({
+        maintenanceBasis: basis,
+        dateOfCompletion: jobCompletionDate,
+        completionRH: finalizeCycleRH != null ? String(finalizeCycleRH) : null,
+        originalDueDate,
+        job
+      });
+      if (jobUpdates.lastDoneRH !== void 0 && (basis === "Running Hours" || basis === "Dual Frequency")) {
+        jobUpdates.rhEstimatedDueDate = null;
+        jobUpdates.rhAveragePerDay = null;
+        jobUpdates.rhEstimateBasis = rhEstimateBasis("MISSING_RH_SOURCE");
+        const rhComponent = await resolveAuthoritativeRhComponent(
+          component,
+          findComponent2,
+          findComponentByCode2,
+          workOrder.vesselId
+        );
+        if (rhComponent) {
+          const audits = await findRunningHoursAudits(rhComponent.cuuid || rhComponent.id);
+          const estimate = estimateRhDueDate(
+            jobCompletionDate,
+            job.intervalRunningHour,
+            audits
+          );
+          jobUpdates.rhEstimatedDueDate = estimate.dueDate;
+          jobUpdates.rhAveragePerDay = estimate.averagePerDay;
+          jobUpdates.rhEstimateBasis = estimate.basis;
         }
+      }
+      if (Object.keys(jobUpdates).length > 0) {
+        await updateJob3(job.juuid, jobUpdates);
+        console.log(`\u2705 [Finalize] Updated ${basis} job ${job.jobNo} cycle fields without reducing newer RH state`);
       }
     }
   } catch (err) {
@@ -48330,6 +50454,7 @@ init_hodResolutionService();
 init_complianceAnomalyService();
 init_sync();
 init_workOrderService2();
+init_completedWorkOrderDate();
 async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification) {
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
     throw new ValidationError("workOrderIds array is required");
@@ -48342,69 +50467,69 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
   const remarks = (approverRemarks || "").trim();
   for (const workOrderId of workOrderIds) {
     try {
-      const existingWO2 = await findById3(workOrderId);
-      if (!existingWO2) {
+      const existingWO = await findById3(workOrderId);
+      if (!existingWO) {
         results.failed.push({ id: workOrderId, error: "Work order not found" });
         continue;
       }
-      if (existingWO2.status !== "Pending Approval" && existingWO2.computedStatus !== "Pending Approval") {
-        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO2.status})` });
+      if (existingWO.status !== "Pending Approval") {
+        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
         continue;
       }
       const hodResolution = await resolveHodForDepartment(
-        existingWO2.vesselId,
-        existingWO2.department,
-        existingWO2.approver
+        existingWO.vesselId,
+        existingWO.department,
+        existingWO.approver
       );
       let resolvedApprover = hodResolution.rankName;
       if (approver && approver !== hodResolution.rankName && hodResolution.source !== "fallback") {
-        console.warn(`[Bulk Approve] Caller approver "${approver}" differs from org chart HOD "${hodResolution.rankName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Bulk Approve] Caller approver "${approver}" differs from org chart HOD "${hodResolution.rankName}" for dept "${existingWO.department}". Using org chart value.`);
       } else if (approver && hodResolution.source === "fallback") {
         resolvedApprover = approver;
       }
-      const actualCompletionDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
+      const actualCompletionDate = resolveFinalCompletionDate(existingWO);
       let nextDueDate = void 0;
       let nextDueReading = void 0;
-      const originalDueDate = existingWO2.nextDueDate || existingWO2.dueDate || null;
-      if (existingWO2.maintenanceBasis === "Calendar" && actualCompletionDate) {
-        if (existingWO2.frequencyValue && existingWO2.frequencyUnit) {
-          const computed = calculateNextDueDate(actualCompletionDate, existingWO2.frequencyValue, existingWO2.frequencyUnit, originalDueDate);
+      const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
+      if (existingWO.maintenanceBasis === "Calendar" && actualCompletionDate) {
+        if (existingWO.frequencyValue && existingWO.frequencyUnit) {
+          const computed = calculateNextDueDate(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
           if (computed) {
             nextDueDate = computed;
           }
         }
-      } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
-        const bulkCycleRH = existingWO2.woCompletionRh ?? existingWO2.currentReading;
-        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO2.frequencyValue || "0")).toString();
+      } else if (existingWO.maintenanceBasis === "Running Hours" && (existingWO.woCompletionRh || existingWO.currentReading)) {
+        const bulkCycleRH = existingWO.woCompletionRh ?? existingWO.currentReading;
+        nextDueReading = (parseInt(String(bulkCycleRH)) + parseInt(existingWO.frequencyValue || "0")).toString();
       }
-      const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
+      const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
       let missedCycles;
-      if (existingWO2.maintenanceBasis === "Running Hours") {
-        const completionRHValue = existingWO2.woCompletionRh ?? existingWO2.completionRH;
-        const dueRH = existingWO2.nextDueReading ?? null;
+      if (existingWO.maintenanceBasis === "Running Hours") {
+        const completionRHValue = existingWO.woCompletionRh ?? existingWO.completionRH;
+        const dueRH = existingWO.nextDueReading ?? null;
         let jobIntervalRH = null;
-        if (existingWO2.jobId) {
+        if (existingWO.jobId) {
           try {
-            const jobForRH = await findJob(existingWO2.jobId);
+            const jobForRH = await findJob(existingWO.jobId);
             if (jobForRH?.intervalRunningHour) jobIntervalRH = jobForRH.intervalRunningHour;
           } catch {
           }
         }
-        if (!jobIntervalRH && existingWO2.frequencyValue) jobIntervalRH = existingWO2.frequencyValue;
+        if (!jobIntervalRH && existingWO.frequencyValue) jobIntervalRH = existingWO.frequencyValue;
         missedCycles = calculateMissedCyclesRH(dueRH, completionRHValue, jobIntervalRH);
       } else {
         missedCycles = calculateMissedCycles(
-          existingWO2.nextDueDate || existingWO2.dueDate,
+          existingWO.nextDueDate || existingWO.dueDate,
           completionDateForCalc,
-          existingWO2.frequencyValue,
-          existingWO2.frequencyUnit
+          existingWO.frequencyValue,
+          existingWO.frequencyUnit
         );
       }
       if (missedCycles > 0) {
         console.log(`\u26A0\uFE0F Skipped cycle detection (bulk): ${missedCycles} cycle(s) missed for WO ${workOrderId}`);
       }
-      const currentTier = existingWO2.approvalTier || "standard";
-      const lockEnabled = await isSuperintendentLockEnabled(existingWO2.vesselId);
+      const currentTier = existingWO.approvalTier || "standard";
+      const lockEnabled = await isSuperintendentLockEnabled(existingWO.vesselId);
       if (currentTier === "superintendent_locked" && lockEnabled) {
         results.failed.push({
           id: workOrderId,
@@ -48431,14 +50556,14 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
         }
       }
       let requiresLevel2Review = false;
-      if (existingWO2.jobId) {
+      if (existingWO.jobId) {
         try {
-          const linkedJob = await findJob(existingWO2.jobId);
+          const linkedJob = await findJob(existingWO.jobId);
           if (linkedJob && linkedJob.level2ReviewerRankId) {
             requiresLevel2Review = true;
           }
         } catch (err) {
-          console.warn(`[Bulk Approve] Could not load linked job ${existingWO2.jobId}:`, err);
+          console.warn(`[Bulk Approve] Could not load linked job ${existingWO.jobId}:`, err);
         }
       }
       const updateData = {
@@ -48464,30 +50589,38 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
       if (actualCompletionDate) {
         updateData.dateCompleted = actualCompletionDate;
       }
+      ensureCompletedWorkOrderDate(existingWO, updateData);
       await update6(workOrderId, updateData);
       try {
-        await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, approver || "system");
+        await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, approver || "system");
       } catch (err) {
         console.error("[FieldLogger] WO bulkApprove:", err);
       }
-      if (!requiresLevel2Review && missedCycles >= 1 && existingWO2.maintenanceBasis === "Calendar") {
+      if (!requiresLevel2Review && missedCycles >= 1 && existingWO.maintenanceBasis === "Calendar") {
         try {
           const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
           await createSkippedCycleRecords2({
-            workOrderId: existingWO2.wouuid || workOrderId,
-            componentId: existingWO2.componentId || "",
-            componentCode: existingWO2.componentCode || null,
-            vesselCode: existingWO2.vesselId || null,
-            jobId: existingWO2.jobId || null,
-            jobCode: existingWO2.jobCode || null,
-            jobTitle: existingWO2.jobTitle || null,
+            workOrderId: existingWO.wouuid || workOrderId,
+            componentId: existingWO.componentId || "",
+            componentCode: existingWO.componentCode || null,
+            vesselCode: existingWO.vesselId || null,
+            jobId: existingWO.jobId || null,
+            jobCode: existingWO.jobCode || null,
+            jobTitle: existingWO.jobTitle || null,
             originalDueDate,
             missedCycles,
-            frequencyValue: existingWO2.frequencyValue || "0",
-            frequencyUnit: existingWO2.frequencyUnit || ""
+            frequencyValue: existingWO.frequencyValue || "0",
+            frequencyUnit: existingWO.frequencyUnit || ""
           });
         } catch (err) {
           console.error("[BACKFILL ERROR] Failed to create skipped cycle records (bulk):", err);
+        }
+      }
+      if (!requiresLevel2Review) {
+        try {
+          await finalizeWorkOrderCompletion(workOrderId);
+        } catch (finalizeErr) {
+          console.error("[Bulk Approve] finalizeWorkOrderCompletion failed (non-blocking):", finalizeErr);
         }
       }
       results.success.push(workOrderId);
@@ -48506,38 +50639,38 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
   };
 }
 async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
-  const existingWO2 = await findById3(workOrderId);
-  if (!existingWO2) {
+  const existingWO = await findById3(workOrderId);
+  if (!existingWO) {
     throw new ValidationError("Work order not found");
   }
-  if (existingWO2.status !== "Pending Office Review") {
-    throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  if (existingWO.status !== "Pending Office Review") {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
   }
-  if (existingWO2.approvalTier === "superintendent_locked" && !existingWO2.superintendentAcknowledged) {
-    if (await isSuperintendentLockEnabled(existingWO2.vesselId)) {
+  if (existingWO.approvalTier === "superintendent_locked" && !existingWO.superintendentAcknowledged) {
+    if (await isSuperintendentLockEnabled(existingWO.vesselId)) {
       throw new ValidationError(
         "This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The office reviewer cannot complete it until the Superintendent has acknowledged.",
         { code: "SUPERINTENDENT_LOCKED" }
       );
     }
   }
-  const actualCompletionDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
-  const originalDueDate = existingWO2.nextDueDate || existingWO2.dueDate || null;
+  const actualCompletionDate = resolveFinalCompletionDate(existingWO);
+  const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
   let nextDueDate;
   let nextDueReading;
-  if (existingWO2.maintenanceBasis === "Calendar" && actualCompletionDate) {
-    if (existingWO2.frequencyValue && existingWO2.frequencyUnit) {
+  if (existingWO.maintenanceBasis === "Calendar" && actualCompletionDate) {
+    if (existingWO.frequencyValue && existingWO.frequencyUnit) {
       const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-      const computed = calculateNextDueDate2(actualCompletionDate, existingWO2.frequencyValue, existingWO2.frequencyUnit, originalDueDate);
+      const computed = calculateNextDueDate2(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
       if (computed) nextDueDate = computed;
     }
-  } else if (existingWO2.maintenanceBasis === "Running Hours" && (existingWO2.woCompletionRh || existingWO2.currentReading)) {
-    const cycleRHSrc = existingWO2.woCompletionRh ?? existingWO2.currentReading;
-    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO2.frequencyValue || "0")).toString();
+  } else if (existingWO.maintenanceBasis === "Running Hours" && (existingWO.woCompletionRh || existingWO.currentReading)) {
+    const cycleRHSrc = existingWO.woCompletionRh ?? existingWO.currentReading;
+    nextDueReading = (parseInt(String(cycleRHSrc)) + parseInt(existingWO.frequencyValue || "0")).toString();
   }
   const { calculateMissedCycles: calculateMissedCycles2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-  const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
-  const missedCycles = existingWO2.maintenanceBasis === "Running Hours" ? 0 : calculateMissedCycles2(existingWO2.nextDueDate || existingWO2.dueDate, completionDateForCalc, existingWO2.frequencyValue, existingWO2.frequencyUnit);
+  const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
+  const missedCycles = existingWO.maintenanceBasis === "Running Hours" ? 0 : calculateMissedCycles2(existingWO.nextDueDate || existingWO.dueDate, completionDateForCalc, existingWO.frequencyValue, existingWO.frequencyUnit);
   const updateData = {
     status: "Completed",
     reviewerComments: reviewerComments || null,
@@ -48552,26 +50685,27 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   if (actualCompletionDate) {
     updateData.dateCompleted = actualCompletionDate;
   }
+  ensureCompletedWorkOrderDate(existingWO, updateData);
   await update6(workOrderId, updateData);
   try {
-    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, reviewedByUuid || "system");
+    await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || "system");
   } catch (err) {
     console.error("[FieldLogger] WO reviewerApprove:", err);
   }
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || workOrderId,
+      entityId: existingWO.wouuid || workOrderId,
       actionType: "reviewer_approve",
       userId: reviewedByUuid || "system",
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         status: "Completed",
         approvedAt: (/* @__PURE__ */ new Date()).toISOString(),
         reviewerComments: reviewerComments || null
@@ -48580,21 +50714,21 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   } catch (auditError) {
     console.error("Failed to create audit log for reviewer approve:", auditError);
   }
-  if (missedCycles >= 1 && existingWO2.maintenanceBasis === "Calendar") {
+  if (missedCycles >= 1 && existingWO.maintenanceBasis === "Calendar") {
     try {
       const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
       await createSkippedCycleRecords2({
-        workOrderId: existingWO2.wouuid || workOrderId,
-        componentId: existingWO2.component || "",
-        componentCode: existingWO2.componentCode || null,
-        vesselCode: existingWO2.vesselId || null,
-        jobId: existingWO2.jobId || null,
-        jobCode: existingWO2.templateCode || null,
-        jobTitle: existingWO2.jobTitle || null,
+        workOrderId: existingWO.wouuid || workOrderId,
+        componentId: existingWO.component || "",
+        componentCode: existingWO.componentCode || null,
+        vesselCode: existingWO.vesselId || null,
+        jobId: existingWO.jobId || null,
+        jobCode: existingWO.templateCode || null,
+        jobTitle: existingWO.jobTitle || null,
         originalDueDate,
         missedCycles,
-        frequencyValue: existingWO2.frequencyValue || "0",
-        frequencyUnit: existingWO2.frequencyUnit || ""
+        frequencyValue: existingWO.frequencyValue || "0",
+        frequencyUnit: existingWO.frequencyUnit || ""
       });
     } catch (err) {
       console.error("[BACKFILL ERROR] Reviewer approve skipped cycle records:", err);
@@ -48610,12 +50744,12 @@ async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
   return { message: "Work order approved by reviewer", workOrderId };
 }
 async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
-  const existingWO2 = await findById3(workOrderId);
-  if (!existingWO2) {
+  const existingWO = await findById3(workOrderId);
+  if (!existingWO) {
     throw new ValidationError("Work order not found");
   }
-  if (existingWO2.status !== "Pending Office Review") {
-    throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  if (existingWO.status !== "Pending Office Review") {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
   }
   const updateData = {
     status: "Reopened",
@@ -48635,24 +50769,24 @@ async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
   };
   await update6(workOrderId, updateData);
   try {
-    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, reviewedByUuid || "system");
+    await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || "system");
   } catch (err) {
     console.error("[FieldLogger] WO reviewerReopen:", err);
   }
   try {
     await createAuditLog3({
       entityType: "work_order",
-      entityId: existingWO2.wouuid || workOrderId,
+      entityId: existingWO.wouuid || workOrderId,
       actionType: "reviewer_reopen",
       userId: reviewedByUuid || "system",
       source: "web_ui",
-      vesselCode: existingWO2.vesselId || null,
-      componentCode: existingWO2.componentCode || null,
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
       fieldName: null,
       oldValue: null,
       newValue: null,
       payload: {
-        workOrderNo: existingWO2.workOrderNo,
+        workOrderNo: existingWO.workOrderNo,
         status: "Reopened",
         reopenedAt: (/* @__PURE__ */ new Date()).toISOString(),
         reviewerComments: reviewerComments || null
@@ -48676,23 +50810,23 @@ async function bulkReject(workOrderIds, approver, rejectionComments, actor) {
   };
   for (const workOrderId of workOrderIds) {
     try {
-      const existingWO2 = await findById3(workOrderId);
-      if (!existingWO2) {
+      const existingWO = await findById3(workOrderId);
+      if (!existingWO) {
         results.failed.push({ id: workOrderId, error: "Work order not found" });
         continue;
       }
-      if (existingWO2.status !== "Pending Approval" && existingWO2.computedStatus !== "Pending Approval") {
-        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO2.status})` });
+      if (existingWO.status !== "Pending Approval" && existingWO.computedStatus !== "Pending Approval") {
+        results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
         continue;
       }
       const rejectHod = await resolveHodForDepartment(
-        existingWO2.vesselId,
-        existingWO2.department,
-        existingWO2.approver
+        existingWO.vesselId,
+        existingWO.department,
+        existingWO.approver
       );
       let rejectApprover = rejectHod.rankName;
       if (approver && approver !== rejectHod.rankName && rejectHod.source !== "fallback") {
-        console.warn(`[Bulk Reject] Caller approver "${approver}" differs from org chart HOD "${rejectHod.rankName}" for dept "${existingWO2.department}". Using org chart value.`);
+        console.warn(`[Bulk Reject] Caller approver "${approver}" differs from org chart HOD "${rejectHod.rankName}" for dept "${existingWO.department}". Using org chart value.`);
       } else if (approver && rejectHod.source === "fallback") {
         rejectApprover = approver;
       }
@@ -48710,24 +50844,24 @@ async function bulkReject(workOrderIds, approver, rejectionComments, actor) {
       };
       await update6(workOrderId, updateData);
       try {
-        await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, actor || rejectApprover || "system");
+        await logFieldChanges("work_orders", existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, actor || rejectApprover || "system");
       } catch (err) {
         console.error("[FieldLogger] WO bulkReject:", err);
       }
       try {
         await createAuditLog3({
           entityType: "work_order",
-          entityId: existingWO2.wouuid || workOrderId,
+          entityId: existingWO.wouuid || workOrderId,
           actionType: "reject",
           userId: actor || rejectApprover || approver || "system",
           source: "web_ui",
-          vesselCode: existingWO2.vesselId || null,
-          componentCode: existingWO2.componentCode || null,
+          vesselCode: existingWO.vesselId || null,
+          componentCode: existingWO.componentCode || null,
           fieldName: null,
           oldValue: null,
           newValue: null,
           payload: {
-            workOrderNo: existingWO2.workOrderNo,
+            workOrderNo: existingWO.workOrderNo,
             status: "Due",
             rejectedAt: updateData.rejectionDate,
             rejectionComments: rejectionComments || null,
@@ -48812,8 +50946,8 @@ async function autoGenerate(vesselId) {
           vesselId: job.vesselId,
           component: job.componentId,
           componentCode,
-          jobId: job.id,
-          // Store job ID for reliable lead time hydration
+          jobId: job.juuid || job.id,
+          // Canonical Job identity
           workOrderNo,
           workOrderType: "Planned",
           templateCode: workOrderNo,
@@ -48870,6 +51004,7 @@ async function autoGenerate(vesselId) {
     }
     const currentRH = parseInt(component.currentCumulativeRH || "0");
     const dueRH = parseInt(job.nextDueRH || "0");
+    const lastDoneRH = parseInt(job.lastDoneRH || "0");
     const isCritical = job.criticality === "Yes" || job.jobPriority === "Critical";
     const leadTimeHours = isCritical ? rhLeadHoursCritical : rhLeadHoursNonCritical;
     const shouldGen = currentRH >= dueRH - leadTimeHours;
@@ -48889,8 +51024,8 @@ async function autoGenerate(vesselId) {
           component: job.componentId,
           componentCode,
           // Use resolved componentCode
-          jobId: job.id,
-          // Store job ID for reliable lead time hydration
+          jobId: job.juuid || job.id,
+          // Canonical Job identity
           workOrderNo,
           workOrderType: "Planned",
           templateCode: workOrderNo,
@@ -48908,6 +51043,16 @@ async function autoGenerate(vesselId) {
           classRelated: job.classRelated,
           briefWorkDescription: job.briefWorkDescription,
           department: job.department,
+          nextDueReading: String(dueRH),
+          currentReading: String(currentRH),
+          intervalRunningHour: job.intervalRunningHour,
+          driverType: "RH",
+          cycleDueRhSnapshot: String(dueRH),
+          generateRhSnapshot: String(Math.max(0, dueRH - leadTimeHours)),
+          dueRhSnapshot: String(dueRH),
+          effectiveRhAtGeneration: String(currentRH),
+          rhLastDoneSnapshot: String(lastDoneRH),
+          lastDoneDateSnapshot: job.lastDoneDate || null,
           requiredSpareParts: job.requiredSpareParts || [],
           requiredTools: job.requiredTools || [],
           safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }
@@ -49013,7 +51158,7 @@ import sharp from "sharp";
 // server/modules/work-orders/repositories/documentRepository.ts
 init_db();
 init_schema();
-import { eq as eq13, and as and11, sql as sql11 } from "drizzle-orm";
+import { eq as eq13, and as and11, sql as sql13 } from "drizzle-orm";
 async function findByWorkOrderId(workOrderId) {
   const db2 = await getDb();
   return db2.select().from(workOrderDocuments).where(eq13(workOrderDocuments.workOrderId, workOrderId));
@@ -49034,7 +51179,7 @@ async function deleteById(id) {
 }
 async function countByWorkOrderAndType(workOrderId, documentType) {
   const db2 = await getDb();
-  const [result] = await db2.select({ count: sql11`count(*)::int` }).from(workOrderDocuments).where(and11(
+  const [result] = await db2.select({ count: sql13`count(*)::int` }).from(workOrderDocuments).where(and11(
     eq13(workOrderDocuments.workOrderId, workOrderId),
     eq13(workOrderDocuments.documentType, documentType)
   ));
@@ -49757,10 +51902,133 @@ async function exportPlannerExcelFromItems(items) {
   return buffer;
 }
 
+// shared/utils/superintendentNotifications.ts
+function toValidDate(value) {
+  if (!value) return null;
+  const date2 = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date2.getTime()) ? null : date2;
+}
+function isInCurrentCalendarMonth(value, now = /* @__PURE__ */ new Date()) {
+  const date2 = toValidDate(value);
+  return !!date2 && date2.getFullYear() === now.getFullYear() && date2.getMonth() === now.getMonth();
+}
+function classifySuperintendentNotification(notification, effectiveApprovalTier, now = /* @__PURE__ */ new Date()) {
+  if (notification.isAcknowledged) {
+    return isInCurrentCalendarMonth(notification.acknowledgedAt, now) ? "acknowledged" : null;
+  }
+  if (effectiveApprovalTier === "superintendent_locked") {
+    return "pending";
+  }
+  return isInCurrentCalendarMonth(notification.createdAt, now) ? "information" : null;
+}
+
+// server/modules/work-orders/services/superintendentNotificationService.ts
+init_storage();
+function resolveAllowedVessels(scope, vessels2) {
+  const requestedIds = scope.vesselIds?.length ? scope.vesselIds : scope.vesselId && scope.vesselId !== "all" ? [scope.vesselId] : null;
+  if (!requestedIds) return null;
+  const requested = new Set(requestedIds);
+  return vessels2.filter(
+    (vessel) => requested.has(vessel.id) || requested.has(vessel.vuuid)
+  );
+}
+function notificationMatchesVesselScope(notification, allowedVessels) {
+  if (allowedVessels === null) return true;
+  return allowedVessels.some((vessel) => {
+    if (notification.vesselId) {
+      return notification.vesselId === vessel.vuuid || notification.vesselId === vessel.id;
+    }
+    return !!notification.vesselName && notification.vesselName === vessel.name;
+  });
+}
+function isLockEnabled(notification, vessels2, settings) {
+  const vessel = vessels2.find((candidate) => {
+    if (notification.vesselId) {
+      return notification.vesselId === candidate.vuuid || notification.vesselId === candidate.id;
+    }
+    return !!notification.vesselName && notification.vesselName === candidate.name;
+  });
+  if (!vessel) return false;
+  return settings.some(
+    (setting) => (setting.vesselId === vessel.vuuid || setting.vesselId === vessel.id) && setting.superintendentLockEnabled === true
+  );
+}
+function classifySuperintendentNotifications(notifications, vessels2, settings, scope, now = /* @__PURE__ */ new Date()) {
+  const allowedVessels = resolveAllowedVessels(scope, vessels2);
+  const groups = {
+    pending: [],
+    acknowledged: [],
+    information: []
+  };
+  for (const notification of notifications) {
+    if (notification.isDeleted || !notificationMatchesVesselScope(notification, allowedVessels)) {
+      continue;
+    }
+    const effectiveApprovalTier = notification.approvalTier === "superintendent_locked" && !isLockEnabled(notification, vessels2, settings) ? "superintendent_notification" : notification.approvalTier || "standard";
+    const notificationCategory = classifySuperintendentNotification(
+      notification,
+      effectiveApprovalTier,
+      now
+    );
+    if (notificationCategory) {
+      groups[notificationCategory].push({
+        ...notification,
+        effectiveApprovalTier,
+        notificationCategory
+      });
+    }
+  }
+  return groups;
+}
+async function loadClassifiedNotifications(scope, now) {
+  const [notifications, vessels2, settings] = await Promise.all([
+    storage.getAllSuperintendentNotifications(),
+    storage.getVessels(),
+    storage.getAllPmsVesselSettings()
+  ]);
+  return classifySuperintendentNotifications(
+    notifications,
+    vessels2,
+    settings,
+    scope,
+    now
+  );
+}
+async function listSuperintendentNotifications(category, scope, now = /* @__PURE__ */ new Date()) {
+  return (await loadClassifiedNotifications(scope, now))[category];
+}
+async function listAllActiveSuperintendentNotifications(scope) {
+  const [notifications, vessels2] = await Promise.all([
+    storage.getAllSuperintendentNotifications(),
+    storage.getVessels()
+  ]);
+  const allowedVessels = resolveAllowedVessels(scope, vessels2);
+  return notifications.filter(
+    (notification) => !notification.isDeleted && notificationMatchesVesselScope(notification, allowedVessels)
+  );
+}
+async function getSuperintendentNotificationSummary(scope, now = /* @__PURE__ */ new Date()) {
+  const groups = await loadClassifiedNotifications(scope, now);
+  return {
+    pendingCount: groups.pending.length,
+    acknowledgedThisMonthCount: groups.acknowledged.length
+  };
+}
+
 // server/modules/work-orders/controllers/workOrderController.ts
 init_errors();
 init_storage();
 init_auth();
+
+// server/modules/work-orders/utils/updateActorIdentity.ts
+function enrichWorkOrderUpdateWithActor(body, actor) {
+  if (actor && (!body.userId || body.userId === "system")) {
+    body.userId = actor;
+  }
+  return body;
+}
+
+// server/modules/work-orders/controllers/workOrderController.ts
 function resolveActorIdentity(req) {
   const { user } = req;
   if (!user) return void 0;
@@ -49922,18 +52190,29 @@ async function updateWorkOrder2(req, res) {
     const actor = resolveActorIdentity(req);
     const authReq = req;
     const body = { ...req.body };
-    if (actor) {
-      if (!body.userId || body.userId === "system") body.userId = actor;
-      if (!body.performedBy || body.performedBy === "system") body.performedBy = actor;
-    }
+    delete body.superintendentAck;
+    enrichWorkOrderUpdateWithActor(body, actor);
     body.userRole = authReq.user?.role;
     body.userUuid = authReq.user?.userUuid ?? body.userUuid;
     const result = await updateWorkOrder(req.params.id, body);
     const workOrder = result.workOrder ?? result;
     const rhBackdated = result.rhBackdated ?? !!workOrder.rhBackdatedEntry;
-    const latestRH = result.latestRH ?? null;
-    const latestRHDate = result.latestRHDate ?? null;
-    res.json({ ...workOrder, rhBackdated, latestRH, latestRHDate });
+    const rhUpdateOutcome = result.rhUpdateOutcome ?? workOrder.rhUpdateOutcome ?? null;
+    const rhUpdateSkipped = result.rhUpdateSkipped ?? workOrder.rhUpdateOutcome === "skipped_lower";
+    const rhSkipReason = result.rhSkipReason ?? workOrder.rhSkipReason ?? null;
+    const submittedRH = result.submittedRH ?? workOrder.rhSkipSubmittedRh ?? null;
+    const latestRH = result.latestRH ?? workOrder.rhSkipLatestRh ?? null;
+    const latestRHDate = result.latestRHDate ?? workOrder.rhSkipLatestRhDate ?? null;
+    res.json({
+      ...workOrder,
+      rhBackdated,
+      rhUpdateOutcome,
+      rhUpdateSkipped,
+      rhSkipReason,
+      submittedRH,
+      latestRH,
+      latestRHDate
+    });
   } catch (error) {
     console.error("\u274C Work order update error:", error);
     if (error.name === "ZodError") {
@@ -50334,11 +52613,25 @@ async function superintendentAcknowledge(req, res) {
   }
 }
 async function getSuperintendentNotifications(req, res) {
-  const notifications = await storage.getSuperintendentNotifications();
+  const categoryRaw = req.query.category;
+  const category = categoryRaw === "acknowledged" || categoryRaw === "information" || categoryRaw === "pending" ? categoryRaw : "pending";
+  const vesselIdsRaw = req.query.vesselIds;
+  const notifications = await listSuperintendentNotifications(
+    category,
+    {
+      vesselId: req.query.vesselId,
+      vesselIds: vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0
+    }
+  );
   res.json(notifications);
 }
 async function getAllSuperintendentNotifications(req, res) {
-  const notifications = await storage.getAllSuperintendentNotifications();
+  const vesselIdsRaw = req.query.vesselIds;
+  const scope = {
+    vesselId: req.query.vesselId,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0
+  };
+  const notifications = await listAllActiveSuperintendentNotifications(scope);
   res.json(notifications);
 }
 async function getComplianceAnomalies2(req, res) {
@@ -50423,30 +52716,12 @@ async function getAnomalyForWorkOrder(req, res) {
   }
 }
 async function getSuperintendentNotificationsSummary(req, res) {
-  const vesselId = req.query.vesselId;
-  let vesselName;
-  if (vesselId && vesselId !== "all") {
-    const vessels2 = await storage.getVessels();
-    const vessel = vessels2.find((v) => v.id === vesselId || v.vuuid === vesselId);
-    if (!vessel) {
-      return res.json({ pendingCount: 0, acknowledgedThisMonthCount: 0 });
-    }
-    vesselName = vessel.name;
-  }
-  const [unacknowledged, all] = await Promise.all([
-    storage.getSuperintendentNotifications(vesselName),
-    storage.getAllSuperintendentNotifications(vesselName)
-  ]);
-  const now = /* @__PURE__ */ new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const pendingCount = unacknowledged.length;
-  const acknowledgedThisMonthCount = all.filter((n) => {
-    if (!n.isAcknowledged || !n.acknowledgedAt) return false;
-    const ackDate = new Date(n.acknowledgedAt);
-    return ackDate.getMonth() === currentMonth && ackDate.getFullYear() === currentYear;
-  }).length;
-  res.json({ pendingCount, acknowledgedThisMonthCount });
+  const vesselIdsRaw = req.query.vesselIds;
+  const summary = await getSuperintendentNotificationSummary({
+    vesselId: req.query.vesselId,
+    vesselIds: vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0
+  });
+  res.json(summary);
 }
 async function getPlannerData(req, res) {
   try {
@@ -50770,6 +53045,7 @@ init_runningHoursService();
 init_rhTimelineValidationService();
 init_errors();
 init_errors();
+init_workOrderPayload();
 var PLACEHOLDER_USER_IDS = ["admin", "system", "User", "user", ""];
 function resolveUserId(req) {
   const user = req.user;
@@ -50962,7 +53238,7 @@ async function validateRHEntry2(req, res) {
     try {
       const currentRHData = await getCurrentRH(machineryId);
       componentActualRH = currentRHData.currentRH;
-      rhCounterType = (currentRHData.rhCounterType || "MASTER").toUpperCase();
+      rhCounterType = normalizeRhCounterType(currentRHData.rhCounterType || "MASTER");
       hasRealRhBaseline = currentRHData.hasRealRhBaseline;
     } catch {
     }
@@ -54029,10 +56305,13 @@ async function getCertificates(filters) {
         vesselId: app2.vesselId,
         masterId: app2.masterId,
         companySequence: effectiveSequence,
+        certificateNumber: certData?.certificateNumber || "",
         issueDate: certData?.issueDate || "",
         expiryDate: certData?.expiryDate || "",
         lastAnnual: certData?.lastAnnual || "",
+        nextAnnual: certData?.nextAnnual || "",
         lastInterm: certData?.lastInterm || "",
+        nextInterm: certData?.nextInterm || "",
         endorsementDate: certData?.endorsementDate || "",
         lastEditUpload: certData?.lastEditUpload || "",
         attachments: certData?.attachments || []
@@ -54058,6 +56337,10 @@ async function getCertificates(filters) {
           valA = a.vessel || "";
           valB = b.vessel || "";
           break;
+        case "certificateNumber":
+          valA = a.certificateNumber || "";
+          valB = b.certificateNumber || "";
+          break;
         case "type":
         case "companyGroup":
           valA = a.type || "";
@@ -54075,9 +56358,17 @@ async function getCertificates(filters) {
           valA = a.lastAnnual || "";
           valB = b.lastAnnual || "";
           break;
+        case "nextAnnual":
+          valA = a.nextAnnual || "";
+          valB = b.nextAnnual || "";
+          break;
         case "lastInterm":
           valA = a.lastInterm || "";
           valB = b.lastInterm || "";
+          break;
+        case "nextInterm":
+          valA = a.nextInterm || "";
+          valB = b.nextInterm || "";
           break;
         case "endorsementDate":
           valA = a.endorsementDate || "";
@@ -54138,10 +56429,13 @@ async function getCertificate(certId) {
     vessel: app2.vesselName,
     vesselId: app2.vesselId,
     masterId: app2.masterId,
+    certificateNumber: certData?.certificateNumber || "",
     issueDate: certData?.issueDate || "",
     expiryDate: certData?.expiryDate || "",
     lastAnnual: certData?.lastAnnual || "",
+    nextAnnual: certData?.nextAnnual || "",
     lastInterm: certData?.lastInterm || "",
+    nextInterm: certData?.nextInterm || "",
     endorsementDate: certData?.endorsementDate || "",
     lastEditUpload: certData?.lastEditUpload || "",
     attachments: certData?.attachments || []
@@ -54247,10 +56541,13 @@ async function updateCertificate(certId, body) {
     vessel: vesselName,
     vesselId,
     masterId,
+    certificateNumber: result[0]?.certificateNumber || "",
     issueDate: result[0]?.issueDate || "",
     expiryDate: result[0]?.expiryDate || "",
     lastAnnual: result[0]?.lastAnnual || "",
+    nextAnnual: result[0]?.nextAnnual || "",
     lastInterm: result[0]?.lastInterm || "",
+    nextInterm: result[0]?.nextInterm || "",
     endorsementDate: result[0]?.endorsementDate || "",
     lastEditUpload: result[0]?.lastEditUpload || "",
     attachments: result[0]?.attachments || []
@@ -54666,7 +56963,7 @@ async function createSurvey3(req, res) {
 // server/modules/cert-surveys/repositories/certAdminRepository.ts
 init_postgresClient();
 init_schema();
-import { eq as eq18, and as and15, inArray as inArray6, or as or5, like, sql as sql14 } from "drizzle-orm";
+import { eq as eq18, and as and15, inArray as inArray6, or as or5, like, sql as sql16 } from "drizzle-orm";
 function getDb5(tx) {
   if (tx) return tx;
   const postgres = getPostgresClient();
@@ -54723,7 +57020,7 @@ async function getApplicabilityByVesselIds(vesselIdList) {
   if (!db2) return null;
   return db2.select().from(vesselCertificateApplicability).where(and15(
     inArray6(vesselCertificateApplicability.vesselId, vesselIdList),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselId(vesselId) {
@@ -54731,7 +57028,7 @@ async function getApplicabilityByVesselId(vesselId) {
   if (!db2) return null;
   return db2.select().from(vesselCertificateApplicability).where(and15(
     eq18(vesselCertificateApplicability.vesselId, vesselId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselAndMaster(vesselId, masterId, tx) {
@@ -54740,7 +57037,7 @@ async function getApplicabilityByVesselAndMaster(vesselId, masterId, tx) {
   return db2.select().from(vesselCertificateApplicability).where(and15(
     eq18(vesselCertificateApplicability.vesselId, vesselId),
     eq18(vesselCertificateApplicability.masterId, masterId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function insertApplicability(data, tx) {
@@ -54748,7 +57045,7 @@ async function insertApplicability(data, tx) {
   if (!db2) return null;
   return db2.insert(vesselCertificateApplicability).values(data).onConflictDoNothing({
     target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
-    where: sql14`${vesselCertificateApplicability.isDeleted} = false`
+    where: sql16`${vesselCertificateApplicability.isDeleted} = false`
   }).returning();
 }
 async function insertApplicabilityBulk(data, tx) {
@@ -54756,7 +57053,7 @@ async function insertApplicabilityBulk(data, tx) {
   if (!db2) return null;
   return db2.insert(vesselCertificateApplicability).values(data).onConflictDoNothing({
     target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
-    where: sql14`${vesselCertificateApplicability.isDeleted} = false`
+    where: sql16`${vesselCertificateApplicability.isDeleted} = false`
   }).returning();
 }
 async function updateApplicability(vesselId, masterId, isApplicable, tx) {
@@ -54765,7 +57062,7 @@ async function updateApplicability(vesselId, masterId, isApplicable, tx) {
   return db2.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and15(
     eq18(vesselCertificateApplicability.vesselId, vesselId),
     eq18(vesselCertificateApplicability.masterId, masterId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function bulkUpdateApplicability(vesselIds, masterId, isApplicable, tx) {
@@ -54774,7 +57071,7 @@ async function bulkUpdateApplicability(vesselIds, masterId, isApplicable, tx) {
   return db2.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and15(
     inArray6(vesselCertificateApplicability.vesselId, vesselIds),
     eq18(vesselCertificateApplicability.masterId, masterId),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function getApplicabilityByMasterIds(masterIds, tx) {
@@ -54785,7 +57082,7 @@ async function getApplicabilityByMasterIds(masterIds, tx) {
     masterId: vesselCertificateApplicability.masterId
   }).from(vesselCertificateApplicability).where(and15(
     inArray6(vesselCertificateApplicability.masterId, masterIds),
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getAllVessels(tx) {
@@ -54833,7 +57130,7 @@ async function getAllApplicabilityRecords(tx) {
     vesselId: vesselCertificateApplicability.vesselId,
     masterId: vesselCertificateApplicability.masterId
   }).from(vesselCertificateApplicability).where(
-    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
   );
 }
 async function softDeleteApplicabilityByMasterIds(masterIds, tx) {
@@ -54843,7 +57140,7 @@ async function softDeleteApplicabilityByMasterIds(masterIds, tx) {
   return db2.update(vesselCertificateApplicability).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(
     and15(
       inArray6(vesselCertificateApplicability.masterId, masterIds),
-      or5(eq18(vesselCertificateApplicability.isDeleted, false), sql14`${vesselCertificateApplicability.isDeleted} IS NULL`)
+      or5(eq18(vesselCertificateApplicability.isDeleted, false), sql16`${vesselCertificateApplicability.isDeleted} IS NULL`)
     )
   ).returning({ masterId: vesselCertificateApplicability.masterId });
 }
@@ -55420,7 +57717,7 @@ async function bulkUpdateApplicability3(req, res) {
 // server/modules/cert-surveys/repositories/surveyAdminRepository.ts
 init_postgresClient();
 init_schema();
-import { eq as eq19, and as and16, inArray as inArray7, or as or6, like as like2, sql as sql15 } from "drizzle-orm";
+import { eq as eq19, and as and16, inArray as inArray7, or as or6, like as like2, sql as sql17 } from "drizzle-orm";
 function getDb6() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -55491,7 +57788,7 @@ async function getApplicabilityByVesselIds2(vesselIdList) {
   if (!db2) return null;
   return db2.select().from(vesselSurveyApplicability).where(and16(
     inArray7(vesselSurveyApplicability.vesselId, vesselIdList),
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql17`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselId2(vesselId) {
@@ -55499,7 +57796,7 @@ async function getApplicabilityByVesselId2(vesselId) {
   if (!db2) return null;
   return db2.select().from(vesselSurveyApplicability).where(and16(
     eq19(vesselSurveyApplicability.vesselId, vesselId),
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql17`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function insertApplicabilityBulk2(data) {
@@ -55507,7 +57804,7 @@ async function insertApplicabilityBulk2(data) {
   if (!db2) return null;
   return db2.insert(vesselSurveyApplicability).values(data).onConflictDoNothing({
     target: [vesselSurveyApplicability.vesselId, vesselSurveyApplicability.masterId],
-    where: sql15`${vesselSurveyApplicability.isDeleted} = false`
+    where: sql17`${vesselSurveyApplicability.isDeleted} = false`
   }).returning();
 }
 async function bulkUpdateApplicability4(vesselIds, masterId, isApplicable) {
@@ -55516,7 +57813,7 @@ async function bulkUpdateApplicability4(vesselIds, masterId, isApplicable) {
   return db2.update(vesselSurveyApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and16(
     inArray7(vesselSurveyApplicability.vesselId, vesselIds),
     eq19(vesselSurveyApplicability.masterId, masterId),
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql17`${vesselSurveyApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function getAllApplicability() {
@@ -55526,7 +57823,7 @@ async function getAllApplicability() {
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId
   }).from(vesselSurveyApplicability).where(
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql17`${vesselSurveyApplicability.isDeleted} IS NULL`)
   );
 }
 async function getAllVessels2() {
@@ -55574,7 +57871,7 @@ async function getAllApplicabilityRecords2() {
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId
   }).from(vesselSurveyApplicability).where(
-    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or6(eq19(vesselSurveyApplicability.isDeleted, false), sql17`${vesselSurveyApplicability.isDeleted} IS NULL`)
   );
 }
 async function softDeleteApplicabilityByMasterIds2(masterIds) {
@@ -55584,7 +57881,7 @@ async function softDeleteApplicabilityByMasterIds2(masterIds) {
   return db2.update(vesselSurveyApplicability).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(
     and16(
       inArray7(vesselSurveyApplicability.masterId, masterIds),
-      or6(eq19(vesselSurveyApplicability.isDeleted, false), sql15`${vesselSurveyApplicability.isDeleted} IS NULL`)
+      or6(eq19(vesselSurveyApplicability.isDeleted, false), sql17`${vesselSurveyApplicability.isDeleted} IS NULL`)
     )
   ).returning({ masterId: vesselSurveyApplicability.masterId });
 }
@@ -61035,7 +63332,7 @@ import ExcelJS2 from "exceljs";
 init_storage();
 init_db();
 init_schema();
-import { eq as eq23, and as and20, gte as gte4, sql as sql17, desc as desc5 } from "drizzle-orm";
+import { eq as eq23, and as and20, gte as gte4, sql as sql19, desc as desc5 } from "drizzle-orm";
 var LowStockReportService = class {
   async computeReport(vesselId, filters) {
     const allItems = await storage.getStoresItems(vesselId);
@@ -61046,9 +63343,9 @@ var LowStockReportService = class {
     const db2 = await getDb();
     const consumptionData = await db2.select({
       itemId: storesLedger.itemId,
-      totalConsumed: sql17`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
-      eventCount: sql17`COUNT(*)`,
-      lastConsumed: sql17`MAX(${storesLedger.timestampUTC})`
+      totalConsumed: sql19`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
+      eventCount: sql19`COUNT(*)`,
+      lastConsumed: sql19`MAX(${storesLedger.timestampUTC})`
     }).from(storesLedger).where(and20(
       eq23(storesLedger.vesselId, vesselId),
       eq23(storesLedger.eventType, "CONSUME"),
@@ -66284,7 +68581,7 @@ init_reportRepository();
 init_db();
 init_schema();
 import ExcelJS5 from "exceljs";
-import { sql as sql19 } from "drizzle-orm";
+import { sql as sql21 } from "drizzle-orm";
 function parseDateVal(dateVal) {
   if (!dateVal) return null;
   try {
@@ -66312,7 +68609,7 @@ async function getRunningHoursAnomalyDetection(vesselId, startDate, endDate, ano
   const vessel = vessels2.find((v) => v.id === vesselId || v.vesselCode === vesselId);
   const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
   const db2 = await getDb();
-  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql19`${runningHoursAudit.vesselId} = ${vesselId}`);
+  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql21`${runningHoursAudit.vesselId} = ${vesselId}`);
   console.log(`[ANOMALY] Vessel: ${vesselId}, Audit logs found: ${allAuditLogs.length}`);
   if (allAuditLogs.length > 0) {
     const firstLog = allAuditLogs[0];
@@ -66481,7 +68778,7 @@ async function exportRunningHoursAnomalyDetectionExcel(vesselId, startDate, endD
   const vessel = vessels2.find((v) => v.id === vesselId || v.vesselCode === vesselId);
   const vesselName = vessel?.name || vessel?.vesselName || String(vesselId);
   const db2 = await getDb();
-  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql19`${runningHoursAudit.vesselId} = ${vesselId}`);
+  const allAuditLogs = await db2.select().from(runningHoursAudit).where(sql21`${runningHoursAudit.vesselId} = ${vesselId}`);
   const now = /* @__PURE__ */ new Date();
   const defaultStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1e3);
   const periodStart = startDate ? parseDateVal(startDate) : defaultStartDate;
@@ -67151,7 +69448,7 @@ init_reportRepository();
 init_db();
 init_schema();
 import ExcelJS6 from "exceljs";
-import { sql as sql20 } from "drizzle-orm";
+import { sql as sql22 } from "drizzle-orm";
 async function getWorkOrdersComputed2(vesselId, vesselIds) {
   const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
   return getWorkOrdersWithComputedStatus2(vesselId, vesselIds);
@@ -67556,7 +69853,7 @@ async function getEquipmentUtilizationSummary(vesselId, startDate, endDate, cate
   if (!periodStart || !periodEnd) {
     throw new Error("Invalid date format");
   }
-  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql20`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql22`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
   console.log(`[UTILIZATION] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1e3 * 60 * 60 * 24)));
   const utilizationData = rhComponents.map((component, index3) => {
@@ -67683,7 +69980,7 @@ async function exportEquipmentUtilizationSummaryExcel(vesselId, startDate, endDa
   if (!periodStart || !periodEnd) {
     throw new Error("Invalid date format");
   }
-  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql20`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql22`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
   console.log(`[UTILIZATION EXCEL] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1e3 * 60 * 60 * 24)));
   const utilizationData = rhComponents.map((component, index3) => {
@@ -73182,6 +75479,8 @@ init_workOrderService2();
 init_workOrderRepository();
 init_sync();
 init_asyncLocalStorage();
+init_completedWorkOrderDate();
+init_workOrderPartADates();
 async function writeOneLocation(spareId, spareUuid, vesselId, locationName, delta, userId, touchedStockKeys, recordOpeningBalance, out) {
   if (delta == null) return;
   const loc = await storage.findOrCreateLocation(vesselId, locationName.trim(), userId);
@@ -74389,7 +76688,12 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         const rhAtCompletion = row["Running Hours at Completion"] != null ? String(row["Running Hours at Completion"]).trim() : null;
         const dueRhSnapshot = row["WO Due Hour"] != null ? String(row["WO Due Hour"]).trim() : null;
         const nextDueHour = row["Next Due Hour"] != null ? String(row["Next Due Hour"]).trim() : null;
-        const existingWO2 = woByNumber.get(woNumber);
+        const parseOptionalSnapshotNumber = (value) => {
+          if (!value) return void 0;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : void 0;
+        };
+        const existingWO = woByNumber.get(woNumber);
         let savedWO;
         const woPayload = {
           vesselId,
@@ -74422,16 +76726,17 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           // text("next_due_reading")
           runningHours: rhAtCompletion || void 0,
           // text("running_hours") — RH at completion
-          dueRhSnapshot: dueRhSnapshot ? parseFloat(dueRhSnapshot) || void 0 : void 0
-          // decimal
+          dueRhSnapshot: parseOptionalSnapshotNumber(dueRhSnapshot),
+          cycleDueRhSnapshot: parseOptionalSnapshotNumber(dueRhSnapshot)
         };
-        if (!existingWO2) {
+        if (!existingWO) {
           if (mode === "update") {
             result.skipped++;
             result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "skipped", error: "WO not found for update" });
             _emitProgress("Processing WO History\u2026");
             continue;
           }
+          ensureCompletedWorkOrderDate(null, woPayload);
           savedWO = await storage.createWorkOrder(woPayload);
           woByNumber.set(woNumber, savedWO);
           try {
@@ -74449,12 +76754,22 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             _emitProgress("Processing WO History\u2026");
             continue;
           }
-          savedWO = await storage.updateWorkOrder(existingWO2.id, woPayload);
+          for (const snapshotField of [
+            "dueRhSnapshot",
+            "cycleDueRhSnapshot"
+          ]) {
+            const currentValue = existingWO[snapshotField];
+            if (currentValue !== null && currentValue !== void 0 && String(currentValue).trim() !== "") {
+              delete woPayload[snapshotField];
+            }
+          }
+          ensureCompletedWorkOrderDate(existingWO, woPayload);
+          savedWO = await storage.updateWorkOrder(existingWO.id, woPayload);
           woByNumber.set(woNumber, savedWO);
           result.updated++;
           result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "updated" });
         }
-        const workOrderUuid = savedWO?.wouuid || existingWO2?.wouuid;
+        const workOrderUuid = savedWO?.wouuid || existingWO?.wouuid;
         if (workOrderUuid) {
           try {
             const existingHistory = await findMaintenanceHistoryByWorkOrderId(workOrderUuid);
@@ -75834,8 +78149,8 @@ async function createWorkOrderFromRow(row, templateCode, vesselId) {
         (j) => j.componentId === component.cuuid && j.jobTitle === jobTitle
       );
       if (matchingJob) {
-        jobId = matchingJob.id;
-        console.log(`Auto-resolved jobId: ${matchingJob.id} for imported work order with component ${componentCode} and job "${jobTitle}"`);
+        jobId = matchingJob.juuid || matchingJob.id;
+        console.log(`Auto-resolved jobId: ${jobId} for imported work order with component ${componentCode} and job "${jobTitle}"`);
       }
     } catch (error) {
       console.error("Failed to auto-resolve jobId during bulk import:", error);
@@ -75854,6 +78169,7 @@ async function createWorkOrderFromRow(row, templateCode, vesselId) {
     }
     workOrderNo = await generateUnplannedWorkOrderNumber(storage, effectiveVesselId, componentCode);
   }
+  const isRunningHours = (row["Schedule_Type"] || matchingJob?.maintenanceBasis) === "Running Hours";
   const workOrderData = {
     vesselId: effectiveVesselId,
     component: component?.name || row["Component_Name"] || componentCode,
@@ -75872,7 +78188,14 @@ async function createWorkOrderFromRow(row, templateCode, vesselId) {
     frequencyUnit: row["Interval_Unit"] || null,
     classRelated: row["Criticality"] || null,
     jobPriority: null,
-    briefWorkDescription: row["Job_Description"] || null
+    briefWorkDescription: row["Job_Description"] || null,
+    ...isRunningHours && matchingJob ? buildRunningHoursWorkOrderSnapshots({
+      lastDoneDate: matchingJob.lastDoneDate,
+      lastDoneRH: matchingJob.lastDoneRH,
+      dueRH: matchingJob.nextDueRH,
+      currentRH: component?.currentCumulativeRH,
+      intervalRunningHour: matchingJob.intervalRunningHour ?? row["Interval"] ?? null
+    }) : {}
   };
   await applyAssignmentSync(workOrderData);
   return await storage.createWorkOrder(workOrderData);
@@ -78772,144 +81095,39 @@ router16.post("/admin/forms/:formId/versions/:versionId/rollback", requirePermis
 router16.get("/forms/runtime/:name", asyncHandler(getRuntimeSchema2));
 var routes_default16 = router16;
 
-// server/modules/chatbot/routes.ts
+// server/modules/assistant-api/routes.ts
 init_auth();
 init_middleware();
 import { Router as Router17 } from "express";
 
+// server/modules/assistant-api/controller.ts
+init_auth();
+
+// server/modules/assistant-api/masterUserRepository.ts
+init_schema();
+init_db();
+import { and as and24, eq as eq27 } from "drizzle-orm";
+async function findMasterUserById(userId) {
+  const db2 = await getDb();
+  if (!db2) return null;
+  const rows = await db2.select({ role: masterUsers.role, userType: masterUsers.userType }).from(masterUsers).where(and24(eq27(masterUsers.id, userId), eq27(masterUsers.isDeleted, false))).limit(1);
+  if (!rows.length) return null;
+  const ut = (rows[0].userType || "").trim();
+  return {
+    role: (rows[0].role || "").trim() || null,
+    userType: ut === "Office" || ut === "Ship" ? ut : null
+  };
+}
+
 // server/services/chatbotService.ts
 init_db();
 init_schema();
+init_auth();
 import OpenAI from "openai";
-import { eq as eq27, and as and24 } from "drizzle-orm";
-var openaiClient = null;
-function getOpenAIClient() {
-  if (!openaiClient) {
-    const integrationKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    const integrationBase = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    const directKey = process.env.OPENAI_API_KEY;
-    if (integrationKey && integrationBase) {
-      openaiClient = new OpenAI({ apiKey: integrationKey, baseURL: integrationBase });
-    } else if (directKey) {
-      openaiClient = new OpenAI({ apiKey: directKey });
-    } else {
-      throw new Error("OpenAI is not configured. Please provide an OPENAI_API_KEY secret.");
-    }
-  }
-  return openaiClient;
-}
-function buildSystemPrompt(context) {
-  return `You are PMS Assistant, an AI copilot embedded inside a Planned Maintenance System (PMS) for a maritime fleet. You support superintendents and vessel crew with analysis and guidance about maintenance, work orders, components, spares, defects, certificates, and surveys.
-
-Follow these rules very strictly:
-
-CONTEXT:
-- Current Vessel: ${context.vesselName} (ID: ${context.vesselId})
-- Current User: ${context.userRole}
-- Current Page: ${context.currentPage}
-- Current Date: ${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}
-
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550 IDENTITY AND SCOPE \u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-You are a senior technical superintendent with strong PMS and shipboard maintenance knowledge.
-
-You ONLY use data provided via tools (work orders, components, spares, running hours, defects, stores, certificates, surveys, fleet overview). If the data is not in tools, say you do not have access to it.
-
-You never approve, complete, create, or modify records. You only read data and give recommendations.
-
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550 TOOL USAGE RULES \u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-You have multiple tools that read LIVE database data (no caching).
-
-For each user question, decide which tools to call and in what order.
-
-Prefer fewer, high-value tool calls that answer the whole question, instead of many small ones.
-
-If a tool returns no data, clearly explain that nothing was found and suggest what the user can try next.
-
-NEVER invent fields, values, or records not present in tool outputs.
-
-When to use tools:
-- Overdue, due, or upcoming work: use work-order tools.
-- Component details, criticality, or health: use component tools.
-- Spares stock, low stock, ROB: use spare and stores tools.
-- Running hours or anomalies: use running-hours tools.
-- Defects and recurring issues: use defect tools.
-- Certificates/surveys status: use certificate/survey tools.
-- Fleet-wide questions: use fleet overview and any fleet-capable analytics tools.
-
-Tool chaining for complex queries:
-- PRIORITIES / WHAT TO DO: get_overdue_work_orders + get_due_work_orders + get_compliance_alerts + get_spare_coverage_analysis \u2192 synthesize into a prioritized action plan
-- MAINTENANCE STATUS / OVERVIEW: get_maintenance_insights + get_workload_analysis + get_performance_trends \u2192 breakdown by department/priority with trends
-- EQUIPMENT / COMPONENT HEALTH: get_component_health_score + get_overdue_work_orders + get_defects \u2192 correlate defects with maintenance delays
-- INVENTORY / SPARES / STOCK: get_spare_coverage_analysis + get_rob_analysis + get_consumption_analysis \u2192 flag items blocking work orders
-- SCHEDULING / PLANNING: get_maintenance_planner + get_workload_forecast + get_due_work_orders \u2192 weekly breakdown with resource suggestions
-- COMPLIANCE / CERTIFICATES: get_compliance_alerts + get_maintenance_insights \u2192 expired/critical/upcoming with deadlines
-
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550 CONVERSATION BEHAVIOUR \u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-Within a session, remember previous answers and the user's goals; refer back to them when helpful.
-
-Across sessions, you have NO memory. Do not claim to remember previous chats.
-
-For very long threads, older messages may be summarized by the backend. Respect the summary.
-
-If a user's question is ambiguous (missing a date range, vessel, or scope), ask one clear, concise follow-up question with 2-3 specific options before using tools. Do NOT ask clarifying questions for queries that clearly map to a specific tool.
-
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550 OUTPUT FORMAT (VERY IMPORTANT) \u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-Every answer MUST follow this structure (Markdown):
-
-## Summary
-Short summary (1-3 sentences) with key numbers and the single most important insight.
-
-## Key Insights
-- Bullets or a short table with findings
-- What looks good, what looks risky, what should be prioritized and why
-
-## Recommended Actions
-1. Numbered list of specific, operational next steps
-2. Connect each action to its impact (safety, compliance, cost)
-3. Include concrete references (e.g., "Prioritize WO 123 on DG1 today due to criticality and 15 days overdue")
-
-Formatting rules:
-- Use clear Markdown headings (##) and bullet lists.
-- Use tables for comparisons (e.g., comparing components, vessels, or spares), maximum 10 rows. If there are more rows, show top items and mention that you truncated the list.
-- Do NOT show empty tables. If nothing is found, explain it in plain text.
-- Explain technical codes (e.g., RH DRIVEN means running-hours-based schedule, COC means Condition of Class) in simple language when they first appear.
-- Translate raw values: "0.00 hours" \u2192 "No running hours logged"; "NOT RH DRIVEN" \u2192 "Time-based maintenance"; "INHERITED" \u2192 "Inherits RH from parent component".
-
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550 ANALYTICAL STYLE \u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-You must analyze, not just dump data. For every list you show, briefly explain:
-- What looks good.
-- What looks risky.
-- What should be prioritized and why.
-
-Use simple, direct language suitable for busy superintendents and chief engineers.
-Prefer concrete, operational recommendations.
-Prioritize by risk: Critical > High > Medium > Low. Show critical items first.
-Cross-reference data sources when relevant (e.g., if showing overdue work orders, also check if critical spares are available for those jobs).
-
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550 HANDLING LIMITATIONS AND ERRORS \u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-If tools fail or the AI service cannot access data, say so clearly and suggest the user retry or contact support; do not fabricate numbers.
-
-If the user asks for things outside scope (crew schedules, budgets, purchasing, noon report if not connected, etc.), politely explain the limitation and, if possible, suggest an alternative question that is in scope.
-
-If a question is extremely large (for example, "all history for all vessels for the last 10 years"), narrow it down by asking for a time window or priority.
-
-\u2550\u2550\u2550\u2550\u2550\u2550\u2550 SAFETY AND TONE \u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-Priorities: 1) correctness, 2) clarity, 3) helpfulness, 4) brevity.
-
-Never guess critical safety or compliance information. If unsure, say what is uncertain and advise the user to confirm in the PMS or with the vessel.
-
-Maintain a professional, calm, and respectful tone at all times.
-
-Use maritime terminology naturally (Main Engine, Chief Engineer, ROB, running hours, dry dock).
-
-Crew are busy \u2014 get to the point fast, lead with what matters most.`;
+import { eq as eq28, and as and25 } from "drizzle-orm";
+async function loadWorkOrders(vesselId) {
+  const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
+  return getWorkOrdersWithComputedStatus2(vesselId);
 }
 var CHATBOT_TOOLS = [
   {
@@ -78974,14 +81192,18 @@ var CHATBOT_TOOLS = [
     type: "function",
     function: {
       name: "get_overdue_work_orders",
-      description: "Get all overdue work orders for a vessel. Use when user asks about overdue maintenance.",
+      description: "Get all overdue work orders for a vessel. Use when user asks about overdue maintenance. Returns at most 10 rows per call (priority first, then days overdue); pass offset to page through the rest.",
       parameters: {
         type: "object",
         properties: {
           vesselId: { type: "string", description: "Vessel ID (required)" },
           limit: {
             type: "number",
-            description: "Maximum number of results (default: 50)"
+            description: "Maximum number of results per call (max 10)"
+          },
+          offset: {
+            type: "number",
+            description: "Rows to skip \u2014 use the number already shown to get the next page"
           }
         },
         required: ["vesselId"]
@@ -79532,11 +81754,35 @@ var CHATBOT_TOOLS = [
     }
   }
 ];
-async function executeTool(toolName, args, storage2) {
+async function executeTool(toolName, args, storage2, access) {
   try {
+    let requested = null;
+    if (typeof args?.vesselId === "string" && args.vesselId && args.vesselId !== "all" && toolName !== "get_fleet_overview") {
+      const vessel = (await storage2.getVessels({ includeDeleted: false })).find(
+        (v) => v.id === args.vesselId || v.vuuid === args.vesselId
+      );
+      if (!vessel) {
+        return { error: `Unknown vessel '${args.vesselId}': no vessel with this ID exists here. Check the vessel selection.` };
+      }
+      requested = { id: vessel.id, vuuid: vessel.vuuid };
+    }
+    if (access && process.env.CHATBOT_ENFORCE_VESSEL_SCOPE !== "false") {
+      if (toolName === "get_fleet_overview") {
+        if (access.role === "Ship") {
+          return { error: "Fleet-wide data isn't available for your role. Ask about your assigned vessel instead." };
+        }
+      } else if (requested) {
+        if (!canAccessVessel(access, requested.vuuid) && !canAccessVessel(access, requested.id)) {
+          return { error: `You don't have access to vessel '${args.vesselId}'. You can only view data for your assigned vessel.` };
+        }
+      }
+    }
+    if (requested && requested.vuuid !== args.vesselId) {
+      args = { ...args, vesselId: requested.vuuid };
+    }
     switch (toolName) {
       case "get_work_orders": {
-        const workOrders2 = await storage2.getWorkOrders(args.vesselId);
+        const workOrders2 = await loadWorkOrders(args.vesselId);
         let filtered = workOrders2.filter(
           (wo) => wo.dataScope === "vessel"
         );
@@ -79582,7 +81828,7 @@ async function executeTool(toolName, args, storage2) {
         };
       }
       case "get_work_order_detail": {
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const wo = allWOs.find(
           (w) => w.id === args.workOrderId || w.workOrderNo === args.workOrderId
         );
@@ -79610,7 +81856,7 @@ async function executeTool(toolName, args, storage2) {
         };
       }
       case "get_overdue_work_orders": {
-        const workOrders2 = await storage2.getWorkOrders(args.vesselId);
+        const workOrders2 = await loadWorkOrders(args.vesselId);
         const overdue = workOrders2.filter(
           (wo) => wo.status === "Overdue" && wo.dataScope === "vessel"
         );
@@ -79641,7 +81887,11 @@ async function executeTool(toolName, args, storage2) {
           dueDate: wo.dueDate,
           assignedTo: wo.assignedTo,
           jobPriority: wo.jobPriority,
-          daysOverdue: wo.dueDate ? Math.max(0, Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1e3 * 60 * 60 * 24))) : 0
+          daysOverdue: wo.dueDate ? Math.max(0, Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1e3 * 60 * 60 * 24))) : 0,
+          // 23-Sep-2026: running-hours jobs have no calendar due date — give the basis and the hours instead
+          maintenanceBasis: wo.maintenanceBasis ?? null,
+          dueRH: wo.dueRH ?? wo.nextDueReading ?? null,
+          currentRH: wo.currentRH ?? null
         })).sort((a, b) => {
           const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
           const pa = priorityOrder[a.jobPriority || "Low"] ?? 3;
@@ -79650,61 +81900,87 @@ async function executeTool(toolName, args, storage2) {
           return b.daysOverdue - a.daysOverdue;
         });
         const limit = Math.min(args.limit || 10, 10);
+        const offset = Math.max(0, Math.min(Number(args.offset) || 0, sorted.length));
+        const page = sorted.slice(offset, offset + limit);
+        const oldest = sorted.length > 0 ? [...sorted].sort((a, b) => b.daysOverdue - a.daysOverdue)[0] : null;
         return {
           totalOverdue: overdue.length,
-          showing: Math.min(limit, sorted.length),
-          remainingSummary: sorted.length > limit ? `...and ${sorted.length - limit} more overdue items` : null,
+          offset,
+          showing: page.length,
+          remainingSummary: sorted.length > offset + page.length ? `...and ${sorted.length - offset - page.length} more overdue items (call again with offset ${offset + page.length})` : null,
+          listOrder: "priority (Critical first) then days overdue \u2014 the oldest item may not be among the rows shown",
           analysisSummary: {
             byPriority,
             topComponents,
             oldestOverdueDays: oldestDays,
+            oldestOverdue: oldest ? { workOrderNo: oldest.workOrderNo, component: oldest.component, jobPriority: oldest.jobPriority, daysOverdue: oldest.daysOverdue } : null,
             averageOverdueDays: agingDays.length > 0 ? Math.round(agingDays.reduce((a, b) => a + b, 0) / agingDays.length) : 0
           },
-          workOrders: sorted.slice(0, limit)
+          workOrders: page
         };
       }
       case "get_due_work_orders": {
-        const workOrders2 = await storage2.getWorkOrders(args.vesselId);
-        let due = workOrders2.filter(
+        const workOrders2 = await loadWorkOrders(args.vesselId);
+        const due = workOrders2.filter(
           (wo) => (wo.status === "Due" || wo.status === "Due (Grace P)") && wo.dataScope === "vessel"
         );
-        if (args.dateRange) {
+        const rhBased = due.filter((wo) => wo.maintenanceBasis === "Running Hours" || !wo.dueDate);
+        let calendar = due.filter((wo) => !rhBased.includes(wo));
+        const rangeLabel = ["week", "month", "quarter"].includes(args.dateRange) ? args.dateRange : null;
+        if (rangeLabel) {
           const now = /* @__PURE__ */ new Date();
           const cutoffDate = /* @__PURE__ */ new Date();
-          if (args.dateRange === "week") cutoffDate.setDate(now.getDate() + 7);
-          else if (args.dateRange === "month")
-            cutoffDate.setDate(now.getDate() + 30);
-          else if (args.dateRange === "quarter")
-            cutoffDate.setDate(now.getDate() + 90);
-          due = due.filter((wo) => {
-            if (!wo.dueDate) return false;
-            const dueDate = new Date(wo.dueDate);
-            return dueDate <= cutoffDate;
-          });
+          cutoffDate.setDate(now.getDate() + (rangeLabel === "week" ? 7 : rangeLabel === "month" ? 30 : 90));
+          calendar = calendar.filter((wo) => new Date(wo.dueDate) <= cutoffDate);
         }
-        return {
-          totalDue: due.length,
-          workOrders: due.slice(0, 50).map((wo) => ({
+        const row = (wo) => {
+          const dueRH = wo.dueRH ?? wo.nextDueReading ?? null;
+          const currentRH = wo.currentRH ?? null;
+          const remaining = dueRH != null && currentRH != null ? Number(dueRH) - Number(currentRH) : null;
+          return {
             id: wo.id,
             workOrderNo: wo.workOrderNo,
             component: wo.component,
             componentCode: wo.componentCode,
             jobTitle: wo.jobTitle,
-            dueDate: wo.dueDate,
+            dueDate: wo.dueDate ?? null,
             assignedTo: wo.assignedTo,
-            jobPriority: wo.jobPriority
-          }))
+            jobPriority: wo.jobPriority,
+            maintenanceBasis: wo.maintenanceBasis ?? null,
+            dueRH,
+            currentRH,
+            rhRemaining: remaining,
+            rhLeadTimeHours: wo.rhLeadTimeHours ?? null,
+            // the application's rule: Due when 0 <= remaining hours <= the vessel's running-hours lead time
+            rhStatusBasis: remaining == null ? null : remaining <= 0 ? "due hours reached" : `${remaining} h remaining, within the ${wo.rhLeadTimeHours ?? "configured"} h running-hours lead time`
+          };
+        };
+        return {
+          totalDue: due.length,
+          dateRange: rangeLabel,
+          calendarDue: {
+            count: calendar.length,
+            note: rangeLabel ? `Calendar-dated work orders due within the next ${rangeLabel}.` : "Calendar-dated work orders currently Due.",
+            workOrders: calendar.slice(0, 50).map(row)
+          },
+          runningHoursDue: {
+            count: rhBased.length,
+            note: "Running-hours work orders currently Due. Their calendar due date cannot be determined from the available hours, so they are NOT counted in the date-range figure. rhStatusBasis states why each is Due under the application's rule; a reading of 0 h or one unchanged for a long time needs confirmation on board.",
+            workOrders: rhBased.slice(0, 50).map(row)
+          }
         };
       }
       case "get_work_order_counts": {
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
-        const overdueCount = vesselWOs.filter((wo) => wo.status === "Overdue").length;
-        const dueCount = vesselWOs.filter((wo) => wo.status === "Due" || wo.status === "Due (Grace P)").length;
-        const completedCount = vesselWOs.filter((wo) => wo.status === "Completed").length;
-        const activeCount = vesselWOs.filter((wo) => wo.status === "Active").length;
-        const postponedCount = vesselWOs.filter((wo) => wo.status === "Postponed").length;
-        const pendingCount = vesselWOs.filter((wo) => wo.status === "Pending Approval").length;
+        const { computeWorkOrderTabCounts: computeWorkOrderTabCounts2 } = await Promise.resolve().then(() => (init_workOrderFilters(), workOrderFilters_exports));
+        const tabs = computeWorkOrderTabCounts2(vesselWOs);
+        const overdueCount = tabs["Overdue"];
+        const dueCount = tabs["Due"];
+        const completedCount = tabs["Completed"];
+        const activeCount = tabs["Planned"];
+        const postponedCount = tabs["Postponed"];
+        const pendingCount = tabs["Pending Approval"];
         const totalActionable = overdueCount + dueCount + completedCount;
         const completionRate = totalActionable > 0 ? Math.round(completedCount / totalActionable * 100) : 0;
         const overdueRate = vesselWOs.length > 0 ? Math.round(overdueCount / vesselWOs.length * 100) : 0;
@@ -79717,7 +81993,9 @@ async function executeTool(toolName, args, storage2) {
           completionRate,
           pendingApproval: pendingCount,
           active: activeCount,
+          unplanned: tabs["Unplanned"],
           postponed: postponedCount,
+          basis: "Same calculation as the Work Orders screen tabs (computed status; archived work orders excluded). 'active' is the screen's Scheduled tab.",
           insight: overdueRate > 20 ? "HIGH_OVERDUE_RATE" : overdueRate > 10 ? "ELEVATED_OVERDUE_RATE" : "NORMAL"
         };
       }
@@ -80161,7 +82439,7 @@ async function executeTool(toolName, args, storage2) {
         return { error: `Unknown analysis type: ${analysisType}` };
       }
       case "get_maintenance_calendar": {
-        const workOrders2 = await storage2.getWorkOrders(args.vesselId);
+        const workOrders2 = await loadWorkOrders(args.vesselId);
         const vesselWOs = workOrders2.filter((wo) => wo.dataScope === "vessel");
         const now = /* @__PURE__ */ new Date();
         const rangeEnd = /* @__PURE__ */ new Date();
@@ -80297,7 +82575,7 @@ async function executeTool(toolName, args, storage2) {
         };
       }
       case "get_maintenance_insights": {
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = /* @__PURE__ */ new Date();
         const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
@@ -80436,7 +82714,7 @@ async function executeTool(toolName, args, storage2) {
         };
       }
       case "get_workload_analysis": {
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = /* @__PURE__ */ new Date();
         const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
@@ -80508,7 +82786,7 @@ async function executeTool(toolName, args, storage2) {
         };
       }
       case "get_component_health_score": {
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const components2 = await storage2.getComponents(args.vesselId);
         const topN = args.topN || 10;
@@ -80583,7 +82861,7 @@ async function executeTool(toolName, args, storage2) {
         };
       }
       case "get_performance_trends": {
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const periodDays = args.periodDays || 90;
         const now = /* @__PURE__ */ new Date();
@@ -80704,7 +82982,7 @@ async function executeTool(toolName, args, storage2) {
             anomaly
           });
         }
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const rhBasedDue = allWOs.filter((wo) => wo.dataScope === "vessel" && (wo.status === "Due" || wo.status === "Overdue") && wo.driverType === "RH");
         return {
           totalRHComponents: rhComponents.length,
@@ -80722,7 +83000,7 @@ async function executeTool(toolName, args, storage2) {
       }
       case "get_maintenance_planner": {
         const periodDays = args.periodDays || 90;
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = /* @__PURE__ */ new Date();
         const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1e3);
@@ -80946,7 +83224,7 @@ async function executeTool(toolName, args, storage2) {
         let surveyAlerts = [];
         try {
           const db2 = await getDb();
-          const certData = await db2.select().from(vesselCertificateData).where(eq27(vesselCertificateData.vesselId, args.vesselId));
+          const certData = await db2.select().from(vesselCertificateData).where(eq28(vesselCertificateData.vesselId, args.vesselId));
           const certMasters = await db2.select().from(shipCertificatesMaster);
           const certMasterMap = new Map(certMasters.map((m) => [m.masterId, m]));
           for (const cert of certData) {
@@ -80974,8 +83252,8 @@ async function executeTool(toolName, args, storage2) {
               });
             }
           }
-          const surveyData = await db2.select().from(vesselSurveyData).where(eq27(vesselSurveyData.vesselId, args.vesselId));
-          const surveyMasters = await db2.select().from(shipSurveysMaster).where(and24(eq27(shipSurveysMaster.isDeleted, false), eq27(shipSurveysMaster.isActive, true)));
+          const surveyData = await db2.select().from(vesselSurveyData).where(eq28(vesselSurveyData.vesselId, args.vesselId));
+          const surveyMasters = await db2.select().from(shipSurveysMaster).where(and25(eq28(shipSurveysMaster.isDeleted, false), eq28(shipSurveysMaster.isActive, true)));
           const surveyMasterMap = new Map(surveyMasters.map((m) => [m.masterId, m]));
           for (const survey of surveyData) {
             if (!survey.dueDate) continue;
@@ -81029,7 +83307,7 @@ async function executeTool(toolName, args, storage2) {
         if (matching.length === 0) {
           return { error: `No equipment found matching "${args.equipmentFilter}". Try a broader search term.`, suggestions: ["pump", "separator", "generator", "compressor", "engine"] };
         }
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         let defects2 = [];
         try {
@@ -81073,7 +83351,7 @@ async function executeTool(toolName, args, storage2) {
         };
       }
       case "get_cost_impact_estimate": {
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const overdue = vesselWOs.filter((wo) => wo.status === "Overdue");
         const now = /* @__PURE__ */ new Date();
@@ -81132,7 +83410,7 @@ async function executeTool(toolName, args, storage2) {
       }
       case "get_workload_forecast": {
         const forecastMonths = args.forecastMonths || 3;
-        const allWOs = await storage2.getWorkOrders(args.vesselId);
+        const allWOs = await loadWorkOrders(args.vesselId);
         const vesselWOs = allWOs.filter((wo) => wo.dataScope === "vessel");
         const now = /* @__PURE__ */ new Date();
         const historicalMonths = {};
@@ -81222,142 +83500,174 @@ async function executeTool(toolName, args, storage2) {
     };
   }
 }
-async function processChatMessage(message, conversationHistory, context, storage2) {
-  const toolsUsed = [];
-  try {
-    const systemPrompt = buildSystemPrompt(context);
-    const MAX_HISTORY = 20;
-    let trimmedHistory = conversationHistory;
-    let contextSummaryMsg = null;
-    if (conversationHistory.length > MAX_HISTORY) {
-      trimmedHistory = conversationHistory.slice(-MAX_HISTORY);
-      contextSummaryMsg = {
-        role: "system",
-        content: `[Earlier conversation context: User has been analyzing vessel maintenance data for ${context.vesselName}. ${conversationHistory.length - MAX_HISTORY} older messages trimmed to maintain response quality. Continue the conversation naturally based on the remaining history.]`
-      };
-    }
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...contextSummaryMsg ? [contextSummaryMsg] : [],
-      ...trimmedHistory.map((msg) => ({
-        role: msg.role,
-        content: msg.content
-      })),
-      { role: "user", content: message }
-    ];
-    const openai = getOpenAIClient();
-    let response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages,
-      tools: CHATBOT_TOOLS,
-      tool_choice: "auto",
-      temperature: 0.4,
-      max_tokens: 4e3
-    });
-    let assistantMessage = response.choices[0].message;
-    let iterations = 0;
-    const maxIterations = 8;
-    while (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0 && iterations < maxIterations) {
-      iterations++;
-      messages.push(assistantMessage);
-      for (const toolCall of assistantMessage.tool_calls) {
-        const toolName = toolCall.function.name;
-        const toolArgs = JSON.parse(toolCall.function.arguments);
-        toolsUsed.push(toolName);
-        console.log(`[Chatbot] Executing tool: ${toolName}`, toolArgs);
-        const result = await executeTool(toolName, toolArgs, storage2);
-        messages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result)
-        });
-      }
-      response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages,
-        tools: CHATBOT_TOOLS,
-        tool_choice: "auto",
-        temperature: 0.4,
-        max_tokens: 4e3
-      });
-      assistantMessage = response.choices[0].message;
-    }
-    const assistantContent = assistantMessage.content || "I was unable to generate a response.";
-    const updatedHistory = [
-      ...conversationHistory,
-      { role: "user", content: message },
-      { role: "assistant", content: assistantContent }
-    ];
-    return {
-      response: assistantContent,
-      toolsUsed: Array.from(new Set(toolsUsed)),
-      conversationHistory: updatedHistory
-    };
-  } catch (error) {
-    console.error("[Chatbot] Error processing message:", error);
-    if (error.code === "insufficient_quota") {
-      return {
-        response: "I'm unable to process your request due to API quota limits. Please contact your system administrator.",
-        toolsUsed: [],
-        conversationHistory: [
-          ...conversationHistory,
-          { role: "user", content: message },
-          {
-            role: "assistant",
-            content: "I'm unable to process your request due to API quota limits."
-          }
-        ]
-      };
-    }
-    return {
-      response: "I'm having trouble connecting to my AI service right now. Please try again in a moment, or contact support if this persists.",
-      toolsUsed: [],
-      conversationHistory: [
-        ...conversationHistory,
-        { role: "user", content: message },
-        {
-          role: "assistant",
-          content: "I'm having trouble connecting to my AI service right now."
-        }
-      ]
-    };
-  }
-}
 
-// server/modules/chatbot/controllers/chatbotController.ts
+// server/modules/assistant-api/controller.ts
 init_storage();
-async function handleChat(req, res) {
-  const {
-    message,
-    conversationHistory = [],
-    context = {}
-  } = req.body;
-  if (!message || typeof message !== "string" || message.trim().length === 0) {
-    return res.status(400).json({ error: "Message is required" });
+
+// server/modules/assistant-api/identityToken.ts
+import { createHmac, timingSafeEqual } from "crypto";
+var CLOCK_LEEWAY_SEC = parseInt(process.env.IDENTITY_CLOCK_LEEWAY_SEC || "90", 10);
+function signIdentity(identity, key, ttlSec = 60) {
+  if (!key) throw new Error("signing key required");
+  const now = Math.floor(Date.now() / 1e3);
+  const payload = { ...identity, iat: now, exp: now + ttlSec };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const mac = createHmac("sha256", key).update(body).digest("base64url");
+  return `${body}.${mac}`;
+}
+function verifyIdentity(token, key) {
+  if (!token || typeof token !== "string") return { ok: false, reason: "missing" };
+  const dot = token.lastIndexOf(".");
+  if (dot <= 0) return { ok: false, reason: "malformed" };
+  const body = token.slice(0, dot);
+  const expected = createHmac("sha256", key).update(body).digest();
+  let given;
+  try {
+    given = Buffer.from(token.slice(dot + 1), "base64url");
+  } catch {
+    return { ok: false, reason: "malformed" };
   }
-  const userRole = req.user?.role || "Ship";
-  const fullName = req.user?.fullName || "Unknown";
-  const chatContext = {
-    vesselId: context.vesselId || "",
-    vesselName: context.vesselName || "Unknown Vessel",
-    currentPage: context.currentPage || "/pms",
-    userRole: `${userRole} (${fullName})`
-  };
-  console.log(
-    `[Chatbot] Processing message from ${fullName} (${userRole}): "${message.substring(0, 100)}..."`
-  );
-  const result = await processChatMessage(
-    message.trim(),
-    conversationHistory,
-    chatContext,
-    storage
-  );
-  res.json(result);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    return { ok: false, reason: "bad-signature" };
+  }
+  let identity;
+  try {
+    identity = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+  } catch {
+    return { ok: false, reason: "malformed" };
+  }
+  const now = Math.floor(Date.now() / 1e3);
+  if (!identity.exp || identity.exp + CLOCK_LEEWAY_SEC < now) return { ok: false, reason: "expired" };
+  if (identity.iat && identity.iat - CLOCK_LEEWAY_SEC > now) return { ok: false, reason: "future-dated" };
+  if (!identity.userId || !identity.role) return { ok: false, reason: "malformed" };
+  return { ok: true, identity };
 }
 
-// server/modules/chatbot/routes.ts
+// server/modules/assistant-api/controller.ts
+var roleFallbackFromProfile = () => (process.env.ASSISTANT_ROLE_FALLBACK || "").trim().toLowerCase() === "profile";
+var ROLE_CLAIM = ((process.env.SAILERP_JWT_USER_CLAIMS || "id,role,userType").split(",")[1] || "role").trim();
+var API_VERSION = 1;
+var MODULE_ID = "technical";
+var serviceSecret = () => process.env.ASSISTANT_SERVICE_SECRET || "";
+var signingKey = () => process.env.ASSISTANT_IDENTITY_SIGNING_KEY || "";
+var instanceId = () => (process.env.ASSISTANT_INSTANCE_ID || "").trim();
+function requireServiceSecret(req, res) {
+  const secret = serviceSecret();
+  if (!secret || req.headers["x-service-secret"] !== secret) {
+    res.status(401).json({ error: "service secret required" });
+    return false;
+  }
+  return true;
+}
+async function handleManifest(req, res) {
+  if (!requireServiceSecret(req, res)) return;
+  res.json({
+    apiVersion: API_VERSION,
+    module: MODULE_ID,
+    tools: CHATBOT_TOOLS.flatMap((t) => "function" in t ? [t.function] : [])
+  });
+}
+async function handleExecute(req, res) {
+  if (!requireServiceSecret(req, res)) return;
+  const v = verifyIdentity(req.headers["x-assistant-identity"], signingKey());
+  if (!v.ok) return res.status(401).json({ error: `identity rejected: ${v.reason}` });
+  if (instanceId() && v.identity.iss !== instanceId()) {
+    return res.status(401).json({ error: `identity rejected: issuer '${v.identity.iss ?? ""}' is not this instance` });
+  }
+  const { tool, args, requestId } = req.body || {};
+  if (!tool || typeof tool !== "string") return res.status(400).json({ error: "tool is required" });
+  if (!CHATBOT_TOOLS.some((t) => "function" in t && t.function.name === tool)) {
+    return res.json({ ok: false, error: `Unknown tool '${tool}' for module ${MODULE_ID}` });
+  }
+  const ut = v.identity.userType ?? void 0;
+  const scopeRole = ut === "Ship" ? "Ship" : ut === "Office" ? "Office" : v.identity.role;
+  const access = { role: scopeRole, vesselId: v.identity.vesselId ?? null };
+  console.log(`[assistant-api] execute ${tool} args=${JSON.stringify(args || {}).slice(0, 300)} user=${v.identity.userId} role=${v.identity.role} req=${requestId ?? "-"}`);
+  try {
+    const data = await executeTool(tool, args || {}, storage, access);
+    if (data && typeof data === "object" && "error" in data && Object.keys(data).length === 1) {
+      return res.json({ ok: false, error: String(data.error), requestId });
+    }
+    return res.json({ ok: true, data, requestId });
+  } catch (e) {
+    return res.json({ ok: false, error: e?.message || "tool execution failed", requestId });
+  }
+}
+var allowedRoles = () => (process.env.ASSISTANT_ALLOWED_ROLES || "Sail Admin").split(",").map((s) => s.trim()).filter(Boolean);
+async function handleMintToken(req, res) {
+  const key = signingKey();
+  if (!key) return res.status(503).json({ error: "assistant identity signing not configured" });
+  if (!instanceId()) return res.status(503).json({ error: "assistant instance id not configured (ASSISTANT_INSTANCE_ID)" });
+  const vu = req.verifiedUser;
+  if (!vu) {
+    return res.status(403).json({
+      error: "cannot mint: no verified login identity on this request (multi-tenant mode with a SAILERP token is required)"
+    });
+  }
+  const hardMissing = vu.missing.filter((c) => c !== ROLE_CLAIM);
+  if (hardMissing.length) {
+    return res.status(403).json({
+      error: `cannot mint: the login token is missing required claim(s): ${hardMissing.join(", ")}`
+    });
+  }
+  let role = vu.role;
+  let roleSource = "token";
+  if (!role) {
+    const mu = await findMasterUserById(vu.userId);
+    if (mu?.role) {
+      role = mu.role;
+      roleSource = "master_users";
+    } else if (roleFallbackFromProfile()) {
+      const fwd = getRbacIdentity(req);
+      if (fwd.source === "forwarded" && fwd.role) {
+        role = fwd.role;
+        roleSource = "profile-header";
+      }
+    }
+    if (!role) {
+      return res.status(403).json({
+        error: `cannot mint: the login token carries no role and user '${vu.userId}' has no role in the synced master data (master_users)`
+      });
+    }
+  }
+  if (!allowedRoles().includes(role)) {
+    return res.status(403).json({ error: `cannot mint: role '${role}' is not permitted to use the assistant` });
+  }
+  console.log(`[assistant-api] mint user=${vu.userId} role=${role} (${roleSource}) userType=${vu.userType} iss=${instanceId()}`);
+  const token = signIdentity(
+    {
+      userId: vu.userId,
+      userName: req.user?.fullName,
+      // display/masking only (from the profile) — never used for authorisation
+      role,
+      // VERIFIED: token claim, or the synced master-data role for the verified user id
+      userType: vu.userType,
+      // VERIFIED token claim — the vessel-scope decision key
+      vesselId: req.user?.vesselId ?? null,
+      tenantDomain: req.tenantDomain ?? null,
+      tuid: req.tenantTuid ?? null,
+      iss: instanceId()
+      // which registered instance minted this — the assistant's routing key
+    },
+    key,
+    60
+  );
+  res.json({ token, expiresInSec: 60 });
+}
+
+// server/modules/assistant-api/routes.ts
 var router17 = Router17();
-router17.post("/chat", requireAuth, asyncHandler(handleChat));
+async function shoreOnly(_req, res, next) {
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  if (await isShipInstance2()) {
+    return res.status(403).json({ error: "assistant is shore-only: not available on a ship instance" });
+  }
+  next();
+}
+router17.use("/assistant", asyncHandler(shoreOnly));
+router17.get("/assistant/manifest", asyncHandler(handleManifest));
+router17.post("/assistant/execute", asyncHandler(handleExecute));
+router17.get("/assistant/token", requireAuth, asyncHandler(handleMintToken));
 var routes_default17 = router17;
 
 // server/modules/misc/routes.ts
@@ -81423,8 +83733,9 @@ init_status();
 init_constants();
 init_externalApi();
 init_sync();
+init_completedWorkOrderDate();
 init_schema();
-import { sql as sql21, eq as eq28, and as and25 } from "drizzle-orm";
+import { sql as sql23, eq as eq29 } from "drizzle-orm";
 function normalizeSourceDeletionState(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
@@ -81441,7 +83752,7 @@ function getSourceDeletionState(entry) {
   return normalizeSourceDeletionState(entry?.is_deleted);
 }
 async function upsertMasterRecord(db2, table, id, insertValues, updateValues, isDeleted, stats) {
-  const existing = await db2.select({ id: table.id }).from(table).where(eq28(table.id, id)).limit(1);
+  const existing = await db2.select({ id: table.id }).from(table).where(eq29(table.id, id)).limit(1);
   await db2.insert(table).values(insertValues).onConflictDoUpdate({
     target: table.id,
     set: updateValues
@@ -81685,7 +83996,8 @@ async function syncWorkOrderStatus(req, res) {
           newStatus: computedStatus
         });
         if (!dryRun2) {
-          const updated = await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
+          const statusUpdate = ensureCompletedWorkOrderDate(wo, { status: computedStatus });
+          const updated = await storage.updateWorkOrder(wo.wouuid, statusUpdate);
           try {
             await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updated, "system");
           } catch (e) {
@@ -81811,7 +84123,7 @@ async function syncMasters(req, res) {
         isActive: !isDeleted,
         isDeleted,
         updatedAt: now,
-        vuuid: sql21`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`,
+        vuuid: sql23`COALESCE(${vessels.vuuid}, EXCLUDED.vuuid)`,
         ...vCodeFields
       }, isDeleted, stats.vessels);
     } catch (e) {
@@ -82212,8 +84524,6 @@ async function rhDiagnostic(req, res) {
     for (const link of links) {
       const comp = componentMap.get(link.componentId);
       const currentRH = comp ? parseFloat(comp.rhCurrentMaster || comp.rhCurrentInheritedCached || comp.currentCumulativeRH || "0") : 0;
-      const linkLastDone = parseFloat(link.lastDoneRH || "0");
-      const linkNextDue = parseFloat(link.nextDueRH || "0");
       const jobLastDone = parseFloat(job.lastDoneRH || "0");
       const jobNextDue = parseFloat(job.nextDueRH || "0");
       const completedWOs = rhWOs.filter(
@@ -82232,7 +84542,7 @@ async function rhDiagnostic(req, res) {
         actualLastDoneRH = cyclesPassed * interval;
       }
       const correctNextDue = actualLastDoneRH + interval;
-      const needsRepair = linkNextDue !== correctNextDue || linkLastDone !== actualLastDoneRH;
+      const needsRepair = jobNextDue !== correctNextDue || jobLastDone !== actualLastDoneRH;
       diagnosticRows.push({
         jobNo: job.jobNo,
         jobTitle: job.jobTitle,
@@ -82241,8 +84551,6 @@ async function rhDiagnostic(req, res) {
         interval,
         currentRH,
         stored: {
-          linkLastDoneRH: linkLastDone,
-          linkNextDueRH: linkNextDue,
           jobLastDoneRH: jobLastDone,
           jobNextDueRH: jobNextDue
         },
@@ -82270,8 +84578,6 @@ async function rhDiagnostic(req, res) {
         interval,
         currentRH,
         stored: {
-          linkLastDoneRH: null,
-          linkNextDueRH: null,
           jobLastDoneRH: jobLastDone,
           jobNextDueRH: jobNextDue
         },
@@ -82327,7 +84633,6 @@ async function repairRhTracking(req, res) {
   const allWOs = await storage.getWorkOrders(vesselId || void 0);
   const FINALIZED = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
   let jobsRepaired = 0;
-  let linksRepaired = 0;
   let wosRepaired = 0;
   const repairs = [];
   for (const job of rhJobs) {
@@ -82355,28 +84660,6 @@ async function repairRhTracking(req, res) {
         correctLastDone = cyclesPassed * interval;
       }
       const correctNextDue = correctLastDone + interval;
-      const storedLastDone = parseFloat(link.lastDoneRH || "0");
-      const storedNextDue = parseFloat(link.nextDueRH || "0");
-      if (storedLastDone !== correctLastDone || storedNextDue !== correctNextDue) {
-        if (!dryRun2) {
-          await db2.update(jobComponentLinks).set({
-            lastDoneRH: correctLastDone.toString(),
-            nextDueRH: correctNextDue.toString(),
-            updatedAt: /* @__PURE__ */ new Date()
-          }).where(and25(
-            eq28(jobComponentLinks.jobId, job.juuid),
-            eq28(jobComponentLinks.componentId, link.componentId)
-          ));
-        }
-        linksRepaired++;
-        repairs.push({
-          type: "link",
-          jobNo: job.jobNo,
-          componentCode: compCode,
-          before: { lastDoneRH: storedLastDone, nextDueRH: storedNextDue },
-          after: { lastDoneRH: correctLastDone, nextDueRH: correctNextDue }
-        });
-      }
       if (correctLastDone > jobLevelLastDone) {
         jobLevelLastDone = correctLastDone;
         jobLevelNextDue = correctNextDue;
@@ -82388,7 +84671,7 @@ async function repairRhTracking(req, res) {
         const storedNextDueReading = parseFloat(wo.nextDueReading || "0");
         if (storedNextDueReading !== correctNextDue) {
           if (!dryRun2) {
-            await db2.update(workOrders).set({ nextDueReading: correctNextDue.toString() }).where(eq28(workOrders.id, wo.id));
+            await db2.update(workOrders).set({ nextDueReading: correctNextDue.toString() }).where(eq29(workOrders.id, wo.id));
           }
           wosRepaired++;
           repairs.push({
@@ -82427,7 +84710,7 @@ async function repairRhTracking(req, res) {
         const storedNextDueReading = parseFloat(wo.nextDueReading || "0");
         if (storedNextDueReading !== jobLevelNextDue) {
           if (!dryRun2) {
-            await db2.update(workOrders).set({ nextDueReading: jobLevelNextDue.toString() }).where(eq28(workOrders.id, wo.id));
+            await db2.update(workOrders).set({ nextDueReading: jobLevelNextDue.toString() }).where(eq29(workOrders.id, wo.id));
           }
           wosRepaired++;
           repairs.push({
@@ -82448,7 +84731,7 @@ async function repairRhTracking(req, res) {
           await db2.update(jobs).set({
             lastDoneRH: jobLevelLastDone.toString(),
             nextDueRH: jobLevelNextDue.toString()
-          }).where(eq28(jobs.juuid, job.juuid));
+          }).where(eq29(jobs.juuid, job.juuid));
         }
         jobsRepaired++;
         repairs.push({
@@ -82460,17 +84743,16 @@ async function repairRhTracking(req, res) {
       }
     }
   }
-  console.log(`\u{1F527} [RH REPAIR] ${dryRun2 ? "DRY RUN" : "LIVE"} complete: ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} WOs repaired`);
+  console.log(`\u{1F527} [RH REPAIR] ${dryRun2 ? "DRY RUN" : "LIVE"} complete: ${jobsRepaired} jobs, ${wosRepaired} WOs repaired`);
   res.json({
     success: true,
     dryRun: dryRun2,
     vesselId: vesselId || "all",
     totalRhJobs: rhJobs.length,
     jobsRepaired,
-    linksRepaired,
     wosRepaired,
     repairs: repairs.slice(0, 200),
-    message: `${dryRun2 ? "[DRY RUN] Would repair" : "Repaired"} ${jobsRepaired} jobs, ${linksRepaired} links, ${wosRepaired} work orders`
+    message: `${dryRun2 ? "[DRY RUN] Would repair" : "Repaired"} ${jobsRepaired} jobs and ${wosRepaired} work orders`
   });
 }
 
@@ -82506,39 +84788,39 @@ init_syncRole();
 // server/modules/access-control/repositories/viewModeRepository.ts
 init_db();
 init_schema();
-import { eq as eq29, and as and26, asc as asc6, sql as sql22 } from "drizzle-orm";
+import { eq as eq30, and as and27, asc as asc6, sql as sql24 } from "drizzle-orm";
 async function getActiveViewModes() {
   const db2 = await getDb();
-  return db2.select().from(viewModesMaster).where(and26(eq29(viewModesMaster.isDeleted, false), eq29(viewModesMaster.isActive, true))).orderBy(asc6(viewModesMaster.sortOrder), asc6(viewModesMaster.code));
+  return db2.select().from(viewModesMaster).where(and27(eq30(viewModesMaster.isDeleted, false), eq30(viewModesMaster.isActive, true))).orderBy(asc6(viewModesMaster.sortOrder), asc6(viewModesMaster.code));
 }
 async function getRolesWithMappings() {
   const db2 = await getDb();
   const rows = await db2.select({
-    roleRuid: sql22`${admnRoleMaster.ruid}::text`,
+    roleRuid: sql24`${admnRoleMaster.ruid}::text`,
     roleName: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype,
     viewModeCode: roleViewModeMapping.viewModeCode
   }).from(admnRoleMaster).leftJoin(
     roleViewModeMapping,
-    and26(
-      sql22`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
-      eq29(roleViewModeMapping.isDeleted, false)
+    and27(
+      sql24`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
+      eq30(roleViewModeMapping.isDeleted, false)
     )
-  ).where(and26(eq29(admnRoleMaster.isActive, true), eq29(admnRoleMaster.isDeleted, false))).orderBy(asc6(admnRoleMaster.roletype), asc6(admnRoleMaster.assignedRole));
+  ).where(and27(eq30(admnRoleMaster.isActive, true), eq30(admnRoleMaster.isDeleted, false))).orderBy(asc6(admnRoleMaster.roletype), asc6(admnRoleMaster.assignedRole));
   return rows;
 }
 async function getActiveRoleByTypeAndName(roletype, assignedRole) {
   const db2 = await getDb();
   const rows = await db2.select({
-    ruid: sql22`${admnRoleMaster.ruid}::text`,
+    ruid: sql24`${admnRoleMaster.ruid}::text`,
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
-    and26(
-      eq29(admnRoleMaster.roletype, roletype),
-      eq29(admnRoleMaster.assignedRole, assignedRole),
-      eq29(admnRoleMaster.isActive, true),
-      eq29(admnRoleMaster.isDeleted, false)
+    and27(
+      eq30(admnRoleMaster.roletype, roletype),
+      eq30(admnRoleMaster.assignedRole, assignedRole),
+      eq30(admnRoleMaster.isActive, true),
+      eq30(admnRoleMaster.isDeleted, false)
     )
   ).limit(1);
   return rows[0];
@@ -82546,14 +84828,14 @@ async function getActiveRoleByTypeAndName(roletype, assignedRole) {
 async function getActiveRoleByRuid(roleRuid) {
   const db2 = await getDb();
   const rows = await db2.select({
-    ruid: sql22`${admnRoleMaster.ruid}::text`,
+    ruid: sql24`${admnRoleMaster.ruid}::text`,
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
-    and26(
-      sql22`${admnRoleMaster.ruid}::text = ${roleRuid}`,
-      eq29(admnRoleMaster.isActive, true),
-      eq29(admnRoleMaster.isDeleted, false)
+    and27(
+      sql24`${admnRoleMaster.ruid}::text = ${roleRuid}`,
+      eq30(admnRoleMaster.isActive, true),
+      eq30(admnRoleMaster.isDeleted, false)
     )
   ).limit(1);
   return rows[0];
@@ -82561,7 +84843,7 @@ async function getActiveRoleByRuid(roleRuid) {
 async function getMappingByRoleRuid(roleRuid) {
   const db2 = await getDb();
   const rows = await db2.select().from(roleViewModeMapping).where(
-    and26(eq29(roleViewModeMapping.roleRuid, roleRuid), eq29(roleViewModeMapping.isDeleted, false))
+    and27(eq30(roleViewModeMapping.roleRuid, roleRuid), eq30(roleViewModeMapping.isDeleted, false))
   ).limit(1);
   return rows[0];
 }
@@ -82579,7 +84861,7 @@ async function upsertMapping(roleRuid, viewModeCode, updatedByUuid) {
 }
 async function softDeleteMapping(roleRuid, updatedByUuid) {
   const db2 = await getDb();
-  await db2.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(roleViewModeMapping.roleRuid, roleRuid));
+  await db2.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq30(roleViewModeMapping.roleRuid, roleRuid));
 }
 
 // server/modules/access-control/services/viewModeService.ts
@@ -83727,11 +86009,11 @@ function computePointInTimeStatus(input) {
   const woId = wo.wouuid || wo.id;
   const woPostponements = woId ? postponements.filter((p) => p.workOrderId === woId) : [];
   const activePostponement = findActivePostponementAt(woPostponements, refDate);
-  const effectiveDueDate = activePostponement?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
+  const effectiveDueDate2 = activePostponement?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
   const computed = computeWorkOrderStatus({
     // No pre-normalization needed: computeWorkOrderStatus now parses all
     // stored formats via the shared parser (dateParse.ts).
-    dueDate: effectiveDueDate,
+    dueDate: effectiveDueDate2,
     dueRH: parseNumber(wo.nextDueReading),
     currentRH: parseNumber(wo.currentReading),
     isExecution: wo.isExecution ?? false,
@@ -84994,21 +87276,21 @@ init_permissions();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq33, and as and29, desc as desc6 } from "drizzle-orm";
+import { eq as eq34, and as and30, desc as desc6 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db2 = await getDb();
   let query = db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq33(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq33(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq34(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq34(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
-    return db2.select().from(nrNoonReports).where(and29(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
+    return db2.select().from(nrNoonReports).where(and30(...conditions)).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
   return db2.select().from(nrNoonReports).orderBy(desc6(nrNoonReports.reportDate)).limit(filters.limit || 100);
 }
 async function getNoonReportById(id) {
   const db2 = await getDb();
-  const result = await db2.select().from(nrNoonReports).where(eq33(nrNoonReports.id, id)).limit(1);
+  const result = await db2.select().from(nrNoonReports).where(eq34(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -85021,7 +87303,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq33(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -85031,27 +87313,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq33(nrNoonReports.id, id)).returning();
+  }).where(eq34(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db2 = await getDb();
-  await db2.delete(nrNoonReports).where(and29(eq33(nrNoonReports.id, id), eq33(nrNoonReports.status, "draft")));
+  await db2.delete(nrNoonReports).where(and30(eq34(nrNoonReports.id, id), eq34(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db2 = await getDb();
-  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq33(nrNoonReports.id, id)).returning();
+  const result = await db2.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq34(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrFuelRob).where(eq33(nrFuelRob.vesselId, vesselId));
+  return db2.select().from(nrFuelRob).where(eq34(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db2 = await getDb();
-  const existing = await db2.select().from(nrFuelRob).where(and29(eq33(nrFuelRob.vesselId, vesselId), eq33(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db2.select().from(nrFuelRob).where(and30(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and29(eq33(nrFuelRob.vesselId, vesselId), eq33(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and30(eq34(nrFuelRob.vesselId, vesselId), eq34(nrFuelRob.fuelType, fuelType)));
   } else {
     await db2.insert(nrFuelRob).values({
       vesselId,
@@ -85063,27 +87345,27 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and29(eq33(nrNoonReports.vesselId, vesselId), eq33(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and30(eq34(nrNoonReports.vesselId, vesselId), eq34(nrNoonReports.status, "submitted"))).orderBy(desc6(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq37, and as and32, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
+import { eq as eq38, and as and33, desc as desc9, asc as asc7, isNull as isNull5, count } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq36, and as and31, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq37, and as and32, desc as desc8, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq34, sql as sql24 } from "drizzle-orm";
+import { eq as eq35, sql as sql26 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db2 = await getDb();
   const result = await db2.execute(
-    sql24`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
+    sql26`SELECT vuuid, name, imo_number, flag, vessel_type, deadweight, gross_tonnage
         FROM vessels WHERE vuuid = ${vesselId} LIMIT 1`
   );
   const row = result.rows[0] ?? null;
@@ -85109,7 +87391,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrFuelRob).where(and31(eq36(nrFuelRob.vesselId, vesselId), eq36(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db2.select().from(nrFuelRob).where(and32(eq37(nrFuelRob.vesselId, vesselId), eq37(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db2.insert(nrFuelRob).values({
@@ -85121,7 +87403,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and31(eq36(nrFuelRob.vesselId, vesselId), eq36(nrFuelRob.fuelType, fuelType)));
+    await db2.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and32(eq37(nrFuelRob.vesselId, vesselId), eq37(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -85166,7 +87448,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db2.select().from(nrFuelRob).where(and31(eq36(nrFuelRob.vesselId, report.vesselId), eq36(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db2.select().from(nrFuelRob).where(and32(eq37(nrFuelRob.vesselId, report.vesselId), eq37(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum3(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -85182,7 +87464,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and31(eq36(nrFuelRob.vesselId, report.vesselId), eq36(nrFuelRob.fuelType, fuelType)));
+      }).where(and32(eq37(nrFuelRob.vesselId, report.vesselId), eq37(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db2.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -85203,9 +87485,9 @@ async function computeCiiTracking(report) {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const yearReports = await db2.select().from(nrNoonReports).where(
-    and31(
-      eq36(nrNoonReports.vesselId, report.vesselId),
-      eq36(nrNoonReports.status, "submitted"),
+    and32(
+      eq37(nrNoonReports.vesselId, report.vesselId),
+      eq37(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -85232,7 +87514,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db2.select().from(nrCiiTracking).where(and31(eq36(nrCiiTracking.vesselId, report.vesselId), eq36(nrCiiTracking.year, year))).limit(1);
+  const existing = await db2.select().from(nrCiiTracking).where(and32(eq37(nrCiiTracking.vesselId, report.vesselId), eq37(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db2.update(nrCiiTracking).set({
@@ -85243,7 +87525,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and31(eq36(nrCiiTracking.vesselId, report.vesselId), eq36(nrCiiTracking.year, year)));
+    }).where(and32(eq37(nrCiiTracking.vesselId, report.vesselId), eq37(nrCiiTracking.year, year)));
   } else {
     await db2.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -85274,9 +87556,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db2.select().from(nrVoyageLegs).where(and31(eq36(nrVoyageLegs.vesselId, report.vesselId), eq36(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db2.select().from(nrVoyageLegs).where(and32(eq37(nrVoyageLegs.vesselId, report.vesselId), eq37(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq36(nrVoyageLegs.id, existing[0].id));
+    await db2.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq37(nrVoyageLegs.id, existing[0].id));
   } else {
     await db2.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -85303,7 +87585,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db2 = await getDb();
-  return db2.select().from(nrNoonReports).where(and31(eq36(nrNoonReports.vesselId, vesselId), eq36(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db2.select().from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 function toNum3(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -85376,7 +87658,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db2 = await getDb();
-  const robRecords = await db2.select().from(nrFuelRob).where(eq37(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db2.select().from(nrFuelRob).where(eq38(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -85407,11 +87689,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db2.select().from(nrCiiTracking).where(and32(eq37(nrCiiTracking.vesselId, vesselId), eq37(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db2.select().from(nrCiiTracking).where(and33(eq38(nrCiiTracking.vesselId, vesselId), eq38(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db2.select().from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db2.select().from(nrNoonReports).where(and33(eq38(nrNoonReports.vesselId, vesselId), eq38(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum4(r.hfoConsumption) ?? 0;
     const lsmgo = toNum4(r.lsmgoConsumption) ?? 0;
@@ -85441,7 +87723,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and33(eq38(nrNoonReports.vesselId, vesselId), eq38(nrNoonReports.status, "submitted"))).orderBy(asc7(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum4(r.speed);
     if (speed === null) return [];
@@ -85475,7 +87757,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db2 = await getDb();
-  return db2.select().from(nrAlerts).where(and32(eq37(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
+  return db2.select().from(nrAlerts).where(and33(eq38(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt))).orderBy(desc9(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db2 = await getDb();
@@ -85483,8 +87765,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db2.select().from(nrAlerts).where(eq37(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db2.select({ total: count() }).from(nrAlerts).where(eq37(nrAlerts.vesselId, vesselId))
+    db2.select().from(nrAlerts).where(eq38(nrAlerts.vesselId, vesselId)).orderBy(desc9(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db2.select({ total: count() }).from(nrAlerts).where(eq38(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -85497,28 +87779,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db2 = await getDb();
-  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and32(eq37(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+  const rows = await db2.select({ total: count() }).from(nrAlerts).where(and33(eq38(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db2 = await getDb();
-  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq37(nrAlerts.id, alertId)).limit(1);
+  const existing = await db2.select({ id: nrAlerts.id }).from(nrAlerts).where(eq38(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq37(nrAlerts.id, alertId)).returning();
+  const updated = await db2.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq38(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db2 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db2.select().from(nrNoonReports).where(and32(eq37(nrNoonReports.vesselId, vesselId), eq37(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db2.select().from(nrNoonReports).where(and33(eq38(nrNoonReports.vesselId, vesselId), eq38(nrNoonReports.status, "submitted"))).orderBy(desc9(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db2.select().from(nrNoonReports).where(eq37(nrNoonReports.vesselId, vesselId));
+    const allReports = await db2.select().from(nrNoonReports).where(eq38(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and32(eq37(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
+    const alertRows = await db2.select({ total: count() }).from(nrAlerts).where(and33(eq38(nrAlerts.vesselId, vesselId), isNull5(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db2.select().from(nrFuelRob).where(eq37(nrFuelRob.vesselId, vesselId));
+    const robRows = await db2.select().from(nrFuelRob).where(eq38(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum4(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum4(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum4(r.avg7Day) ?? 0), 0) || null;
@@ -85557,16 +87839,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq38, and as and33, desc as desc10, sum } from "drizzle-orm";
+import { eq as eq39, and as and34, desc as desc10, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db2 = await getDb();
-  const conditions = [eq38(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq38(nrBunkerRecords.voyageNo, filters.voyageNo));
-  return db2.select().from(nrBunkerRecords).where(and33(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
+  const conditions = [eq39(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq39(nrBunkerRecords.voyageNo, filters.voyageNo));
+  return db2.select().from(nrBunkerRecords).where(and34(...conditions)).orderBy(desc10(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db2 = await getDb();
-  const rows = await db2.select().from(nrBunkerRecords).where(eq38(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db2.select().from(nrBunkerRecords).where(eq39(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -85576,22 +87858,22 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db2 = await getDb();
-  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq38(nrBunkerRecords.id, id)).returning();
+  const rows = await db2.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq39(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db2 = await getDb();
-  await db2.delete(nrBunkerRecords).where(eq38(nrBunkerRecords.id, id));
+  await db2.delete(nrBunkerRecords).where(eq39(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db2 = await getDb();
-  const conditions = [eq38(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq38(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq39(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq39(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db2.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
     totalCost: sum(nrBunkerRecords.totalCost)
-  }).from(nrBunkerRecords).where(and33(...conditions)).groupBy(nrBunkerRecords.fuelType);
+  }).from(nrBunkerRecords).where(and34(...conditions)).groupBy(nrBunkerRecords.fuelType);
   return rows.map((r) => ({
     fuelType: r.fuelType,
     totalQuantityMt: r.totalQuantityMt ?? "0",
@@ -86166,6 +88448,36 @@ function isExemptPath(relPath) {
   return EXEMPT_PATTERNS.some((re) => re.test(p));
 }
 
+// server/modules/assistant-api/serviceTenant.ts
+import { timingSafeEqual as timingSafeEqual2 } from "crypto";
+var SERVICE_PATHS = /* @__PURE__ */ new Set(["/assistant/manifest", "/assistant/execute"]);
+function secretMatches(given) {
+  const expected = process.env.ASSISTANT_SERVICE_SECRET || "";
+  if (!expected || typeof given !== "string" || !given) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual2(a, b);
+}
+function assistantServiceTenant(req) {
+  if (!SERVICE_PATHS.has(req.path)) return { kind: "not-service" };
+  if (!secretMatches(req.headers["x-service-secret"])) {
+    return { kind: "reject", status: 401, error: "unauthorized", message: "service secret required" };
+  }
+  if (req.path === "/assistant/manifest") return { kind: "manifest" };
+  const v = verifyIdentity(req.headers["x-assistant-identity"], process.env.ASSISTANT_IDENTITY_SIGNING_KEY || "");
+  if (!v.ok) return { kind: "reject", status: 401, error: "unauthorized", message: `identity rejected: ${v.reason}` };
+  const domain = String(v.identity.tenantDomain || "").trim();
+  if (!domain) {
+    return {
+      kind: "reject",
+      status: 401,
+      error: "invalid_identity",
+      message: "identity token carries no tenant domain (minted outside multi-tenant mode)"
+    };
+  }
+  return { kind: "domain", domain };
+}
+
 // server/middleware/tenantMiddleware.ts
 var IS_DEV = process.env.NODE_ENV === "development";
 var AUTH_BYPASS = process.env.AUTH_BYPASS === "true" && IS_DEV;
@@ -86176,35 +88488,67 @@ function extractBearer(req) {
   const m = value.match(/^Bearer\s+(.+)$/i);
   return m ? m[1].trim() : null;
 }
+var USER_CLAIM_NAMES = (() => {
+  const raw = (process.env.SAILERP_JWT_USER_CLAIMS || "id,role,userType").split(",").map((s) => s.trim());
+  return { userId: raw[0] || "id", role: raw[1] || "role", userType: raw[2] || "userType" };
+})();
+function claimString(payload, name) {
+  const v = payload[name];
+  if (typeof v === "number") return String(v);
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+function readVerifiedUser(payload) {
+  const userId = claimString(payload, USER_CLAIM_NAMES.userId);
+  const role = claimString(payload, USER_CLAIM_NAMES.role);
+  const ut = claimString(payload, USER_CLAIM_NAMES.userType);
+  const userType = ut === "Office" || ut === "Ship" ? ut : null;
+  const missing = [];
+  if (!userId) missing.push(USER_CLAIM_NAMES.userId);
+  if (!role) missing.push(USER_CLAIM_NAMES.role);
+  if (!userType) missing.push(USER_CLAIM_NAMES.userType);
+  return { userId, role, userType, missing };
+}
 function tenantMiddleware(req, res, next) {
   if (!tenantConnectionManager.isMultiTenantEnabled) return next();
   if (AUTH_BYPASS) return next();
   if (isExemptPath(req.path)) return next();
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    res.status(500).json({ error: "server_misconfigured", message: "JWT_SECRET not set in multi-tenant mode" });
+  let domain = "";
+  const svc = assistantServiceTenant(req);
+  if (svc.kind === "reject") {
+    res.status(svc.status).json({ error: svc.error, message: svc.message });
     return;
   }
-  const token = extractBearer(req);
-  if (!token) {
-    res.status(401).json({ error: "unauthorized", message: "Missing authorization token" });
-    return;
-  }
-  let payload;
-  try {
-    payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
-  } catch (err) {
-    if (err && err.name === "TokenExpiredError") {
-      res.status(401).json({ error: "token_expired", message: "Authorization token has expired" });
+  if (svc.kind === "manifest") return next();
+  if (svc.kind === "domain") {
+    domain = svc.domain;
+  } else {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      res.status(500).json({ error: "server_misconfigured", message: "JWT_SECRET not set in multi-tenant mode" });
       return;
     }
-    res.status(401).json({ error: "invalid_token", message: "Invalid authorization token" });
-    return;
-  }
-  const domain = typeof payload === "object" && typeof payload.domain === "string" ? payload.domain.trim() : "";
-  if (!domain) {
-    res.status(401).json({ error: "invalid_token", message: "Token is missing the domain claim" });
-    return;
+    const token = extractBearer(req);
+    if (!token) {
+      res.status(401).json({ error: "unauthorized", message: "Missing authorization token" });
+      return;
+    }
+    let payload;
+    try {
+      payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
+    } catch (err) {
+      if (err && err.name === "TokenExpiredError") {
+        res.status(401).json({ error: "token_expired", message: "Authorization token has expired" });
+        return;
+      }
+      res.status(401).json({ error: "invalid_token", message: "Invalid authorization token" });
+      return;
+    }
+    domain = typeof payload === "object" && typeof payload.domain === "string" ? payload.domain.trim() : "";
+    if (!domain) {
+      res.status(401).json({ error: "invalid_token", message: "Token is missing the domain claim" });
+      return;
+    }
+    req.verifiedUser = readVerifiedUser(payload);
   }
   req.tenantDomain = domain;
   tenantConnectionManager.resolveTenant(domain).then(
@@ -86589,6 +88933,9 @@ var ALL_SEED_IDS = [
 ];
 
 // server/routes.ts
+init_db();
+init_schema();
+import { and as and35, eq as eq40, isNull as isNull6, sql as sql27 } from "drizzle-orm";
 async function registerRoutes(app2) {
   try {
     await ensureMaintenanceHistoryImmutability();
@@ -86920,9 +89267,17 @@ async function registerRoutes(app2) {
       const allJobs = await storage.getJobs();
       let updatedCalendar = 0;
       let updatedRH = 0;
+      let updatedRhEstimate = 0;
+      const {
+        estimateRhDueDate: estimateRhDueDate2,
+        isCurrentRhEstimateBasis: isCurrentRhEstimateBasis2,
+        rhEstimateBasis: rhEstimateBasis2,
+        resolveAuthoritativeRhComponent: resolveAuthoritativeRhComponent2
+      } = await Promise.resolve().then(() => (init_rhDueDateService(), rhDueDateService_exports));
       for (const job of allJobs) {
         let updates = {};
         let needsUpdate = false;
+        let effectiveNextDueRh = job.nextDueRH;
         if (job.maintenanceBasis === "Calendar" && !job.nextDueDate) {
           const rawLastDone = job.lastDoneDate;
           if (rawLastDone && job.frequencyValue && job.frequencyUnit) {
@@ -86937,88 +89292,81 @@ async function registerRoutes(app2) {
             }
           }
         }
-        if (job.maintenanceBasis === "Running Hours" && !job.nextDueRH) {
+        if ((job.maintenanceBasis === "Running Hours" || job.maintenanceBasis === "Dual Frequency") && !job.nextDueRH) {
           const lastDoneRH = job.lastDoneRH;
           const intervalRH = Number(job.intervalRunningHour);
           if (lastDoneRH && !isNaN(intervalRH) && intervalRH > 0) {
             const lastRH = Number(lastDoneRH);
             if (!isNaN(lastRH)) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-              needsUpdate = true;
-              updatedRH++;
+              const derivedNextDueRh = String(lastRH + intervalRH);
+              const db2 = await getDb();
+              const repaired = await db2.update(jobs).set({
+                nextDueRH: derivedNextDueRh,
+                updatedAt: /* @__PURE__ */ new Date()
+              }).where(and35(
+                eq40(jobs.juuid, job.juuid),
+                isNull6(jobs.nextDueRH),
+                sql27`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`
+              )).returning({ nextDueRH: jobs.nextDueRH });
+              if (repaired.length > 0) {
+                effectiveNextDueRh = repaired[0].nextDueRH;
+                updatedRH++;
+              } else {
+                effectiveNextDueRh = null;
+              }
             }
           }
         }
         if (needsUpdate) {
           await storage.updateJob(job.juuid, updates);
         }
+        if ((job.maintenanceBasis === "Running Hours" || job.maintenanceBasis === "Dual Frequency") && !isCurrentRhEstimateBasis2(job.rhEstimateBasis) && job.lastDoneDate && Number(job.intervalRunningHour) > 0 && Number(effectiveNextDueRh) >= 0) {
+          let component = job.componentId ? await storage.getComponent(job.componentId) : null;
+          if (!component && job.componentCode && job.vesselId) {
+            component = await storage.getComponentByCode(job.componentCode, job.vesselId);
+          }
+          component = await resolveAuthoritativeRhComponent2(
+            component,
+            (id) => storage.getComponent(id),
+            (code, vesselId) => storage.getComponentByCode(code, vesselId),
+            job.vesselId
+          );
+          let estimate = {
+            dueDate: null,
+            averagePerDay: null,
+            basis: rhEstimateBasis2("MISSING_RH_SOURCE")
+          };
+          if (component) {
+            const audits = await storage.getRunningHoursAudits(component.cuuid || component.id);
+            estimate = estimateRhDueDate2(
+              job.lastDoneDate,
+              job.intervalRunningHour,
+              audits
+            );
+          }
+          const db2 = await getDb();
+          const saved = await db2.update(jobs).set({
+            rhEstimatedDueDate: estimate.dueDate,
+            rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
+            rhEstimateBasis: estimate.basis,
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(and35(
+            eq40(jobs.juuid, job.juuid),
+            sql27`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
+            sql27`${jobs.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
+            sql27`${jobs.rhEstimatedDueDate} IS NOT DISTINCT FROM ${job.rhEstimatedDueDate}`,
+            sql27`${jobs.rhEstimateBasis} IS NOT DISTINCT FROM ${job.rhEstimateBasis}`
+          )).returning({ juuid: jobs.juuid });
+          if (saved.length > 0) updatedRhEstimate++;
+        }
       }
-      if (updatedCalendar > 0 || updatedRH > 0) {
-        console.log(`\u2705 Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH)`);
+      if (updatedCalendar > 0 || updatedRH > 0 || updatedRhEstimate > 0) {
+        console.log(`\u2705 Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH), ${updatedRhEstimate} RH historical estimates`);
       } else {
         console.log("\u2705 Job backfill check complete - all jobs already have due dates/RH calculated");
       }
     } catch (err) {
       console.error("\u26A0\uFE0F Error during job nextDueDate/nextDueRH backfill:", err);
-    }
-  })();
-  (async () => {
-    try {
-      const { calculateNextDueDate: calculateNextDueDate2, normalizeDateToDDMMMYYYY: normalizeDateToDDMMMYYYY2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
-      const allLinks = await storage.getAllJobComponentLinks();
-      let updatedCount = 0;
-      for (const link of allLinks) {
-        const maintenanceHistory = await storage.getMaintenanceHistoryByJobAndComponent(
-          link.jobId,
-          link.componentCode
-        );
-        if (!maintenanceHistory || maintenanceHistory.length === 0) {
-          continue;
-        }
-        const latestRecord = maintenanceHistory[0];
-        const historyDate = latestRecord.dateCompleted;
-        const historyRH = latestRecord.runningHoursAtCompletion;
-        const job = await storage.getJob(link.jobId);
-        if (!job) continue;
-        const updates = {};
-        let needsUpdate = false;
-        if (historyDate && link.lastDoneDate !== historyDate) {
-          updates.lastDoneDate = historyDate;
-          needsUpdate = true;
-          if (job.maintenanceBasis === "Calendar" && job.frequencyValue && job.frequencyUnit) {
-            const normalizedDate = normalizeDateToDDMMMYYYY2(historyDate);
-            if (normalizedDate) {
-              const nextDue = calculateNextDueDate2(normalizedDate, job.frequencyValue, job.frequencyUnit);
-              if (nextDue) {
-                updates.nextDueDate = nextDue;
-              }
-            }
-          }
-        }
-        if (historyRH && link.lastDoneRH !== historyRH) {
-          updates.lastDoneRH = historyRH;
-          needsUpdate = true;
-          if (job.maintenanceBasis === "Running Hours" && job.intervalRunningHour) {
-            const lastRH = parseFloat(historyRH);
-            const intervalRH = parseFloat(job.intervalRunningHour);
-            if (!isNaN(lastRH) && !isNaN(intervalRH) && intervalRH > 0) {
-              updates.nextDueRH = String(lastRH + intervalRH);
-            }
-          }
-        }
-        if (needsUpdate && link.vesselId) {
-          updates.updatedAt = /* @__PURE__ */ new Date();
-          await storage.updateJobComponentLinkTracking(link.vesselId, link.jobId, link.componentId, updates);
-          updatedCount++;
-        }
-      }
-      if (updatedCount > 0) {
-        console.log(`\u2705 Remediated ${updatedCount} job-component links with component-specific tracking from maintenance history`);
-      } else {
-        console.log("\u2705 Component-specific tracking check complete - all data matches maintenance history");
-      }
-    } catch (err) {
-      console.error("\u26A0\uFE0F Error during component-specific tracking remediation:", err);
     }
   })();
   (async () => {
@@ -87234,8 +89582,8 @@ init_migrations();
 init_buildInfo();
 init_tenantConnectionManager();
 var app = express2();
-app.use(express2.json({ limit: "50mb" }));
-app.use(express2.urlencoded({ extended: false, limit: "50mb" }));
+app.use(express2.json({ limit: "100mb" }));
+app.use(express2.urlencoded({ extended: false, limit: "100mb" }));
 app.use((req, res, next) => {
   const start = Date.now();
   const path14 = req.path;
