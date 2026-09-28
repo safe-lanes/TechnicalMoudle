@@ -61,7 +61,13 @@ const engineReqs = (screenId: string, ref: string) =>
   shoreSql(`SELECT requuid, status FROM apprv_requests WHERE module_id='technical' AND screen_id=$1 AND subject_ref=$2 ORDER BY submitted_at DESC`, [screenId, ref]);
 
 async function sync(label: string) {
-  const r = await call(SHIP, 'POST', '/sync/trigger', { vesselId: V }, ADMIN);
+  // The ship's own auto-sync can hold the sync lock (its first cycle runs ~3 min after boot):
+  // a refused trigger (no batch) is retried, never counted as a result.
+  let r = await call(SHIP, 'POST', '/sync/trigger', { vesselId: V }, ADMIN);
+  for (let attempt = 0; attempt < 6 && r.json && r.json.success === false && !r.json.batchUuid; attempt++) {
+    await sleep(10000);
+    r = await call(SHIP, 'POST', '/sync/trigger', { vesselId: V }, ADMIN);
+  }
   const j = r.json || {};
   console.log(`   sync(${label}): ok=${j.success} pushed=${j.recordsPushed} pulled=${j.recordsPulled} remainPush=${j.remainingPush} remainPull=${j.remainingPull}`);
   await sleep(4000); // the shore arrival sweep runs right after the response (fire-and-forget)

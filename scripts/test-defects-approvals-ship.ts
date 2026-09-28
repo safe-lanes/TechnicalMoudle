@@ -71,7 +71,13 @@ const extEntry = (id: string, existing: string, next: string) => ({
 const shipDefect = (duuid: string, col: string) => shipSql(`SELECT ${col} FROM defects WHERE duuid='${duuid}'`);
 
 async function sync(label: string) {
-  const r = await call(SHIP, 'POST', '/sync/trigger', { vesselId: V }, ADMIN);
+  // The ship's own auto-sync can hold the sync lock (its first cycle runs ~3 min after boot):
+  // a refused trigger (no batch) is retried, never counted as a result.
+  let r = await call(SHIP, 'POST', '/sync/trigger', { vesselId: V }, ADMIN);
+  for (let attempt = 0; attempt < 6 && r.json && r.json.success === false && !r.json.batchUuid; attempt++) {
+    await sleep(10000);
+    r = await call(SHIP, 'POST', '/sync/trigger', { vesselId: V }, ADMIN);
+  }
   const j = r.json || {};
   console.log(`   sync(${label}): ok=${j.success} pushed=${j.recordsPushed} pulled=${j.recordsPulled} remainPush=${j.remainingPush} remainPull=${j.remainingPull}`);
   await sleep(5000);
