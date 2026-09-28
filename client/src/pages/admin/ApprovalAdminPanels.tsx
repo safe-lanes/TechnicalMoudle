@@ -336,6 +336,16 @@ type SharedDiagnostics = {
     rows: Array<{ text: string; detail?: string; requuid?: string }> }>;
 };
 
+/** Short chip text per diagnostics group (the full title shows in View details). */
+const CHIP_LABEL: Record<string, [string, string]> = {
+  blockedActions: ["action without an approval chain", "actions without an approval chain"],
+  rolesWithoutApprover: ["role nobody holds", "roles nobody holds"],
+  stalled: ["request nobody can approve", "requests nobody can approve"],
+  failedUpdates: ["approval not applied to its record", "approvals not applied to their records"],
+};
+const chipLabel = (key: string, count: number, fallback: string) =>
+  CHIP_LABEL[key]?.[count === 1 ? 0 : 1] ?? fallback;
+
 export function ApprovalDiagnosticsPanel() {
   const queryClient = useQueryClient();
   const { currentUser } = useAuth();
@@ -352,6 +362,7 @@ export function ApprovalDiagnosticsPanel() {
     retry: false,
   });
   const [message, setMessage] = useState<Record<string, string>>({});
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const reapply = useMutation({
     mutationFn: async (requuid: string) => {
       const res = await fetch(`/technical/api/approvals/diagnostics/${encodeURIComponent(requuid)}/reapply`, { method: "POST" });
@@ -371,33 +382,55 @@ export function ApprovalDiagnosticsPanel() {
       </p>
       {isLoading && <div style={{ fontSize: 13 }}>Loading diagnostics...</div>}
       {(error || data?.available === false) && <div style={{ color: "#b42318", fontSize: 13 }}>Diagnostics unavailable. Contact your administrator.</div>}
-      {data?.available && data.healthy && <div style={{ color: "#067647", fontSize: 13 }} data-testid="approval-diagnostics-healthy">No problems found.</div>}
-      {data?.available && data.groups.map((g) => (
-        <div key={g.key} data-testid={`approval-diagnostics-group-${g.key}`} style={{ marginTop: 10, borderTop: "1px solid #eaecf0", paddingTop: 8 }}>
-          <div style={{ fontWeight: 600, fontSize: 13, color: "#b42318" }}>{g.title} ({g.rows.length})</div>
-          <div style={{ fontSize: 12, color: "#475467", margin: "2px 0" }}>{g.consequence}</div>
-          <div style={{ fontSize: 12, color: "#1e3a5f", marginBottom: 6 }}><strong>What to do:</strong> {g.instruction}</div>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-            {g.rows.map((r, i) => (
-              <li key={`${g.key}-${i}`} style={{ marginBottom: 4 }}>
-                <span>{r.text}</span>
-                {r.detail && <span style={{ color: "#667085" }}> — {r.detail}</span>}
-                {g.key === "failedUpdates" && r.requuid && (
-                  <>
-                    {" "}
-                    <button onClick={() => reapply.mutate(r.requuid!)} disabled={reapply.isPending}
-                      data-testid={`button-reapply-${r.requuid}`}
-                      style={{ marginLeft: 6, padding: "1px 8px", borderRadius: 5, border: "1px solid #2e90fa", background: "#fff", color: "#2e90fa", cursor: "pointer", fontSize: 12 }}>
-                      Apply again
-                    </button>
-                    {message[r.requuid] && <span style={{ marginLeft: 6, fontSize: 12 }}>{message[r.requuid]}</span>}
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+      {data?.available && data.healthy && <div style={{ color: "#067647", fontSize: 12 }} data-testid="approval-diagnostics-healthy">No problems found.</div>}
+      {data?.available && !data.healthy && (
+        // Compact summary like the Defects box (Sahil's design): one chip per problem, details on request.
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          {data.groups.map((g) => (
+            <span key={g.key} data-testid={`approval-diagnostics-chip-${g.key}`} style={{
+              padding: "5px 9px", borderRadius: 999, fontSize: 12,
+              border: "1px solid #fda29b", background: "#fff1f0", color: "#b42318",
+            }}><strong>{g.rows.length}</strong> {chipLabel(g.key, g.rows.length, g.title)}</span>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => setDetailsOpen(true)} data-testid="button-approval-diagnostics-details">View details</Button>
         </div>
-      ))}
+      )}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Approval diagnostics</DialogTitle>
+            <DialogDescription>Problems that stop Technical approvals, and approvals of any module that finished without updating their record.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            {(data?.groups ?? []).map((g) => (
+              <div key={g.key} data-testid={`approval-diagnostics-group-${g.key}`}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "#b42318" }}>{g.title} ({g.rows.length})</div>
+                <div style={{ fontSize: 12, color: "#475467", margin: "2px 0" }}>{g.consequence}</div>
+                <div style={{ fontSize: 12, color: "#1e3a5f", marginBottom: 6 }}><strong>What to do:</strong> {g.instruction}</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                  {g.rows.map((r, i) => (
+                    <li key={`${g.key}-${i}`} style={{ marginBottom: 4 }}>
+                      <span>{r.text}</span>
+                      {r.detail && <span style={{ color: "#667085" }}> — {r.detail}</span>}
+                      {g.key === "failedUpdates" && r.requuid && (
+                        <>
+                          {" "}
+                          <button onClick={() => reapply.mutate(r.requuid!)} disabled={reapply.isPending}
+                            data-testid={`button-reapply-${r.requuid}`}
+                            style={{ marginLeft: 6, padding: "1px 8px", borderRadius: 5, border: "1px solid #2e90fa", background: "#fff", color: "#2e90fa", cursor: "pointer", fontSize: 12 }}>
+                            Apply again
+                          </button>
+                          {message[r.requuid] && <span style={{ marginLeft: 6, fontSize: 12 }}>{message[r.requuid]}</span>}
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
