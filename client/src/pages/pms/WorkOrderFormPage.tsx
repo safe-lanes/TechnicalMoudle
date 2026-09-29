@@ -293,6 +293,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
+    level2ReviewerRankId: null as string | null,
     jobPriority: "Medium",
     classRelated: "No",
     department: "",
@@ -800,7 +801,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       ws.mergeCells(`A2:${lastColLetter}2`);
       const s = ws.getCell('A2');
       const exportVesselName = vessels.find(v => v.id === (vesselId || contextVesselId))?.name || 'Vessel';
-      const exportJobTitle = templateData.woTitle || templateData.jobTitle || '';
+      const exportJobTitle = templateData.woTitle || '';
       s.value = `Work History — ${exportJobTitle || templateData.componentName || templateData.componentCode || 'Component'} — ${workOrderNo || 'Work Order'}`;
       s.font = { size: 12, bold: true, color: { argb: 'FF2C3E50' }, name: 'Arial' };
       s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
@@ -892,7 +893,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const margin = 10;
 
       const pdfVesselName = vessels.find(v => v.id === (vesselId || contextVesselId))?.name || 'Vessel';
-      const pdfJobTitle = templateData.woTitle || templateData.jobTitle || templateData.componentName || templateData.componentCode || '';
+      const pdfJobTitle = templateData.woTitle || templateData.componentName || templateData.componentCode || '';
       doc.setFillColor(30, 90, 142);
       doc.rect(0, 0, pageWidth, 38, 'F');
       doc.setTextColor(255, 255, 255);
@@ -1010,6 +1011,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     operationalForms: "No",
     startDateTime: "",
     completionDateTime: "",
+    executionAssignedTo: "",
     dateOfCompletion: "",
     runningHours: "",
     performedBy: "",
@@ -1018,6 +1020,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     manhours: "",
     workCarriedOut: "",
     jobExperienceNotes: "",
+    remarks: "",
+    completionRemarks: "",
     previousReading: "",
     currentReading: "",
     // RH accuracy (migration 139): B2.1 completion-time RH and B3 date the
@@ -1407,6 +1411,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       return newData;
+    });
+  };
+
+  const handleReviewerChange = (value: string | null) => {
+    hasUserTouchedForm.current = true;
+    setTemplateData(prev => {
+      if (isModifyMode && trackFieldChange) {
+        trackFieldChange('level2ReviewerRankId', value, prev.level2ReviewerRankId);
+      }
+      return { ...prev, level2ReviewerRankId: value };
+    });
+  };
+
+  const handleSafetyRequirementsChange = (value: typeof templateData.safetyRequirements) => {
+    hasUserTouchedForm.current = true;
+    setTemplateData(prev => {
+      if (isModifyMode && trackFieldChange) {
+        trackFieldChange('safetyRequirements', value, prev.safetyRequirements);
+      }
+      return { ...prev, safetyRequirements: value };
     });
   };
 
@@ -3244,7 +3268,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           : templateData.maintenanceBasis === 'Running Hours'
             ? parseInt(normalizedFrequency, 10)
             : undefined,
-        level2ReviewerRankId: (templateData as any).level2ReviewerRankId || null,
+        level2ReviewerRankId: templateData.level2ReviewerRankId || null,
         lastDoneRH: (templateData as any).lastDoneRH ? String((templateData as any).lastDoneRH).trim() : null,
         lastDoneDate: mapLastCompletedOnToLastDoneDate((templateData as any).lastCompletedOn),
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
@@ -4737,8 +4761,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.L2R">Level 2 Reviewer (Rank)</Label>
                   <Select
-                    value={(templateData as any).level2ReviewerRankId || ''}
-                    onValueChange={(value) => handleTemplateChange('level2ReviewerRankId', value || null)}
+                    value={templateData.level2ReviewerRankId || ''}
+                    onValueChange={(value) => handleReviewerChange(value || null)}
                     disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-level2-reviewer-rank">
@@ -5127,14 +5151,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       value={(templateData.safetyRequirements?.ppeRequirements || []).join('\n')}
                       onChange={(e) => {
                         const lines = e.target.value.split('\n');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           ppeRequirements: lines,
                         });
                       }}
                       onBlur={() => {
                         const cleaned = (templateData.safetyRequirements?.ppeRequirements || []).filter((s: string) => s.trim() !== '');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           ppeRequirements: cleaned,
                         });
@@ -5150,14 +5174,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       value={(templateData.safetyRequirements?.permitRequirements || []).join('\n')}
                       onChange={(e) => {
                         const lines = e.target.value.split('\n');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           permitRequirements: lines,
                         });
                       }}
                       onBlur={() => {
                         const cleaned = (templateData.safetyRequirements?.permitRequirements || []).filter((s: string) => s.trim() !== '');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           permitRequirements: cleaned,
                         });
@@ -5365,7 +5389,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                               {hasFilters ? 'No matching history entries' : 'No data available'}
                             </td>
                           </tr>
-                        ) : displayData.map((row: any, idx: number) => {
+                        ) : displayData.map((row, idx) => {
                           const isExpanded = expandedHistoryIndex === idx;
                           return (
                             <React.Fragment key={idx}>
@@ -7429,10 +7453,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 variant="inline"
               >
                 <div className="space-y-4">
-                  {!!(templateData as any).level2ReviewerRankId && (
+                  {!!templateData.level2ReviewerRankId && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800" data-testid="text-reviewer-rank-info">
                       <span className="font-medium">Reviewer Rank:</span>
-                      <span>{(templateData as any).level2ReviewerRankId}</span>
+                      <span>{templateData.level2ReviewerRankId}</span>
                     </div>
                   )}
                   <div className="space-y-2">
