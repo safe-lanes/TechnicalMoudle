@@ -286,7 +286,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                     if (allSelected) {
                       setSelectedComponents(prev => prev.filter(n => !visibleNames.includes(n)));
                     } else {
-                      setSelectedComponents(prev => [...new Set([...prev, ...visibleNames])]);
+                      setSelectedComponents(prev => Array.from(new Set([...prev, ...visibleNames])));
                     }
                   }}
                 >

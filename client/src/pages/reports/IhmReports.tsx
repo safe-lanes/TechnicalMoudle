@@ -300,7 +300,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
   if (viewingReport === 'ihm-inventory-status') {
     return (
       <IhmInventoryStatusReport
-        onBack={() => setViewingReport(embedded ? selectedReportId : null)}
+        onBack={() => setViewingReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId || undefined}
         embedded={embedded}
         globalVessels={globalVessels}
