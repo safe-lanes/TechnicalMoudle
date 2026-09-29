@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { ApprovalProcessSection, useWorkOrderApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
 import { queryClient as woQueryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
@@ -578,6 +579,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Postpone Work Order</DialogTitle>
+          {workOrder?.id && <WoPostponementProcess workOrderId={workOrder.id} which="postponement" />}
           {workOrder?.id && (workOrder.status === 'Awaiting Office Approval' || workOrder.computedStatus === 'Awaiting Office Approval') && (
             <WithdrawRequestPanel subjectType="wo-postponement" subjectRef={workOrder.id}
               onWithdrawn={() => {
@@ -997,3 +999,9 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 };
 
 export default PostponeWorkOrderDialog;
+
+/** Postponement approval process — every request and decision (29-Sep-2026, Jeevan). */
+function WoPostponementProcess({ workOrderId, which }: { workOrderId: string; which: "postponement" | "rePostponement" }) {
+  const { data } = useWorkOrderApprovalProcess(workOrderId);
+  return <ApprovalProcessSection blocks={[{ title: which === "postponement" ? "Postponement" : "Re-Postponement", process: data?.[which] }]} />;
+}

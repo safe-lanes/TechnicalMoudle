@@ -1,4 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
+import { recordWoEvent } from './woApprovalHistory';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { calculateMissedCycles as calcMissedCyclesShared, calculateMissedCyclesRH } from '@shared/dateUtils';
@@ -622,6 +623,8 @@ export async function completeWorkOrder(
     draftExecutionData: null
   };
   const updatedWorkOrder = await repo.update(workOrderId, completionUpdate);
+  // 29-Sep-2026 (Jeevan): approval history — a direct completion (no approval step).
+  await recordWoEvent(workOrder, 'wo-completion', 'completed', { remarks: body.remarks ?? null });
 
   // Sync field logging — log completion UPDATE
   try {

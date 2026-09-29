@@ -10,6 +10,7 @@
  */
 import { ApprovalEngine, EngineError, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
 import { AppError } from '../shared/errors';
+import { recordApprovalEvent, type HistorySubjectType } from './approvalHistoryService';
 import { currentEngineTenantId } from './tenantProvider';
 import { TECHNICAL_MODULE_ID, technicalApprovalCard, type TechnicalSubject } from './approvalCard';
 import { getRequestContext } from '../../middleware/requestContext';
@@ -288,6 +289,22 @@ export async function maybeEngineDecide(
   return maybeEngineDecideScoped(techScope(screenId), subjectRef, decision, actorUserId, remarks);
 }
 
+/** 29-Sep-2026 (Jeevan): Technical approval history — which subject a Technical approval action is. */
+const HISTORY_SUBJECT: Record<string, HistorySubjectType> = {
+  'pms-components-cr': 'change-request', 'pms-jobs-cr': 'change-request', 'pms-spares-cr': 'change-request', 'pms-stores-cr': 'change-request',
+  'pms-wo-postponement': 'wo-postponement', 'pms-wo-re-postponement': 'wo-re-postponement',
+};
+export const historySubjectFor = (scope: Scope): HistorySubjectType | null =>
+  (scope.moduleId === 'technical' ? HISTORY_SUBJECT[scope.screenId] ?? null : null);
+
+/** Record one approval-step decision (approved / rejected, with the step name) in the approval history. */
+async function recordTechnicalDecision(scope: Scope, subjectRef: string, request: RequestRow, nodeKey: string, decision: 'approve' | 'reject', remarks: string | null) {
+  const subjectType = historySubjectFor(scope);
+  if (!subjectType) return;
+  const stepLabel = request.snapshot?.nodes?.find((n) => n.key === nodeKey)?.label ?? null;
+  await recordApprovalEvent({ vesselId: request.vesselId, subjectType, subjectRef, eventType: decision === 'approve' ? 'approved' : 'rejected', stepLabel, remarks });
+}
+
 /** Scope-generic decide — same contract as maybeEngineDecide, any card. */
 export async function maybeEngineDecideScoped(
   scope: Scope, subjectRef: string, decision: 'approve' | 'reject',
@@ -298,6 +315,7 @@ export async function maybeEngineDecideScoped(
   if (!pending) return null;
   try {
     const r = await engine.decide(engineCtx(actorUserId), pending.requuid, { decision, remarks: remarks ?? undefined });
+    await recordTechnicalDecision(scope, subjectRef, pending, r.nodeKey, decision, remarks ?? null);
     if (r.callbackError) {
       // Terminal state committed but the module apply failed — loud, actionable.
       throw new AppError(500, `Approval recorded but applying the result failed: ${r.callbackError}. The apply is idempotent — retry via support.`, { code: 'APPLY_FAILED', requuid: r.requuid });

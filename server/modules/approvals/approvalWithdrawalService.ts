@@ -19,6 +19,7 @@ import { changeRequestSender, withdrawChangeRequest } from '../change-requests/s
 import { postponementRequestSender, withdrawPostponementRequest } from '../work-orders/services/workOrderService';
 import { extensionEntrySender, withdrawExtensionEntry } from '../defects/services/defectsService';
 import { isShipInstance } from '../sync/syncRole';
+import { currentActor, recordApprovalEvent, type HistorySubjectType } from './approvalHistoryService';
 
 export const SUBJECT_TYPES = ['change-request', 'wo-postponement', 'defect-extension'] as const;
 export type WithdrawalSubjectType = typeof SUBJECT_TYPES[number];
@@ -34,6 +35,8 @@ interface SubjectState {
   stateText: string;
   scopes: Scope[];
   reset: (actor: { userUuid: string; name: string | null }) => Promise<void>;
+  /** Approval history subject (Technical only; defect extensions keep their own history). */
+  historySubject: HistorySubjectType | null;
 }
 
 async function subjectState(type: WithdrawalSubjectType, subjectRef: string, extensionId: string | null): Promise<SubjectState | null> {
@@ -41,6 +44,7 @@ async function subjectState(type: WithdrawalSubjectType, subjectRef: string, ext
     const cr = await changeRequestSender(subjectRef);
     if (!cr) return null;
     return {
+      historySubject: 'change-request',
       ref: subjectRef, vesselId: cr.vesselId, sender: cr.sender, waiting: cr.status === 'submitted', stateText: cr.status,
       scopes: cr.functionId ? [scopeFor('technical', cr.functionId)] : [],
       reset: () => withdrawChangeRequest(cr.id),
@@ -50,6 +54,7 @@ async function subjectState(type: WithdrawalSubjectType, subjectRef: string, ext
     const wo = await postponementRequestSender(subjectRef);
     if (!wo) return null;
     return {
+      historySubject: wo.rePostponement ? 'wo-re-postponement' : 'wo-postponement',
       ref: wo.wouuid, vesselId: wo.vesselId, sender: wo.sender, waiting: wo.status === 'Awaiting Office Approval', stateText: wo.status ?? 'unknown',
       scopes: [scopeFor('technical', 'pms-wo-postponement'), scopeFor('technical', 'pms-wo-re-postponement')],
       reset: (actor) => withdrawPostponementRequest(wo.wouuid, actor),
@@ -59,6 +64,7 @@ async function subjectState(type: WithdrawalSubjectType, subjectRef: string, ext
   const entry = await extensionEntrySender(subjectRef, extensionId);
   if (!entry) return null;
   return {
+    historySubject: null,
     ref: entry.duuid, vesselId: entry.vesselId, sender: entry.sender, waiting: entry.status === 'Requested', stateText: entry.status ?? 'unknown',
     scopes: [scopeFor('defects', 'defects-extension'), scopeFor('defects', 'defects-repeat-extension')],
     reset: () => withdrawExtensionEntry(entry.duuid, extensionId),
@@ -113,17 +119,36 @@ export async function requestWithdrawal(
     vesselId: state.vesselId, subjectType: type, subjectRef: state.ref, extensionId,
     reason: input.reason?.trim() || null, requestedByUuid: actor.userUuid, requestedByName: actor.name,
   });
-  if (await isShipInstance()) return row; // the office cancels it when it arrives
+  if (await isShipInstance()) {
+    if (state.historySubject) {
+      await recordApprovalEvent({ vesselId: state.vesselId, subjectType: state.historySubject, subjectRef: state.ref, eventType: 'withdrawal-requested', remarks: row.reason });
+    }
+    return row; // the office cancels it when it arrives
+  }
   return (await processWithdrawal(row)) ?? row;
 }
 
 /** Shore: settle one open withdrawal. Returns the updated row (null when already settled). */
 export async function processWithdrawal(row: ApprovalWithdrawal): Promise<ApprovalWithdrawal | null> {
   if (row.outcome) return null;
-  const settle = (outcome: repo.WithdrawalOutcome, note: string | null) => repo.setWithdrawalOutcome(row.awuuid, outcome, note, row.requestedByUuid);
+  let historySubject: HistorySubjectType | null = null;
+  let historyVessel: string | null = row.vesselId;
+  const settle = async (outcome: repo.WithdrawalOutcome, note: string | null) => {
+    const settled = await repo.setWithdrawalOutcome(row.awuuid, outcome, note, row.requestedByUuid);
+    if (settled && historySubject && outcome !== 'refused') {
+      // The sender withdrew it (the office only carries it out) — recorded under the sender's name.
+      const sender = await currentActor();
+      const actor = sender.uuid === row.requestedByUuid ? sender : { uuid: row.requestedByUuid, name: row.requestedByName ?? null, position: null };
+      await recordApprovalEvent({ vesselId: historyVessel, subjectType: historySubject, subjectRef: row.subjectRef,
+        eventType: outcome === 'withdrawn' ? 'withdrawn' : 'withdrawal-too-late', remarks: outcome === 'withdrawn' ? row.reason ?? null : note, actor });
+    }
+    return settled;
+  };
   if (!isSubjectType(row.subjectType)) return settle('refused', `Unknown request type '${row.subjectType}'.`);
   const state = await subjectState(row.subjectType, row.subjectRef, row.extensionId ?? null);
   if (!state) return settle('refused', 'The request was not found in the office.');
+  historySubject = state.historySubject;
+  historyVessel = state.vesselId ?? row.vesselId;
   // Decided first: once decided, the request's sender record may be gone (a WO postponement's waiting
   // row is closed by the decision) and nobody can change the outcome anyway — the decision stands.
   if (!state.waiting) return settle('too-late', `Already decided before the withdrawal arrived (${state.stateText}) — the decision stands.`);

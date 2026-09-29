@@ -85,6 +85,8 @@ router.get('/work-orders/:id/context', asyncHandler(woCtrl.getWorkOrderContext))
 
 // GET  /work-orders/:id/rejection-history — get prior rejection audit entries
 router.get('/work-orders/:id/rejection-history', asyncHandler(woCtrl.getRejectionHistory));
+// GET  /work-orders/:id/approval-process — who submitted / approved / rejected / acknowledged, and when (every attempt)
+router.get('/work-orders/:id/approval-process', asyncHandler(woCtrl.getApprovalProcess));
 
 // POST /work-orders/generate-now — office on-demand generation sweep for one vessel
 // (registered before POST /work-orders; distinct path, no :param collision)

@@ -41,6 +41,7 @@ router.post('/change-requests/:id/attachments', requirePermission('change-reques
 router.put('/change-requests/:id/approve', requireApproverOrRole(['Office', 'PMS Admin', 'Sail Admin']), requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.approveChangeRequest));
 router.put('/change-requests/:id/reject', requireApproverOrRole(['Office', 'PMS Admin', 'Sail Admin']), requirePermission('change-requests', 'edit'), asyncHandler(crCtrl.rejectChangeRequest));
 router.get('/change-requests/:id/rejection-history', asyncHandler(crCtrl.getRejectionHistory));
+router.get('/change-requests/:id/approval-process', asyncHandler(crCtrl.getApprovalProcess));
 
 // ── Get by ID (MUST be last — catch-all) ──
 router.get('/change-requests/:id', asyncHandler(crCtrl.getChangeRequest));

@@ -1,5 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { getRequestContext } from '../../../middleware/requestContext';
+import { recordWoCompletionUpdate, recordWoEvent } from './woApprovalHistory';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
@@ -2407,6 +2408,12 @@ export async function updateWorkOrder(id: string, body: any) {
     console.error('Failed to create audit log entry:', auditError);
   }
 
+  // 29-Sep-2026 (Jeevan): approval history — who submitted / approved / rejected / acknowledged, and when.
+  await recordWoCompletionUpdate(existingWO,
+    { status: updateData.status ?? existingWO.status, superintendentAcknowledged: updateData.superintendentAcknowledged ?? existingWO.superintendentAcknowledged },
+    { rejected: isBeingRejected, forwardedForOfficeReview: interceptedForL2Review },
+    { approval: body.ceApprovalRemarks ?? body.approverRemarks ?? null, rejection: body.rejectionComments ?? null });
+
   // When work order is being approved/completed, create maintenance history and update job
   if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
     console.log('📋 Work order approved - creating maintenance history and updating job cycle dates');
@@ -3034,6 +3041,7 @@ export async function rejectCompletedWorkOrder(
     rejectionDate: rejectedAt,
   };
   const updatedWO = await repo.update(id, updatePayload);
+  await recordWoEvent(existingWO, 'wo-completion', 'ts-rejected', { remarks: remarks.trim() });
 
   // 4. Sync field-level change log — not wrapped: failures must surface for sync reliability
   await logFieldChanges(
@@ -3191,11 +3199,15 @@ export async function withdrawPostponementRequest(wouuid: string, actor: { userU
 }
 
 /** The sender of the waiting postponement request (created_by_uuid of its 'Awaiting Approval' row). */
-export async function postponementRequestSender(woRef: string): Promise<{ wouuid: string; sender: string | null; status: string | null; vesselId: string | null } | null> {
+export async function postponementRequestSender(woRef: string): Promise<{ wouuid: string; sender: string | null; status: string | null; vesselId: string | null; rePostponement: boolean } | null> {
   const wo = await repo.findById(woRef);
   if (!wo) return null;
   const awaiting = await repo.getLatestAwaitingPostponement(wo.wouuid);
-  return { wouuid: wo.wouuid, sender: awaiting?.createdByUuid ?? null, status: wo.status ?? null, vesselId: wo.vesselId ?? null };
+  // Postponement or re-postponement: the type of the latest postponement row (history label).
+  const rows = (await repo.findPostponementsByWorkOrderId(wo.wouuid)) ?? [];
+  const latest = [...rows].sort((a: any, b: any) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0))[0] as { requestType?: string | null } | undefined;
+  return { wouuid: wo.wouuid, sender: awaiting?.createdByUuid ?? null, status: wo.status ?? null, vesselId: wo.vesselId ?? null,
+    rePostponement: (awaiting?.requestType ?? latest?.requestType) === 'Re-Postponement' };
 }
 
 /**
@@ -3277,6 +3289,7 @@ export async function submitPostponeRequest(id: string, body: any) {
     createdByUuid: getRequestContext()?.userId ?? body.userId ?? null,
   });
 
+  await recordWoEvent(wo, 'wo-postponement', 'submitted', { remarks: body.reason ?? body.postponementReason ?? null });
   // Start the engine chain (shore; no-op on a ship — the chain starts on shore after sync).
   await gw.maybeEngineSubmit('pms-wo-postponement', wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId ?? null, body.userId || body.performedBy || null);
 
@@ -3598,6 +3611,7 @@ export async function submitRePostponeRequest(id: string, body: any) {
   const dueDateSnapshot = wo.dueDate;
 
   const rePostponeResult = await createRePostponementRecord(wo, body, dueDateSnapshot);
+  await recordWoEvent(wo, 'wo-re-postponement', 'submitted', { remarks: body.reason ?? body.postponementReason ?? null });
 
   // Start the engine chain (shore; no-op on a ship — the chain starts on shore after sync).
   const gw = await import('../../approvals/engineGateway');
@@ -3853,6 +3867,7 @@ export async function reopenCompletedWorkOrder(
     reopenedAt,
   };
   const updatedWO = await repo.update(id, updatePayload);
+  await recordWoEvent(existingWO, 'wo-completion', 'reopened', { remarks: remarks.trim() });
 
   // 5. Sync field-level change log
   await logFieldChanges(

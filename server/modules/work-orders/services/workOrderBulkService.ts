@@ -1,4 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
+import { recordWoEvent } from './woApprovalHistory';
 import { ValidationError } from '../../shared/errors';
 import { calculateMissedCycles, calculateNextDueDate, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
@@ -183,6 +184,8 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
 
       ensureCompletedWorkOrderDate(existingWO, updateData);
       await repo.update(workOrderId, updateData);
+      // 29-Sep-2026 (Jeevan): approval history.
+      await recordWoEvent(existingWO, 'wo-completion', requiresLevel2Review ? 'forwarded' : 'approved', { remarks: approverRemarks ?? null });
 
       // Sync field logging — bulk approve
       try {
@@ -305,6 +308,7 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
 
   ensureCompletedWorkOrderDate(existingWO, updateData);
   await repo.update(workOrderId, updateData);
+  await recordWoEvent(existingWO, 'wo-completion', 'approved', { stepLabel: 'Office review', remarks: reviewerComments ?? null });
 
   try {
     await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || 'system');
@@ -396,6 +400,7 @@ export async function reviewerReopen(workOrderId: string, reviewerComments?: str
   };
 
   await repo.update(workOrderId, updateData);
+  await recordWoEvent(existingWO, 'wo-completion', 'rejected', { stepLabel: 'Office review', remarks: reviewerComments ?? null });
 
   try {
     await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || 'system');
@@ -482,6 +487,7 @@ export async function bulkReject(workOrderIds: string[], approver?: string, reje
       };
 
       await repo.update(workOrderId, updateData);
+      await recordWoEvent(existingWO, 'wo-completion', 'rejected', { remarks: rejectionComments ?? null });
 
       // Sync field logging — bulk reject
       try {

@@ -28,6 +28,9 @@ export interface AuditActor {
   actorRank: string | null;
   /** Real role forwarded for audit only — NOT used for RBAC (req.user.role stays mock in Phase 0). */
   actorRole: string | null;
+  /** 29-Sep-2026: the person's name when known — Ship users too (their label stays the rank).
+   *  Used by the approval history (name + rank/position, frozen at the time of the event). */
+  actorName?: string | null;
 }
 
 /** Actor used for machine/background writes (no authenticated request). */
@@ -68,6 +71,7 @@ export function resolveAuditActor(user: any): AuditActor {
       actorType: 'Ship',
       actorRank: rank,
       actorRole: role,
+      actorName: name,
     };
   }
 
@@ -79,5 +83,6 @@ export function resolveAuditActor(user: any): AuditActor {
     actorType: userType || 'Office',
     actorRank: rank,
     actorRole: role,
+    actorName: name,
   };
 }

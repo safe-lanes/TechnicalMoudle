@@ -129,6 +129,12 @@ export async function rejectChangeRequest(req: Request, res: Response) {
   res.json(updated);
 }
 
+// ── GET /change-requests/:id/approval-process (29-Sep-2026, Jeevan) ──
+
+export async function getApprovalProcess(req: Request, res: Response) {
+  res.json(await crService.getChangeRequestApprovalProcess(parseInt(req.params.id)));
+}
+
 // ── GET /change-requests/:id/rejection-history ──
 
 export async function getRejectionHistory(req: Request, res: Response) {

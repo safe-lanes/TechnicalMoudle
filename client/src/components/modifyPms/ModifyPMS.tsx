@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { queryClient } from '@/lib/queryClient';
 import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
+import { ApprovalProcessSection, useChangeRequestApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import { Label } from '@/components/ui/label';
 import { ChangeRequestModal } from '@/components/modify/ChangeRequestModal';
 import ApproveRejectModal from '@/pages/change-requests/ApproveRejectModal';
@@ -529,6 +530,7 @@ export function ModifyPMS() {
           </div>
         )}
 
+        {viewingRequest && <ChangeRequestApprovalProcessBlock id={viewingRequest.id} />}
         {viewingRequest?.cruuid && (
           <WithdrawRequestPanel subjectType="change-request" subjectRef={viewingRequest.cruuid} className="mb-2"
             onWithdrawn={() => {
@@ -631,4 +633,10 @@ export function ModifyPMS() {
     )}
     </>
   );
+}
+
+/** Change request dialog: submitted / approved / rejected / withdrawn — every attempt (29-Sep-2026, Jeevan). */
+function ChangeRequestApprovalProcessBlock({ id }: { id: number }) {
+  const { data } = useChangeRequestApprovalProcess(id);
+  return <ApprovalProcessSection blocks={[{ title: "Change request approval", process: data }]} />;
 }

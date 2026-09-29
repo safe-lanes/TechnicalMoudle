@@ -3,6 +3,7 @@ import * as woService from '../services/workOrderService';
 import * as woContextService from '../services/workOrderContextService';
 import * as woCompletionService from '../services/workOrderCompletionService';
 import * as woBulkService from '../services/workOrderBulkService';
+import * as woApprovalHistory from '../services/woApprovalHistory';
 import * as woAutoService from '../services/workOrderAutoService';
 import * as executionService from '../services/executionService';
 import * as complianceAnomalyService from '../services/complianceAnomalyService';
@@ -207,6 +208,11 @@ export async function runReconcilerNow(req: Request, res: Response) {
 export async function getWorkOrderContext(req: Request, res: Response) {
   const result = await woContextService.getWorkOrderContext(req.params.id);
   res.json(result);
+}
+
+// 29-Sep-2026 (Jeevan): the WO form's approval process — completion, postponement, re-postponement.
+export async function getApprovalProcess(req: Request, res: Response) {
+  res.json(await woApprovalHistory.getWorkOrderApprovalProcess(req.params.id));
 }
 
 export async function getRejectionHistory(req: Request, res: Response) {

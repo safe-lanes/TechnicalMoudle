@@ -1,10 +1,12 @@
-// QA test cases — Approval Workflow round 2 (28-Sep-2026, build 8b8237c25). Same layout as the 04-Sep pack.
+// QA test cases — Approval Workflow round 2 (28/29-Sep-2026; build = the commit it is generated from). Same layout as the 04-Sep pack.
 // Run from the repo root: node local-test-env/make_qa_docx_approvals_round2.cjs → docs/output/QA-TESTCASES-Approval-Workflow-Round2.docx
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, HeadingLevel, ShadingType, BorderStyle, PageOrientation,
 } = require('docx');
 const fs = require('fs');
+// The build under test: the commit the pack is generated from (override with QA_BUILD).
+const BUILD = process.env.QA_BUILD || require('child_process').execSync('git rev-parse --short HEAD').toString().trim();
 
 const FONT = 'Arial';
 const run = (t, o = {}) => new TextRun({ text: t, font: FONT, size: 20, ...o });
@@ -13,7 +15,7 @@ const h1 = (t) => new Paragraph({ heading: HeadingLevel.HEADING_1, children: [ru
 
 const AREAS = [
   { name: '1. Setup & Prerequisites', cases: [
-    ['SET-01', 'Test server on the new build', 'Office (shore) server and at least one vessel installation run build 8b8237c25 (branch feature/approval-engine-phase2). Server restarted after deploy.', 'Server starts without errors; database updates up to 178 applied automatically.'],
+    ['SET-01', 'Test server on the new build', `Office (shore) server and at least one vessel installation run build ${BUILD} (branch feature/approval-engine-phase2). Server restarted after deploy.`, 'Server starts without errors; database updates up to 179 applied automatically.'],
     ['SET-02', 'Vessel installation provisioned', 'Provision (or re-provision) the test vessel from the office server and run Sync Now once.', 'Sync completes with nothing left to send or receive.'],
     ['SET-03', 'Test users', 'Prepare: (a) Sail Admin; (b) an office APPROVER whose role is used in the approval chains, assigned to the test vessel in SAILERP (My Vessels); (c) a second office user with the SAME role NOT assigned to the vessel; (d) a vessel user who raises requests (e.g. Chief Engineer); (e) a second vessel user (e.g. 2nd Engineer); (f) the Master.', 'All users can log in.'],
     ['SET-04', 'Access Control', 'In Admin → Access Control give the approver/admin role VIEW + EDIT on "Approval Workflow" (PMS and Defects); give one other office role VIEW only.', 'Saved.'],
@@ -99,6 +101,16 @@ const AREAS = [
     ['NT-03', 'Email on (if SES set)', 'Toggle ON; run CR-03.', 'Approver receives an email as well as the bell notification.'],
     ['NT-04', 'Email toggle off', 'Toggle OFF; run CR-03.', 'No email; bell notification still arrives; approval works.'],
   ]},
+  { name: '12. Approval process — who and when (NEW, Jeevan)', cases: [
+    ['AP-01', 'WO completion history', 'Vessel: submit a WO completion; Chief Engineer rejects with remarks; submit again; Chief Engineer approves. Open the WO form and scroll to the bottom.', '"Approval process" section: Attempt 1 — Submitted, Rejected (with remarks); Attempt 2 — Resubmitted, Approved. Each line shows name (rank) and date + time like the Defects screen (e.g. 29 Sep 2026, 1228 Z).'],
+    ['AP-02', 'Tech. Sup. acknowledgement', 'On a WO locked for Technical Superintendent acknowledgement, acknowledge in the office; open the WO form.', '"Acknowledged by Technical Superintendent" with the name (position) of the person who acknowledged and date + time, after the WO approval lines.'],
+    ['AP-03', 'Postponement history', 'Vessel requests a postponement; office rejects; vessel requests again; office approves. Open the WO form (and the postpone dialog).', 'Postponement: Attempt 1 — Requested, Rejected — <step name>; Attempt 2 — Requested again, Approved — <step name>, each with name (rank) and date + time.'],
+    ['AP-04', 'Re-postponement history', 'Repeat AP-03 as a re-postponement.', 'Same, under "Re-Postponement".'],
+    ['AP-05', 'Change request history', 'Vessel submits a Modify PMS change request (Components, Jobs, Spares or Stores); office approves (or rejects). Open the CR dialog.', '"Approval process" in the dialog: Submitted — name (rank) + time; Approved/Rejected — <step name> — approver name (position) + time, with remarks.'],
+    ['AP-06', 'Withdrawal shown', 'Withdraw a pending CR from the vessel; sync.', 'History shows "Withdrawal requested" (vessel) and then "Withdrawn" with name and time.'],
+    ['AP-07', 'Same on the vessel', 'After each case above, Sync the vessel and open the same screen on the vessel.', 'The vessel shows exactly the same history as the office.'],
+    ['AP-08', 'Older records', 'Open a WO / CR completed before this build.', 'The section shows what was captured; missing names or times show "Not Recorded" (not a defect).'],
+  ]},
   { name: '11. Ship ↔ Office sync (end to end)', cases: [
     ['SY-01', 'Results reach the vessel', 'After each office decision / withdrawal above, Sync the vessel.', 'Vessel shows the same status, dates and notes as the office.'],
     ['SY-02', 'Clean sync', 'After the whole round, Sync twice.', 'Nothing left to send or receive; no sync errors on the Sync Dashboard.'],
@@ -129,13 +141,14 @@ if (require.main !== module) return;
 const total = AREAS.reduce((n, a) => n + a.cases.length, 0);
 const children = [
   new Paragraph({ heading: HeadingLevel.TITLE, children: [run('QA Test Cases — Approval Workflow (Round 2): combined screen, engine-only approvals, withdraw, Defects', { size: 32, bold: true })], spacing: { after: 120 } }),
-  para(`Branch: feature/approval-engine-phase2   ·   Build: 8b8237c25   ·   Date: 28-Sep-2026   ·   ${total} test cases`, { run: { italics: true, size: 20 } }),
+  para(`Branch: feature/approval-engine-phase2   ·   Build: ${BUILD}   ·   Date: 29-Sep-2026   ·   ${total} test cases`, { run: { italics: true, size: 20 } }),
   h1('Scope of this round'),
   para('1. One combined Admin → Approval Workflow screen (tree, chain editor, Defects settings, email banner, diagnostics). The separate "Approval Engine" page is removed.'),
   para('2. Change Requests and WO Postponement / Re-Postponement are approved ONLY through the approval chains. The old Level 1 / Level 2 ticks are retired. With no chain, office submissions are refused; vessel submissions wait in the office.'),
   para('3. NEW: the sender can withdraw a pending Change Request, WO (re-)postponement or defect extension. The office cancels it automatically; approvers are notified.'),
   para('4. Defects: extension / repeat extension / verification approvals, Master-only closure, closure evidence protection, closure history on the vessel, one Extended/Overdue rule, full PDF.'),
   para('5. Diagnostics with "Apply again", and a Sail Admin warning when an approval has had nobody to approve it for 24 hours.'),
+  para('6. NEW: "Approval process" section — who submitted / approved / rejected / acknowledged / withdrew and when (name + rank, date + time, every attempt) on the WO form, the postponement dialogs and the change request dialog.'),
   h1('Known intentional behaviour — do NOT log as a defect'),
   para('• The vessel never approves: approvals happen in the office and reach the vessel by sync.'),
   para('• A vessel can submit a request even when the office has no chain; it waits in the office until one is set up.'),

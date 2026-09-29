@@ -761,6 +761,18 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: 'Disjoint writers: the sender (ship or shore) inserts; the shore writes the outcome after cancelling the approval.',
     notes: 'Sender withdrawals of pending approvals (migration 178, 28-Sep-2026, Sahil E6). A ship withdrawal travels to shore by sync; the shore cancels the engine request and resets the record, and the outcome (withdrawn / too-late / refused) travels back.',
   },
+  approval_history: {
+    tableName: 'approval_history',
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'ahuuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: false,
+    businessRules: 'Insert-only event rows: the side where the event happens (vessel or office) inserts it; rows are never edited.',
+    notes: 'Approval history for Technical approvals (migration 179, 29-Sep-2026, Jeevan): WO completion, WO (re-)postponement and Modify PMS change requests — who (name + rank/position) and when, per attempt, shown on the vessel and in the office.',
+  },
   defect_closure_history: {
     tableName: 'defect_closure_history',
     category: 'ONE_WAY_SHORE_TO_SHIP',
@@ -1829,6 +1841,8 @@ export function getSyncPhaseOrder(): string[][] {
      'change_request_attachment', 'change_request_comment', 'change_request_approval',
      // 178: sender withdrawals reference CR / WO / defect subjects (no FK) — after their parents.
      'approval_withdrawals',
+     // 179: approval history events (no FK) — after their parents.
+     'approval_history',
      // rotation_history references rotational_items (riuuid) + components — Phase 4 after Phase 3 parents.
      'rotation_history',
      'ihm_maintenance_log', 'component_documents', 'component_requisitions',

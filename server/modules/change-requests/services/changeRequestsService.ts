@@ -316,6 +316,9 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     requestedByUserId: userId,
     approvalWorkflowSnapshot: snapshot
   } as any);
+  // 29-Sep-2026 (Jeevan): approval history — who submitted, and when.
+  const { recordApprovalEvent } = await import('../../approvals/approvalHistoryService');
+  await recordApprovalEvent({ vesselId: cr.vesselId, subjectType: 'change-request', subjectRef: cr.cruuid, eventType: 'submitted' });
 
   // Start the engine chain (shore). On a ship this is a no-op — the chain starts on shore.
   if (cls.functionId) {
@@ -488,6 +491,24 @@ export async function withdrawChangeRequest(id: number): Promise<void> {
   }
   await supersedeLegacyCrSteps(id, 'rejected');
   await crRepo.updateChangeRequest(id, { status: 'draft' });
+}
+
+/**
+ * 29-Sep-2026 (Jeevan): the CR's approval process — who submitted / approved / rejected / withdrew,
+ * and when, every attempt. Requests from before this change fall back to the CR's own fields
+ * ("Not Recorded" where who or when was never captured).
+ */
+export async function getChangeRequestApprovalProcess(id: number) {
+  const cr = await crRepo.getChangeRequest(id);
+  if (!cr) throw new NotFoundError('Change request not found');
+  const history = await import('../../approvals/approvalHistoryService');
+  const legacy: import('../../approvals/approvalHistoryService').LegacyEvent[] = [];
+  const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
+  if (cr.submittedAt) legacy.push({ type: 'submitted', at: iso(cr.submittedAt), ...(await history.legacyUser(cr.requestedByUserId)) });
+  if (cr.status === 'approved' || cr.status === 'rejected' || cr.status === 'returned') {
+    legacy.push({ type: cr.status === 'approved' ? 'approved' : 'rejected', at: iso(cr.reviewedAt), ...(await history.legacyUser(cr.reviewedByUserId)) });
+  }
+  return history.approvalProcess('change-request', cr.cruuid, legacy);
 }
 
 /** The sender of a change request (the user who submitted it). */

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ApprovalProcessSection, useWorkOrderApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import { ApprovalChainProgress, ApprovalNotStartedNote, useApprovalChain, resolveCanAct } from '@/components/approvals/ApprovalChainProgress';
 import { useSyncInstanceInfo } from '@/hooks/useSyncInstanceInfo';
 import { anyLevelMatches } from '@shared/approvals/level';
@@ -169,6 +170,7 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
           </DialogTitle>
           {engineScreenId && <ApprovalChainProgress screenId={engineScreenId} subjectRef={workOrder?.wouuid ?? null} />}
           <ApprovalNotStartedNote show={ppAwaitingNoChain} isShip={!ppIsShore} />
+          {workOrder?.id && <WoPostponementProcessBoth workOrderId={workOrder.id} />}
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-1">
@@ -296,3 +298,9 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
 };
 
 export default PostponeApprovalDialog;
+
+/** Office review of a postponement: the whole postponement history (29-Sep-2026, Jeevan). */
+function WoPostponementProcessBoth({ workOrderId }: { workOrderId: string }) {
+  const { data } = useWorkOrderApprovalProcess(workOrderId);
+  return <ApprovalProcessSection blocks={[{ title: "Postponement", process: data?.postponement }, { title: "Re-Postponement", process: data?.rePostponement }]} />;
+}

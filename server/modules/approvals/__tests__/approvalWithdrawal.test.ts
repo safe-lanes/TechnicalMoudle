@@ -24,6 +24,8 @@ vi.mock('../../change-requests/services/changeRequestsService', () => cr);
 vi.mock('../../work-orders/services/workOrderService', () => wo);
 vi.mock('../../defects/services/defectsService', () => df);
 vi.mock('../../sync/syncRole', () => role);
+const hist = vi.hoisted(() => ({ recordApprovalEvent: vi.fn(), currentActor: vi.fn(async () => ({ uuid: 'user-sender', name: 'CE', position: 'Chief Engineer' })) }));
+vi.mock('../approvalHistoryService', () => hist);
 
 import { processWithdrawal, requestWithdrawal } from '../approvalWithdrawalService';
 import { AppError } from '../../shared/errors';
@@ -54,6 +56,8 @@ describe('processWithdrawal (office)', () => {
     expect(gw.withdrawEngineRequest).toHaveBeenCalledWith('r1', SENDER, null);
     expect(cr.withdrawChangeRequest).toHaveBeenCalledWith(7);
     expect(out?.outcome).toBe('withdrawn');
+    // 29-Sep-2026: the withdrawal is recorded in the CR's approval history under the sender.
+    expect(hist.recordApprovalEvent).toHaveBeenCalledWith(expect.objectContaining({ subjectType: 'change-request', subjectRef: 'cr-1', eventType: 'withdrawn' }));
   });
   it('already decided in the module → too-late, nothing reset', async () => {
     cr.changeRequestSender.mockResolvedValue({ id: 7, sender: SENDER, status: 'approved', vesselId: 'V1', functionId: 'pms-spares-cr' });

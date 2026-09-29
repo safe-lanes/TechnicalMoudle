@@ -78,6 +78,7 @@ import { StatusPill } from '@/components/StatusPill';
 import { Marker } from "@/components/Marker";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection";
+import { ApprovalProcessSection, useWorkOrderApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import { WorkOrderDateInput } from "@/components/pms/WorkOrderDateInput";
 
 export interface HistoryWorkOrderPayload {
@@ -7347,6 +7348,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </>
           )}
 
+          {/* 29-Sep-2026 (Jeevan): approval process — who submitted / approved / rejected / acknowledged, and when. */}
+          {workOrderId && <WorkOrderApprovalProcessBlock workOrderId={workOrderId} />}
+
           {/* Save/Submit Button at Bottom - Hidden for Pending Approval (unless rejected), Completed work orders, and embedded mode */}
           {!embedded && (currentWorkOrderStatus !== 'Pending Approval' || isRejectedWO) && currentWorkOrderStatus !== 'Completed' && (() => {
             const isRHBased = (workOrderContext as any)?.maintenanceBasis === 'Running Hours';
@@ -8153,3 +8157,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 };
 
 export default WorkOrderFormPage;
+
+/** WO form: completion approval, Tech. Sup. acknowledgement and (re-)postponements — every attempt. */
+function WorkOrderApprovalProcessBlock({ workOrderId }: { workOrderId: string }) {
+  const { data } = useWorkOrderApprovalProcess(workOrderId);
+  return (
+    <ApprovalProcessSection blocks={[
+      { title: "Work Order approval", process: data?.completion },
+      { title: "Postponement", process: data?.postponement },
+      { title: "Re-Postponement", process: data?.rePostponement },
+    ]} />
+  );
+}

@@ -17,7 +17,7 @@ export async function createWithdrawal(req: Request, res: Response) {
     subjectRef: String(body.subjectRef ?? ''),
     extensionId: body.extensionId == null ? null : String(body.extensionId),
     reason: typeof body.reason === 'string' ? body.reason : null,
-  }, { userUuid, name: getRequestContext()?.fullName ?? null });
+  }, { userUuid, name: getRequestContext()?.actor.actorName ?? getRequestContext()?.fullName ?? null });
   res.status(201).json(row);
 }
 

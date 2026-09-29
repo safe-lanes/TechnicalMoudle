@@ -1,7 +1,9 @@
-// QA checklist (Excel) — Approval Workflow round 2 (28-Sep-2026, build 8b8237c25).
+// QA checklist (Excel) — Approval Workflow round 2 (28/29-Sep-2026; build = the commit it is generated from).
 // Run from the repo root: node local-test-env/make_qa_xlsx_approvals_round2.cjs → docs/output/QA-TESTCASES-Approval-Workflow-Round2.xlsx
 // Same cases as the Word document (make_qa_docx_approvals_round2.cjs); same layout as the 04-Sep sheet.
 const fs = require('fs');
+// The build under test: the commit the pack is generated from (override with QA_BUILD).
+const BUILD = process.env.QA_BUILD || require('child_process').execSync('git rev-parse --short HEAD').toString().trim();
 const ExcelJS = require('exceljs');
 const { AREAS } = require('./make_qa_docx_approvals_round2.cjs');
 
@@ -17,18 +19,19 @@ const PRECONDITION = {
   '9': 'Defect with several extensions / a returned verification',
   '10': 'Chains set up; email settings for NT-03',
   '11': 'Vessel installation provisioned from this office server',
+  '12': 'Build with migration 179; chains set up; vessel synced',
 };
-const HIGH = /^(SET-0[1-4]|AW-0[1-4]|CR-0[1-7]|PP-0[1-3]|WD-0[1-7]|DF-0[1-8]|ST-0[12]|SY-0[12]|DG-0[1-3])$/;
+const HIGH = /^(AP-0[1-7]|SET-0[1-4]|AW-0[1-4]|CR-0[1-7]|PP-0[1-3]|WD-0[1-7]|DF-0[1-8]|ST-0[12]|SY-0[12]|DG-0[1-3])$/;
 
 const wb = new ExcelJS.Workbook();
 const readme = wb.addWorksheet('Read Me');
 readme.getColumn(1).width = 118;
 const lines = [
   ['QA Test Cases — Approval Workflow (Round 2): combined screen, engine-only approvals, withdraw, Defects', true],
-  ['Branch: feature/approval-engine-phase2  ·  Build: 8b8237c25  ·  Date: 28-Sep-2026'],
+  [`Branch: feature/approval-engine-phase2  ·  Build: ${BUILD}  ·  Date: 29-Sep-2026`],
   [''],
   ['SETUP REQUIRED BEFORE TESTING (Setup section in the Test Cases sheet):', true],
-  ['1. Office server and a vessel installation on build 8b8237c25; vessel provisioned from the office and synced once.'],
+  [`1. Office server and a vessel installation on build ${BUILD}; vessel provisioned from the office and synced once.`],
   ['2. Users: Sail Admin; an office approver (role used in the chains) assigned to the test vessel in SAILERP; a second user with'],
   ['   the SAME role NOT assigned; a vessel user who sends requests (e.g. Chief Engineer); a second vessel user; the Master.'],
   ['3. Access Control: Approval Workflow (PMS and Defects) — VIEW + EDIT for the admin/approver role, VIEW only for one other role.'],
