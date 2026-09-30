@@ -52,6 +52,7 @@ interface MaintenanceReport {
   priority: 'high' | 'medium' | 'low';
   lastGenerated?: string;
   estimatedTime: string;
+  hidden?: boolean;
 }
 
 interface MaintenanceReportsProps {

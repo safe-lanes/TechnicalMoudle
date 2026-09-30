@@ -35,7 +35,7 @@ import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 
-const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
+const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "select" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
   <div className="space-y-2">
     <Label className="text-sm text-[#8798ad]" data-testid={labelMarker}>
       {labelMarker && <Marker id={labelMarker} />}

@@ -118,7 +118,7 @@ export async function bulkUpsert(components: InsertComponent[]): Promise<{ creat
 export async function setRunningHours(params: {
   componentId: string;
   newRHValue: number;
-  updateSource: string;
+  updateSource: Parameters<typeof storage.setComponentRunningHours>[0]['updateSource'];
   userId: string;
   lastUpdatedDate?: string;
 }) {

@@ -46,6 +46,8 @@ import {
   alertDeliveries,
   type AlertDelivery,
   type InsertAlertDelivery,
+  type AlertAcknowledgement,
+  type InsertAlertAcknowledgement,
   alertConfig,
   type AlertConfig,
   type InsertAlertConfig,
@@ -500,6 +502,12 @@ export interface IStorage {
   getAlertDeliveries(eventId: string): Promise<AlertDelivery[]>;
   createAlertDelivery(delivery: InsertAlertDelivery): Promise<AlertDelivery>;
   updateAlertDeliveryStatus(id: number, status: string, errorMessage?: string): Promise<AlertDelivery>;
+  getAlertAcknowledgements(eventUuid: string): Promise<AlertAcknowledgement[]>;
+  createAlertAcknowledgement(ack: InsertAlertAcknowledgement): Promise<AlertAcknowledgement>;
+  getExistingAlertDedupeKeys(): Promise<Set<string>>;
+  getWorkOrdersWithMissedCycles(): Promise<WorkOrder[]>;
+  getAllVesselSpares(): Promise<Spare[]>;
+  getUnacknowledgedAlertEventsForRole(userRole: string, vesselId?: string | null): Promise<AlertEvent[]>;
   
   getAlertConfig(vesselId: string): Promise<AlertConfig | undefined>;
   createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig>;
