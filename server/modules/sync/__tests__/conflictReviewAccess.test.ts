@@ -79,7 +79,44 @@ describe("Sync Conflict Review permission wiring (shared shore/vessel UI)", () =
     const routes = readFileSync(resolve("server/modules/sync/routes.ts"), "utf8");
     expect(review).toContain('canEdit("admin-sync-conflicts")');
     expect(review).toMatch(/\{canEditConflicts && \(\s*<>[\s\S]*?Apply incoming value[\s\S]*?Dismiss/);
-    expect(routes).toContain("requirePermission('admin-sync-conflicts', 'edit'), asyncHandler(conflictReviewCtrl.applyIncomingHandler)");
-    expect(routes).toContain("requirePermission('admin-sync-conflicts', 'edit'), asyncHandler(conflictReviewCtrl.dismissHandler)");
+    for (const handler of ["applyIncomingHandler", "dismissHandler"]) {
+      expect(routes).toContain(`requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(conflictReviewCtrl.${handler})`);
+    }
+    expect(routes).toContain("requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(syncController.resolveConflictHandler)");
+    expect(routes).toContain("requirePermission('admin-sync-dashboard', 'view', { enforce: true }), asyncHandler(conflictReviewCtrl.countConflictsHandler)");
+    for (const handler of ["conflictTablesHandler", "listConflictsHandler", "getConflictHandler"]) {
+      expect(routes).toContain(`requirePermission('admin-sync-conflicts', 'view', { enforce: true }), asyncHandler(conflictReviewCtrl.${handler})`);
+    }
+    expect(routes).toContain("router.post('/sync/push', syncTenantGuard");
+    expect(routes).toContain("router.post('/sync/pull', syncTenantGuard");
+  });
+
+  it("does not show navigation or resolution to users lacking the respective grants", () => {
+    const dashboard = readFileSync(resolve("client/src/pages/admin/SyncDashboard.tsx"), "utf8");
+    expect(dashboard).toContain('canViewMenu("admin-sync-conflicts")');
+    expect(dashboard).toContain('canEdit("admin-sync-conflicts")');
+    expect(dashboard).toContain('role={canViewConflicts ? "link" : undefined}');
+    expect(dashboard).toContain('{canViewConflicts && <Button');
+    expect(dashboard).toContain('{canEditConflicts && (');
+    expect(dashboard).toContain('canViewConflicts && countReady && conflicts.length > 0');
+    expect(dashboard).toContain('Conflicts (selected vessel)');
+    const review = readFileSync(resolve("client/src/pages/admin/SyncConflictReview.tsx"), "utf8");
+    expect(review).toContain("full fleet");
+  });
+
+  it("keeps loading, errors, empty filters and stale counts separate in both ship and shore UI", () => {
+    const review = readFileSync(resolve("client/src/pages/admin/SyncConflictReview.tsx"), "utf8");
+    const dashboard = readFileSync(resolve("client/src/pages/admin/SyncDashboard.tsx"), "utf8");
+    expect(review).toContain("if (!res.ok) throw new Error(`${res.status}`)");
+    expect(review).toContain("tablesQuery.isError");
+    expect(review).toContain("conflictsQuery.isError");
+    expect(review).toContain('reviewEmptyTitle(statusFilter');
+    expect(review).toContain("resultState(conflictsQuery)");
+    expect(dashboard).toContain("countState(selectedVesselId, conflictCountQuery)");
+    expect(dashboard).toContain("conflictCountQuery.isError");
+    expect(dashboard).toContain("countReady && totalConflictCount === 0");
+    expect(dashboard).toContain('resultState(conflictsQuery) === "error"');
+    expect(dashboard).toContain("isShip && selectedVesselId");
+    expect(dashboard).toContain("vesselId=${selectedVesselId}");
   });
 });

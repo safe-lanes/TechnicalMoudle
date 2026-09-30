@@ -26,14 +26,14 @@
  *     frontend shows everything for such roles today). `{ unconfigured: 'deny' }` closes that
  *     branch — an unconfigured (or absent) role is then refused with reason ROLE_UNCONFIGURED.
  *   • CONFIGURED = FAIL-CLOSED: once permission rows exist, the matching
- *     can_create/can_edit/can_delete flag must be true; a missing menu row or missing
- *     permission row denies (403), exactly like the frontend's canCreate/canEdit/canDelete.
+ *     requested flag must be true; a missing menu row or missing
+ *     permission row denies (403), exactly like the frontend's permission helpers.
  */
 import type { Response, NextFunction } from "express";
 import { getRbacIdentity, RBAC_BYPASS_ROLES, type AuthenticatedRequest } from "./auth";
 import { storage } from "../storage";
 
-export type PermissionAction = "create" | "edit" | "delete";
+export type PermissionAction = "view" | "create" | "edit" | "delete";
 
 export interface RequirePermissionOptions {
   /** false (default) = pass-through (pre-Phase-0 runtime behaviour); true = evaluate the forwarded role. */
@@ -42,7 +42,8 @@ export interface RequirePermissionOptions {
   unconfigured?: "allow" | "deny";
 }
 
-const ACTION_FLAG: Record<PermissionAction, "canCreate" | "canEdit" | "canDelete"> = {
+const ACTION_FLAG: Record<PermissionAction, "canView" | "canCreate" | "canEdit" | "canDelete"> = {
+  view: "canView",
   create: "canCreate",
   edit: "canEdit",
   delete: "canDelete",
@@ -53,7 +54,7 @@ interface PermState {
   /** menu name -> muid (only when configured) */
   menuByName: Map<string, string>;
   /** muid -> permission row (only when configured) */
-  permsByMuid: Map<string, { canCreate?: boolean; canEdit?: boolean; canDelete?: boolean }>;
+  permsByMuid: Map<string, { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean }>;
 }
 
 const REQ_CACHE_KEY = "__permGuardState";
