@@ -18,8 +18,8 @@ const PRECONDITION = {
   '8': 'Defects with approved extensions',
   '9': 'Defect with several extensions / a returned verification',
   '10': 'Chains set up; email settings for NT-03',
-  '11': 'Vessel installation provisioned from this office server',
-  '12': 'Build with migration 179; chains set up; vessel synced',
+  '11': 'Build with migration 179; chains set up; vessel synced',
+  '12': 'Vessel installation provisioned from this office server',
 };
 const HIGH = /^(AP-0[1-7]|SET-0[1-4]|AW-0[1-4]|CR-0[1-7]|PP-0[1-3]|WD-0[1-7]|DF-0[1-8]|ST-0[12]|SY-0[12]|DG-0[1-3])$/;
 
@@ -74,11 +74,13 @@ for (const area of AREAS) {
   for (const [id, title, steps, expected] of area.cases) {
     const row = ws.addRow([id, areaName, title, PRECONDITION[num] ?? '', steps, expected, HIGH.test(id) ? 'High' : 'Medium', '', '', '']);
     row.eachCell({ includeEmpty: true }, (c) => { c.alignment = { vertical: 'top', wrapText: true }; c.font = { name: 'Arial', size: 10, bold: c.col === 1 }; });
-    row.getCell(8).dataValidation = { type: 'list', allowBlank: true, formulae: ['"PASS,FAIL,BLOCKED,N/A"'] };
     total++;
   }
 }
 ws.autoFilter = { from: 'A1', to: 'J1' };
+// One Status dropdown for the whole column (per-cell rules were merged into overlapping ranges,
+// which Excel can report as a problem and offer to repair).
+ws.dataValidations.add(`H2:H${total + 1}`, { type: 'list', allowBlank: true, formulae: ['"PASS,FAIL,BLOCKED,N/A"'] });
 ws.addConditionalFormatting({ ref: `H2:H${total + 1}`, rules: [
   { type: 'cellIs', operator: 'equal', formulae: ['"PASS"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFD1FADF' } } } },
   { type: 'cellIs', operator: 'equal', formulae: ['"FAIL"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEE4E2' } } } },

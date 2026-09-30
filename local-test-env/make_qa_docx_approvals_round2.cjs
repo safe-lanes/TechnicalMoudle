@@ -101,7 +101,7 @@ const AREAS = [
     ['NT-03', 'Email on (if SES set)', 'Toggle ON; run CR-03.', 'Approver receives an email as well as the bell notification.'],
     ['NT-04', 'Email toggle off', 'Toggle OFF; run CR-03.', 'No email; bell notification still arrives; approval works.'],
   ]},
-  { name: '12. Approval process — who and when (NEW, Jeevan)', cases: [
+  { name: '11. Approval process — who and when (NEW, Jeevan)', cases: [
     ['AP-01', 'WO completion history', 'Vessel: submit a WO completion; Chief Engineer rejects with remarks; submit again; Chief Engineer approves. Open the WO form and scroll to the bottom.', '"Approval process" section: Attempt 1 — Submitted, Rejected (with remarks); Attempt 2 — Resubmitted, Approved. Each line shows name (rank) and date + time like the Defects screen (e.g. 29 Sep 2026, 1228 Z).'],
     ['AP-02', 'Tech. Sup. acknowledgement', 'On a WO locked for Technical Superintendent acknowledgement, acknowledge in the office; open the WO form.', '"Acknowledged by Technical Superintendent" with the name (position) of the person who acknowledged and date + time, after the WO approval lines.'],
     ['AP-03', 'Postponement history', 'Vessel requests a postponement; office rejects; vessel requests again; office approves. Open the WO form (and the postpone dialog).', 'Postponement: Attempt 1 — Requested, Rejected — <step name>; Attempt 2 — Requested again, Approved — <step name>, each with name (rank) and date + time.'],
@@ -111,7 +111,7 @@ const AREAS = [
     ['AP-07', 'Same on the vessel', 'After each case above, Sync the vessel and open the same screen on the vessel.', 'The vessel shows exactly the same history as the office.'],
     ['AP-08', 'Older records', 'Open a WO / CR completed before this build.', 'The section shows what was captured; missing names or times show "Not Recorded" (not a defect).'],
   ]},
-  { name: '11. Ship ↔ Office sync (end to end)', cases: [
+  { name: '12. Ship ↔ Office sync (end to end)', cases: [
     ['SY-01', 'Results reach the vessel', 'After each office decision / withdrawal above, Sync the vessel.', 'Vessel shows the same status, dates and notes as the office.'],
     ['SY-02', 'Clean sync', 'After the whole round, Sync twice.', 'Nothing left to send or receive; no sync errors on the Sync Dashboard.'],
   ]},
@@ -155,7 +155,7 @@ function headerRow() {
 }
 function caseRow([id, title, steps, exp]) {
   const cells = [[run(id, { bold: true })], [run(title)], [run(steps)], [run(exp)], [run('')]];
-  return new TableRow({ children: cells.map((ch, i) => new TableCell({
+  return new TableRow({ cantSplit: true, children: cells.map((ch, i) => new TableCell({
     width: { size: W[i], type: WidthType.DXA }, borders: CELL_BORDERS,
     children: [new Paragraph({ children: ch, spacing: { after: 40 } })],
   })) });
