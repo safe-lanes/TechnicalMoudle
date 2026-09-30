@@ -38,6 +38,7 @@ import { FEATURES } from '@/config/features';
 import { SPARES_TEMPLATE_FIELDS } from '@shared/sparesTemplateFields';
 import { useVessels } from "@/hooks/useVessels";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
+import { resolveSpareMakerDefault } from "./spareMakerDefault";
 
 interface Spare {
   id: number;
@@ -260,6 +261,7 @@ const Spares: React.FC = () => {
     note: "",
     isRotationItem: false
   });
+  const [addMakerOverridden, setAddMakerOverridden] = useState(false);
   
   // Comprehensive edit spare form (includes all fields from Spare Part Details)
   const [editSpareForm, setEditSpareForm] = useState({
@@ -1442,12 +1444,12 @@ const Spares: React.FC = () => {
   }, [fetchedComponents]);
 
   const flattenedComponents = useMemo(() => {
-    const result: { id: string; code: string; name: string; fleetEquipmentCode?: string; actualId?: string }[] = [];
+    const result: { id: string; code: string; name: string; fleetEquipmentCode?: string; actualId?: string; maker?: string | null; makerCode?: string | null }[] = [];
     const flatten = (nodes: ComponentNode[]) => {
       for (const node of nodes) {
         const hasChildren = node.children && node.children.length > 0;
         if (!hasChildren) {
-          result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode, actualId: node.actualId });
+          result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode, actualId: node.actualId, maker: node.maker, makerCode: node.makerCode });
         }
         if (node.children) flatten(node.children);
       }
@@ -1455,6 +1457,17 @@ const Spares: React.FC = () => {
     flatten(componentTree);
     return result;
   }, [componentTree]);
+
+  const selectedAddComponent = flattenedComponents.find(c => c.id === addSpareForm.componentId);
+  useEffect(() => {
+    if (!selectedAddComponent || addMakerOverridden) return;
+    const selectedMaker = resolveSpareMakerDefault(selectedAddComponent, makerListData);
+    setAddSpareForm(prev =>
+      prev.maker === selectedMaker.maker && prev.makerCode === selectedMaker.makerCode
+        ? prev
+        : { ...prev, ...selectedMaker }
+    );
+  }, [selectedAddComponent, makerListData, addMakerOverridden]);
 
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
@@ -1673,6 +1686,7 @@ const Spares: React.FC = () => {
       invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
       toast({ title: "Success", description: "Spare created successfully" });
       setIsAddSpareModalOpen(false);
+      setAddMakerOverridden(false);
       setAddSpareForm({
         partCode: "",
         partName: "",
@@ -4513,7 +4527,8 @@ const Spares: React.FC = () => {
                                   key={comp.id}
                                   value={`${comp.code} ${comp.name}`}
                                   onSelect={() => {
-                                    setAddSpareForm({...addSpareForm, componentId: comp.id});
+                                    setAddMakerOverridden(false);
+                                    setAddSpareForm(prev => ({ ...prev, componentId: comp.id, maker: "", makerCode: "" }));
                                     setComponentCodePopoverOpen(false);
                                   }}
                                   data-testid={`component-option-${comp.code}`}
@@ -4702,7 +4717,8 @@ const Spares: React.FC = () => {
                               <CommandItem
                                 value="__clear__"
                                 onSelect={() => {
-                                  setAddSpareForm({...addSpareForm, maker: "", makerCode: ""});
+                                  setAddMakerOverridden(true);
+                                  setAddSpareForm(prev => ({ ...prev, maker: "", makerCode: "" }));
                                   setAddMakerSearch('');
                                   setAddMakerPopoverOpen(false);
                                 }}
@@ -4717,7 +4733,8 @@ const Spares: React.FC = () => {
                                 key={m.id}
                                 value={m.makerName}
                                 onSelect={() => {
-                                  setAddSpareForm({...addSpareForm, maker: m.makerName, makerCode: m.makerCode});
+                                  setAddMakerOverridden(true);
+                                  setAddSpareForm(prev => ({ ...prev, maker: m.makerName, makerCode: m.makerCode }));
                                   setAddMakerSearch('');
                                   setAddMakerPopoverOpen(false);
                                 }}
