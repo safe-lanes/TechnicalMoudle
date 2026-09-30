@@ -5,7 +5,7 @@ const fs = require('fs');
 // The build under test: the commit the pack is generated from (override with QA_BUILD).
 const BUILD = process.env.QA_BUILD || require('child_process').execSync('git rev-parse --short HEAD').toString().trim();
 const ExcelJS = require('exceljs');
-const { AREAS } = require('./make_qa_docx_approvals_round2.cjs');
+const { AREAS, TEXTS } = require('./make_qa_docx_approvals_round2.cjs');
 
 const PRECONDITION = {
   '1': 'None',
@@ -27,8 +27,11 @@ const wb = new ExcelJS.Workbook();
 const readme = wb.addWorksheet('Read Me');
 readme.getColumn(1).width = 118;
 const lines = [
-  ['QA Test Cases — Approval Workflow (Round 2): combined screen, engine-only approvals, withdraw, Defects', true],
-  [`Branch: feature/approval-engine-phase2  ·  Build: ${BUILD}  ·  Date: 29-Sep-2026`],
+  [TEXTS.TITLE, true],
+  [`Branch: feature/approval-engine-phase2  ·  Build: ${BUILD}  ·  Date: 30-Sep-2026`],
+  [''],
+  ['SCOPE OF THIS ROUND:', true],
+  ...TEXTS.SCOPE.map((t) => [t]),
   [''],
   ['SETUP REQUIRED BEFORE TESTING (Setup section in the Test Cases sheet):', true],
   [`1. Office server and a vessel installation on build ${BUILD}; vessel provisioned from the office and synced once.`],
@@ -39,12 +42,10 @@ const lines = [
   ['5. Email tests only: AWS_SES_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, APPROVAL_EMAIL_FROM on the office server.'],
   [''],
   ['KNOWN INTENTIONAL BEHAVIOUR — DO NOT LOG AS A DEFECT:', true],
-  ['• The vessel never approves: approvals happen in the office and reach the vessel by sync.'],
-  ['• A vessel can submit a request even when the office has no chain; it waits in the office until one is set up.'],
-  ['• Requests sent before this build cannot be withdrawn (no sender was recorded).'],
-  ['• A withdrawal from the vessel takes effect only after sync; if the office decided first, the decision stands ("too late").'],
-  ['• Modify PMS change requests in the "Work Orders" category need no approval.'],
-  ['• Without email settings on the server, only in-app (bell) notifications are sent.'],
+  ...TEXTS.INTENTIONAL.map((t) => [t]),
+  [''],
+  ['KNOWN ISSUE — ALREADY REPORTED:', true],
+  ...TEXTS.KNOWN_ISSUES.map((t) => [t]),
   [''],
   ['Fill the Status column with PASS / FAIL / BLOCKED / N/A. For every FAIL add in Remarks: user + role, vessel, office or vessel', true],
   ['installation, time, and the exact message shown; attach a screenshot. BACKEND-ASSISTED cases need a developer to prepare the data.', true],

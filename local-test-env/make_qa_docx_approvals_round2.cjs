@@ -117,6 +117,32 @@ const AREAS = [
   ]},
 ];
 
+// Shared with the Excel checklist (make_qa_xlsx_approvals_round2.cjs) so both files always say the same.
+const TITLE = 'QA Test Cases — Approval Workflow (Round 2): combined screen, engine-only approvals, withdraw, approval process, Defects';
+const SCOPE = [
+  '1. One combined Admin → Approval Workflow screen (tree, chain editor, Defects settings, email banner, diagnostics). The separate "Approval Engine" page is removed.',
+  '2. Change Requests and WO Postponement / Re-Postponement are approved ONLY through the approval chains. The old Level 1 / Level 2 ticks are retired. With no chain, office submissions are refused; vessel submissions wait in the office.',
+  '3. NEW: the sender can withdraw a pending Change Request, WO (re-)postponement or defect extension. The office cancels it automatically; approvers are notified.',
+  '4. Defects: extension / repeat extension / verification approvals, Master-only closure, closure evidence protection, closure history on the vessel, one Extended/Overdue rule, full PDF.',
+  '5. Diagnostics with "Apply again", and a Sail Admin warning when an approval has had nobody to approve it for 24 hours.',
+  '6. NEW: "Approval process" section — who submitted / approved / rejected / acknowledged / withdrew and when (name + rank, date + time, every attempt) on the WO form, the postponement dialogs and the change request dialog.',
+];
+const INTENTIONAL = [
+  '• The vessel never approves: approvals happen in the office and reach the vessel by sync.',
+  '• A vessel can submit a request even when the office has no chain; it waits in the office until one is set up.',
+  '• Requests sent before this build cannot be withdrawn (no sender was recorded).',
+  '• A withdrawal from the vessel takes effect only after sync; if the office decided first, the decision stands ("too late").',
+  '• Modify PMS change requests in the "Work Orders" category need no approval.',
+  '• Without email settings on the server, only in-app (bell) notifications are sent.',
+  '• Approval process times are shown in UTC with a "Z" (e.g. 29 Sep 2026, 1228 Z) — the same as the Defects screen.',
+  '• Work Orders, postponements and change requests from before this build show "Not Recorded" where the name or time was never saved.',
+  '• The WO completion approval itself works as before (approver set in the WO form); only the who / when display is new.',
+];
+const KNOWN_ISSUES = [
+  '• Change request dialog: the "Requested By" field at the top shows the user id instead of the name (existing behaviour; the Approval process section below it shows the name). Already reported — no need to log again.',
+];
+module.exports.TEXTS = { TITLE, SCOPE, INTENTIONAL, KNOWN_ISSUES };
+
 const CELL_BORDERS = { top: { style: BorderStyle.SINGLE, size: 4, color: 'BFBFBF' }, bottom: { style: BorderStyle.SINGLE, size: 4, color: 'BFBFBF' }, left: { style: BorderStyle.SINGLE, size: 4, color: 'BFBFBF' }, right: { style: BorderStyle.SINGLE, size: 4, color: 'BFBFBF' } };
 const W = [1000, 2300, 4700, 4900, 1500]; // sum 14400
 function headerRow() {
@@ -135,27 +161,19 @@ function caseRow([id, title, steps, exp]) {
   })) });
 }
 
-module.exports = { AREAS };
+module.exports.AREAS = AREAS;
 if (require.main !== module) return;
 
 const total = AREAS.reduce((n, a) => n + a.cases.length, 0);
 const children = [
-  new Paragraph({ heading: HeadingLevel.TITLE, children: [run('QA Test Cases — Approval Workflow (Round 2): combined screen, engine-only approvals, withdraw, Defects', { size: 32, bold: true })], spacing: { after: 120 } }),
-  para(`Branch: feature/approval-engine-phase2   ·   Build: ${BUILD}   ·   Date: 29-Sep-2026   ·   ${total} test cases`, { run: { italics: true, size: 20 } }),
+  new Paragraph({ heading: HeadingLevel.TITLE, children: [run(TITLE, { size: 32, bold: true })], spacing: { after: 120 } }),
+  para(`Branch: feature/approval-engine-phase2   ·   Build: ${BUILD}   ·   Date: 30-Sep-2026   ·   ${total} test cases`, { run: { italics: true, size: 20 } }),
   h1('Scope of this round'),
-  para('1. One combined Admin → Approval Workflow screen (tree, chain editor, Defects settings, email banner, diagnostics). The separate "Approval Engine" page is removed.'),
-  para('2. Change Requests and WO Postponement / Re-Postponement are approved ONLY through the approval chains. The old Level 1 / Level 2 ticks are retired. With no chain, office submissions are refused; vessel submissions wait in the office.'),
-  para('3. NEW: the sender can withdraw a pending Change Request, WO (re-)postponement or defect extension. The office cancels it automatically; approvers are notified.'),
-  para('4. Defects: extension / repeat extension / verification approvals, Master-only closure, closure evidence protection, closure history on the vessel, one Extended/Overdue rule, full PDF.'),
-  para('5. Diagnostics with "Apply again", and a Sail Admin warning when an approval has had nobody to approve it for 24 hours.'),
-  para('6. NEW: "Approval process" section — who submitted / approved / rejected / acknowledged / withdrew and when (name + rank, date + time, every attempt) on the WO form, the postponement dialogs and the change request dialog.'),
+  ...SCOPE.map((t) => para(t)),
   h1('Known intentional behaviour — do NOT log as a defect'),
-  para('• The vessel never approves: approvals happen in the office and reach the vessel by sync.'),
-  para('• A vessel can submit a request even when the office has no chain; it waits in the office until one is set up.'),
-  para('• Requests sent before this build cannot be withdrawn (no sender was recorded).'),
-  para('• A withdrawal from the vessel takes effect only after sync; if the office decided first, the decision stands ("too late").'),
-  para('• Modify PMS change requests in the "Work Orders" category need no approval.'),
-  para('• Without email settings on the server, only in-app (bell) notifications are sent.'),
+  ...INTENTIONAL.map((t) => para(t)),
+  h1('Known issue — already reported'),
+  ...KNOWN_ISSUES.map((t) => para(t)),
   h1('How to record results'),
   para('Write Pass or Fail in the last column. For every Fail give: TC ID, user and role, vessel, office or vessel installation, time, a screenshot, and the exact message shown. BACKEND-ASSISTED cases need a developer to prepare the state.'),
 ];
