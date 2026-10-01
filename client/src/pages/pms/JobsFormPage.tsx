@@ -34,6 +34,8 @@ import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
+import JobSafetyRequirementsEditor from "@/components/pms/JobSafetyRequirementsEditor";
+import { buildJobSafetyUpdate, type JobSafetyDraft } from "@/lib/jobSafetyRequirements";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "select" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
   <div className="space-y-2">
@@ -213,6 +215,7 @@ const JobsFormPage: React.FC = () => {
   });
 
   const [originalData, setOriginalData] = useState<Record<string, any>>({});
+  const [safetyDraft, setSafetyDraft] = useState<JobSafetyDraft>({});
 
   const [templateData, setTemplateData] = useState({
     woTitle: "",
@@ -392,6 +395,7 @@ const JobsFormPage: React.FC = () => {
 
   const handleEditClick = () => {
     setOriginalData({ ...templateData });
+    setSafetyDraft({});
     setIsEditMode(true);
   };
 
@@ -400,6 +404,7 @@ const JobsFormPage: React.FC = () => {
       ...prev,
       ...originalData
     }));
+    setSafetyDraft({});
     setIsEditMode(false);
   };
 
@@ -497,6 +502,10 @@ const JobsFormPage: React.FC = () => {
       }
       if (templateData.woTemplateCode !== originalData.woTemplateCode) {
         updatePayload.jobNo = templateData.woTemplateCode;
+      }
+      const safetyUpdate = buildJobSafetyUpdate(templateData.safetyRequirements, safetyDraft);
+      if (safetyUpdate) {
+        updatePayload.safetyRequirements = safetyUpdate;
       }
       
       if (Object.keys(updatePayload).length === 0) {
@@ -939,7 +948,7 @@ const JobsFormPage: React.FC = () => {
       {/* Top Header Bar */}
       <div className={`bg-white border-b shadow-sm ${isModifyMode ? 'border-amber-300' : 'border-gray-200'}`}>
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4 md:gap-6">
               <img src={sailLogo} alt="SAIL Logo" className="h-10 w-auto" data-testid="img-logo" />
               <div className="hidden md:block h-8 w-px bg-gray-300" />
@@ -1004,7 +1013,7 @@ const JobsFormPage: React.FC = () => {
                 {isModifyMode ? 'Modify Job' : 'Jobs Form'}
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {isModifyMode && (
                 <Button
                   variant="ghost"
@@ -1124,11 +1133,11 @@ const JobsFormPage: React.FC = () => {
         </aside>
 
         {/* Main Content Area */}
-        <div className="flex-1 px-6 py-6">
+        <div className="flex-1 min-w-0 px-4 sm:px-6 py-6">
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Part A - Job Details */}
-            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
+            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-4 sm:p-6 space-y-8">
             <PartHeader
               id="part-a"
               label="Part A"
@@ -1555,6 +1564,14 @@ const JobsFormPage: React.FC = () => {
               descriptionMarker="JF.A4.2"
               variant="inline"
             >
+              {isEditMode ? (
+                <JobSafetyRequirementsEditor
+                  requirements={templateData.safetyRequirements}
+                  draft={safetyDraft}
+                  onChange={(field, value) => setSafetyDraft(prev => ({ ...prev, [field]: value }))}
+                  disabled={isSaving}
+                />
+              ) : (
               <div className="space-y-3">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-1.5" data-testid="JF.A4.3"><Marker id="JF.A4.3" />Personal Protective Equipment (PPE):</h3>
@@ -1607,6 +1624,7 @@ const JobsFormPage: React.FC = () => {
                   )}
                 </div>
               </div>
+              )}
             </SectionBlock>
 
             {/* A4. Work History */}
