@@ -276,3 +276,73 @@ BASE = new features off (prompt fingerprint equals live). KB = pilot. Same image
 - **Unit tests: 77,** including both pages' script syntax.
 - **In the browser:** the trainer page renders with no errors, and a wrong token shows "Wrong admin token." I did
   **not** type the real admin token into the browser myself.
+
+---
+
+## 11. Final corrections after Astra's review, and the final version
+
+### Final version (identified)
+
+- **Final code commit:** `7550c9000` on `chatbot-enterprise`, local only and not pushed. Earlier commits on the same
+  line: `120b42d15`, `393410399`, `1ca3fca23`.
+- **Tested image:** `sail-assistant-py:kbpilot-7550c9000` (image id `sha256:c17216c6…`).
+  - Built with `git archive 7550c9000`, not from the working tree.
+  - Running as the pilot service.
+  - Database migration level `0010`.
+  - The live service is unchanged (`v7-r2`).
+
+### The five points
+
+| # | Astra's point | Done | Evidence |
+|---|---|---|---|
+| 1 | Make the publishing impact unmistakable; sharing is a policy, not a necessity; the pilot must not affect production | Button now reads **"Publish for all clients and environments"**; the screen and guide say publishing makes guidance **available** to the chatbot for every client in dev and production, and that this is our chosen policy (the assistant can keep scopes apart). The pilot remains a separate service and database; nothing published there reaches the real production chatbot | `kb_ui.html`, guide |
+| 2 | Commit and identify the final version | Commit `7550c9000`; image `kbpilot-7550c9000` built from it; **harness 61/61** (`harness-7550c9000.txt`); **publish failure 8/8** (`publish-failure-7550c9000.txt`); four examples rerun (`four-examples-20261001-164622.json`) | PROVEN |
+| 3 | Test the administrator's page workflow in a real browser, with the pilot token handled securely | See "Administrator workflow" below | PROVEN |
+| 4 | Guide wording | The guide now says: identity = **issuer + company + user id**; Publish = available for retrieval, **not** guaranteed in every answer; Test draft covers **documentation** questions, not live-data tools | guide |
+| 5 | Delete answer wording | The entry now says "The Delete button is **available** to Sail Admin and Client Admin users". The user's answer on the final image reads "It is available to Sail Admin and Client Admin users", with no permission claim. Defect D1 stays recorded separately | four-examples run, case 1 |
+
+### Administrator workflow (point 3)
+
+**How the token was handled.** To avoid typing a server credential into a browser, the **same committed code** was run on
+this machine only (`127.0.0.1:8090`):
+- it was connected to the pilot database through an SSH forward;
+- it had its own **throwaway admin token**, generated locally and deleted afterwards;
+- it was afterwards shut down, along with the forward.
+
+**What was done on the real page** (typing and clicking, screenshots 8 and 9):
+1. the token gate;
+2. the list of the pilot's real trainers;
+3. the person picker (it found the DEV TEST chatbot users);
+4. **Add trainer** `devtest-tech-4` → "…is now a Technical trainer";
+5. **Deactivate**;
+6. **Show inactive** → history;
+7. **Reactivate** → "Reactivated";
+8. **Deactivate** again, leaving the pilot clean.
+
+**Effect on the deployed pilot** (its own admin token, untouched), checked after each step with the trainer's real
+sign-in and one open session:
+- after Add: trainer, Technical;
+- after Deactivate: refused (403) in the **same open session**;
+- after Reactivate: allowed again;
+- after the final Deactivate: refused.
+
+### Four examples on the final image
+
+- All four use the draft in preview.
+- The served answers are correct.
+- Delete: button availability only, no permission claim.
+- RH validations: the future-date rule sits under "Date validation on the Update RH **screen**", and the server-side
+  "not earlier than the last update" rule is now its own item, which removes the earlier grouping nuance.
+- RH types: Master → Inherited, and no "Non-inherited" type.
+
+### Guidance for trainers (Astra's note, now in the screen and the guide)
+
+- Record any version or configuration condition in **Conditions** / **Application version**.
+- Do not copy client-specific data from reported conversations into entries, because entries are published for all
+  clients.
+
+### State
+
+- **Pilot:** Jeevan's five drafts waiting, two retired demo entries, nothing served.
+- **Active DEV TEST trainers:** `devtest-tech-1`, `devtest-tech-2`, `devtest-crew-1`.
+- **Ready for Jeevan to test the isolated pilot** once the access plan is approved.
