@@ -6,7 +6,7 @@
 - **Requested by:** Ghazi Anwer
 - **Work done:** 30 Sep and 1 Oct 2026
 - **Status:** complete on the isolated pilot.
-  - Committed **locally** on `chatbot-enterprise` (SHA in §9).
+  - Committed **locally** on `chatbot-enterprise` as `120b42d15`.
   - **Not merged, pushed or deployed.** No new public endpoint.
   - Production, the live service, the live index and the other services are unchanged.
 - **Detailed evidence:** `docs/assistant-experiments/2026-09-30-kb-pilot/`:
@@ -215,9 +215,9 @@ BASE = new features off (prompt fingerprint equals live). KB = pilot. Same image
 
 ## 9. State, commit and next steps
 
-- **Code:** local commit on `chatbot-enterprise`: **`<SHA>`** (not pushed).
+- **Code:** local commit on `chatbot-enterprise`: **`120b42d15`** (code + evidence), plus a docs-only follow-up commit recording this SHA. Not pushed.
 - **Pilot:**
-  - AI server: `sail-kbpilot-db`, `sail-assistant-py-kbpilot` (`kbpilot-r6`, rebuilt from the commit), and
+  - AI server: `sail-kbpilot-db`, `sail-assistant-py-kbpilot` (image `kbpilot-r7-120b42d15`, built with `git archive` from the commit; harness **68/68** on it, `harness-r7-120b42d15.txt`), and
     `sail-assistant-py-kbbase` (A/B only, removable);
   - local: shores A/B and the tunnel.
 - **Pilot data:**
