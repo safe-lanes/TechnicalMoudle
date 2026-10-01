@@ -1,72 +1,109 @@
-# Chatbot knowledge management — pilot report (final round)
+# Chatbot knowledge management — pilot report
 
-**SAIL AI Assistant · Technical module · Build and verification report, revision 2**
+**SAIL AI Assistant · Technical module · Build and verification report — FINAL STATE (1 Oct 2026)**
 
 - **Prepared for:** Astra (review)
 - **Requested by:** Ghazi Anwer
 - **Work done:** 30 Sep and 1 Oct 2026
-- **Status:** complete on the isolated pilot.
-  - Committed **locally** on `chatbot-enterprise` as `120b42d15`.
-  - **Not merged, pushed or deployed.** No new public endpoint.
-  - Production, the live service, the live index and the other services are unchanged.
+- **Status:** pilot complete. Pushed to the feature branch `origin/feature/chatbot-enterprise`, with Ghazi's approval.
+  - **Not merged into `replit_dev`, not deployed.**
+  - No public endpoint.
+  - Production, the live assistant service, its index and the other services are unchanged.
+- **Final code:** commit `7550c9000`. Evidence commit `ed80dda86`; this report update follows it.
+- **Tested image:** `sail-assistant-py:kbpilot-7550c9000` (built with `git archive` from `7550c9000`), running as the
+  isolated pilot service.
 - **Detailed evidence:** `docs/assistant-experiments/2026-09-30-kb-pilot/`:
-  - `PILOT-RESULTS.md` — results;
-  - `APP-BEHAVIOUR-VERIFIED.md` — intended / observed / defect, kept separate;
-  - `DEFECTS-FOR-DEVELOPMENT.md` — D1–D7;
+  - `PILOT-RESULTS.md`;
+  - `APP-BEHAVIOUR-VERIFIED.md`;
+  - `DEFECTS-FOR-DEVELOPMENT.md` (D1–D7);
   - harness, failure-test and four-example outputs;
   - `screenshots-2026-10-01/`.
 - **Guides:**
   - `docs/CHATBOT-KNOWLEDGE-PILOT-GUIDE.md` — assigning trainers, and using the screen;
-  - `docs/CHATBOT-KNOWLEDGE-PILOT-ACCESS-PLAN.md` — Jeevan's own access, waiting for approval.
+  - `docs/CHATBOT-KNOWLEDGE-PILOT-ACCESS-PLAN.md` — Jeevan's own access; a separate approval is pending.
 
 **Evidence classes:**
 - **PROVEN** — run, output kept.
 - **READ** — from code.
 - **INFERRED** — a deduction, basis stated.
 
-**Pilot used:** yes, for everything below.
+**Pilot used:** yes, for every result.
+
+> **How to read this report.**
+> - **§1** is the **final state**.
+> - **§10** (owner decisions) and **§11** (Astra's corrections and the final version) describe how it was reached.
+> - **§2–§9 are historical:** the morning-of-1-Oct round. Their company-only / per-environment design, scope and
+>   share-grant fields, and images `kbpilot-r5/r6/r7` were **superseded** by §10–§11. They are kept for the audit trail.
 
 ---
 
-## 1. Summary
+## 1. Final state (summary)
 
-**Trainers are now configurable per module:**
-- Jeevan is not hard-coded anywhere.
-- A trainer grant names one module, a publishing scope (own company or product-wide) and, separately, whether guidance
-  may be shared across environments.
-- It is matched on the verified identity's issuer + company + user id, and checked on every request.
+**Who trains:**
+- Named **SAIL staff**, assigned per **module** on a list kept by the assistant (AI server).
+- They are managed on the trainer page `/admin/kb`, which needs the admin token and is not reachable publicly, or with
+  the command `python -m app.kb_admin`.
+- A trainer is matched on **issuer + company + user id** from the verified login.
+- **Sail Admin alone gives no training access.**
+- Deactivation applies on the trainer's next click, even in an open screen.
 
-**Proven boundaries:**
-- An ordinary Sail Admin cannot manage knowledge.
-- The same user id in another company, or another environment, gets nothing.
-- A revoked trainer is refused in an already-open screen.
+**What trainers do:**
+- Draft → **Test draft** → **Publish for all clients and environments** → edit / restore an earlier revision / retire,
+  with full history.
+- There is no separate approver.
+- Test draft uses the chatbot's own answer path for documentation ("how do I") questions. It does not cover live-data
+  tools.
 
-**Environments are explicit:**
-- Guidance applies to the environment it was written in, unless explicitly shared.
-- A dev entry, and a dev supersede, do not affect the same company's (simulated) production.
+**What publishing means:**
+- The revision becomes **available to the chatbot** for every client, in dev and production, at once. The chatbot uses
+  it when it is relevant; this is not guaranteed in every answer.
+- Applying to all clients and environments is **our chosen policy**, not a technical necessity.
+- Drafts and unpublished edits are never available to users.
 
-**Test draft is now representative:** it answers through the widget's own path (tool loop, same model and settings),
-with the draft visible only in that request and never logged.
+**Reports:**
+- "Report this answer" creates a review item for the module's trainers. It never becomes knowledge by itself.
+- Trainers must not copy client-specific data from a report into an entry.
 
-**Publishing is safe under failure (PROVEN):**
-- With an embedding outage, or a failure inside the swap transaction, the served revision, its searchable chunk and its
-  supersedes are unchanged.
-- Rollback restores the earlier revision's text and supersedes.
+**Safety (PROVEN):**
+- A failed publish (embedding outage, or a failure inside the transaction) leaves the served revision, its searchable
+  content and its superseding unchanged.
+- Rollback and retire restore the earlier content.
 
-**Review corrections are closed:**
-- The reversed "cascaded to all child components" sentence is traced to two manual passages. A correction entry now
-  replaces them.
-- The future-date rule is stated as an Update RH **screen** check.
-- The sub-component check is not presented as enforced.
-- Work-order retention on job delete is now PROVEN (34 work orders kept).
+**The four examples (PROVEN on the final image):**
+- All four are correct by meaning and evidence.
+- The delete answer says the Delete button "is available to" Sail Admin / Client Admin, with no permission claim.
+- RH answers give Master → Inherited, and the future-date rule as an Update RH **screen** check.
+- Application defects D1–D7 are logged separately and not fixed.
 
-**The four examples answer correctly by meaning and evidence,** with minor wording nuances stated in §4.
+**Final verification, on image `kbpilot-7550c9000`:**
 
-**Regression:** no content regression against the served behaviour (§6).
+| Check | Result |
+|---|---|
+| End-to-end harness | **61/61** |
+| Publish-failure test | **8/8** |
+| Administrator page workflow in a real browser | PROVEN: add, deactivate, history, reactivate, with each effect checked on the deployed pilot |
+| Unit tests | 77 |
+| mypy | clean |
+| PMS `tsc` | 294 = branch baseline |
+
+**Regression suites:**
+- The A/B regression (routing, retrieval, work orders, frozen, corrected, fresh, manual coverage) last ran on image r6
+  (§6): no content regression.
+- It was **not rerun** on the final image. The later changes were the access rules, the screen labels and the admin
+  page; they do not alter retrieval or answers for chatbot users while nothing is published. This is **INFERRED** from
+  the diff, not measured.
+
+**Not done (approval needed separately):**
+- Jeevan's access from his own computer (access plan).
+- Merge into `replit_dev`.
+- Any deployment.
 
 ---
 
-## 2. Requirements (final brief) and how each was met
+## 2. Requirements and how each was met (historical)
+
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
 
 | # | Requirement | Result | Evidence |
 |---|---|---|---|
@@ -94,6 +131,9 @@ with the draft visible only in that request and never logged.
 ---
 
 ## 3. What changed since the previous report
+
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
 
 1. **Trainers:**
    - new table `kb_trainers` (migration `0009`) and admin command `app/kb_admin.py`;
@@ -127,7 +167,10 @@ with the draft visible only in that request and never logged.
 
 ---
 
-## 4. The four examples — final assessment (PROVEN, by reading; `four-examples-20261001-114006.json`)
+## 4. The four examples — assessment of the earlier run (PROVEN, by reading; `four-examples-20261001-114006.json`)
+
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
 
 | Case | Answer with the entry | Verdict and nuance |
 |---|---|---|
@@ -146,6 +189,9 @@ with the draft visible only in that request and never logged.
 
 ## 5. Verification results
 
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
+
 | Check | Result |
 |---|---|
 | Harness `verify_kb_pilot.py` (permissions, lifecycle, environments, company scope, supersede + rollback, reports, revocation, module context) | **68/68** PROVEN |
@@ -157,7 +203,10 @@ with the draft visible only in that request and never logged.
 
 ---
 
-## 6. Regression — existing suites, A/B (PROVEN)
+## 6. Regression — existing suites, A/B on image r6 (PROVEN; still the latest regression run)
+
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
 
 BASE = new features off (prompt fingerprint equals live). KB = pilot. Same image (r6), same index copy, nothing published.
 
@@ -182,6 +231,9 @@ BASE = new features off (prompt fingerprint equals live). KB = pilot. Same image
 
 ## 7. Limitations (plainly)
 
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
+
 1. **Jeevan cannot use the pilot from his own computer yet.** The plan is ready (separate hostname, dev PMS widget
    change, his grant). It needs approval because it exposes an endpoint and deploys to dev.
 2. **Trainers are managed by command**, not on a screen (the agreed simple mechanism).
@@ -200,6 +252,9 @@ BASE = new features off (prompt fingerprint equals live). KB = pilot. Same image
 
 ## 8. Decisions made in this round that you may want to review
 
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
+
 1. **Grants live in the assistant database,** managed by a command, rather than in an environment variable: no restart,
    immediate revocation, history kept.
 2. **Environment = the registered instance's environment label;** `*` = shared, allowed only with an explicit share grant.
@@ -214,6 +269,9 @@ BASE = new features off (prompt fingerprint equals live). KB = pilot. Same image
 ---
 
 ## 9. State, commit and next steps
+
+> **HISTORICAL (morning of 1 Oct 2026).** Superseded by §10–§11 and summarised in §1. Company-only / per-environment scope and the r5–r7 images described here are no longer current.
+
 
 - **Code:** local commit on `chatbot-enterprise`: **`120b42d15`** (code + evidence), plus a docs-only follow-up commit recording this SHA. Not pushed.
 - **Pilot:**

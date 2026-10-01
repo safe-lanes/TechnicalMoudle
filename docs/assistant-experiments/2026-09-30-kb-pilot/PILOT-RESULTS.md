@@ -1,5 +1,10 @@
 # Chatbot knowledge management — pilot results (final round, 1-Oct-2026)
 
+> **HISTORICAL (morning of 1 Oct 2026).** These are the results of the round run on images r5/r6, including the
+> company-only / per-environment design that was later dropped. The **final state and final verification**
+> (commit `7550c9000`, image `kbpilot-7550c9000`) are in `docs/CHATBOT-KNOWLEDGE-PILOT-REPORT.md` §1, §10 and §11.
+
+
 **Evidence classes:**
 - **PROVEN** — run on the pilot or the test shore, with output kept.
 - **READ** — from code, not run.
