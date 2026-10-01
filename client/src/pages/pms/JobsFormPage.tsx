@@ -1579,9 +1579,9 @@ const JobsFormPage: React.FC = () => {
                     <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.4">
                       <Marker id="JF.A4.4" />
                       {templateData.safetyRequirements.ppeRequirements.map((item, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
-                          <span>{item}</span>
+                        <li key={index} className="flex items-start gap-2 leading-5">
+                          <span className="shrink-0 text-[hsl(var(--primary))]" aria-hidden="true">&bull;</span>
+                          <span className="min-w-0 break-words">{item}</span>
                         </li>
                       ))}
                     </ul>
@@ -1596,9 +1596,9 @@ const JobsFormPage: React.FC = () => {
                     <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.6">
                       <Marker id="JF.A4.6" />
                       {templateData.safetyRequirements.permitRequirements.map((item, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
-                          <span>{item}</span>
+                        <li key={index} className="flex items-start gap-2 leading-5">
+                          <span className="shrink-0 text-[hsl(var(--primary))]" aria-hidden="true">&bull;</span>
+                          <span className="min-w-0 break-words">{item}</span>
                         </li>
                       ))}
                     </ul>
@@ -1613,9 +1613,9 @@ const JobsFormPage: React.FC = () => {
                     <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.8">
                       <Marker id="JF.A4.8" />
                       {templateData.safetyRequirements.otherRequirements.map((item, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
-                          <span>{item}</span>
+                        <li key={index} className="flex items-start gap-2 leading-5">
+                          <span className="shrink-0 text-[hsl(var(--primary))]" aria-hidden="true">&bull;</span>
+                          <span className="min-w-0 break-words">{item}</span>
                         </li>
                       ))}
                     </ul>
