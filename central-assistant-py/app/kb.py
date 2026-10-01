@@ -10,15 +10,17 @@ Guarantees, all enforced here on the server:
     application instance), company (tenant domain) AND user id. A role (even Sail Admin) grants nothing; the same user
     id in another company or another environment gets nothing. Grants are read on EVERY request, so a revocation also
     stops an existing session. Chat access stays with the module's own policy.
-  * Publishing scope is separate from the module grant: 'company' = the trainer's own company only; 'global' =
-    product-wide (only when granted). Guidance applies to the trainer's ENVIRONMENT ('dev', 'prod', …) unless the
-    grant allows sharing and the entry is explicitly marked shared by all environments ('*').
+  * Owner decision 1-Oct-2026: trainers are SAIL staff and train the chatbot for ALL clients, on dev, for ALL
+    environments (one central assistant). Every entry is therefore product-wide ('global') and applies in every
+    environment ('*'); a publish is live for all clients at once. (The company / environment columns stay in the
+    data model and the retrieval filter, so a scoped entry can never leak if one is ever written.)
+  * Trainers are managed on the AI server: the admin page /admin/kb (admin token, not reachable publicly) or the
+    command `python -m app.kb_admin`.
   * A draft is never served: it is not in the chunk table except as a PREVIEW chunk, which only the trainer's
     preview request retrieves (db.retrieval_scope). A preview is never logged as a conversation.
   * Publish embeds FIRST, then swaps the entry's served chunk and its supersedes in ONE transaction.
     A failure anywhere leaves the previously published revision served.
-  * Supersedes are stored per published entry and scoped to the entry's company and environment; retiring or rolling
-    back rewrites them, so replaced passages come back.
+  * Supersedes are stored per published entry; retiring or rolling back rewrites them, so replaced passages come back.
   * Ordinary users can only file a review item (POST /feedback); it never changes the knowledge.
 """
 from __future__ import annotations
@@ -65,8 +67,6 @@ class Session:
 @dataclass(frozen=True)
 class Grant:
     module: str
-    scope: str          # 'company' | 'global'
-    share_envs: bool
 
 
 def _now() -> datetime:
@@ -93,46 +93,29 @@ class Access:
     def grant(self, module: str) -> Grant | None:
         return self.grants.get((module or "").lower())
 
-    def env_ok(self, module: str, env_scope: str | None, *, write: bool) -> bool:
-        g = self.grant(module)
-        if not g or not env_scope or not self.sess.env:
-            return False
-        if env_scope == self.sess.env:
-            return True
-        return env_scope == "*" and (g.share_envs or not write)
+    def can_write(self, module: str, scope_tenant: str | None, env_scope: str | None = "*") -> bool:
+        """Create/preview/publish/roll back/retire: any trainer of the module, for product-wide entries (all clients,
+        all environments — the only kind written since 1-Oct-2026)."""
+        return self.grant(module) is not None and scope_tenant is None and env_scope == "*"
 
-    def can_write(self, module: str, scope_tenant: str | None, env_scope: str | None) -> bool:
-        """Create/preview/publish/roll back/retire: module granted, environment allowed, and either a GLOBAL grant for a
-        global entry or the trainer's OWN company for a company entry."""
-        g = self.grant(module)
-        if not g or not self.env_ok(module, env_scope, write=True):
-            return False
-        if scope_tenant is None:
-            return g.scope == "global"
-        return bool(self.sess.tenant) and scope_tenant == self.sess.tenant
+    def can_read(self, module: str, scope_tenant: str | None, env_scope: str | None = "*") -> bool:
+        return self.grant(module) is not None and scope_tenant is None
 
-    def can_read(self, module: str, scope_tenant: str | None, env_scope: str | None) -> bool:
-        """Trainers see global entries of their modules and their own company's — never another company's — of their
-        environment or explicitly shared."""
-        if not self.grant(module) or not self.env_ok(module, env_scope, write=False):
-            return False
-        return scope_tenant is None or (bool(self.sess.tenant) and scope_tenant == self.sess.tenant)
-
-    def require_write(self, module: str, scope_tenant: str | None, env_scope: str | None) -> None:
+    def require_write(self, module: str, scope_tenant: str | None, env_scope: str | None = "*") -> None:
         if not self.can_write(module, scope_tenant, env_scope):
-            raise KBError(403, "You are not a knowledge trainer for this module, scope and environment.")
+            raise KBError(403, "You are not a knowledge trainer for this module.")
 
 
 async def load_grants(issuer: str | None, tenant: str | None, user_id: str | None) -> dict[str, Grant]:
-    """Active grants for exactly this issuer + company + user id (all three must match; none may be empty)."""
+    """Active grants for exactly this issuer + company (login domain) + user id — all three must match, none may be
+    empty: the same user id from another company or environment gets nothing."""
     if not issuer or not tenant or not user_id:
         return {}
     async with db.engine().connect() as c:
         rows = (await c.execute(text(
-            "SELECT module, publish_scope, share_envs FROM kb_trainers WHERE issuer=:i AND tenant_domain=:t AND user_id=:u "
-            "AND revoked_at IS NULL"), {"i": issuer, "t": tenant, "u": user_id})).all()
-    return {r.module.lower(): Grant(r.module.lower(), r.publish_scope, bool(r.share_envs))
-            for r in rows if r.publish_scope in ("company", "global")}
+            "SELECT module FROM kb_trainers WHERE issuer=:i AND tenant_domain=:t AND user_id=:u AND revoked_at IS NULL"),
+            {"i": issuer, "t": tenant, "u": user_id})).all()
+    return {r.module.lower(): Grant(r.module.lower()) for r in rows}
 
 
 async def access(sess: Session) -> Access:
@@ -195,8 +178,8 @@ async def me(sess: Session) -> dict[str, Any]:
     a = await access(sess)
     return {"userId": sess.user_id, "userName": sess.user_name, "role": sess.role, "company": sess.tenant, "issuer": sess.iss,
             "environment": sess.env, "trainer": bool(a.grants),
-            "modules": [{"module": g.module, "label": MODULE_LABELS.get(g.module, g.module.title()), "scope": g.scope,
-                         "shareEnvs": g.share_envs} for g in sorted(a.grants.values(), key=lambda x: x.module)],
+            "modules": [{"module": g.module, "label": MODULE_LABELS.get(g.module, g.module.title())}
+                        for g in sorted(a.grants.values(), key=lambda x: x.module)],
             "moduleLabels": MODULE_LABELS}
 
 
@@ -360,8 +343,8 @@ async def list_entries(sess: Session, module: str | None, status: str | None) ->
     async with db.engine().connect() as c:
         rows = (await c.execute(text(
             "SELECT * FROM kb_entries WHERE lower(module) = ANY(CAST(:m AS text[])) AND (:st = '' OR status = :st) "
-            "AND (scope_tenant IS NULL OR scope_tenant = :t) AND env_scope IN (:env, '*') ORDER BY updated_at DESC"),
-            {"m": [m for m in mods if m in a.grants], "st": status or "", "t": sess.tenant or "", "env": sess.env or ""})).all()
+            "AND scope_tenant IS NULL ORDER BY updated_at DESC"),
+            {"m": [m for m in mods if m in a.grants], "st": status or ""})).all()
     return [_entry(r._mapping) | {"writable": a.can_write(r._mapping["module"], r._mapping["scope_tenant"], r._mapping["env_scope"])}
             for r in rows]
 
@@ -393,10 +376,8 @@ async def _writable_entry(c: Any, sess: Session, entry_id: str) -> tuple[dict[st
 
 async def create_entry(sess: Session, b: dict[str, Any]) -> dict[str, Any]:
     module = str(b.get("module") or "").lower()
-    scope_tenant = sess.tenant if b.get("scope") == "company" else None
-    if b.get("scope") == "company" and not sess.tenant:
-        raise KBError(400, "Your sign-in has no company, so a company-only entry cannot be created.")
-    env_scope = "*" if b.get("environment") == "all" else sess.env
+    scope_tenant: str | None = None  # all clients (owner decision 1-Oct-2026)
+    env_scope = "*"                  # all environments: trained on dev, served everywhere
     a = await access(sess)
     a.require_write(module, scope_tenant, env_scope)
     r = _clean_revision_input(b)
@@ -410,12 +391,9 @@ async def create_entry(sess: Session, b: dict[str, Any]) -> dict[str, Any]:
                          "u": sess.user_id, "n": sess.user_name})
         await _insert_revision(c, eid, 1, r, sess)
         await _audit(c, sess, eid, 1, "created", {"reviewItem": b.get("reviewItemId"), "environment": env_scope})
-        if b.get("reviewItemId"):  # only a report this trainer can see (same module and environment; own company unless global)
-            g = a.grant(module)
-            await c.execute(text("UPDATE kb_review_items SET status='linked', entry_id=:e, updated_at=now() WHERE id=:id AND lower(module)=:m "
-                                 "AND (:glob OR tenant_domain = :t) AND env = :env"),
-                            {"e": eid, "id": str(b["reviewItemId"]), "m": module, "glob": bool(g and g.scope == "global"),
-                             "t": sess.tenant or "", "env": sess.env or ""})
+        if b.get("reviewItemId"):  # only a report of this module (the trainer's module)
+            await c.execute(text("UPDATE kb_review_items SET status='linked', entry_id=:e, updated_at=now() WHERE id=:id AND lower(module)=:m"),
+                            {"e": eid, "id": str(b["reviewItemId"]), "m": module})
     return await get_entry(sess, eid, a)
 
 
@@ -634,14 +612,8 @@ async def create_review_item(identity: dict[str, Any], b: dict[str, Any]) -> dic
 
 
 def review_visible(a: Access, module: str, tenant: str | None, env: str | None) -> bool:
-    """A report reaches the trainers of its module, in its environment (or trainers allowed to share across environments);
-    company trainers see only their own company's reports, global trainers every company's."""
-    g = a.grant(module)
-    if not g or not env:
-        return False
-    if env != a.sess.env and not g.share_envs:
-        return False
-    return g.scope == "global" or (bool(a.sess.tenant) and tenant == a.sess.tenant)
+    """A report reaches every trainer of its module (trainers train for all clients and all environments)."""
+    return a.grant(module) is not None
 
 
 async def list_review_items(sess: Session, module: str | None, status: str | None) -> list[dict[str, Any]]:
@@ -684,3 +656,71 @@ async def annotate(entry_id: str, note: str, by: str) -> None:
         await c.execute(text("INSERT INTO kb_audit (entry_id, revision, action, actor_id, actor_name, detail) "
                              "VALUES (:e, NULL, 'note', :u, :n, CAST(:d AS jsonb))"),
                         {"e": entry_id, "u": by, "n": by, "d": _j({"note": note[:1000]})})
+
+
+# ── trainer administration (AI server only: /admin/kb page and `python -m app.kb_admin`) ────────────────────
+async def list_trainers(include_inactive: bool = True) -> list[dict[str, Any]]:
+    async with db.engine().connect() as c:
+        rows = (await c.execute(text("SELECT * FROM kb_trainers " + ("" if include_inactive else "WHERE revoked_at IS NULL ") +
+                                     "ORDER BY (revoked_at IS NOT NULL), module, display_name, granted_at DESC"))).all()
+    out = []
+    for r in rows:
+        d = dict(r._mapping)
+        for k in ("granted_at", "revoked_at"):
+            d[k] = d[k].isoformat() if d.get(k) else None
+        d["active"] = d["revoked_at"] is None
+        d["moduleLabel"] = MODULE_LABELS.get(d["module"], d["module"].title())
+        out.append(d)
+    return out
+
+
+async def grant_trainer(issuer: str, tenant: str, user_id: str, module: str, name: str, by: str, note: str = "") -> dict[str, Any]:
+    """Make a person a trainer of one module (all clients, all environments). Re-granting replaces the active grant;
+    the history keeps both."""
+    module = (module or "").lower().strip()
+    issuer, tenant, user_id, by = (issuer or "").strip(), (tenant or "").strip(), (user_id or "").strip(), (by or "").strip()
+    if module not in MODULE_LABELS:
+        raise KBError(400, f"Unknown module '{module}'.")
+    if issuer not in settings().module_instances:
+        raise KBError(400, f"'{issuer}' is not a registered application instance.")
+    if not tenant or not user_id or not by:
+        raise KBError(400, "User id, company (login domain) and 'granted by' are required.")
+    async with db.engine().begin() as c:
+        await c.execute(text("UPDATE kb_trainers SET revoked_at=now(), revoked_by=:b WHERE issuer=:i AND tenant_domain=:t AND user_id=:u "
+                             "AND module=:m AND revoked_at IS NULL"), {"b": by, "i": issuer, "t": tenant, "u": user_id, "m": module})
+        row = (await c.execute(text("INSERT INTO kb_trainers (issuer, tenant_domain, user_id, module, publish_scope, share_envs, display_name, "
+                                    "note, granted_by) VALUES (:i, :t, :u, :m, 'global', true, :n, :note, :b) RETURNING id"),
+                               {"i": issuer, "t": tenant, "u": user_id, "m": module, "n": (name or "").strip()[:120],
+                                "note": (note or "")[:300], "b": by})).first()
+    return {"ok": True, "id": row.id if row else None}
+
+
+async def deactivate_trainer(trainer_id: int, by: str) -> dict[str, Any]:
+    """Revoke one grant; takes effect on the trainer's next request, including an already-open screen."""
+    async with db.engine().begin() as c:
+        r = await c.execute(text("UPDATE kb_trainers SET revoked_at=now(), revoked_by=:b WHERE id=:id AND revoked_at IS NULL"),
+                            {"b": (by or "admin")[:120], "id": trainer_id})
+    if not r.rowcount:
+        raise KBError(404, "No active trainer grant with that id.")
+    return {"ok": True}
+
+
+async def reactivate_trainer(trainer_id: int, by: str) -> dict[str, Any]:
+    async with db.engine().connect() as c:
+        r = (await c.execute(text("SELECT * FROM kb_trainers WHERE id=:id"), {"id": trainer_id})).first()
+    if not r:
+        raise KBError(404, "Trainer grant not found.")
+    return await grant_trainer(r.issuer, r.tenant_domain, r.user_id, r.module, r.display_name or "", by, r.note or "")
+
+
+async def chatbot_users(q: str, limit: int = 20) -> list[dict[str, Any]]:
+    """People who have used the chatbot (from the conversation log) — the picker for 'Add trainer'."""
+    like = f"%{(q or '').strip()}%"
+    async with db.engine().connect() as c:
+        rows = (await c.execute(text(
+            "SELECT user_id, max(user_name) AS user_name, tenant_domain, max(ts) AS last_seen FROM assistant_conversations "
+            "WHERE user_id IS NOT NULL AND user_id <> '' AND (user_id ILIKE :q OR coalesce(user_name, '') ILIKE :q OR "
+            "coalesce(tenant_domain, '') ILIKE :q) GROUP BY user_id, tenant_domain ORDER BY max(ts) DESC LIMIT :n"),
+            {"q": like, "n": limit})).all()
+    return [{"userId": r.user_id, "name": r.user_name, "company": r.tenant_domain,
+             "lastSeen": r.last_seen.isoformat() if r.last_seen else None} for r in rows]

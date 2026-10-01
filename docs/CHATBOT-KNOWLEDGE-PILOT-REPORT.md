@@ -229,3 +229,50 @@ BASE = new features off (prompt fingerprint equals live). KB = pilot. Same image
   2. the access plan (hostname, nginx, dev widget deploy, dev credentials in the pilot registry);
   3. Jeevan's dev user id and company domain;
   4. a production count for D2/D7.
+
+---
+
+## 10. Addendum (later on 1 Oct 2026): owner decisions applied, plus a trainer page
+
+### Ghazi's decisions after reviewing the pilot
+
+1. **Trainers are a list of named people,** not a SAILERP role. A user has only one SAILERP role, and Sail Admin
+   bypasses PMS permission checks, so a role-based grant would have made every Sail Admin a trainer or removed their
+   admin role.
+2. **Trainers are SAIL staff and train for all clients,** so the company-only option is removed.
+3. **One assistant serves every environment and training is done on dev,** so every entry applies to all
+   environments. A Publish is live for all clients in dev and production at once.
+
+### Built
+
+- **Trainer page** `/admin/kb` on the AI server, with the same protection as the existing `/admin` endpoints (admin
+  token, not reachable from the internet). It provides:
+  - a list of trainers (user id, name, company, module, active/inactive, who and when);
+  - "Add trainer", picking from people who have used the chatbot or typing the id;
+  - deactivate and reactivate.
+- **The command** `python -m app.kb_admin` does the same.
+- **Simplified access rules:** any trainer of a module may write that module's entries; every entry is for all clients
+  and all environments; reports go to all of the module's trainers.
+- **Migration `0010`** makes existing knowledge "all clients, all environments" (idempotent).
+- **Knowledge screen:** the company and environment choices are removed.
+
+### Found and fixed
+
+- **The pilot's admin token was identical to the live service's.** It had been inherited from an older pilot env file.
+  The token was never printed or sent anywhere off the server.
+- **Fix:** the pilot now has its own token; superseded pilot env copies were deleted from the AI server; the
+  A/B-comparison container that carried the same copy was removed.
+- **The live service and its token are unchanged.**
+
+### Verified on pilot image `kbpilot-r8`
+
+- **Harness `verify_kb_pilot.py`: 61/61 (`harness-r8.txt`).** This includes, newly:
+  - a dev publish reaches production users and other companies;
+  - the supersede applies everywhere;
+  - every report reaches all of the module's trainers;
+  - the trainer page's API: wrong token refused (401), add trainer, deactivate (refused at once in an open session),
+    reactivate, user picker.
+- **Publish failure: 8/8.**
+- **Unit tests: 77,** including both pages' script syntax.
+- **In the browser:** the trainer page renders with no errors, and a wrong token shows "Wrong admin token." I did
+  **not** type the real admin token into the browser myself.

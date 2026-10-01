@@ -94,13 +94,13 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
         <div><span id="edStatus"></span><span id="edScope"></span><span class="muted small" id="edRev"></span></div>
         <div class="row"><button id="saveDraft" title="Keep your changes as a draft. Nobody else sees a draft.">Save draft</button><button id="testJump" title="Ask the chatbot privately with this draft in place">Test draft</button><button id="publishBtn" class="primary" title="Make this revision the answer chatbot users get">Publish</button><button id="retireBtn" class="danger">Retire</button></div>
       </div>
-      <p class="muted small" style="margin:6px 0 0">1 <strong>Save draft</strong> keeps your changes — nobody else sees them. 2 <strong>Test draft</strong> asks the chatbot privately with this draft in place. 3 <strong>Publish</strong> makes it the answer chatbot users get; until then they keep the published version.</p>
+      <p class="muted small" style="margin:6px 0 0">1 <strong>Save draft</strong> keeps your changes — nobody else sees them. 2 <strong>Test draft</strong> asks the chatbot privately with this draft in place. 3 <strong>Publish</strong> makes it the answer for chatbot users of <strong>all clients, in dev and production, at once</strong>; until then they keep the published version.</p>
       <div id="edMsg"></div>
       <div class="grid2">
         <div><label for="fTitle">Title</label><input type="text" id="fTitle" placeholder="e.g. Deleting a job"></div>
         <div class="grid2">
           <div><label for="fKind">Type</label><select id="fKind"></select></div>
-          <div><label for="fScope">Companies</label><select id="fScope"><option value="global">All companies</option><option value="company">My company only</option></select></div>
+          <div><label>Applies to companies</label><div class="muted" style="padding:7px 0">All clients</div></div>
         </div>
       </div>
       <label for="fBody">Guidance (what the chatbot should say)</label>
@@ -111,7 +111,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
       </div>
       <div class="grid2">
         <div><label for="fConditions">Conditions</label><input type="text" id="fConditions" placeholder="e.g. vessel RH validation switched on"></div>
-        <div class="grid2"><div><label for="fVersion">Application version</label><input type="text" id="fVersion"></div><div><label for="fEnvScope">Environment</label><select id="fEnvScope"><option value="this">This environment only</option><option value="all">All environments (shared)</option></select></div></div>
+        <div class="grid2"><div><label for="fVersion">Application version</label><input type="text" id="fVersion"></div><div><label>Environments</label><div class="muted" style="padding:7px 0">All (dev and production)</div></div></div>
       </div>
 
       <div class="section"><h3>Supporting evidence</h3>
@@ -123,7 +123,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
         <div id="opList"></div><button id="addOp">Add point</button></div>
 
       <div class="section"><h3>Replaces manual passages</h3>
-        <p class="muted small">Passages picked here stop being used by the chatbot while this entry is published (for your scope only). Retiring the entry brings them back.</p>
+        <p class="muted small">Passages picked here stop being used by the chatbot while this entry is published. Retiring the entry brings them back.</p>
         <div id="supList"></div>
         <div class="row"><input type="text" id="supQ" placeholder="Search manual passages…" style="flex:1;min-width:200px"><button id="supSearch">Search</button></div>
         <div id="supResults"></div></div>
@@ -181,12 +181,10 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
     $("who").textContent += ` · ${me.environment}`;
     $("module").innerHTML = me.modules.map((m) => `<option value="${esc(m.module)}">${esc(m.label)}</option>`).join("");
     $("fKind").innerHTML = Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
-    $("fEnvScope").options[0].textContent = `This environment only (${me.environment})`;
+
     $("app").hidden = false;
     await loadEntries(); await loadReviewCount();
   }
-  const grantOf = () => me.modules.find((m) => m.module === $("module").value) || {scope: "company", shareEnvs: false};
-  const envLabel = (e) => (e.env_scope === "*" ? "all environments" : e.env_scope || "?");
   function gate(msg) { $("gate").hidden = false; $("app").hidden = true; $("gateMsg").textContent = msg; }
 
   async function loadEntries() {
@@ -195,8 +193,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
     $("entryList").innerHTML = entries.length ? entries.map((e) => `
       <div class="item" data-id="${e.id}" ${current && current.entry.id === e.id ? 'aria-current="true"' : ""} tabindex="0">
         <div class="t">${esc(e.title)}</div>
-        <div><span class="pill s-${shown(e)}">${shown(e)}</span><span class="pill s-${e.scope_tenant ? "company" : "global"}">${e.scope_tenant ? "company" : "all companies"}</span><span class="pill">${esc(envLabel(e))}</span>
-        <span class="muted small">${esc(KINDS[e.kind] || e.kind)}${statusNote(e)}</span></div></div>`).join("")
+        <div><span class="pill s-${shown(e)}">${shown(e)}</span><span class="muted small">${esc(KINDS[e.kind] || e.kind)}${statusNote(e)}</span></div></div>`).join("")
       : `<div class="muted small">No entries yet.</div>`;
     document.querySelectorAll("#entryList .item").forEach((el) => {
       el.onclick = () => openEntry(el.dataset.id);
@@ -227,14 +224,9 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
     draft = JSON.parse(JSON.stringify(r || {title: "", kind: "procedure", body: "", applies_to: {}, evidence: [], open_points: [], supersedes: [], internal_notes: "", change_note: ""}));
     const e = current ? current.entry : null;
     $("edStatus").innerHTML = e ? `<span class="pill s-${shown(e)}">${shown(e)}</span><span class="muted small">${esc(statusNote(e))}</span> ` : `<span class="pill s-draft">new</span>`;
-    $("edScope").innerHTML = e ? `<span class="pill s-${e.scope_tenant ? "company" : "global"}">${e.scope_tenant ? "company: " + esc(e.scope_tenant) : "all companies"}</span><span class="pill">${esc(envLabel(e))}</span>` : "";
+    $("edScope").innerHTML = "";
     $("edRev").textContent = e ? `published revision: ${e.published_revision ?? "none"} · draft: ${e.draft_revision ?? "none"}` : "";
     $("fTitle").value = draft.title || ""; $("fKind").value = draft.kind || "procedure"; $("fBody").value = draft.body || "";
-    const g = grantOf();
-    if (e) { $("fScope").value = e.scope_tenant ? "company" : "global"; $("fScope").disabled = true; }
-    else { if (g.scope !== "global") $("fScope").value = "company"; $("fScope").disabled = g.scope !== "global"; }
-    if (e) { $("fEnvScope").value = e.env_scope === "*" ? "all" : "this"; $("fEnvScope").disabled = true; }
-    else { $("fEnvScope").value = "this"; $("fEnvScope").disabled = !g.shareEnvs; }
     const a = draft.applies_to || {};
     $("fOffice").checked = (a.userTypes || []).includes("Office"); $("fShip").checked = (a.userTypes || []).includes("Ship");
     $("fRoles").value = (a.roles || []).join(", "); $("fConditions").value = a.conditions || ""; $("fVersion").value = a.appVersion || "";
@@ -248,7 +240,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
 
   function collect() {
     const types = []; if ($("fOffice").checked) types.push("Office"); if ($("fShip").checked) types.push("Ship");
-    return {module: $("module").value, scope: $("fScope").value, environment: $("fEnvScope").value, title: $("fTitle").value.trim(), kind: $("fKind").value, body: $("fBody").value,
+    return {module: $("module").value, title: $("fTitle").value.trim(), kind: $("fKind").value, body: $("fBody").value,
       appliesTo: {userTypes: types, roles: $("fRoles").value.split(",").map((s) => s.trim()).filter(Boolean), conditions: $("fConditions").value,
         appVersion: $("fVersion").value},
       evidence: draft.evidence, openPoints: draft.open_points, supersedes: draft.supersedes, internalNotes: $("fNotes").value, changeNote: $("fChange").value};

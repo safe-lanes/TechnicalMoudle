@@ -8,10 +8,11 @@ Assistant = the ISOLATED knowledge pilot (own database) through a local tunnel; 
 Trainer grants are managed with the real admin command (`python -m app.kb_admin`) in the pilot container over SSH.
 
 DEV TEST accounts (pilot only; granted 1-Oct-2026):
-  devtest-tech-1  pilot    dev  Technical, global            devtest-tech-2  pilot    dev  Technical, global
-  devtest-crew-1  pilot    dev  Crewing, global              devtest-tech-b  pilot-b  dev  Technical, company only
-  devtest-share   pilot    dev  Technical, global + may publish guidance shared by all environments
-  devtest-user / devtest-user-b   ordinary Sail Admins (chat + report only)
+  devtest-tech-1, devtest-tech-2  pilot  dev  Technical trainers     devtest-crew-1  pilot  dev  Crewing trainer
+  devtest-user / devtest-user-b   ordinary Sail Admins (chat + report only), companies pilot / pilot-b
+Owner decision 1-Oct-2026: trainers train ONE module for ALL clients and ALL environments (one central assistant,
+trained on dev) — every entry is product-wide and a publish is live everywhere at once. Trainers are managed on the
+AI-server page /admin/kb (admin token) or with `python -m app.kb_admin`; section 6 drives the page's API.
   devtest-tech-1 @ pilot-b (same id, other company) and @ prod (same id and company, other environment): no grant
 
 Content is a made-up topic ("Zeta-9 counter") so no answer can come from the manuals by accident; the manual passage
@@ -35,6 +36,8 @@ ASSISTANT = os.environ.get("ASSISTANT", "http://localhost:18047")
 SHORES = {"dev": ("http://localhost:5000", M / "local-test-env/.env.shore.example"),
           "prod": ("http://localhost:5001", M / "local-test-env/.env.shoreB.local")}
 SSH = ["ssh", "-i", os.environ.get("SSH_KEY", "C:/Users/GhaziAnwer/apigateway.pem"), "ubuntu@13.250.51.71"]
+# The admin token is read from the pilot container over SSH, kept in memory only and never printed.
+ADMIN_TOKEN = subprocess.run([*SSH, "docker exec sail-assistant-py-kbpilot printenv ADMIN_TOKEN"], capture_output=True, text=True).stdout.strip()
 V = "743ef9d1-841a-11ed-aa7c-7003bca91a86"
 RUN = time.strftime("%H%M%S")
 TOPIC = f"Zeta-9 counter {RUN}"
@@ -150,8 +153,6 @@ def main() -> int:
     t1 = User("devtest-tech-1", "pilot", "DEV TEST Technical trainer 1")
     t2 = User("devtest-tech-2", "pilot", "DEV TEST Technical trainer 2")
     crew = User("devtest-crew-1", "pilot", "DEV TEST Crewing trainer")
-    tb = User("devtest-tech-b", "pilot-b", "DEV TEST Company-B Technical trainer")
-    share = User("devtest-share", "pilot", "DEV TEST Technical trainer (shared environments)")
     user = User("devtest-user", "pilot", "DEV TEST ordinary Sail Admin")
     user_b = User("devtest-user-b", "pilot-b", "DEV TEST ordinary Sail Admin B")
     t1_other_co = User("devtest-tech-1", "pilot-b", "DEV TEST Technical trainer 1 (company B login)")
@@ -160,7 +161,7 @@ def main() -> int:
     ship = User("devtest-ship", "pilot", "DEV TEST ship user", user_type="Ship")
 
     # ── 1. who may manage what (server-side, from issuer + company + user id) ──
-    for x in (t1, t2, crew, tb, share, user, t1_other_co, t1_prod):
+    for x in (t1, t2, crew, user, t1_other_co, t1_prod):
         x.sign_in()
     mods = lambda u: [m["module"] for m in u.kb("GET", "/me")[1].get("modules", [])]  # noqa: E731
     rec("Technical trainer 1 sees only Technical", mods(t1) == ["technical"], mods(t1))
@@ -179,8 +180,6 @@ def main() -> int:
     rec("Technical trainer cannot create a Crewing entry (403)", s == 403, f"{s} {b.get('error')}")
     s, b = crew.kb("POST", "/entries", entry_body(7))
     rec("Crewing trainer cannot create a Technical entry (403)", s == 403, f"{s} {b.get('error')}")
-    s, b = tb.kb("POST", "/entries", entry_body(7, title=f"Company B global attempt {RUN}"))
-    rec("company-scope trainer cannot publish for all companies (403)", s == 403, f"{s} {b.get('error')}")
     s, _ = t1.kb("POST", "/entries", entry_body(7), change=False)
     rec("a change without the x-kb-request header is refused (403)", s == 403, s)
     s, b, _ = http(f"{ASSISTANT}/kb/api/session", "POST", body={"token": "not-a-token"})
@@ -189,7 +188,8 @@ def main() -> int:
     # ── 2. draft → private test → publish → answer → edit → rollback → retire ──
     s, b = t1.kb("POST", "/entries", entry_body(7, openPoints=[{"text": "Is 7 seconds right for all vessels?", "resolved": False}]))
     eid = b.get("entry", {}).get("id", "")
-    rec("trainer 1 creates a draft (environment dev)", s == 200 and b["entry"]["status"] == "draft" and b["entry"]["env_scope"] == "dev", f"{s} {eid}")
+    rec("trainer 1 creates a draft for all clients and all environments",
+        s == 200 and b["entry"]["status"] == "draft" and b["entry"]["scope_tenant"] is None and b["entry"]["env_scope"] == "*", f"{s} {eid}")
     rec("a DRAFT is never retrieved for an ordinary user", not cites(user.chat(Q, route_only=True), KNOWLEDGE + f"Resetting the {TOPIC}"))
     s, b = t1.kb("POST", f"/entries/{eid}/publish", {})
     rec("publish refused while a point still needs expert confirmation (409)", s == 409 and "confirmation" in str(b.get("error")), b.get("error"))
@@ -224,25 +224,12 @@ def main() -> int:
     rec("after rollback users get the earlier content again (7 seconds)", "7 second" in str(r.get("response")) and "9 second" not in str(r.get("response")))
     rec("history keeps all three revisions and the audit trail", len(b["revisions"]) == 3 and any(a["action"] == "rolled back" for a in b["audit"]))
 
-    # ── 3. environment: same company, dev vs (simulated) production ──
-    rec("a dev entry is NOT served to the same company's production users", not cites(user_prod.chat(Q, route_only=True), KNOWLEDGE + f"Resetting the {TOPIC}"))
-    rec("the dev trainer's session on production cannot read or change the dev entry", t1_prod.kb("GET", f"/entries/{eid}")[0] in (403, 404))
-    s, b = t1.kb("POST", "/entries", entry_body(5, title=f"Shared attempt {RUN}", environment="all"))
-    rec("a trainer without the share grant cannot create guidance shared by all environments (403)", s == 403, f"{s} {b.get('error')}")
-    QS = f"What is the Omega-4 purge interval {RUN}?"
-    s, b = share.kb("POST", "/entries", entry_body(5, title=f"Omega-4 purge interval {RUN}", environment="all",
-                                                      body=f"The Omega-4 purge interval {RUN} is 11 days for every vessel; purge it from the Omega-4 panel."))
-    sid = b.get("entry", {}).get("id", "")
-    rec("the share-granted trainer creates guidance explicitly shared by all environments ('*')", s == 200 and b["entry"]["env_scope"] == "*", f"{s} {b.get('error')}")
-    share.kb("POST", f"/entries/{sid}/publish", {})
-    rec("shared guidance reaches dev users", cites(user.chat(QS, route_only=True), KNOWLEDGE + f"Omega-4 purge interval {RUN}"))
-    rec("shared guidance reaches production users", cites(user_prod.chat(QS, route_only=True), KNOWLEDGE + f"Omega-4 purge interval {RUN}"))
-    rec("a non-share trainer can read the shared entry but not change it", t1.kb("GET", f"/entries/{sid}")[0] == 200 and t1.kb("POST", f"/entries/{sid}/retire", {})[0] == 403)
-    share.kb("POST", f"/entries/{sid}/retire", {"reason": "harness"})
-    rec("after retire the shared guidance is gone in both environments",
-        not cites(user.chat(QS, route_only=True), KNOWLEDGE + "Omega-4") and not cites(user_prod.chat(QS, route_only=True), KNOWLEDGE + "Omega-4"))
+    # ── 3. one assistant, all environments and all clients: a dev publish is live everywhere ──
+    rec("the entry published on dev reaches the same company's PRODUCTION users", cites(user_prod.chat(Q, route_only=True), KNOWLEDGE + f"Resetting the {TOPIC}"))
+    rec("…and users of ANOTHER company", cites(user_b.chat(Q, route_only=True), KNOWLEDGE + f"Resetting the {TOPIC}"))
+    rec("the trainer's production login (no grant there) still cannot change it", t1_prod.kb("POST", f"/entries/{eid}/retire", {})[0] == 403)
 
-    # ── 4. company scope and scoped superseding of a real manual passage; rollback restores the earlier supersedes ──
+    # ── 4. superseding a real manual passage applies everywhere; rollback restores the earlier supersede ──
     probe = "How do I postpone a work order?"
     top = (user.chat(probe, route_only=True).get("citations") or [{}])[0]
     _, cand = t1.kb("GET", "/passages?module=technical&q=" + urllib.parse.quote(str(top.get("section", ""))[:60]))
@@ -251,29 +238,13 @@ def main() -> int:
     if target:
         p0 = target[0]
         sup = [{"chunkId": p["chunkId"], "file": p["file"], "section": p["section"]} for p in target]
-        tb.sign_in()
-        s, b = tb.kb("POST", "/entries", entry_body(5, scope="company", title=f"Company B postponement rule {RUN}", supersedes=sup,
-                                                     body="In Company B a work order is postponed only after the superintendent has phoned the vessel; request it from the work order form."))
-        cid = b.get("entry", {}).get("id", "")
-        rec("company trainer creates a COMPANY entry (own company, dev)", s == 200 and b["entry"]["scope_tenant"] == "pilot-b", f"{s} {b.get('error')}")
-        rec("the global trainer of another company cannot open it (404)", t1.kb("GET", f"/entries/{cid}")[0] == 404)
-        tb.kb("POST", f"/entries/{cid}/publish", {})
-        a_u, a_b = user.chat(probe, route_only=True), user_b.chat(probe, route_only=True)
-        rec("company B: superseded passage no longer given, company entry given",
-            not cites_passage(a_b, p0) and cites(a_b, KNOWLEDGE + "Company B postponement rule"), a_b.get("citations"))
-        rec("other company keeps the passage and never gets company B's entry",
-            cites_passage(a_u, p0) and not cites(a_u, KNOWLEDGE + "Company B postponement rule"), a_u.get("citations"))
-        rec("company B's production users are unaffected (dev entry)", cites_passage(user_prod.chat(probe, route_only=True), p0) or True)
-        tb.kb("POST", f"/entries/{cid}/retire", {"reason": "harness"})
-        rec("after retire company B gets the manual passage again", cites_passage(user_b.chat(probe, route_only=True), p0))
-        # rollback restores the earlier revision's supersedes
         s, b = t1.kb("POST", "/entries", entry_body(5, title=f"Global postponement note {RUN}", supersedes=sup,
                                                     body="A work order is postponed from the work order form with a reason; the office approves it."))
         gid = b.get("entry", {}).get("id", "")
         t1.kb("POST", f"/entries/{gid}/publish", {})
-        rec("global supersede (dev) applies to company A and company B",
-            not cites_passage(user.chat(probe, route_only=True), p0) and not cites_passage(user_b.chat(probe, route_only=True), p0))
-        rec("a dev supersede does not hide the passage in production", cites_passage(user_prod.chat(probe, route_only=True), p0))
+        rec("the supersede hides the passage for company A, company B and production",
+            not cites_passage(user.chat(probe, route_only=True), p0) and not cites_passage(user_b.chat(probe, route_only=True), p0)
+            and not cites_passage(user_prod.chat(probe, route_only=True), p0))
         t1.kb("PUT", f"/entries/{gid}/draft", entry_body(5, title=f"Global postponement note {RUN}", supersedes=[],
                                                           body="A work order is postponed from the work order form with a reason; the office approves it. (rev 2)"))
         t1.kb("POST", f"/entries/{gid}/publish", {})
@@ -281,8 +252,8 @@ def main() -> int:
         t1.kb("POST", f"/entries/{gid}/rollback", {"revision": 1})
         rec("rollback to revision 1 restores its supersede: the passage is hidden again", not cites_passage(user.chat(probe, route_only=True), p0))
         t1.kb("POST", f"/entries/{gid}/retire", {"reason": "harness"})
-        rec("retire restores the passage for both companies",
-            cites_passage(user.chat(probe, route_only=True), p0) and cites_passage(user_b.chat(probe, route_only=True), p0))
+        rec("retire restores the passage everywhere",
+            cites_passage(user.chat(probe, route_only=True), p0) and cites_passage(user_prod.chat(probe, route_only=True), p0))
 
     # ── 5. reports reach the module's trainers only, never become knowledge ──
     n0 = len(t1.kb("GET", "/entries?module=technical")[1])
@@ -292,28 +263,47 @@ def main() -> int:
     rec("ordinary users' reports create review items", s == 200 and s2 == 200 and s3 == 200 and bool(fa.get("id")))
     rec("the reports changed no knowledge entry", len(t1.kb("GET", "/entries?module=technical")[1]) == n0)
     q = lambda u: [x["question"] for x in u.kb("GET", "/review-items?module=technical")[1]] if u.kb("GET", "/review-items?module=technical")[0] == 200 else []  # noqa: E731
-    q1, q2, qb, qc = q(t1), q(t2), q(tb), crew.kb("GET", "/review-items?module=technical")
-    rec("both Technical trainers get the company-A report", f"harness question {RUN}" in q1 and f"harness question {RUN}" in q2)
-    rec("global Technical trainers also get company B's report; the company-B trainer only company B's",
-        f"harness question B {RUN}" in q1 and f"harness question B {RUN}" in qb and f"harness question {RUN}" not in qb)
-    rec("a production report does not reach dev trainers", f"harness question PROD {RUN}" not in q1)
+    q1, q2, qc = q(t1), q(t2), crew.kb("GET", "/review-items?module=technical")
+    want = {f"harness question {RUN}", f"harness question B {RUN}", f"harness question PROD {RUN}"}
+    rec("both Technical trainers get every report (all companies, dev and production)", want <= set(q1) and want <= set(q2))
     rec("the Crewing trainer does not get Technical reports", qc[0] == 200 and not qc[1])
     rec("an ordinary user cannot read the review queue (403)", user.kb("GET", "/review-items?module=technical")[0] == 403)
     s, b = t1.kb("POST", "/entries", entry_body(3, title=f"Entry from a report {RUN}", reviewItemId=fa.get("id")))
     linked = [x for x in t1.kb("GET", "/review-items?module=technical&status=linked")[1] if x["id"] == fa.get("id")]
     rec("'Create entry from this' links the report to the new entry", s == 200 and bool(linked) and linked[0].get("entry_id") == b["entry"]["id"])
-    rec("a company trainer cannot close another company's report", tb.kb("POST", f"/review-items/{fa.get('id')}", {"status": "closed"})[0] in (403, 404))
+    rec("the Crewing trainer cannot close a Technical report", crew.kb("POST", f"/review-items/{fa.get('id')}", {"status": "closed"})[0] in (403, 404))
 
     # ── 6. revocation stops an EXISTING session ──
     out = admin("revoke", "--issuer", "technical-dev", "--tenant", "pilot", "--user", "devtest-tech-2", "--module", "technical", "--by", "harness")
     s, b = t2.kb("PUT", f"/entries/{eid}/draft", entry_body(8))
     rec("after revocation, trainer 2's already-open session is refused (403)", "revoked 1" in out and s == 403, f"{out} / {s} {b.get('error')}")
     rec("…and trainer 2 no longer sees the module", t2.kb("GET", "/me")[1].get("trainer") is False)
-    admin("grant", "--issuer", "technical-dev", "--tenant", "pilot", "--user", "devtest-tech-2", "--module", "technical", "--scope", "global",
+    admin("grant", "--issuer", "technical-dev", "--tenant", "pilot", "--user", "devtest-tech-2", "--module", "technical",
           "--name", "DEV TEST Technical trainer 2", "--by", "harness (re-grant after revocation test)", "--note", "test account")
     rec("re-granting restores access in the same session", t2.kb("GET", "/me")[1].get("trainer") is True)
 
-    # ── 7. module context ──
+    # ── 7. trainer administration page (AI server /admin/kb) ──
+    adm = lambda m, path, body=None, tok=ADMIN_TOKEN: http(f"{ASSISTANT}/admin/kb/api{path}", m, {"x-admin-token": tok}, body)  # noqa: E731
+    rec("admin page API refuses a wrong admin token (401)", adm("GET", "/trainers", tok="wrong")[0] == 401)
+    rec("admin page itself is served (HTML)", urllib.request.urlopen(f"{ASSISTANT}/admin/kb").status == 200)
+    s, b, _ = adm("GET", "/users?q=devtest-user")
+    rec("user picker finds people who have used the chatbot", s == 200 and any(u["userId"] == "devtest-user" for u in b.get("users", [])), b)
+    t3 = User("devtest-tech-3", "pilot", "DEV TEST Technical trainer 3 (added on the page)")
+    s, b, _ = adm("POST", "/trainers", {"issuer": "technical-dev", "company": "pilot", "userId": "devtest-tech-3", "module": "technical",
+                                        "name": "DEV TEST Technical trainer 3", "by": "harness", "note": "test account"})
+    rec("admin page adds a trainer", s == 200 and b.get("ok") is True, b)
+    t3.sign_in()
+    rec("the new trainer can open the knowledge screen for Technical", [m["module"] for m in t3.kb("GET", "/me")[1].get("modules", [])] == ["technical"])
+    tid = [t["id"] for t in adm("GET", "/trainers")[1]["trainers"] if t["user_id"] == "devtest-tech-3" and t["active"]][0]
+    s, b, _ = adm("POST", f"/trainers/{tid}/deactivate", {"by": "harness"})
+    rec("admin page deactivates; the trainer's open session is refused at once", s == 200 and t3.kb("POST", "/entries", entry_body(1))[0] == 403)
+    s, b, _ = adm("POST", f"/trainers/{tid}/reactivate", {"by": "harness"})
+    rec("admin page reactivates; access returns in the same session", s == 200 and t3.kb("GET", "/me")[1].get("trainer") is True)
+    rows = [t for t in adm("GET", "/trainers")[1]["trainers"] if t["user_id"] == "devtest-tech-3"]
+    rec("history keeps the deactivated grant next to the active one", sum(1 for t in rows if t["active"]) == 1 and sum(1 for t in rows if not t["active"]) >= 1)
+    adm("POST", f"/trainers/{[t['id'] for t in rows if t['active']][0]}/deactivate", {"by": "harness clean-up"})
+
+    # ── 8. module context ──
     rec("'RH' asked from Technical is answered from Technical", user.chat("What are RH validations for updating RH", route_only=True).get("module") == "Technical")
     rec("an explicit Crewing question stays Crewing", user.chat("In Crewing, how are rest hours recorded?", route_only=True).get("module") == "Crewing")
 

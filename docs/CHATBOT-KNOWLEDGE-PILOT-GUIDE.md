@@ -1,4 +1,4 @@
-# Chatbot knowledge — guide (pilot, 1 Oct 2026)
+# Chatbot knowledge — guide (pilot, updated 1 Oct 2026)
 
 Two parts:
 - **Part A** — for the administrator who decides who may train the chatbot.
@@ -6,67 +6,62 @@ Two parts:
 
 *Pilot only: nothing here is live.*
 
+**How training works (decided 1 Oct 2026):**
+- Trainers are **SAIL staff**.
+- A trainer trains **one module** (for example Technical) for **all clients**.
+- Training is done on **dev**. There is **one assistant** for dev and production, so a **Publish is live for all clients
+  in dev and production at once**.
+
 ---
 
-## Part A — Assigning and revoking trainers (administrator)
+## Part A — Assigning and removing trainers (administrator)
 
-### What a trainer grant is
+### How the system knows who is a trainer
 
-Chat access is unchanged: it stays under the existing policy (Sail Admin). **Knowledge management** is a separate grant,
-for **one module**, given to **one person**, identified by three things that must all match the person's login:
+- **The trainer list:** the assistant keeps it on the AI server. Each row holds a **user id**, a name, a company, a
+  module, and active/inactive.
+- **The check:** when someone opens "Manage knowledge" from the chatbot, PMS tells the assistant who is logged in. This
+  is the SAILERP user id from the signed login, and it cannot be faked in the browser. The assistant looks that id up in
+  the list. If an **active** row exists for a module, the person can train that module; otherwise they are refused.
+- **Roles:** no role is involved. Being a Sail Admin does not make someone a trainer.
+- **Matching:** the user id **and** the company they log in with must match, so the same id in another company gets
+  nothing.
+- **When changes apply:** adding, deactivating or reactivating applies on the trainer's **next click**, even in a screen
+  that is already open. The history of every change is kept.
 
-| Field | Meaning | Example |
-|---|---|---|
-| issuer | The application **environment** the trainer signs in through (registered instance) | `technical-prod` (production) · `technical-dev` (dev) |
-| company | The trainer's company (tenant domain of the login) | `wk` |
-| user id | The trainer's SAILERP user id | `12345` |
-| module | The one module the grant is for | `technical` |
-| scope | `company` = may publish for **their own company only** · `global` = may publish **product-wide** guidance (all companies) | `global` for Jeevan |
-| share across environments | Optional. May publish guidance that applies in **all** environments (dev + production). Off by default | off |
+### Option 1 — the Trainers page (on the AI server)
 
-**Matching rules:**
-- **No role grants access.** Being a Sail Admin does not make someone a trainer.
-- **Same user id elsewhere gets nothing.** The same user id in another company, or in another environment, does not
-  inherit the grant.
-- **One grant per module.** A Technical grant gives nothing in Crewing, Audit or any other module.
-- **Several people per module.** Any number of people may hold grants for the same module. They can all edit and
-  publish that module's entries; no separate approver is needed.
+1. **Open it.** The page is at `/admin/kb` on the assistant. It is **not reachable from the internet**; open it on the AI
+   server, for example through the SSH tunnel: `http://localhost:18047/admin/kb`.
+2. **Enter the assistant's admin token.** For the pilot it is the `ADMIN_TOKEN` line in
+   `~/central-assistant/kbpilot-r8.env` on the AI server. The pilot now has its **own** token; it no longer reuses the
+   live service's.
+3. **Add a trainer.**
+   1. Type a name, user id or company in **Find a person**. The list shows people who have used the chatbot.
+   2. Pick one, and the user id, name and company are filled in. If the person has never used the chatbot, type the
+      SAILERP user id and company yourself.
+   3. Choose the **module**.
+   4. Leave **Signs in through** on the dev instance, because training happens on dev.
+   5. Fill in **Granted by** and click **Add trainer**.
+4. **The list** shows every trainer with module and status. **Deactivate** removes access at once; **Reactivate** gives
+   it back. Tick **Show inactive** to see the history.
 
-### Commands
+### Option 2 — the command (same result)
 
-The commands run on the AI server, inside the assistant container. For the pilot, that container is
-`sail-assistant-py-kbpilot`.
+The commands run on the AI server, inside the pilot container:
 
 ```bash
-# who is a trainer (add --all to include revoked grants)
-docker exec sail-assistant-py-kbpilot python -m app.kb_admin list
-
-# grant Technical, product-wide, to one person on one environment
+docker exec sail-assistant-py-kbpilot python -m app.kb_admin list            # add --all for inactive ones
 docker exec sail-assistant-py-kbpilot python -m app.kb_admin grant \
-  --issuer technical-prod --tenant <company> --user <SAILERP user id> --module technical \
-  --scope global --name "Jeevan …" --by "Ghazi" --note "Technical PIC"
-
-# company-only trainer
-… grant … --scope company …
-
-# revoke (takes effect on the trainer's NEXT click — even in a screen that is already open)
+  --issuer technical-dev --tenant <login company> --user <SAILERP user id> --module technical --name "Smith" --by "Ghazi"
 docker exec sail-assistant-py-kbpilot python -m app.kb_admin revoke \
-  --issuer technical-prod --tenant <company> --user <SAILERP user id> --module technical --by "Ghazi"
+  --issuer technical-dev --tenant <login company> --user <SAILERP user id> --module technical --by "Ghazi"
 ```
 
-**Behaviour of these commands:**
-- **Changing a grant:** granting again with a different scope replaces the old grant. The history keeps both.
-- **Two environments:** someone who trains on two environments needs one grant per environment (issuer).
-- **Shared guidance:** add `--share-envs` only when that person must be able to publish guidance shared by dev and
-  production.
-- **Where it is stored:** grants live in the assistant's own database (`kb_trainers`), with who granted or revoked them
-  and when. No restart is needed.
+### Finding a user id when the person has not used the chatbot
 
-### Finding the values
-
-- **user id:** the SAILERP user id. The PMS server logs it each time the chatbot is opened (`[assistant-api] mint user=…`).
-- **company:** the login's tenant domain.
-- **issuer:** the environment's registered instance (`technical-dev`, `technical-prod`, `technical-demo`).
+The PMS server logs it each time the person opens the chatbot: `[assistant-api] mint user=<id>`. It is also in the
+`master_users` table of their company's PMS database.
 
 ---
 
@@ -75,23 +70,20 @@ docker exec sail-assistant-py-kbpilot python -m app.kb_admin revoke \
 ### Open it
 
 1. Open the PMS chatbot.
-2. Click the **book icon** ("Manage knowledge") at the top. It is shown only to trainers.
-3. The knowledge screen opens signed in as you. It shows your company and environment (for example
-   "Jeevan · wk · prod") and **only the modules you train**.
+2. Click the **book icon** ("Manage knowledge"). It is shown only to trainers.
+3. The screen opens in a new tab, signed in as you, and shows **only the modules you train**.
 
 ### The flow
 
-1. **New entry** (or open an existing one). Choose:
-   - the type: Procedure, FAQ, Validation rules, Scenario explanation or Correction;
-   - **Companies:** all companies, or my company only;
-   - **Environment:** this environment only, or shared by all environments (only if your grant allows it).
+1. **New entry** (or open an existing one). Choose the type: Procedure, FAQ, Validation rules, Scenario explanation or
+   Correction. Every entry applies to **all clients** and **all environments**.
 2. Write the guidance in plain steps. Add who it applies to, the supporting **evidence** (Manual-derived,
    Code-verified, Expert-confirmed) and any **points needing expert confirmation**.
 3. **Save draft.** It keeps your changes; nobody else sees a draft.
 4. **Test draft.** Type the question as a user would. The chatbot answers **the same way it answers users**, but with
    your draft in place. Only you see this test. The green line tells you whether your draft was used.
-5. **Publish.** This revision becomes the chatbot's answer for users. Until then they keep the previous published
-   version. Publishing is refused while a point still needs confirmation.
+5. **Publish.** This revision becomes the chatbot's answer for **all clients, in dev and production, at once**.
+   Publishing is refused while a point still needs confirmation.
 6. **Later:**
    - **Edit and Publish again** to change it (a new revision);
    - **History → Restore** to go back to an earlier revision;
@@ -99,10 +91,10 @@ docker exec sail-assistant-py-kbpilot python -m app.kb_admin revoke \
 
 ### Other parts of the screen
 
-- **Review queue.** Users' "Report this answer" items for your module, company and environment. **Create entry from
-  this** links a new entry to the report; **Close** closes it. A report never changes the chatbot by itself.
-- **Replaces manual passages.** While your entry is published, the chatbot stops using the passages you pick, for your
-  companies and environment only. Retiring the entry brings them back.
+- **Review queue.** "Report this answer" items from users of all clients, for your module. **Create entry from this**
+  links a new entry to the report; **Close** closes it. A report never changes the chatbot by itself.
+- **Replaces manual passages.** While your entry is published, the chatbot stops using the passages you pick. Retiring
+  the entry brings them back.
 - **Internal notes.** Never shown to chatbot users.
 
 ### Your drafts in the pilot (Technical)

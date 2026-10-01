@@ -21,7 +21,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from . import kb
-from .config import settings
+from .config import MODULE_LABELS, settings
 from .identity import peek_issuer, verify_identity
 
 router = APIRouter()
@@ -187,6 +187,72 @@ async def kb_reviews(request: Request) -> Any:
 async def kb_review_update(request: Request, item_id: str) -> Any:
     b = await _body(request)
     return await _wrap(lambda s: kb.update_review_item(s, item_id, b))(request, True)
+
+
+# ── trainer administration (1-Oct-2026): AI-server only — /admin/* is denied publicly by nginx (tunnel only) and every
+# API call needs the service's admin token (x-admin-token), exactly like the existing /admin endpoints.
+_ADMIN_UI = Path(__file__).with_name("kb_admin_ui.html")
+
+
+def _admin_ok(request: Request) -> bool:
+    tok = settings().admin_token
+    return bool(tok) and request.headers.get("x-admin-token") == tok
+
+
+def _admin(fn):  # type: ignore[no-untyped-def]
+    async def run(request: Request) -> Any:
+        if not _admin_ok(request):
+            return JSONResponse({"error": "admin token required"}, status_code=401)
+        try:
+            return JSONResponse(await fn(request), headers={"Cache-Control": "no-store"})
+        except kb.KBError as e:
+            return _err(e)
+    return run
+
+
+@router.get("/admin/kb", response_class=HTMLResponse)
+async def admin_kb_page() -> HTMLResponse:
+    return HTMLResponse(_ADMIN_UI.read_text(encoding="utf-8"), headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY",
+                                                                        "Referrer-Policy": "no-referrer"})
+
+
+@router.get("/admin/kb/api/trainers")
+async def admin_trainers(request: Request) -> Any:
+    async def f(_r: Request) -> Any:
+        return {"trainers": await kb.list_trainers(),
+                "instances": [{"issuer": k, "env": v.get("env"), "module": v.get("module")} for k, v in settings().module_instances.items()],
+                "modules": [{"module": k, "label": v} for k, v in MODULE_LABELS.items()]}
+    return await _admin(f)(request)
+
+
+@router.post("/admin/kb/api/trainers")
+async def admin_grant(request: Request) -> Any:
+    async def f(r: Request) -> Any:
+        b = await _body(r)
+        return await kb.grant_trainer(str(b.get("issuer") or ""), str(b.get("company") or ""), str(b.get("userId") or ""),
+                                      str(b.get("module") or ""), str(b.get("name") or ""), str(b.get("by") or ""), str(b.get("note") or ""))
+    return await _admin(f)(request)
+
+
+@router.post("/admin/kb/api/trainers/{trainer_id}/deactivate")
+async def admin_deactivate(request: Request, trainer_id: int) -> Any:
+    async def f(r: Request) -> Any:
+        return await kb.deactivate_trainer(trainer_id, str((await _body(r)).get("by") or "admin page"))
+    return await _admin(f)(request)
+
+
+@router.post("/admin/kb/api/trainers/{trainer_id}/reactivate")
+async def admin_reactivate(request: Request, trainer_id: int) -> Any:
+    async def f(r: Request) -> Any:
+        return await kb.reactivate_trainer(trainer_id, str((await _body(r)).get("by") or "admin page"))
+    return await _admin(f)(request)
+
+
+@router.get("/admin/kb/api/users")
+async def admin_users(request: Request) -> Any:
+    async def f(r: Request) -> Any:
+        return {"users": await kb.chatbot_users(r.query_params.get("q") or "")}
+    return await _admin(f)(request)
 
 
 @router.get("/kb/eligibility")

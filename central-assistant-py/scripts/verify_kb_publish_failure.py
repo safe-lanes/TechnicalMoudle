@@ -64,8 +64,8 @@ async def main() -> int:
     eid = d["entry"]["id"]
     await kb.publish(SESS, eid, "rev 1")
     s1 = await snapshot(eid)
-    rec("revision 1 published: one served chunk, one supersede, environment dev",
-        s1["entry"] == ("published", 1) and len(s1["chunks"]) == 1 and s1["chunks"][0][3] == "dev" and len(s1["supersedes"]) == 1, s1)
+    rec("revision 1 published: one served chunk, one supersede, all environments",
+        s1["entry"] == ("published", 1) and len(s1["chunks"]) == 1 and s1["chunks"][0][3] == "*" and len(s1["supersedes"]) == 1, s1)
     await kb.save_draft(SESS, eid, body("Revision two text: hold the RESET key for 9 seconds before restarting the unit.", []))
 
     real_embed = llm.embed

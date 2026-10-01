@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chatbot Trainers</title>
+<style>
+/* Trainer administration (AI server only). Same tokens as the knowledge screen; light + dark. */
+:root{
+  --bg:#f4f6f8; --panel:#fff; --ink:#17212c; --muted:#5c6b7a; --line:#d8dee5; --soft:#eef2f6;
+  --accent:#1f5f99; --accent-ink:#fff; --ok:#1d7a4c; --ok-soft:#e1f2e8; --bad:#a33030; --bad-soft:#f8e2e2;
+  --f:"Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f161d; --panel:#16212b; --ink:#e3eaf1; --muted:#9aa9b8; --line:#2a3947; --soft:#1c2935;
+  --accent:#6fb0ea; --accent-ink:#0f161d; --ok:#6fd09c; --ok-soft:#163427; --bad:#ef8c8c; --bad-soft:#3a1c1c; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--f)}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;font-weight:650}
+main{max-width:1200px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+h2{font-size:15px;margin:0 0 8px}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],input[type=password],select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit}
+button{font:inherit;border:1px solid var(--line);background:var(--soft);color:var(--ink);padding:7px 12px;border-radius:7px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px} @media (max-width:800px){.grid{grid-template-columns:1fr}}
+.muted{color:var(--muted)} .small{font-size:12px}
+.notice{padding:10px 12px;border-radius:8px;margin:8px 0}
+.notice.bad{background:var(--bad-soft);color:var(--bad)} .notice.ok{background:var(--ok-soft);color:var(--ok)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px}
+.on{background:var(--ok-soft);color:var(--ok)} .off{background:var(--soft);color:var(--muted)}
+.pick{border:1px solid var(--line);border-radius:8px;max-height:220px;overflow:auto;margin-top:6px}
+.pick div{padding:6px 9px;cursor:pointer;border-bottom:1px solid var(--line)} .pick div:hover,.pick div:focus{background:var(--soft)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Chatbot Trainers</h1>
+  <span class="muted small">Who may train the chatbot, per module. Trainers train for all clients and all environments.</span>
+</header>
+<main>
+  <section class="card" id="gate">
+    <h2>Admin token</h2>
+    <p class="muted small">This page is reachable only on the AI server. Enter the assistant's admin token (kept in this browser tab only).</p>
+    <div class="row"><input type="password" id="token" style="flex:1;min-width:240px" autocomplete="off" aria-label="Admin token"><button class="primary" id="enter">Open</button></div>
+    <div id="gateMsg"></div>
+  </section>
+
+  <section class="card" id="add" hidden>
+    <h2>Add a trainer</h2>
+    <label for="find">Find a person (people who have used the chatbot)</label>
+    <input type="text" id="find" placeholder="Type a name, user id or company…" autocomplete="off">
+    <div class="pick" id="pick" hidden></div>
+    <div class="grid">
+      <div><label for="fUser">User id (SAILERP)</label><input type="text" id="fUser"></div>
+      <div><label for="fName">Name</label><input type="text" id="fName"></div>
+      <div><label for="fCompany">Company (login domain)</label><input type="text" id="fCompany"></div>
+      <div><label for="fModule">Module</label><select id="fModule"></select></div>
+      <div><label for="fIssuer">Signs in through</label><select id="fIssuer"></select></div>
+      <div><label for="fBy">Granted by</label><input type="text" id="fBy" placeholder="Your name"></div>
+    </div>
+    <label for="fNote">Note (optional)</label><input type="text" id="fNote">
+    <div class="row" style="margin-top:10px"><button class="primary" id="grant">Add trainer</button></div>
+    <div id="addMsg"></div>
+  </section>
+
+  <section class="card" id="listCard" hidden>
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Trainers</h2>
+      <label class="row small" style="margin:0;text-transform:none;font-weight:400"><input type="checkbox" id="showInactive"> Show inactive</label></div>
+    <div id="listMsg"></div>
+    <div class="tablewrap"><table><thead><tr><th>Name</th><th>User id</th><th>Company</th><th>Module</th><th>Signs in through</th><th>Status</th><th>Granted</th><th></th></tr></thead>
+      <tbody id="rows"></tbody></table></div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  let token = "", data = null, timer = 0;
+  try { token = sessionStorage.getItem("kbAdminToken") || ""; } catch { /* storage unavailable */ }
+
+  async function api(method, path, body) {
+    const r = await fetch(path, {method, headers: {"content-type": "application/json", "x-admin-token": token}, body: body ? JSON.stringify(body) : undefined});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(j.error || `HTTP ${r.status}`); e.status = r.status; throw e; }
+    return j;
+  }
+  function note(el, kind, msg) { el.innerHTML = msg ? `<div class="notice ${kind}">${esc(msg)}</div>` : ""; }
+
+  async function load() {
+    data = await api("GET", "/admin/kb/api/trainers");
+    $("gate").hidden = true; $("add").hidden = false; $("listCard").hidden = false;
+    $("fModule").innerHTML = data.modules.map((m) => `<option value="${esc(m.module)}">${esc(m.label)}</option>`).join("");
+    $("fIssuer").innerHTML = data.instances.map((i) => `<option value="${esc(i.issuer)}" ${i.env === "dev" ? "selected" : ""}>${esc(i.issuer)} (${esc(i.env)})</option>`).join("");
+    render();
+  }
+  function render() {
+    const rows = data.trainers.filter((t) => $("showInactive").checked || t.active);
+    $("rows").innerHTML = rows.length ? rows.map((t) => `<tr>
+      <td>${esc(t.display_name || "—")}</td><td>${esc(t.user_id)}</td><td>${esc(t.tenant_domain)}</td><td>${esc(t.moduleLabel)}</td><td>${esc(t.issuer)}</td>
+      <td><span class="pill ${t.active ? "on" : "off"}">${t.active ? "Active" : "Inactive"}</span>${t.active ? "" : `<div class="small muted">${esc((t.revoked_at || "").slice(0, 16).replace("T", " "))} by ${esc(t.revoked_by)}</div>`}</td>
+      <td class="small">${esc((t.granted_at || "").slice(0, 16).replace("T", " "))}<br><span class="muted">by ${esc(t.granted_by)}</span></td>
+      <td>${t.active ? `<button class="danger" data-off="${t.id}">Deactivate</button>` : `<button data-on="${t.id}">Reactivate</button>`}</td></tr>`).join("")
+      : `<tr><td colspan="8" class="muted">No trainers yet.</td></tr>`;
+    document.querySelectorAll("[data-off]").forEach((b) => b.onclick = () => change(b.dataset.off, "deactivate"));
+    document.querySelectorAll("[data-on]").forEach((b) => b.onclick = () => change(b.dataset.on, "reactivate"));
+  }
+  async function change(id, what) {
+    try { await api("POST", `/admin/kb/api/trainers/${id}/${what}`, {by: $("fBy").value || "admin page"}); note($("listMsg"), "ok", what === "deactivate" ? "Deactivated — takes effect on the trainer's next click." : "Reactivated."); await load(); }
+    catch (e) { note($("listMsg"), "bad", e.message); }
+  }
+
+  $("enter").onclick = async () => {
+    token = $("token").value.trim();
+    try { await load(); try { sessionStorage.setItem("kbAdminToken", token); } catch { /* ignore */ } }
+    catch (e) { note($("gateMsg"), "bad", e.status === 401 ? "Wrong admin token." : e.message); }
+  };
+  $("token").onkeydown = (e) => { if (e.key === "Enter") $("enter").click(); };
+  $("showInactive").onchange = render;
+  $("find").oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const q = $("find").value.trim();
+      if (q.length < 2) { $("pick").hidden = true; return; }
+      try {
+        const r = await api("GET", `/admin/kb/api/users?q=${encodeURIComponent(q)}`);
+        $("pick").innerHTML = r.users.map((u, i) => `<div tabindex="0" data-i="${i}"><strong>${esc(u.name || "(no name)")}</strong> · ${esc(u.userId)} · ${esc(u.company || "")}</div>`).join("") || `<div class="muted">Nobody found — type the user id below.</div>`;
+        $("pick").hidden = false;
+        $("pick").querySelectorAll("[data-i]").forEach((el) => {
+          const pickIt = () => { const u = r.users[+el.dataset.i]; $("fUser").value = u.userId; $("fName").value = u.name || ""; $("fCompany").value = u.company || ""; $("pick").hidden = true; };
+          el.onclick = pickIt; el.onkeydown = (ev) => { if (ev.key === "Enter") pickIt(); };
+        });
+      } catch (e) { $("pick").innerHTML = `<div class="muted">${esc(e.message)}</div>`; $("pick").hidden = false; }
+    }, 250);
+  };
+  $("grant").onclick = async () => {
+    try {
+      await api("POST", "/admin/kb/api/trainers", {userId: $("fUser").value, name: $("fName").value, company: $("fCompany").value,
+        module: $("fModule").value, issuer: $("fIssuer").value, by: $("fBy").value, note: $("fNote").value});
+      note($("addMsg"), "ok", `${$("fName").value || $("fUser").value} is now a ${$("fModule").selectedOptions[0].textContent} trainer.`);
+      ["fUser", "fName", "fCompany", "fNote", "find"].forEach((id) => $(id).value = "");
+      await load();
+    } catch (e) { note($("addMsg"), "bad", e.message); }
+  };
+  if (token) load().catch(() => { token = ""; });
+})();
+</script>
+</body>
+</html>

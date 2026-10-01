@@ -23,49 +23,33 @@ def sess(user: str, tenant: str | None, env: str | None = "dev", iss: str | None
     return kb.Session("s", user, user.title(), "Sail Admin", tenant, iss, env, "Office")
 
 
-def access(s: kb.Session, **mods: tuple[str, bool]) -> kb.Access:
-    return kb.Access(s, {m: kb.Grant(m, scope, share) for m, (scope, share) in mods.items()})
+def access(s: kb.Session, *mods: str) -> kb.Access:
+    return kb.Access(s, {m: kb.Grant(m) for m in mods})
 
 
 def test_no_grant_no_access() -> None:
     a = kb.Access(sess("someone", "a.com"), {})  # a Sail Admin with no grant
-    assert not a.can_write("technical", None, "dev") and not a.can_read("technical", None, "dev")
+    assert not a.can_write("technical", None) and not a.can_read("technical", None)
 
 
 def test_module_boundary() -> None:
-    a = access(sess("t1", "a.com"), technical=("global", False))
-    assert a.can_write("technical", None, "dev")
-    assert not a.can_write("crewing", None, "dev")          # Technical grant gives nothing in Crewing
-    assert not a.can_read("audit", None, "dev")
+    a = access(sess("t1", "a.com"), "technical")
+    assert a.can_write("technical", None)
+    assert not a.can_write("crewing", None)                  # a Technical trainer gets nothing in Crewing
+    assert not a.can_read("audit", None)
 
 
-def test_publish_scope_is_separate_from_module() -> None:
-    co = access(sess("t2", "b.com"), technical=("company", False))
-    assert not co.can_write("technical", None, "dev")       # company trainer: never product-wide
-    assert co.can_write("technical", "b.com", "dev")
-    assert not co.can_write("technical", "a.com", "dev")    # never another company
-    assert co.can_read("technical", None, "dev") and not co.can_read("technical", "a.com", "dev")
-
-
-def test_environment_scope() -> None:
-    dev = access(sess("t1", "a.com", "dev"), technical=("global", False))
-    assert not dev.can_write("technical", None, "prod")     # a dev trainer never changes production guidance
-    assert not dev.can_read("technical", None, "prod")
-    assert not dev.can_write("technical", None, "*")        # shared guidance needs an explicit share grant
-    assert dev.can_read("technical", None, "*")
-    share = access(sess("t3", "a.com", "dev"), technical=("global", True))
-    assert share.can_write("technical", None, "*")
-    assert not share.can_write("technical", None, "prod")   # share = the '*' entries, not another environment's own
-    nil = access(sess("t1", "a.com", None), technical=("global", True))
-    assert not nil.can_write("technical", None, "dev")      # no registered environment: nothing
+def test_entries_are_for_all_clients_and_environments() -> None:
+    a = access(sess("t1", "a.com"), "technical")
+    assert a.can_write("technical", None, "*")
+    assert not a.can_write("technical", "a.com", "*")        # no company-only entries any more (owner decision 1-Oct)
+    assert not a.can_write("technical", None, "dev")         # no environment-only entries any more
 
 
 def test_review_visibility() -> None:
-    g = access(sess("t1", "a.com", "dev"), technical=("global", False))
-    c = access(sess("t2", "b.com", "dev"), technical=("company", False))
-    assert kb.review_visible(g, "technical", "b.com", "dev") and not kb.review_visible(g, "technical", "b.com", "prod")
-    assert kb.review_visible(c, "technical", "b.com", "dev") and not kb.review_visible(c, "technical", "a.com", "dev")
-    assert not kb.review_visible(g, "crewing", "a.com", "dev")
+    a = access(sess("t1", "a.com"), "technical")
+    assert kb.review_visible(a, "technical", "b.com", "prod")  # every company and environment of the trainer's module
+    assert not kb.review_visible(a, "crewing", "a.com", "dev")
 
 
 def rev(**over: object) -> dict:
@@ -86,12 +70,12 @@ def test_publish_problems() -> None:
 
 
 def test_render_labels_and_scope() -> None:
-    e = {"id": "e1", "module": "technical", "scope_tenant": "a.com", "env_scope": "dev"}
+    e = {"id": "e1", "module": "technical", "scope_tenant": None, "env_scope": "*"}
     when = datetime(2026, 9, 30, tzinfo=UTC)
     body, meta = kb.render(e, rev(), preview=False, published_by="Jeevan", when=when)
     assert body.startswith("# Deleting a job")
     assert "Code-verified" in body and "Expert-confirmed" in body and "revision 2" in body
-    assert meta["file"] == "Technical - Knowledge: Deleting a job" and meta["kb_scope"] == "a.com" and meta["kb_env"] == "dev"
+    assert meta["file"] == "Technical - Knowledge: Deleting a job" and meta["kb_scope"] == "global" and meta["kb_env"] == "*"
     assert retrieval.manual_of(meta) == "Technical - Knowledge: Deleting a job"
     pbody, _ = kb.render(e, rev(), preview=True, published_by=None, when=when)
     assert "DRAFT PREVIEW" in pbody
