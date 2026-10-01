@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assistant Knowledge</title>
+<style>
+/* Layout: left rail (module + entry list), main pane (editor / review queue). Tokens below; light + dark. */
+:root{
+  --bg:#f4f6f8; --panel:#fff; --ink:#17212c; --muted:#5c6b7a; --line:#d8dee5; --soft:#eef2f6;
+  --accent:#1f5f99; --accent-ink:#fff; --ok:#1d7a4c; --ok-soft:#e1f2e8; --warn:#9a5a00; --warn-soft:#fbefd9;
+  --bad:#a33030; --bad-soft:#f8e2e2; --draft:#6a4fb3; --draft-soft:#ece6fa;
+  --f:"Segoe UI", system-ui, -apple-system, sans-serif; --mono:Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f161d; --panel:#16212b; --ink:#e3eaf1; --muted:#9aa9b8; --line:#2a3947; --soft:#1c2935;
+  --accent:#6fb0ea; --accent-ink:#0f161d; --ok:#6fd09c; --ok-soft:#163427; --warn:#e8b25a; --warn-soft:#33270f;
+  --bad:#ef8c8c; --bad-soft:#3a1c1c; --draft:#b8a4f0; --draft-soft:#2a2340; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--f)}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;font-weight:650}
+.who{color:var(--muted);font-size:13px}
+.layout{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;max-width:1400px;margin:0 auto}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.rail{display:flex;flex-direction:column;gap:12px}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit}
+textarea{min-height:90px;resize:vertical}
+textarea.big{min-height:220px;font-family:var(--f)}
+button{font:inherit;border:1px solid var(--line);background:var(--soft);color:var(--ink);padding:7px 12px;border-radius:7px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tabs{display:flex;gap:6px}
+.tabs button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.list{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}
+.item{border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;background:var(--panel)}
+.item[aria-current=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.item .t{font-weight:600}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;margin-right:4px}
+.s-draft{background:var(--draft-soft);color:var(--draft)} .s-published{background:var(--ok-soft);color:var(--ok)} .s-retired{background:var(--soft);color:var(--muted)}
+.s-company{background:var(--warn-soft);color:var(--warn)} .s-global{background:var(--soft);color:var(--muted)}
+.ev{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:150px 1fr 1fr auto;gap:6px;align-items:start;margin-bottom:6px}
+@media (max-width:700px){.ev{grid-template-columns:1fr}}
+.op{border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:8px;margin-bottom:6px}
+.op.done{border-color:var(--ok);background:var(--ok-soft)}
+.muted{color:var(--muted)} .small{font-size:12px}
+.notice{padding:10px 12px;border-radius:8px;margin:8px 0}
+.notice.bad{background:var(--bad-soft);color:var(--bad)} .notice.ok{background:var(--ok-soft);color:var(--ok)} .notice.warn{background:var(--warn-soft);color:var(--warn)}
+pre{white-space:pre-wrap;background:var(--soft);padding:10px;border-radius:8px;font:12.5px/1.5 var(--mono);max-height:340px;overflow:auto}
+.answer{white-space:pre-wrap;background:var(--soft);padding:10px;border-radius:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px} @media (max-width:700px){.grid2{grid-template-columns:1fr}}
+table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.section{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.section h3{margin:0 0 6px;font-size:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Assistant Knowledge</h1>
+  <div class="row"><span class="who" id="who">Signing in…</span><button id="logout" hidden>Sign out</button></div>
+</header>
+
+<div id="gate" class="layout" hidden><div class="card" style="grid-column:1/-1"><div id="gateMsg" class="notice bad"></div></div></div>
+
+<div id="app" class="layout" hidden>
+  <aside class="rail">
+    <div class="card">
+      <label for="module">Module</label>
+      <select id="module"></select>
+      <div class="tabs" style="margin-top:10px">
+        <button id="tabEntries" aria-pressed="true">Entries</button>
+        <button id="tabReview" aria-pressed="false">Review queue <span id="reviewCount"></span></button>
+      </div>
+    </div>
+    <div class="card" id="entriesRail">
+      <div class="row" style="justify-content:space-between"><strong>Entries</strong><button class="primary" id="newEntry">New entry</button></div>
+      <label for="statusFilter">Status</label>
+      <select id="statusFilter"><option value="">All</option><option value="draft">Draft</option><option value="published">Published</option><option value="retired">Retired</option></select>
+      <div class="list" id="entryList" style="margin-top:10px"></div>
+    </div>
+  </aside>
+
+  <main class="card" id="main">
+    <div id="empty" class="muted">Select an entry, create a new one, or open the review queue.</div>
+
+    <section id="editor" hidden>
+      <div class="row" style="justify-content:space-between">
+        <div><span id="edStatus"></span><span id="edScope"></span><span class="muted small" id="edRev"></span></div>
+        <div class="row"><button id="saveDraft" title="Keep your changes as a draft. Nobody else sees a draft.">Save draft</button><button id="testJump" title="Ask the chatbot privately with this draft in place">Test draft</button><button id="publishBtn" class="primary" title="Make this revision the answer chatbot users get">Publish</button><button id="retireBtn" class="danger">Retire</button></div>
+      </div>
+      <p class="muted small" style="margin:6px 0 0">1 <strong>Save draft</strong> keeps your changes — nobody else sees them. 2 <strong>Test draft</strong> asks the chatbot privately with this draft in place. 3 <strong>Publish</strong> makes it the answer chatbot users get; until then they keep the published version.</p>
+      <div id="edMsg"></div>
+      <div class="grid2">
+        <div><label for="fTitle">Title</label><input type="text" id="fTitle" placeholder="e.g. Deleting a job"></div>
+        <div class="grid2">
+          <div><label for="fKind">Type</label><select id="fKind"></select></div>
+          <div><label for="fScope">Companies</label><select id="fScope"><option value="global">All companies</option><option value="company">My company only</option></select></div>
+        </div>
+      </div>
+      <label for="fBody">Guidance (what the chatbot should say)</label>
+      <textarea class="big" id="fBody" placeholder="Write the correct procedure, rule or explanation in plain steps."></textarea>
+      <div class="grid2">
+        <div><label>Applies to</label><div class="row"><label class="row" style="margin:0;text-transform:none;font-weight:400"><input type="checkbox" id="fOffice"> Office</label><label class="row" style="margin:0;text-transform:none;font-weight:400"><input type="checkbox" id="fShip"> Ship</label></div></div>
+        <div><label for="fRoles">Roles (comma separated)</label><input type="text" id="fRoles" placeholder="e.g. Sail Admin, Client Admin"></div>
+      </div>
+      <div class="grid2">
+        <div><label for="fConditions">Conditions</label><input type="text" id="fConditions" placeholder="e.g. vessel RH validation switched on"></div>
+        <div class="grid2"><div><label for="fVersion">Application version</label><input type="text" id="fVersion"></div><div><label for="fEnvScope">Environment</label><select id="fEnvScope"><option value="this">This environment only</option><option value="all">All environments (shared)</option></select></div></div>
+      </div>
+
+      <div class="section"><h3>Supporting evidence</h3>
+        <p class="muted small">Manual-derived = from a user manual page · Code-verified = checked in the application code · Expert-confirmed = confirmed by a knowledge trainer or a domain expert.</p>
+        <div id="evList"></div><button id="addEv">Add evidence</button></div>
+
+      <div class="section"><h3>Points needing expert confirmation</h3>
+        <p class="muted small">An entry cannot be published while a point is unconfirmed. Confirm it (and write the answer) or remove it.</p>
+        <div id="opList"></div><button id="addOp">Add point</button></div>
+
+      <div class="section"><h3>Replaces manual passages</h3>
+        <p class="muted small">Passages picked here stop being used by the chatbot while this entry is published (for your scope only). Retiring the entry brings them back.</p>
+        <div id="supList"></div>
+        <div class="row"><input type="text" id="supQ" placeholder="Search manual passages…" style="flex:1;min-width:200px"><button id="supSearch">Search</button></div>
+        <div id="supResults"></div></div>
+
+      <div class="section"><h3>Internal notes (never shown to chatbot users)</h3>
+        <textarea id="fNotes" placeholder="e.g. application permission gaps reported to development"></textarea>
+        <label for="fChange">Change note</label><input type="text" id="fChange" placeholder="What changed in this revision"></div>
+
+      <div class="section"><h3>Test before publishing</h3>
+        <p class="muted small">Asks the chatbot with this draft in place. Only you see the draft; chatbot users keep getting the published version.</p>
+        <div class="row"><input type="text" id="pvQ" placeholder="Ask a question as a user would…" style="flex:1;min-width:220px"><button id="pvAsk" class="primary">Test draft</button></div>
+        <div id="pvOut"></div></div>
+
+      <div class="section"><h3>History</h3><div id="history"></div></div>
+    </section>
+
+    <section id="review" hidden>
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0;font-size:16px">Review queue</h2>
+        <select id="reviewStatus" style="width:auto"><option value="new">New</option><option value="linked">Linked</option><option value="closed">Closed</option><option value="">All</option></select></div>
+      <p class="muted small">Answers reported by chatbot users. Reports never change the knowledge; create or update an entry to correct it.</p>
+      <div id="reviewList"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const KINDS = {procedure: "Procedure", faq: "FAQ", validation: "Validation rules", scenario: "Scenario explanation", correction: "Correction"};
+  const EV = {manual: "Manual-derived", code: "Code-verified", expert: "Expert-confirmed"};
+  let me = null, entries = [], current = null, draft = null, pendingReviewId = null;
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+
+  async function api(method, path, body) {
+    const opt = {method, headers: {"x-kb-request": "1"}, credentials: "same-origin"};
+    if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+    const r = await fetch(path, opt);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), {status: r.status});
+    return j;
+  }
+  function note(el, kind, text) { el.innerHTML = text ? `<div class="notice ${kind}">${esc(text)}</div>` : ""; }
+
+  async function signIn() {
+    const m = /[#&]t=([^&]+)/.exec(location.hash);
+    if (m) {
+      history.replaceState(null, "", location.pathname);  // the token never stays in the address bar
+      try { me = await api("POST", "/kb/api/session", {token: decodeURIComponent(m[1])}); } catch (e) { return gate(e.message); }
+    } else {
+      try { me = await api("GET", "/kb/api/me"); } catch (e) { return gate(e.status === 401 ? "Open the knowledge screen from the application (it signs you in)." : e.message); }
+    }
+    $("who").textContent = `${me.userName || me.userId}${me.company ? " · " + me.company : ""}`;
+    $("logout").hidden = false;
+    if (!me.trainer) return gate("You are signed in, but you are not a knowledge trainer for any module. Report wrong answers from the chat window instead.");
+    $("who").textContent += ` · ${me.environment}`;
+    $("module").innerHTML = me.modules.map((m) => `<option value="${esc(m.module)}">${esc(m.label)}</option>`).join("");
+    $("fKind").innerHTML = Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+    $("fEnvScope").options[0].textContent = `This environment only (${me.environment})`;
+    $("app").hidden = false;
+    await loadEntries(); await loadReviewCount();
+  }
+  const grantOf = () => me.modules.find((m) => m.module === $("module").value) || {scope: "company", shareEnvs: false};
+  const envLabel = (e) => (e.env_scope === "*" ? "all environments" : e.env_scope || "?");
+  function gate(msg) { $("gate").hidden = false; $("app").hidden = true; $("gateMsg").textContent = msg; }
+
+  async function loadEntries() {
+    const q = new URLSearchParams({module: $("module").value, status: $("statusFilter").value});
+    entries = await api("GET", `/kb/api/entries?${q}`);
+    $("entryList").innerHTML = entries.length ? entries.map((e) => `
+      <div class="item" data-id="${e.id}" ${current && current.entry.id === e.id ? 'aria-current="true"' : ""} tabindex="0">
+        <div class="t">${esc(e.title)}</div>
+        <div><span class="pill s-${shown(e)}">${shown(e)}</span><span class="pill s-${e.scope_tenant ? "company" : "global"}">${e.scope_tenant ? "company" : "all companies"}</span><span class="pill">${esc(envLabel(e))}</span>
+        <span class="muted small">${esc(KINDS[e.kind] || e.kind)}${statusNote(e)}</span></div></div>`).join("")
+      : `<div class="muted small">No entries yet.</div>`;
+    document.querySelectorAll("#entryList .item").forEach((el) => {
+      el.onclick = () => openEntry(el.dataset.id);
+      el.onkeydown = (ev) => { if (ev.key === "Enter") openEntry(el.dataset.id); };
+    });
+  }
+  async function loadReviewCount() {
+    try { const items = await api("GET", `/kb/api/review-items?status=new&module=${encodeURIComponent($("module").value)}`); $("reviewCount").textContent = items.length ? `(${items.length})` : ""; } catch { /* ignore */ }
+  }
+
+  // an entry that serves nothing but has a draft waiting is shown as a draft (its earlier version was retired)
+  const shown = (e) => (e.draft_revision && e.status === "retired" ? "draft" : e.status);
+  const statusNote = (e) => (!e.draft_revision || e.status === "draft" ? "" : e.status === "retired" ? " · earlier version retired" : " · draft pending");
+  function workingRevision(d) {
+    const revs = d.revisions; const e = d.entry;
+    return revs.find((r) => r.revision === e.draft_revision) || revs.find((r) => r.revision === e.published_revision) || revs[0];
+  }
+  async function openEntry(id) {
+    current = await api("GET", `/kb/api/entries/${id}`);
+    show("editor"); fill(workingRevision(current)); await loadEntries();
+  }
+  function show(which) {
+    $("empty").hidden = true; $("editor").hidden = which !== "editor"; $("review").hidden = which !== "review";
+    $("tabEntries").setAttribute("aria-pressed", which !== "review"); $("tabReview").setAttribute("aria-pressed", which === "review");
+  }
+
+  function fill(r) {
+    draft = JSON.parse(JSON.stringify(r || {title: "", kind: "procedure", body: "", applies_to: {}, evidence: [], open_points: [], supersedes: [], internal_notes: "", change_note: ""}));
+    const e = current ? current.entry : null;
+    $("edStatus").innerHTML = e ? `<span class="pill s-${shown(e)}">${shown(e)}</span><span class="muted small">${esc(statusNote(e))}</span> ` : `<span class="pill s-draft">new</span>`;
+    $("edScope").innerHTML = e ? `<span class="pill s-${e.scope_tenant ? "company" : "global"}">${e.scope_tenant ? "company: " + esc(e.scope_tenant) : "all companies"}</span><span class="pill">${esc(envLabel(e))}</span>` : "";
+    $("edRev").textContent = e ? `published revision: ${e.published_revision ?? "none"} · draft: ${e.draft_revision ?? "none"}` : "";
+    $("fTitle").value = draft.title || ""; $("fKind").value = draft.kind || "procedure"; $("fBody").value = draft.body || "";
+    const g = grantOf();
+    if (e) { $("fScope").value = e.scope_tenant ? "company" : "global"; $("fScope").disabled = true; }
+    else { if (g.scope !== "global") $("fScope").value = "company"; $("fScope").disabled = g.scope !== "global"; }
+    if (e) { $("fEnvScope").value = e.env_scope === "*" ? "all" : "this"; $("fEnvScope").disabled = true; }
+    else { $("fEnvScope").value = "this"; $("fEnvScope").disabled = !g.shareEnvs; }
+    const a = draft.applies_to || {};
+    $("fOffice").checked = (a.userTypes || []).includes("Office"); $("fShip").checked = (a.userTypes || []).includes("Ship");
+    $("fRoles").value = (a.roles || []).join(", "); $("fConditions").value = a.conditions || ""; $("fVersion").value = a.appVersion || "";
+    $("fNotes").value = draft.internal_notes || ""; $("fChange").value = "";
+    renderEvidence(); renderOpenPoints(); renderSupersedes(); renderHistory();
+    const writable = !e || e.writable;
+    ["saveDraft", "testJump", "publishBtn", "retireBtn", "pvAsk", "addEv", "addOp", "supSearch"].forEach((id) => $(id).disabled = !writable);
+    $("retireBtn").disabled = !writable || !e || e.status === "retired";
+    note($("edMsg"), "", ""); $("pvOut").innerHTML = ""; $("supResults").innerHTML = "";
+  }
+
+  function collect() {
+    const types = []; if ($("fOffice").checked) types.push("Office"); if ($("fShip").checked) types.push("Ship");
+    return {module: $("module").value, scope: $("fScope").value, environment: $("fEnvScope").value, title: $("fTitle").value.trim(), kind: $("fKind").value, body: $("fBody").value,
+      appliesTo: {userTypes: types, roles: $("fRoles").value.split(",").map((s) => s.trim()).filter(Boolean), conditions: $("fConditions").value,
+        appVersion: $("fVersion").value},
+      evidence: draft.evidence, openPoints: draft.open_points, supersedes: draft.supersedes, internalNotes: $("fNotes").value, changeNote: $("fChange").value};
+  }
+
+  function renderEvidence() {
+    $("evList").innerHTML = draft.evidence.map((e, i) => `
+      <div class="ev"><select data-i="${i}" data-k="cls" aria-label="Evidence type">${Object.entries(EV).map(([k, v]) => `<option value="${k}" ${e.cls === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+      <input type="text" data-i="${i}" data-k="reference" value="${esc(e.reference)}" placeholder="Reference (manual page, code file:line, expert name)" aria-label="Reference">
+      <input type="text" data-i="${i}" data-k="note" value="${esc(e.note)}" placeholder="Note" aria-label="Note">
+      <button data-del="${i}" aria-label="Remove evidence">Remove</button></div>`).join("") || `<div class="muted small">No evidence yet.</div>`;
+    $("evList").querySelectorAll("[data-k]").forEach((el) => el.oninput = el.onchange = () => { draft.evidence[+el.dataset.i][el.dataset.k] = el.value; });
+    $("evList").querySelectorAll("[data-del]").forEach((el) => el.onclick = () => { draft.evidence.splice(+el.dataset.del, 1); renderEvidence(); });
+  }
+  function renderOpenPoints() {
+    $("opList").innerHTML = draft.open_points.map((p, i) => `
+      <div class="op ${p.resolved ? "done" : ""}"><div class="row" style="justify-content:space-between"><strong>${p.resolved ? "Confirmed" : "Needs expert confirmation"}</strong>
+      <div class="row"><label class="row small" style="margin:0;text-transform:none;font-weight:400"><input type="checkbox" data-i="${i}" data-k="resolved" ${p.resolved ? "checked" : ""}> Confirmed</label><button data-del="${i}">Remove</button></div></div>
+      <input type="text" data-i="${i}" data-k="text" value="${esc(p.text)}" aria-label="Point" style="margin-top:6px">
+      <input type="text" data-i="${i}" data-k="resolution" value="${esc(p.resolution)}" placeholder="Answer / decision" aria-label="Answer" style="margin-top:6px"></div>`).join("") || `<div class="muted small">No open points.</div>`;
+    $("opList").querySelectorAll("[data-k]").forEach((el) => el.oninput = el.onchange = () => {
+      const p = draft.open_points[+el.dataset.i]; if (el.dataset.k === "resolved") { p.resolved = el.checked; renderOpenPoints(); } else p[el.dataset.k] = el.value; });
+    $("opList").querySelectorAll("[data-del]").forEach((el) => el.onclick = () => { draft.open_points.splice(+el.dataset.del, 1); renderOpenPoints(); });
+  }
+  function renderSupersedes() {
+    $("supList").innerHTML = draft.supersedes.map((s, i) => `<div class="row small" style="margin-bottom:4px"><span>${esc(s.file)} — ${esc(s.section)}</span><button data-del="${i}">Remove</button></div>`).join("") || `<div class="muted small">No passages replaced.</div>`;
+    $("supList").querySelectorAll("[data-del]").forEach((el) => el.onclick = () => { draft.supersedes.splice(+el.dataset.del, 1); renderSupersedes(); });
+  }
+  function renderHistory() {
+    if (!current) { $("history").innerHTML = `<div class="muted small">Saved revisions will appear here.</div>`; return; }
+    const e = current.entry;
+    $("history").innerHTML = `<table><thead><tr><th>Rev</th><th>State</th><th>Author</th><th>Change note</th><th></th></tr></thead><tbody>` +
+      current.revisions.map((r) => `<tr><td>${r.revision}</td><td>${r.revision === e.published_revision && e.status === "published" ? '<span class="pill s-published">served</span>' : r.published_at ? "published " + esc(r.published_at.slice(0, 16).replace("T", " ")) : r.revision === e.draft_revision ? '<span class="pill s-draft">draft</span>' : "not published"}</td>
+      <td>${esc(r.author_name || r.author)}</td><td>${esc(r.change_note)}</td>
+      <td>${r.published_at && !(r.revision === e.published_revision && e.status === "published") && e.writable ? `<button data-rb="${r.revision}">Restore</button>` : ""}</td></tr>`).join("") + `</tbody></table>` +
+      `<p class="muted small" style="margin-top:8px">${current.audit.slice(0, 8).map((a) => `${esc(a.at.slice(0, 16).replace("T", " "))} ${esc(a.actor_name || a.actor_id)}: ${esc(a.action)}${a.revision ? " (rev " + a.revision + ")" : ""}`).join("<br>")}</p>`;
+    $("history").querySelectorAll("[data-rb]").forEach((el) => el.onclick = async () => {
+      try { current = await api("POST", `/kb/api/entries/${e.id}/rollback`, {revision: +el.dataset.rb}); fill(workingRevision(current)); note($("edMsg"), "ok", `Revision ${el.dataset.rb} restored and published.`); await loadEntries(); }
+      catch (err) { note($("edMsg"), "bad", err.message); }
+    });
+  }
+
+  $("addEv").onclick = () => { draft.evidence.push({cls: "code", reference: "", note: ""}); renderEvidence(); };
+  $("addOp").onclick = () => { draft.open_points.push({text: "", resolved: false, resolution: ""}); renderOpenPoints(); };
+  $("supSearch").onclick = async () => {
+    try {
+      const rows = await api("GET", `/kb/api/passages?module=${encodeURIComponent($("module").value)}&q=${encodeURIComponent($("supQ").value)}`);
+      $("supResults").innerHTML = rows.map((r, i) => `<div class="item" style="cursor:default;margin-top:6px"><div class="t small">${esc(r.file)} — ${esc(r.section)}</div><div class="small muted">${esc(r.snippet)}</div><button data-pick="${i}" style="margin-top:4px">Replace this passage</button></div>`).join("") || `<div class="muted small">No passages found.</div>`;
+      $("supResults").querySelectorAll("[data-pick]").forEach((el) => el.onclick = () => { const r = rows[+el.dataset.pick]; if (!draft.supersedes.some((s) => s.chunkId === r.chunkId)) draft.supersedes.push({chunkId: r.chunkId, file: r.file, section: r.section}); renderSupersedes(); });
+    } catch (err) { $("supResults").innerHTML = `<div class="notice bad">${esc(err.message)}</div>`; }
+  };
+  async function save() {
+    const body = collect();
+    if (!current) { if (pendingReviewId) body.reviewItemId = pendingReviewId; current = await api("POST", "/kb/api/entries", body); pendingReviewId = null; }
+    else { current = await api("PUT", `/kb/api/entries/${current.entry.id}/draft`, body); }
+    fill(workingRevision(current)); await loadEntries();
+  }
+  $("saveDraft").onclick = async () => { try { await save(); note($("edMsg"), "ok", "Draft saved. Chatbot users still see the published version."); } catch (e) { note($("edMsg"), "bad", e.message); } };
+  $("publishBtn").onclick = async () => {
+    try { await save(); current = await api("POST", `/kb/api/entries/${current.entry.id}/publish`, {changeNote: $("fChange").value}); fill(workingRevision(current)); note($("edMsg"), "ok", `Published revision ${current.entry.published_revision}. The chatbot now uses it.`); await loadEntries(); }
+    catch (e) { note($("edMsg"), "bad", e.message); }
+  };
+  let retireTimer = 0;
+  $("retireBtn").onclick = async () => {
+    clearTimeout(retireTimer);
+    if ($("retireBtn").dataset.confirm !== "1") { $("retireBtn").dataset.confirm = "1"; $("retireBtn").textContent = "Click again to retire"; retireTimer = setTimeout(() => { $("retireBtn").dataset.confirm = ""; $("retireBtn").textContent = "Retire"; }, 10000); return; }
+    try { current = await api("POST", `/kb/api/entries/${current.entry.id}/retire`, {}); fill(workingRevision(current)); note($("edMsg"), "ok", "Retired. The chatbot no longer uses this entry; replaced passages are back."); await loadEntries(); }
+    catch (e) { note($("edMsg"), "bad", e.message); } finally { $("retireBtn").dataset.confirm = ""; $("retireBtn").textContent = "Retire"; }
+  };
+  $("pvAsk").onclick = async () => {
+    $("pvOut").innerHTML = `<div class="muted small">Testing…</div>`;
+    try {
+      await save();  // saving re-draws the editor, which clears the test area — show the progress message again
+      $("pvOut").innerHTML = `<div class="muted small">Testing… (the chatbot is answering with your draft; this can take up to a minute)</div>`;
+      const r = await api("POST", `/kb/api/entries/${current.entry.id}/preview/ask`, {question: $("pvQ").value});
+      $("pvOut").innerHTML = `<div class="notice ${r.draftRetrieved ? "ok" : "warn"}">${r.draftRetrieved ? "Your draft was used for this answer." : "Your draft was NOT found for this question — try the words a user would use, or check the title."} Only you see this test; chatbot users still get the published version.</div>
+        <div class="answer">${esc(r.response)}</div><div class="small muted" style="margin-top:6px">Answered the same way as the chatbot (${esc(r.path || "")}).</div>`;
+    } catch (e) { $("pvOut").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
+  };
+  $("testJump").onclick = () => { $("pvQ").scrollIntoView({behavior: "smooth", block: "center"}); $("pvQ").focus(); };
+  $("newEntry").onclick = () => { current = null; pendingReviewId = null; show("editor"); fill(null); loadEntries(); };
+  $("module").onchange = () => { current = null; $("editor").hidden = true; $("empty").hidden = false; loadEntries(); loadReviewCount(); };
+  $("statusFilter").onchange = loadEntries;
+  $("tabEntries").onclick = () => { show(current ? "editor" : "none"); if (!current) $("empty").hidden = false; };
+  $("tabReview").onclick = async () => { show("review"); await loadReview(); loadReviewCount(); };
+  $("reviewStatus").onchange = loadReview;
+  $("logout").onclick = async () => { await api("POST", "/kb/api/logout", {}).catch(() => {}); gate("Signed out."); $("logout").hidden = true; };
+
+  async function loadReview() {
+    try {
+      const items = await api("GET", `/kb/api/review-items?module=${encodeURIComponent($("module").value)}&status=${encodeURIComponent($("reviewStatus").value)}`);
+      $("reviewList").innerHTML = items.map((it) => `<div class="item" style="cursor:default;margin-top:8px">
+        <div class="t">${esc(it.question)}</div><div class="small muted">${esc(it.reporter_name || it.reporter_id)}${it.tenant_domain ? " · " + esc(it.tenant_domain) : ""} · ${esc(it.created_at.slice(0, 16).replace("T", " "))} · ${esc(it.status)}</div>
+        ${it.note ? `<div class="notice warn small">Reporter's note: ${esc(it.note)}</div>` : ""}
+        <details><summary class="small">Answer the user got</summary><div class="answer small">${esc(it.answer)}</div></details>
+        <div class="row" style="margin-top:6px"><button data-new="${it.id}" class="primary">Create entry from this</button><button data-close="${it.id}">Close</button></div></div>`).join("") || `<div class="muted small">No reports.</div>`;
+      $("reviewList").querySelectorAll("[data-new]").forEach((el) => el.onclick = async () => {
+        const it = items.find((x) => x.id === el.dataset.new);
+        current = null; show("editor"); fill({title: it.question.slice(0, 120), kind: "correction", body: "", applies_to: {}, evidence: [], open_points: [], supersedes: [], internal_notes: `From review item ${it.id}: ${it.note || ""}`, change_note: ""});
+        pendingReviewId = it.id; note($("edMsg"), "warn", "New entry from a user report — it is linked to the report when you save it.");
+      });
+      $("reviewList").querySelectorAll("[data-close]").forEach((el) => el.onclick = async () => { await api("POST", `/kb/api/review-items/${el.dataset.close}`, {status: "closed"}); loadReview(); loadReviewCount(); });
+    } catch (e) { $("reviewList").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
+  }
+  signIn();
+})();
+</script>
+</body>
+</html>

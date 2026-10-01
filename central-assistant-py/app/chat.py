@@ -31,7 +31,21 @@ def _fire(coro: Any) -> None:
 
 
 async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_token: str,
-                      instance: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:
+                      instance: dict[str, Any] | None = None, scope: db.RetrievalScope | None = None,
+                      preview: bool = False) -> tuple[int, dict[str, Any]]:
+    # Knowledge filters for every search in this request: the verified identity's company and environment (company- and
+    # environment-scoped entries and supersedes), plus — for an owner's preview request only — the draft being previewed.
+    default = db.RetrievalScope(tenant=str(identity.get("tenantDomain") or "") or None,
+                                env=(instance or {}).get("env") or None)
+    reset = db.retrieval_scope.set(scope or default)
+    try:
+        return await _handle_chat(body, identity, identity_token, instance, preview)
+    finally:
+        db.retrieval_scope.reset(reset)
+
+
+async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_token: str,
+                       instance: dict[str, Any] | None = None, preview: bool = False) -> tuple[int, dict[str, Any]]:
     s = settings()
     started = time.monotonic()
     message = str(body.get("message") or "").strip()
@@ -56,6 +70,8 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
     def log(gate: str, answer: str | None, *, module: str | None = None, citations: list[Any] | None = None,
             confidence: float | None = None, usage: dict[str, int] | None = None, model: str | None = None,
             tools_used: list[str] | None = None) -> None:
+        if preview:
+            return  # an owner's draft test is never stored as a conversation (draft text must not outlive the preview)
         _fire(db.log_conversation(db.ConversationRow(
             tenant_domain=tenant, tuid=identity.get("tuid"), user_id=str(identity.get("userId")), user_name=identity.get("userName"),
             user_role=identity.get("role"), module=module or ui_module, gate=gate, question=for_log(message) or "",
@@ -88,7 +104,13 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         # 24-Sep-2026: live data ONLY for a token whose issuer is a registered instance of the module the widget
         # says it is embedded in; any other token (no issuer, other module) gets documentation answers only.
         live = instance if (instance and instance["module"] == ui_module) else None
-        manifest = None if body.get("routeOnly") is True else await agent.manifest_for(live)
+        if preview:
+            # 1-Oct-2026: an owner's draft test takes the SAME answering path, model and settings as the widget (the tool
+            # loop) with documentation search only — the module's live-data tools need the user's own short-lived token,
+            # which a knowledge-screen session does not hold, and knowledge entries are documentation.
+            manifest: dict[str, Any] | None = {"tools": []}
+        else:
+            manifest = None if body.get("routeOnly") is True else await agent.manifest_for(live)
         if manifest is not None:
             # the selected vessel travels as context in the message text (masked on the wire); the log keeps the
             # user's own question. Authorisation stays with the module's Data API.
@@ -107,26 +129,27 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         # the originating module (ASSISTANT_ROUTE_INTENT), excerpt selection may fuse a lexical ranking inside the routed
         # module (ASSISTANT_HYBRID). Both default off = served behaviour. Neither touches identity, tenant or vessel checks.
         history = agent.build_history(body.get("conversationHistory"))
-        query = message
+        terms = await retrieval.title_terms() if retrieval.context_routing_on() else None
+        query = retrieval.expand_for_module(message, ui_module, terms)  # glossary off → the message itself
         emb = await llm.embed(query, masker)
         hits = await retrieval.retrieve(emb)
-        terms = await retrieval.title_terms() if s.assistant_route_intent.lower() == "on" else None
-        routed = retrieval.route(hits, query, ui_module, terms)
+        routed = await retrieval.fill_from_module(retrieval.route(hits, query, ui_module, terms), emb)
         if history and routed.gate != "answer" and agent.last_user_turn(history):
             # 23-Sep-2026 follow-ups: 'explain step 2' retrieves nothing on its own words. With the widget's history
             # present and no answerable route, retry ONCE with the previous user question prepended. Without history
             # (every regression suite, the API contract examples) this block never runs — the served path is unchanged.
-            query = f"{agent.last_user_turn(history)}\n{message}"
+            query = retrieval.expand_for_module(f"{agent.last_user_turn(history)}\n{message}", ui_module, terms)
             emb = await llm.embed(query, masker)
             hits = await retrieval.retrieve(emb)
-            routed = retrieval.route(hits, query, ui_module, terms)
+            routed = await retrieval.fill_from_module(retrieval.route(hits, query, ui_module, terms), emb)
             reasons_prefix = ["follow-up: retrieved with the previous question"]
         else:
             reasons_prefix = []
         hybrid = s.assistant_hybrid.lower()
         reasons: list[str] = list(reasons_prefix)
         if routed.gate == "answer" and hybrid in ("on", "rescue") and routed.module:
-            vec = [h for h in hits if h.module == routed.module and h.distance <= s.route_sim_floor]
+            vec = (list(routed.hits) if str(getattr(routed, "reason", "")).startswith("module context")  # already the module's own passages
+                   else [h for h in hits if h.module == routed.module and h.distance <= s.route_sim_floor])
             lex = [h for h in await db.search_lexical(emb, masker.mask_text(query) if masker else query, routed.module, s.route_top_k) if h.distance <= s.route_sim_floor]
             if hybrid == "rescue":
                 # r7: served selection kept; the lexical leader takes the last slot only if it earns it on relevance
@@ -162,6 +185,7 @@ async def handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_t
         if reasons:
             routed.reason = getattr(routed, "reason", "vector routing") + " | " + " | ".join(reasons)  # type: ignore[attr-defined]
         citations = retrieval.citations_of(routed)
+        retrieval.note_seen(routed.hits)
         label = MODULE_LABELS.get(routed.module or "", routed.module)
         if body.get("routeOnly") is True:
             log("route_only", None, module=routed.module, citations=citations, confidence=routed.confidence)

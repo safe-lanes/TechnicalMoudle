@@ -72,7 +72,7 @@ def module_of(meta: dict[str, Any]) -> str:
 # Technical widget) only breaks a clarify tie when it is one of the near candidates; it never overrides an explicit name
 # and never bypasses identity: module context is routing only, tenant and vessel permissions are enforced elsewhere.
 MODULE_ALIASES = {"technical": "technical", "pms": "technical", "audit": "audit", "safety": "safety", "incident": "incident", "crewing": "crewing"}
-_GENERIC_TITLE_WORDS = {"user", "manual", "manuals", "office", "vessel", "specific", "notes", "operational", "for", "sail", "admin", "history", "preparation", "sync", "kb", "pilot"}
+_GENERIC_TITLE_WORDS = {"user", "manual", "manuals", "office", "vessel", "specific", "notes", "operational", "for", "sail", "admin", "history", "preparation", "sync", "kb", "pilot", "knowledge"}
 _title_terms: dict[str, str] | None = None  # term → module
 
 
@@ -138,6 +138,14 @@ def route(hits: list[Hit], message: str | None = None, ui_module: str | None = N
         elif margin < s.route_margin and ui_module and ui_module.lower() in {m for m, _ in ranked[:3]}:
             top_module, reason = ui_module.lower(), "originating-module context broke a clarify tie"
             margin = s.route_margin
+    # Module context (30-Sep-2026): the question names no module and the user's own module is close to the nearest one →
+    # the user's module wins ('RH' in Technical = Running Hours). A question naming another module was handled above.
+    gap = s.assistant_context_module_gap
+    if gap > 0 and ui_module and reason == "vector routing" and ui_module.lower() in best and top_module != ui_module.lower():
+        named = explicit_module(message, terms or {})[0] if message is not None else None
+        if named is None and best[ui_module.lower()] - top_dist <= gap:
+            top_module, reason = ui_module.lower(), f"module context ({ui_module.lower()}) within {gap}"
+            margin = max(margin, s.route_margin)
     if margin < s.route_margin:
         return Routed("clarify", candidates=[MODULE_LABELS.get(m, m) for m, _ in ranked[:3]], confidence=margin)
     chosen = [h for h in hits if h.module == top_module and h.distance <= s.route_sim_floor][: s.answer_chunks]
@@ -326,10 +334,59 @@ async def retrieve(embedding: list[float]) -> list[Hit]:
     return hits
 
 
-async def search_docs_tool(query: str, masker: Masker | None) -> dict[str, Any]:
-    """search_module_docs backing for the tool loop — Stage 1 retrieval packaged as a tool."""
+async def fill_from_module(routed: Routed, embedding: list[float]) -> Routed:
+    """When MODULE CONTEXT chose the module, the overall top-k may hold few of its passages — take the excerpts from a
+    search inside that module (same floor, same excerpt count). Other routing decisions are returned unchanged."""
+    s = settings()
+    if routed.gate != "answer" or not routed.module or not str(getattr(routed, "reason", "")).startswith("module context"):
+        return routed
+    own = [h for h in await db.search_chunks(embedding, s.route_top_k, routed.module) if h.distance <= s.route_sim_floor]
+    for h in own:
+        h.module = module_of(h.meta)
+    if own:
+        routed.hits = own[: s.answer_chunks]
+    return routed
+
+
+def note_seen(hits: list[Hit]) -> None:
+    """During an owner's preview only: remember which knowledge entries the answer was given (did the draft reach it?)."""
+    seen = db.retrieval_seen.get()
+    if seen is not None:
+        seen.extend(str(h.meta.get("kb_entry_id")) for h in hits if h.meta.get("kb_entry_id"))
+
+
+def context_routing_on() -> bool:
+    s = settings()
+    return s.assistant_route_intent.lower() == "on" or s.assistant_context_module_gap > 0 or bool(s.module_glossary)
+
+
+def expand_for_module(message: str, ui_module: str | None, terms: dict[str, str] | None) -> str:
+    """Search text for a question asked from `ui_module`: its glossary abbreviations are spelled out ('RH' →
+    'Running Hours (RH)' in Technical). A question that names another module is returned unchanged."""
+    g = settings().module_glossary.get((ui_module or "").lower())
+    if not g:
+        return message
+    named = explicit_module(message, terms or {})[0]
+    if named and named != (ui_module or "").lower():
+        return message
+    out = message
+    for abbrev, full in g.items():
+        out = re.sub(rf"\b{re.escape(abbrev)}\b", f"{full} ({abbrev})", out)
+    return out
+
+
+async def search_docs_tool(query: str, masker: Masker | None, ui_module: str | None = None) -> dict[str, Any]:
+    """search_module_docs backing for the tool loop — Stage 1 retrieval packaged as a tool. The user's module is used
+    for routing only when module context or intent routing is configured (both off = served behaviour)."""
     from .llm import embed  # local import: llm imports masking, keep module graph simple
-    routed = route(await retrieve(await embed(query, masker)))
+    if context_routing_on() and ui_module:
+        terms = await title_terms()
+        query = expand_for_module(query, ui_module, terms)
+        emb = await embed(query, masker)
+        routed = await fill_from_module(route(await retrieve(emb), query, ui_module, terms), emb)
+    else:
+        routed = route(await retrieve(await embed(query, masker)))
+    note_seen(routed.hits)
     if routed.gate == "not_documented":
         return {"documented": False, "note": "This topic is not covered in the module documentation."}
     if routed.gate == "clarify":
@@ -337,6 +394,17 @@ async def search_docs_tool(query: str, masker: Masker | None) -> dict[str, Any]:
                 "note": "Ambiguous across modules — ask the user which module they mean."}
     return {"documented": True, "module": MODULE_LABELS.get(routed.module or "", routed.module),
             "excerpts": [{"manual": manual_of(h.meta), "section": section_of(h.meta), "text": h.text[:3000]} for h in routed.hits]}
+
+
+# Knowledge-management answer rules (30-Sep-2026, owner brief), used on both answer paths when ASSISTANT_KB_RULES=on.
+KB_ANSWER_RULES = (
+    "RULE — asked action: answer the action the user asked about. If no excerpt describes that action (for example the user "
+    "asks how to delete or deactivate something and the excerpts only describe editing or modifying it), say plainly that "
+    "the documentation available to you does not describe it; do NOT give the steps of a different procedure as the answer. "
+    "RULE — knowledge entries: an excerpt titled 'Knowledge:' is guidance published by the module's knowledge owner and "
+    "labelled with its evidence (manual-derived, code-verified, expert-confirmed). Where it conflicts with a manual excerpt, "
+    "answer from the knowledge entry and say that it updates the manual; cite it by its title, and state its evidence label "
+    "in the Source line.")
 
 
 def docs_prompt(message: str, routed: Routed) -> tuple[str, str]:
@@ -369,6 +437,8 @@ def docs_prompt(message: str, routed: Routed) -> tuple[str, str]:
               "name each source; where an excerpt is marked draft, unverified or revision-specific, say so in one clause. "
               "Keep it short and plain; do not use 'Method' / 'Applies to' / 'Requirements' labels. "
               'End with ONE "Source:" list naming, for each method, the manual or guidance and section that supports it.')
+    if settings().kb_rules_on:
+        system += " " + KB_ANSWER_RULES
     if settings().assistant_docs_prompt.lower() == "v6":
         # v6 (candidate, owner brief 18-Sep-2026): three sentences added to v5, each answering a defect demonstrated in the
         # 171-answer review (§15.2). Nothing in v5 is removed or reworded, so v6 differs from v5 only by this block.

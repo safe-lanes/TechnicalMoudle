@@ -1,0 +1,71 @@
+# Pilot access plan — letting Jeevan test from his own computer
+
+**Status:** plan only. **Nothing below has been done.** Every step that exposes an address, changes DNS, nginx or
+credentials, or deploys code is waiting for Ghazi's approval.
+
+## Goal
+
+**Jeevan** uses the knowledge pilot from his own computer:
+- with his **normal SAILERP login**;
+- as a **Technical** trainer;
+- without touching production PMS, the live chatbot service or its index.
+
+## Today
+
+- **Where the pilot runs:** the AI server.
+  - Service: `sail-assistant-py-kbpilot`, image `kbpilot-r6`, listening on `127.0.0.1:8047` only.
+  - Database: `sail-kbpilot-db`, its own, holding a read-only copy of the live index.
+- **How it is reached:** only through an SSH tunnel from Ghazi's machine, by two local pilot PMS shores. No public
+  address exists.
+- **Why a path on the live hostname is not possible:** the knowledge screen uses absolute paths (`/kb/api/…`) and a
+  session cookie scoped to `/`. Served under a path of `assistant.sl-sail.com`, its calls would reach the **live**
+  service and share the live origin's cookies. The pilot therefore needs **its own hostname**.
+
+## Recommended plan (about 1 hour once approved)
+
+| # | Step | Where | Approval needed for |
+|---|---|---|---|
+| 1 | DNS: `kb-pilot.sl-sail.com` → AI server (13.250.51.71) | DNS (owner) | new public name |
+| 2 | nginx site for that name + Let's Encrypt certificate → `127.0.0.1:8047` (the pilot only). Same hardening as the live assistant site: TLS only, no `/admin` | AI server | new public endpoint |
+| 3 | Register the **dev** PMS instance in the **pilot** registry: `technical-dev` → `https://dev.sl-sail.com/technical/api`, using the dev instance's existing signing key and service secret. They are copied **on the server** from the live env file into the pilot env file and never leave the server. This is the same trust relationship dev already has with the live assistant | AI server, pilot env | reusing dev's instance credentials in a second service |
+| 4 | Pilot CORS: allow `https://dev.sl-sail.com` | pilot env | — |
+| 5 | Deploy the **widget change** (4 files on `chatbot-enterprise`) to **dev** PMS: "Report this answer" for everyone; the "Manage knowledge" icon only for trainers (decided by the assistant). Production PMS unchanged | dev server | deploying to dev |
+| 6 | Point **only Jeevan's browser** at the pilot: one-time per-browser setting `ASSISTANT_CENTRAL_URL = https://kb-pilot.sl-sail.com` (existing tester override in the widget; we give him a one-line instruction). Other dev users keep the live assistant | Jeevan's browser | — |
+| 7 | Grant Jeevan: `kb_admin grant --issuer technical-dev --tenant <his dev company domain> --user <his dev SAILERP user id> --module technical --scope global --name "Jeevan" --by Ghazi` | pilot | his real ids (from you) |
+| 8 | Smoke test from outside, as Ghazi:<br>• real dev login → book icon → knowledge screen<br>• Test draft<br>• publish a DEV TEST entry → the widget cites it<br>• retire it<br>• one request **without** a token is refused | — | — |
+
+## Authentication
+
+- **Every pilot endpoint needs a signed identity.** It is minted by the dev PMS from Jeevan's verified SAILERP login (the
+  same mechanism as the live chatbot). There is no anonymous access and no separate pilot password.
+- **The knowledge screen needs a trainer grant**, matched on issuer + company + user id, and checked on every request.
+- **Revoking Jeevan's grant** stops his access immediately, including an open screen.
+
+## Isolation
+
+- **Production PMS:** not changed.
+- **Live assistant (`sail-assistant-py-v7`) and its database:** not changed.
+- **Pilot publications:** reach only browsers pointed at the pilot (step 6), and only for the dev environment.
+
+## Alternative (if you prefer no per-browser setting)
+
+At step 6, point **all of dev** at the pilot instead (`VITE_ASSISTANT_CENTRAL_URL`, then rebuild dev):
+- dev testers would use the pilot service, with the same index copy and the new rules;
+- revert by rebuilding dev with the old value.
+
+## Removal
+
+To remove the pilot:
+1. Remove the nginx site and DNS record.
+2. Revoke the grants.
+3. Clear the per-browser setting.
+4. Stop and remove `sail-assistant-py-kbpilot`, `sail-assistant-py-kbbase` and `sail-kbpilot-db` (volume
+   `sail-kbpilot-db-data`).
+
+Live is unaffected at every step.
+
+## Information needed from you
+
+- Jeevan's SAILERP **user id** on dev, and his dev **company domain**.
+- Approval for steps 1, 2, 3 and 5.
+- Whether step 6 or the alternative.

@@ -9,6 +9,7 @@ Queries are explicit SQL via SQLAlchemy Core `text()` on an async engine
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 from dataclasses import dataclass
@@ -19,6 +20,48 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from .config import settings
+
+
+# ── retrieval scope (knowledge management, 30-Sep-2026) ──────────────────────────────────────────────────────
+@dataclass(frozen=True)
+class RetrievalScope:
+    """Who is asking, for the knowledge filters every chunk search applies:
+    tenant            the verified identity's company; company-scoped entries and supersedes apply only to it
+    env               the environment label of the verified identity's registered instance ('dev', 'prod', …);
+                      knowledge of another environment is never served (shared guidance is marked '*')
+    preview_entries   entry ids whose PREVIEW chunk replaces the published one (owner preview requests only)
+    preview_supersedes chunk ids the previewed draft would supersede"""
+    tenant: str | None = None
+    env: str | None = None
+    preview_entries: tuple[str, ...] = ()
+    preview_supersedes: tuple[str, ...] = ()
+
+
+_NO_SCOPE = RetrievalScope()  # frozen: safe as a shared default
+retrieval_scope: contextvars.ContextVar[RetrievalScope] = contextvars.ContextVar("retrieval_scope", default=_NO_SCOPE)
+# Knowledge entries retrieved during this request (set only by an owner's preview, to report whether the draft was used).
+retrieval_seen: contextvars.ContextVar[list[str] | None] = contextvars.ContextVar("retrieval_seen", default=None)
+
+# Every chunk search: document chunks + PUBLISHED knowledge entries (never drafts; preview chunks only for the previewing owner),
+# global or the asker's own company, of the asker's environment or explicitly shared ('*'), minus passages superseded by a
+# published entry of that scope. A knowledge chunk or supersede with no environment is never applied (fail closed).
+_KB_FILTER = (
+    " AND (kb_state IS NULL"
+    "      OR (kb_state = 'published' AND NOT (coalesce(kb_entry_id, '') = ANY(CAST(:kb_pv AS text[]))))"
+    "      OR (kb_state = 'preview' AND kb_entry_id = ANY(CAST(:kb_pv AS text[]))))"
+    " AND (tenant_domain IS NULL OR tenant_domain = :kb_tenant)"
+    " AND (kb_state IS NULL OR kb_env = '*' OR kb_env = :kb_env)"
+    " AND NOT EXISTS (SELECT 1 FROM kb_supersedes x WHERE x.index_set = assistant_chunks.index_set AND x.chunk_id = assistant_chunks.id"
+    "                 AND (x.tenant_domain IS NULL OR x.tenant_domain = :kb_tenant) AND (x.env_scope = '*' OR x.env_scope = :kb_env)"
+    "                 AND NOT (x.entry_id = ANY(CAST(:kb_pv AS text[]))))"
+    " AND NOT (assistant_chunks.id = ANY(CAST(:kb_pvsup AS text[])))"
+)
+
+
+def _kb_params() -> dict[str, Any]:
+    sc = retrieval_scope.get()
+    return {"kb_pv": list(sc.preview_entries), "kb_pvsup": list(sc.preview_supersedes), "kb_tenant": sc.tenant or "",
+            "kb_env": sc.env or ""}
 
 # words carrying no retrieval signal in a how-to question (the lexical OR query drops them; the vector side still sees them)
 _STOPWORDS = {"how", "do", "does", "i", "we", "you", "to", "a", "an", "the", "in", "on", "of", "for", "is", "are", "it", "that", "this",
@@ -140,11 +183,11 @@ class Hit:
 
 async def chunk_count() -> int:
     async with engine().connect() as c:
-        return int((await c.execute(text("SELECT count(*) FROM assistant_chunks WHERE index_set=:s"),
+        return int((await c.execute(text("SELECT count(*) FROM assistant_chunks WHERE index_set=:s AND (kb_state IS NULL OR kb_state = 'published')"),
                                     {"s": settings().assistant_index_set})).scalar_one())
 
 
-async def search_chunks(embedding: list[float], top_k: int) -> list[Hit]:
+async def search_chunks(embedding: list[float], top_k: int, module: str | None = None) -> list[Hit]:
     """Nearest chunks by squared L2 (= Chroma 'l2' space). OpenAI embeddings are unit
     vectors, so (a <-> b)^2 == 2 * cosine_distance; kept squared so the calibrated
     thresholds carry over unchanged. 907 rows: a sequential scan is sub-millisecond,
@@ -155,8 +198,9 @@ async def search_chunks(embedding: list[float], top_k: int) -> list[Hit]:
         rows = await c.execute(text(
             "SELECT module, file, section_title, breadcrumb, metadata, content, "
             "power(embedding <-> CAST(:q AS vector), 2) AS distance "
-            "FROM assistant_chunks WHERE index_set=:s ORDER BY embedding <-> CAST(:q AS vector) LIMIT :k"),
-            {"q": q, "k": top_k, "s": settings().assistant_index_set})
+            "FROM assistant_chunks WHERE index_set=:s" + (" AND lower(module)=:m" if module else "") + _KB_FILTER +
+            " ORDER BY embedding <-> CAST(:q AS vector) LIMIT :k"),
+            {"q": q, "k": top_k, "s": settings().assistant_index_set, "m": (module or "").lower(), **_kb_params()})
         out: list[Hit] = []
         for r in rows:
             m = dict(r._mapping)
@@ -189,8 +233,8 @@ async def search_lexical(embedding: list[float], question: str, module: str, top
             "ts_rank_cd(tsv, to_tsquery('english', :orq)) + ts_rank_cd(to_tsvector('english', coalesce(section_title, '') || ' ' || coalesce(breadcrumb, '')), to_tsquery('english', :orq)) AS lex "
             "FROM assistant_chunks WHERE index_set=:s AND lower(module)=:m AND tsv @@ to_tsquery('english', :orq) "
             "AND lower(coalesce(breadcrumb, '')) NOT LIKE '%table of contents%' AND lower(coalesce(section_title, '')) NOT LIKE '%table of contents%' "  # r3: a contents page names every section and carries no procedure
-            "ORDER BY lex DESC LIMIT :k"),
-            {"q": q, "orq": orq, "s": settings().assistant_index_set, "m": module.lower(), "k": top_k})
+            + _KB_FILTER + " ORDER BY lex DESC LIMIT :k"),
+            {"q": q, "orq": orq, "s": settings().assistant_index_set, "m": module.lower(), "k": top_k, **_kb_params()})
         out: list[Hit] = []
         for r in rows:
             m = dict(r._mapping)
@@ -208,7 +252,7 @@ async def document_titles() -> list[tuple[str, str]]:
     """(module, file) for every document in the served index set — the source of the manual/sub-module name terms that the
     intent router recognises (derived from the corpus, not from any test question)."""
     async with engine().connect() as c:
-        rows = await c.execute(text("SELECT DISTINCT lower(module), file FROM assistant_chunks WHERE index_set=:s"), {"s": settings().assistant_index_set})
+        rows = await c.execute(text("SELECT DISTINCT lower(module), file FROM assistant_chunks WHERE index_set=:s AND kb_state IS NULL"), {"s": settings().assistant_index_set})
         return [(str(r[0]), str(r[1])) for r in rows]
 
 

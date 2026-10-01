@@ -88,3 +88,69 @@ export async function sendToAssistant(
   if (typeof j?.response !== 'string') throw new Error('central assistant returned no response');
   return j;
 }
+
+/**
+ * "Report this answer" (30-Sep-2026): sends the question, the answer and the user's note to the central
+ * assistant, which files it as a review item for the module's knowledge trainers. It never changes what the assistant says.
+ */
+export async function reportAnswer(report: {
+  question: string;
+  answer: string;
+  note: string;
+  citations?: AssistantReply['citations'];
+  module?: string;
+}): Promise<void> {
+  const token = await mintToken();
+  const r = await fetch(`${resolveCentralUrl()}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-assistant-identity': token },
+    body: JSON.stringify({ module: 'technical', ...report }),
+    signal: AbortSignal.timeout(CENTRAL_TIMEOUT_MS),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body?.error || `report failed (HTTP ${r.status})`);
+  }
+}
+
+/**
+ * Is the signed-in user a knowledge trainer for any module? (1-Oct-2026) Decided by the central assistant from the
+ * signed identity and its trainer grants; used only to show or hide the "Manage knowledge" icon — every action on the
+ * knowledge screen is checked again on the server. Any failure means "no".
+ */
+export async function knowledgeEligibility(): Promise<{ trainer: boolean; modules: string[] }> {
+  try {
+    const token = await mintToken();
+    const r = await fetch(`${resolveCentralUrl()}/kb/eligibility`, {
+      headers: { 'x-assistant-identity': token },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) return { trainer: false, modules: [] };
+    const j = await r.json();
+    return { trainer: j?.trainer === true, modules: Array.isArray(j?.modules) ? j.modules : [] };
+  } catch {
+    return { trainer: false, modules: [] };
+  }
+}
+
+/**
+ * "Manage knowledge": opens the central knowledge screen signed in as the current user. The one-time identity
+ * travels in the URL fragment (never sent to a server by the browser); the screen exchanges it for a session.
+ * Whether the user may change anything is decided by the central service, not here.
+ */
+export async function openKnowledgeManager(): Promise<void> {
+  const w = window.open('about:blank', '_blank'); // opened synchronously so a popup blocker allows it
+  try {
+    const token = await mintToken();
+    const url = `${resolveCentralUrl()}/kb#t=${encodeURIComponent(token)}`;
+    if (w) {
+      w.opener = null;
+      w.location.href = url;
+    } else {
+      window.location.href = url;
+    }
+  } catch (e) {
+    w?.close();
+    throw e;
+  }
+}

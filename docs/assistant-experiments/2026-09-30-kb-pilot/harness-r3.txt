@@ -1,0 +1,74 @@
+PASS  sign-in pilot-jeevan: session from a verified identity (company=pilot)  -> 200 owner=True scope=global
+PASS  sign-in pilot-user-1: session from a verified identity (company=pilot)  -> 200 owner=False scope=None
+PASS  sign-in pilot-b-owner: session from a verified identity (company=pilot-b)  -> 200 owner=True scope=tenant
+PASS  sign-in pilot-b-user: session from a verified identity (company=pilot-b)  -> 200 owner=False scope=None
+PASS  sign-in with an invalid token is refused  -> 401
+PASS  Jeevan is a GLOBAL owner of Technical
+PASS  Company-B owner is a COMPANY owner
+PASS  an ordinary Sail Admin is NOT an owner (role alone grants nothing)  -> {'userId': 'pilot-user-1', 'userName': 'Pilot User One', 'role': 'Sail Admin', 'company': 'pilot', 'issuer': 'technical-dev', 'owner': False, 'modules': [], 'scope': None, 'moduleLabels': {'technical': 'Technical', 'audi
+PASS  ordinary user cannot create an entry (403)  -> 403 {'error': 'You are not a knowledge owner for this module and scope.'}
+PASS  ordinary user cannot list entries (403)
+PASS  a change without the x-kb-request header is refused (403)  -> 403
+PASS  company owner cannot create a GLOBAL entry (403)  -> 403 You are not a knowledge owner for this module and scope.
+PASS  owner creates a draft  -> 200 6f64791f-259e-49c3-bf2e-fcf24a4d5282
+PASS  a DRAFT is never retrieved for ordinary users  -> []
+PASS  publish refused while a point still needs expert confirmation (409)  -> Not published: 1 point(s) still need expert confirmation. Confirm or remove them before publishing.
+PASS  preview: the owner's test question retrieves the draft  -> vector routing [{'module': 'Technical', 'manual': 'Technical - Knowledge: Resetting the Zeta-9 counter 193132', 'section': 'Draft preview, revision 1 (Expert-confirmed)', 'distance': 0.5666}]
+PASS  preview answer uses the draft guidance (7 seconds)  -> 1. As **Chief Engineer**, and only when the counter is **not in use**, open the Zeta-9 panel.
+2. Hold the green **RESET** key for **7 seconds**, until the displ
+PASS  while previewed, the draft is still invisible to ordinary users  -> []
+PASS  publish succeeds (revision 1)  -> 200 None
+PASS  published entry is retrieved and cited for an ordinary user  -> [{'module': 'Technical', 'manual': 'Technical - Knowledge: Resetting the Zeta-9 counter 193132', 'section': 'Knowledge entry, revision 1 (Expert-confirmed)', 'distance': 0.5197}]
+PASS  ordinary user's answer (widget tool loop) gives the published guidance: 7 seconds  -> 1. Ensure the Zeta-9 counter is **not in use**. This procedure is for **Chief Engineers** in both **Office and Ship**.
+2. Open the **Zeta-9 panel**.
+3. Hold the green **RESET** key for **7 seconds**, 
+PASS  the answer names the knowledge entry or its evidence  -> onds**, until the display shows **0000**.
+4. Record the reset in the **remarks**.
+
+Source: *Technical - Knowledge: Resetting the Zeta-9 counter 193132*, Knowledge entry, revision 1 (Expert-confirmed).
+PASS  editing a published entry starts revision 2 as a draft
+PASS  unpublished edit is not served: still 7 seconds  -> 1. Ensure you are the **Chief Engineer** and that counter **193132 is not in use**.
+2. Open the **Zeta-9** panel.
+3. Hold the green **RESET** key for **7 second
+PASS  a publish that fails validation is refused and says the previous version is still in use  -> 409 1 superseded passage(s) are no longer in the index or belong to another module. Remove them and pick again.
+PASS  after the failed publish revision 1 is still the served revision
+PASS  after the failed publish users still get revision 1 (7 seconds)  -> 1. Ensure the Zeta-9 counter is **not in use**.
+2. As **Chief Engineer**, open the **Zeta-9 panel**.
+3. Hold the green **RESET** key for **7 seconds**, until th
+PASS  revision 2 published  -> 200
+PASS  users now get revision 2 (9 seconds)  -> 1. Ensure the Zeta-9 counter is **not in use**. This applies in **Office and Ship** for the **Chief Engineer** role.
+2. Open the **Zeta-9 panel**.
+3. Hold the g
+PASS  rollback to revision 1 publishes it again as revision 3  -> 200 None
+PASS  after rollback users get the earlier content again (7 seconds)  -> 1. Ensure you are the **Chief Engineer** and the counter is **not in use**.
+2. Open the **Zeta-9** panel.
+3. Hold the green **RESET** key for **7 seconds**, unt
+PASS  history keeps all three revisions and the audit trail
+PASS  picked the manual passage the pilot actually cites for the probe question  -> {'module': 'Technical', 'manual': 'Technical - Recent Updates & Changed Behaviours (Operational) Notes', 'section': '1.1.14.9 Postponements Do Not Auto-Revert', 'distance': 0.8675} -> 1 chunk(s)
+PASS  before: both companies are given that passage
+PASS  company owner creates a COMPANY entry (scope = own company)  -> 200 None
+PASS  the global owner of another company cannot open it (404)
+PASS  company entry published  -> 200 None
+PASS  company B user: superseded passage no longer given  -> [{'module': 'Technical', 'manual': 'Technical - Knowledge: Company B postponement rule 193132', 'section': 'Knowledge entry, revision 1 (Expert-confirmed)', 'distance': 0.973}, {'module': 'Technical', 'manual': 'Technica
+PASS  company B user: company entry given  -> [{'module': 'Technical', 'manual': 'Technical - Knowledge: Company B postponement rule 193132', 'section': 'Knowledge entry, revision 1 (Expert-confirmed)', 'distance': 0.973}, {'module': 'Technical', 'manual': 'Technica
+PASS  other company: passage STILL given (company correction does not suppress it)  -> [{'module': 'Technical', 'manual': 'Technical - Recent Updates & Changed Behaviours (Operational) Notes', 'section': '1.1.14.9 Postponements Do Not Auto-Revert', 'distance': 0.8675}, {'module': 'Technical', 'manual': 'Te
+PASS  other company: company B's entry is never given  -> [{'module': 'Technical', 'manual': 'Technical - Recent Updates & Changed Behaviours (Operational) Notes', 'section': '1.1.14.9 Postponements Do Not Auto-Revert', 'distance': 0.8675}, {'module': 'Technical', 'manual': 'Te
+PASS  company entry retired
+PASS  after retire company B gets the manual passage again
+PASS  global entry superseding the same passage published  -> 200 None
+PASS  global supersede applies to company A
+PASS  global supersede applies to company B
+PASS  after retire both companies get the passage again
+PASS  retired entry is no longer retrieved  -> []
+PASS  an ordinary user's report creates a review item  -> 200 {'ok': True, 'id': '22c12125-b47e-4aa3-a782-e374c8a31d8c'}
+PASS  the report changed no knowledge entry
+PASS  the global owner sees reports from every company
+PASS  the company owner sees only their own company's reports
+PASS  an ordinary user cannot read the review queue (403)
+PASS  'Create entry from this' links the report to the new entry  -> [{'id': '22c12125-b47e-4aa3-a782-e374c8a31d8c', 'module': 'technical', 'tenant_domain': 'pilot', 'iss': 'technical-dev', 'question': 'harness question 193132', 'answer': 'harness answer', 'citations': [], 'note': 'the an
+PASS  a company owner cannot close another company's report  -> 404
+PASS  'RH' asked from Technical is answered from Technical  -> Technical vector routing
+PASS  'How do I update RH?' from Technical is answered from Technical (not 'not documented')  -> Technical vector routing
+PASS  an explicit Crewing question stays Crewing  -> Crewing explicit: module name in question
+
+58/58 passed

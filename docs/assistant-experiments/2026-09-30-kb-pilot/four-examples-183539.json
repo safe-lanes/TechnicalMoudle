@@ -1,0 +1,318 @@
+{
+ "at": "2026-09-30 18:33:51",
+ "cases": [
+  {
+   "question": "How to delete the jobs",
+   "title": "Deleting a job",
+   "must": [
+    "delete",
+    "trash",
+    "sail admin",
+    "hidden",
+    "work orders"
+   ],
+   "never": [
+    "change request steps as the answer"
+   ],
+   "before": {
+    "response": "The available documentation does not describe how to delete jobs. It only explains how to modify a job and submit the changes for approval.\n\nSource: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, section “HOW TO CREATE A NEW CHANGE REQUEST FOR JOBS,” p. 56; *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, “HOW TO EDIT OR DELETE THE RECORDS,” p. 46 (this deletion procedure applies to spares, not jobs).",
+    "tools": [
+     "search_module_docs"
+    ]
+   },
+   "seeded": 200,
+   "entryId": "5fb36c91-2c67-4254-b5f8-e6a29d1ae298",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "routing": "vector routing | cross-module: crewing 1.9.3.7 HOW TO DELETE VARIABLE TAS",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Deleting a job",
+      "section": "Draft preview, revision 1 (Code-verified)",
+      "distance": 0.9375
+     },
+     {
+      "module": "Crewing",
+      "manual": "Crewing - Crewing User Manual R2_10.06.2026",
+      "section": "1.9.3.7 HOW TO DELETE VARIABLE TASKS (p.86)",
+      "distance": 1.1458
+     }
+    ],
+    "response": "The supported method for deleting a Technical job is:\n\n1. In the **Office**, with the **Sail Admin** or **Client Admin** role, open the job so the **Job** form is displayed.\n2. Click the red **Delete** (trash) button at the top of the form. It is unavailable when the job is opened in **Modify** or **Edit** mode.\n3. Confirm the deletion in the **Delete Job** dialog.\n\nThe job is then hidden from normal **Office and Vessel** job views and cannot be restored through normal editing. Existing work orders and maintenance history are retained.\n\nThis is a **draft, code-verified** procedure. The Crewing excerpt describes deleting **variable tasks**, not Technical jobs.\n\n**Source:** Technical Knowledge, “Deleting a job — Draft preview, revision 1,” evidence: Code-verified."
+   },
+   "served": {
+    "publish": 200,
+    "response": "To delete a job:\n\n1. Open the job so its **Job** form is displayed, for example from the component’s job list.\n2. Click the red **Delete** (trash) button at the top of the form. This button is hidden in **Modify/Edit** mode.\n3. Confirm in the **Delete Job** dialog.\n\nThis is available in **Office** for **Sail Admin** and **Client Admin** users only. The job is hidden from normal Office and Vessel views and cannot be restored through normal editing. Existing work orders and maintenance history are retained.\n\nIf you only want to stop using the job while keeping it available to the office, use **Deactivate Job** instead. Active work orders continue to completion.\n\n*This procedure is from a code-verified knowledge entry, revision 1.*\n\nSource: **Technical - Knowledge: Deleting a job**, Knowledge entry, revision 1 (Code-verified).",
+    "tools": [
+     "search_module_docs"
+    ],
+    "routeOnlyCitations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Deleting a job",
+      "section": "Knowledge entry, revision 1 (Code-verified)",
+      "distance": 0.9002
+     },
+     {
+      "module": "Crewing",
+      "manual": "Crewing - Crewing User Manual R2_10.06.2026",
+      "section": "1.9.3.7 HOW TO DELETE VARIABLE TASKS (p.86)",
+      "distance": 1.1467
+     }
+    ],
+    "routeOnlyModule": "Technical"
+   }
+  },
+  {
+   "question": "How to deactivate any components",
+   "title": "Deactivating a component",
+   "must": [
+    "is active",
+    "no",
+    "save",
+    "jobs"
+   ],
+   "never": [
+    "edit component steps as the answer"
+   ],
+   "before": {
+    "response": "The available documentation does **not describe how to deactivate a component**. It only documents how to edit or modify component details:\n\n1. Select the vessel from the **Vessel** dropdown.\n2. Select the component.\n3. Click **Edit Component**.\n4. Modify the details.\n5. Click **Save**, then **Submit**.\n\nFor Office users, the documented workflow may instead be to select the component and submit a **Change Request** for approval. Neither procedure documents deactivation, so I cannot provide deactivation steps.\n\nSource: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, sections **1.1.4.4 HOW TO EDIT COMPONENTS** (p.25) and **TECHNICAL USER MANUAL** (p.56).",
+    "tools": [
+     "search_module_docs"
+    ]
+   },
+   "seeded": 200,
+   "entryId": "0925edf6-8a4f-4c83-b69d-60615303a9e7",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "routing": "vector routing",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Deactivating a component",
+      "section": "Draft preview, revision 1 (Manual-derived, Code-verified)",
+      "distance": 0.821
+     }
+    ],
+    "response": "To deactivate a component:\n\n1. In the **Office**, with edit permission, open the component in the **Component Register** and switch to **Edit**.\n2. Before saving:\n   - Deactivate or delete all active jobs linked to it.\n   - Deal with linked spares; active spares prevent deactivation.\n   - Deactivate its child components first.\n3. Set **Is Active** to **No (Inactive)**.\n4. Save.\n\nDeactivation is refused while active jobs or spares remain linked. The component is then no longer shown on the vessel, although open work orders continue.\n\n**Source:** *Deactivating a component* — Technical Knowledge entry, Draft preview revision 1; evidence: **Manual-derived, Code-verified** (not published)."
+   },
+   "served": {
+    "publish": 200,
+    "response": "To deactivate a component:\n\n1. In **Office**, open the component in the **Component Register** and select **Edit**. You need component edit permission.\n2. Before saving:\n   - Deactivate or delete all active jobs linked to the component.\n   - Resolve the linked spares; active linked spares can prevent deactivation.\n   - Deactivate the component’s child components first.\n3. Set **Is Active** to **No (Inactive)**.\n4. Save.\n\nThe component will no longer appear on the vessel. Existing open work orders continue.\n\nSource: **Technical - Knowledge: Deactivating a component**, Knowledge entry, revision 1 — Manual-derived, Code-verified.",
+    "tools": [
+     "search_module_docs"
+    ],
+    "routeOnlyCitations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Deactivating a component",
+      "section": "Knowledge entry, revision 1 (Manual-derived, Code-verified)",
+      "distance": 0.7927
+     }
+    ],
+    "routeOnlyModule": "Technical"
+   }
+  },
+  {
+   "question": "What are types of RH Counter type",
+   "title": "Running Hours (RH) counter types",
+   "must": [
+    "master",
+    "inherited",
+    "not rh driven"
+   ],
+   "never": [
+    "non-inherited"
+   ],
+   "before": {
+    "response": "The available documentation does not list different **RH Counter types**. It only describes RH as tracking the total operating hours of machinery components and shows how to update the values.\n\nTo update RH:\n\n1. Open **Running Hrs**.\n2. Select **+ Bulk Update RH**.\n3. Enter the date, comments, and present running-hour values for each component.\n4. Click **Save**.\n\nSource: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, Introduction (p.38), section 1.1.6.3 (p.39); *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, section 1.1.6.3 (p.33).",
+    "tools": [
+     "search_module_docs"
+    ]
+   },
+   "seeded": 200,
+   "entryId": "da93c14a-3cf4-4743-b6b5-20ea69306031",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "routing": "vector routing",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Running Hours (RH) counter types",
+      "section": "Draft preview, revision 1 (Code-verified)",
+      "distance": 0.6011
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "Introduction (p.32)",
+      "distance": 0.8546
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "Introduction (p.38)",
+      "distance": 0.9266
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - Recent Updates & Changed Behaviours (Operational) Notes",
+      "section": "1.1.14.3 Running Hours Never Move Backwards",
+      "distance": 0.9882
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "TECHNICAL USER MANUAL (p.34)",
+      "distance": 1.0254
+     }
+    ],
+    "response": "There are three RH counter types, applicable in both Office and Ship:\n\n1. **Master (RH Owner):** The component owns its RH counter. It appears on the Running Hrs page, and updates are passed to components that inherit from it.\n2. **Inherited (Uses Master Counter):** The component has no counter of its own. It uses the RH counter of a selected Master component on the same vessel.\n3. **Not RH Driven:** The component does not use running hours. This is the default; its RH fields are cleared, and no RH reading is required when completing a work order.\n\nThere is no separate “Non-inherited” type.\n\n**Source:** Running Hours (RH) counter types, Technical Knowledge entry — Code-verified, Draft preview revision 1 (not published), applicable to Office and Ship; *PMS User Manual_Vessel Specific*, Technical User Manual, p.34."
+   },
+   "served": {
+    "publish": 200,
+    "response": "There are **three RH Counter types**, applicable in both Office and Ship:\n\n1. **Master (RH Owner)**\n   - The component owns its running-hours counter.\n   - It appears on the **Running Hrs** page.\n   - Updates are passed to components that inherit its counter.\n\n2. **Inherited (Uses Master Counter)**\n   - The component has no separate counter.\n   - It uses the running hours of a selected **Master** component on the same vessel.\n   - Updates to the master are cascaded to its child components.\n\n3. **Not RH Driven**\n   - The component does not use running hours.\n   - Its RH fields are cleared.\n   - No RH reading is required when completing its work order.\n   - This is the default type.\n\nThere is no additional type such as “Non-inherited.”\n\n**Source:** *Technical - Knowledge: Running Hours (RH) counter types*, Knowledge entry, revision 1 (Code-verified).",
+    "tools": [
+     "search_module_docs"
+    ],
+    "routeOnlyCitations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Running Hours (RH) counter types",
+      "section": "Knowledge entry, revision 1 (Code-verified)",
+      "distance": 0.5737
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "Introduction (p.32)",
+      "distance": 0.8546
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "Introduction (p.38)",
+      "distance": 0.9266
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - Recent Updates & Changed Behaviours (Operational) Notes",
+      "section": "1.1.14.3 Running Hours Never Move Backwards",
+      "distance": 0.9882
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "TECHNICAL USER MANUAL (p.34)",
+      "distance": 1.0254
+     }
+    ],
+    "routeOnlyModule": "Technical"
+   }
+  },
+  {
+   "question": "What are RH validations available when updating RH",
+   "title": "Running Hours (RH) validations when updating RH",
+   "must": [
+    "lower",
+    "one update per day",
+    "25",
+    "future",
+    "earlier"
+   ],
+   "never": [
+    "does not list"
+   ],
+   "before": {
+    "response": "The available RH update validations are:\n\n1. **Previous Running Hours** — the bulk-update form displays the component’s previous RH for comparison.\n2. **Present Running Hours** — enter the current RH value for each component.\n3. **Meter Replaced?** — indicate whether the meter has been replaced.\n4. **Status** — the form displays the resulting update status.\n5. **Date Updated and Comments** — enter these for the RH update record.\n6. **Inherited RH components** — when updating a component with an Inherited RH type, the update is cascaded to all child components.\n\nThe manual does not describe additional validation rules, such as whether the present value must be greater than the previous value.\n\nSource: Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026, section 1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.39); Technical - PMS User Manual_Vessel Specific_R3_08.07.2026, sections 1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.33) and TECHNICAL USER MANUAL (p.34).",
+    "tools": [
+     "search_module_docs"
+    ]
+   },
+   "seeded": 200,
+   "entryId": "166cbec3-289c-43da-a7ca-e44203497520",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "routing": "vector routing",
+    "citations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Running Hours (RH) validations when updating RH",
+      "section": "Draft preview, revision 1 (Manual-derived, Code-verified)",
+      "distance": 0.5557
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "Introduction (p.32)",
+      "distance": 0.7857
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.39)",
+      "distance": 0.8039
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "TECHNICAL USER MANUAL (p.34)",
+      "distance": 0.8171
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS. (p.33)",
+      "distance": 0.8199
+     }
+    ],
+    "response": "Two supported ways to update RH are:\n\n### Single-component update\n\n1. Open **Running Hrs**, select the component’s **Gear** icon, enter the details, and save.\n2. The new reading:\n   - Cannot be lower than the latest RH value, except for a **meter replacement** or **renewal reset**.\n   - Cannot produce a negative result.\n3. A **date is required** and cannot be in the future.\n4. A reading of **zero requires renewal confirmation**.\n5. For a **meter replacement**, enter the old meter’s final reading.\n6. When the vessel’s RH validation is **ON**—the default, including when the setting has never been saved:\n   - The date cannot be earlier than the component’s last RH update.\n   - Only one update is allowed per component per day.\n   - The increase cannot exceed **25 hours per day** since the last update.\n   - A **Sail Admin** can override these three limits.\n7. RH is updated on **Master components**; inherited components take the Master’s value. The vessel manual also states that updates for components with an **Inherited RH** type cascade to child components.\n\n### Bulk update\n\n1. Open **Running Hrs**, select **+ Bulk Update RH**, enter the date, comments, and values for the components, then click **Save**.\n2. A **date is required**.\n3. A bulk update with a reading of **zero is refused**; use the individual update for zero and provide renewal confirmation.\n4. The general lower-reading and negative-result validations still apply. RH validation limits apply when the vessel’s RH validation is ON, as described above.\n\nThe validation entry is a **draft preview**, but it is marked **Manual-derived and Code-verified**.\n\n**Source:**\n- Single-component update: *Technical Knowledge: Running Hours (RH) validations when updating RH*, Validation rules (Draft preview, revision 1; Manual-derived, Code-verified); *Technical PMS User Manual_Vessel Specific*, “HOW TO UPDATE RUNNING HOURS,” pp. 33–34.\n- Bulk update: *Technical Knowledge: Running Hours (RH) validations when updating RH*, Validation rules (Draft preview, revision 1; Manual-derived, Code-verified); *Technical PMS User Manual For Office_Sail Admin*, “HOW TO UPDATE RUNNING HOURS,” p. 39; *Technical PMS User Manual_Vessel Specific*, “HOW TO UPDATE RUNNING HOURS,” p. 33."
+   },
+   "served": {
+    "publish": 200,
+    "response": "The available RH validations apply to both Office and Ship:\n\n1. **Reading cannot decrease:** The new reading cannot be lower than the latest RH value, unless you record a **meter replacement** or a **renewal reset**.\n2. **No negative values:** The resulting RH value cannot be negative.\n3. **Date required:** An individual RH update must include a date.\n4. **No future dates:** The update date cannot be in the future.\n5. **Back-dated updates:** When the vessel’s RH validation is **ON**—the default—the date cannot be earlier than the component’s last RH update.\n6. **One update per component per day:** With validation ON, only one update is allowed per component per day.\n7. **Maximum daily increase:** With validation ON, the increase cannot exceed **25 hours per day** from the previous update.\n8. **Sail Admin override:** A Sail Admin can override the back-date, same-day, and 25-hours-per-day limits.\n9. **Zero reading:** An individual reading of zero requires renewal confirmation.\n10. **Meter replacement:** A meter replacement requires the old meter’s final reading.\n11. **Bulk updates:** A date is required, and zero readings are refused in bulk updates; use an individual update for zero.\n12. **Component inheritance:** RH is updated on Master components; inherited components take the Master component’s value.\n\n**Source:** *Technical - Knowledge: Running Hours (RH) validations when updating RH*, “Knowledge entry, revision 1” (Manual-derived, Code-verified); *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, section 1.1.6.3, p.39; *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, section 1.1.6.3, p.33.",
+    "tools": [
+     "search_module_docs"
+    ],
+    "routeOnlyCitations": [
+     {
+      "module": "Technical",
+      "manual": "Technical - Knowledge: Running Hours (RH) validations when updating RH",
+      "section": "Knowledge entry, revision 1 (Manual-derived, Code-verified)",
+      "distance": 0.5519
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "Introduction (p.32)",
+      "distance": 0.7857
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026",
+      "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.39)",
+      "distance": 0.8039
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "TECHNICAL USER MANUAL (p.34)",
+      "distance": 0.8171
+     },
+     {
+      "module": "Technical",
+      "manual": "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026",
+      "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS. (p.33)",
+      "distance": 0.8199
+     }
+    ],
+    "routeOnlyModule": "Technical"
+   }
+  }
+ ]
+}

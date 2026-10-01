@@ -1,0 +1,214 @@
+{
+ "at": "2026-10-01 11:38:05",
+ "cases": [
+  {
+   "question": "How to delete the jobs",
+   "title": "Deleting a job",
+   "before": {
+    "response": "The available documentation does not describe how to delete **jobs**. It only documents modifying job details and submitting them for approval.\n\nSource: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, “HOW TO CREATE A NEW CHANGE REQUEST FOR JOBS” and “HOW TO ACCESS MODIFY PMS” (pp. 54, 56–57); *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, pp. 50.",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [
+      "trash",
+      "hidden",
+      "work order"
+     ],
+     "forbidden": []
+    }
+   },
+   "seeded": 200,
+   "entryId": "5fb36c91-2c67-4254-b5f8-e6a29d1ae298",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "toolsUsed": [
+     "search_module_docs"
+    ],
+    "path": "chatbot answer path (tool loop, documentation search)",
+    "response": "The available documentation describes deleting a **job**, not deleting individual work orders.\n\n1. Open the job so the **Job** form is displayed.\n2. Click the red **Delete** (trash) button at the top of the form. It is hidden in Modify/Edit mode.\n3. Confirm in the **Delete Job** dialog.\n\nThis is available in **Office** to **Sail Admin** and **Client Admin** users only. Deleting the job hides it from normal Office and Vessel views, but its existing work orders and maintenance history are retained.\n\nIf you only want to stop using the job while keeping it available to the office, use **Deactivate Job** instead: open the component in the Component Register, click the red icon beside the job in the Jobs table, and confirm.\n\n**Source:** *Technical - Knowledge: Deleting a job*, “Draft preview, revision 2 (Code-verified)” — draft, not published.",
+    "check": {
+     "missing": [],
+     "forbidden": []
+    }
+   },
+   "served": {
+    "response": "1. Open the job so its **Job** form is displayed, for example from the component’s job list.\n2. Click the red **Delete** (trash) button at the top of the form. This button is hidden when the job is in **Modify/Edit** mode.\n3. Confirm the deletion in the **Delete Job** dialog.\n\nOnly **Sail Admin** and **Client Admin** users can delete jobs, and the procedure applies in **Office**. Deleted jobs are hidden from normal Office and Vessel job views and cannot normally be restored. Existing work orders and maintenance history remain available.\n\nIf you only want to stop using the job while keeping it available to the office, use **Deactivate Job** instead: open the component in the Component Register, click the red icon beside the job in the Jobs table, and confirm.\n\nSource: **Technical - Knowledge: Deleting a job**, Knowledge entry, revision 2 (Code-verified).",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [],
+     "forbidden": []
+    },
+    "routeOnlyCitations": [
+     "Technical - Knowledge: Deleting a job — Knowledge entry, revision 2 (Code-verified)",
+     "Crewing - Crewing User Manual R2_10.06.2026 — 1.9.3.7 HOW TO DELETE VARIABLE TASKS (p.86)"
+    ]
+   }
+  },
+  {
+   "question": "How to deactivate any components",
+   "title": "Deactivating a component",
+   "before": {
+    "response": "The available documentation does **not describe how to deactivate a component**. It only documents:\n\n1. Select a vessel and component.\n2. Click **Edit Component**.\n3. Modify the component details.\n4. Click **Save**, then **Submit**.\n\nFor change requests, users can edit component details and click **Submit Change Request**. The change-request screen is available only to the **HOD**; it is not available to a **Vessel User**.\n\nSource: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, sections **1.1.4.1 How To Access Components** (p.16) and **1.1.4.4 How To Edit Components** (p.25); *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, section **TECHNICAL USER MANUAL** (p.49) and **1.1.10.1 HOW TO ACCESS MODIFY PMS** (p.47).",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [
+      "is active",
+      "job"
+     ],
+     "forbidden": []
+    }
+   },
+   "seeded": 200,
+   "entryId": "0925edf6-8a4f-4c83-b69d-60615303a9e7",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "toolsUsed": [
+     "search_module_docs"
+    ],
+    "path": "chatbot answer path (tool loop, documentation search)",
+    "response": "To deactivate a component:\n\n1. In the **Office** application, open the **Component Register** and select the vessel.\n2. Select the component and click **Edit Component**.\n3. Set **Is Active** to **No (Inactive)**.\n4. Save and submit the change.\n\nBefore deactivating it:\n\n- Deactivate or delete all active jobs linked to the component; otherwise, the system may refuse the deactivation.\n- Handle any spares linked to the component.\n- Deactivate child components first and verify that they are inactive.\n- You need component edit permission.\n\nA component deactivated in Office is no longer shown on the vessel. Existing open work orders continue.\n\nThis procedure comes from a **draft, code-verified knowledge entry**; the published manual documents editing and saving components but does not explicitly document deactivation.\n\nSource: **Technical - Knowledge: Deactivating a component**, “Deactivating a component,” Draft preview, revision 2; **Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026**, section 1.1.4.4 “HOW TO EDIT COMPONENTS,” p.25.",
+    "check": {
+     "missing": [],
+     "forbidden": []
+    }
+   },
+   "served": {
+    "response": "You can deactivate components in the **Office** application if you have component edit permission:\n\n1. Open the component in the **Component Register** and select **Edit**.\n2. Set **Is Active** to **No (Inactive)**.\n3. Save the component.\n\nBefore deactivating it:\n\n- Deactivate or delete all active jobs linked to the component; otherwise, deactivation may be refused.\n- Deal with any spares linked to the component.\n- Deactivate its child components first. Verify this yourself—the application may not prevent deactivation while a child component remains active.\n\nA component deactivated in Office is no longer shown on the vessel. Existing open work orders continue.\n\nThis procedure is from a **Knowledge** entry that updates the manual, with **Manual-derived, Code-verified** evidence.\n\nSource: Technical - Knowledge: Deactivating a component, Knowledge entry revision 2 (Manual-derived, Code-verified).",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [],
+     "forbidden": [
+      "(refus|block|prevent|stop)\\w*[^.]{0,60}(child|sub-?component)"
+     ]
+    },
+    "routeOnlyCitations": [
+     "Technical - Knowledge: Deactivating a component — Knowledge entry, revision 2 (Manual-derived, Code-verified)"
+    ]
+   }
+  },
+  {
+   "question": "What are types of RH Counter type",
+   "title": "Running Hours (RH) counter types",
+   "before": {
+    "response": "The available documentation does not describe the types of **RH Counter type**. It only explains that Running Hours track total machinery operating hours and can be updated individually or through **Bulk Update RH**.\n\nSource: *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, Introduction (p.38); section 1.1.6.3 (p.39).",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [
+      "master",
+      "inherited",
+      "not rh driven"
+     ],
+     "forbidden": []
+    }
+   },
+   "seeded": 200,
+   "entryId": "da93c14a-3cf4-4743-b6b5-20ea69306031",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "toolsUsed": [
+     "search_module_docs"
+    ],
+    "path": "chatbot answer path (tool loop, documentation search)",
+    "response": "There are **three RH Counter types**:\n\n1. **Master (RH Owner)**  \n   Owns its own running-hours counter and appears on the **Running Hrs** page. When its RH is updated, the increase is also applied to linked **Inherited** components.\n\n2. **Inherited (Uses Master Counter)**  \n   Does not have its own counter. It uses the RH of a linked Master component on the same vessel.\n\n3. **Not RH Driven**  \n   Does not use running hours. This is the default type; its RH fields are cleared, and no RH reading is required when completing its work orders.\n\nThere is no separate **“Non-inherited”** counter type.\n\nSource: **Technical - Knowledge: Running Hours (RH) counter types**, “Draft preview, revision 2 (Code-verified)” — evidence: Code-verified, draft/unpublished.",
+    "check": {
+     "missing": [],
+     "forbidden": []
+    }
+   },
+   "served": {
+    "response": "There are **three RH counter types**:\n\n1. **Master (RH Owner)**  \n   The component owns its own running-hours counter. It appears on the **Running Hrs** page. When its RH is updated, the increase is also applied to linked Inherited components.\n\n2. **Inherited (Uses Master Counter)**  \n   The component does not have its own counter. It uses the RH value of a linked Master component on the same vessel.\n\n3. **Not RH Driven**  \n   The component does not use running hours. This is the default type; its RH fields are cleared, and no RH reading is required when completing its work order.\n\nThere is no separate “Non-inherited” counter type.\n\nSource: *Technical - Knowledge: Running Hours (RH) counter types*, “Knowledge entry, revision 2 (Code-verified)”.",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [],
+     "forbidden": []
+    },
+    "routeOnlyCitations": [
+     "Technical - Knowledge: Running Hours (RH) counter types — Knowledge entry, revision 2 (Code-verified)",
+     "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.32)",
+     "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.38)",
+     "Technical - Recent Updates & Changed Behaviours (Operational) Notes — 1.1.14.3 Running Hours Never Move Backwards",
+     "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.39)"
+    ]
+   }
+  },
+  {
+   "question": "What are RH validations available when updating RH",
+   "title": "Running Hours (RH) validations when updating RH",
+   "before": {
+    "response": "The documentation describes two RH update methods:\n\n1. **Bulk update — Ship and Office**\n   1. Open **Running Hrs**.\n   2. Select **+ Bulk Update RH**.\n   3. Enter the **Date**, **Comments**, and the corresponding RH **Values** for each component.\n   4. Select **Save** to save all changes.\n   5. In the Office form, the table also shows **Previous Running Hours**, **Present Running Hours**, **Meter Replaced?**, and **Status**.\n\n2. **Single-component update — Ship**\n   1. In the Running Hours overview, select the component’s **Gear** icon.\n   2. Enter the required details.\n   3. Select **Save**.\n   4. For components with an **Inherited RH** type, the update is cascaded to all child components.\n\nThe excerpts do not specify additional validation rules, such as whether the new value must be higher than the previous RH or how meter replacement affects validation.\n\n**Source:** *Technical - PMS User Manual_Vessel Specific_R3_08.07.2026*, sections **1.1.6.3 HOW TO UPDATE RUNNING HOURS** (pp. 33–34); *Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026*, section **1.1.6.3 HOW TO UPDATE RUNNING HOURS** (p. 39).",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [
+      "lower",
+      "(one|1) (update|reading)[^.]{0,30}(per|a|each) day",
+      "25",
+      "earlier",
+      "future"
+     ],
+     "forbidden": [
+      "inherited[^.]{0,80}cascad\\w*[^.]{0,40}child"
+     ],
+     "future_without_screen_qualifier": []
+    }
+   },
+   "seeded": 200,
+   "entryId": "166cbec3-289c-43da-a7ca-e44203497520",
+   "preview": {
+    "status": 200,
+    "draftRetrieved": true,
+    "toolsUsed": [
+     "search_module_docs"
+    ],
+    "path": "chatbot answer path (tool loop, documentation search)",
+    "response": "The following RH validations are available when updating running hours. They apply in both **Office and Ship**:\n\n1. **Reading cannot decrease:** The new reading cannot be lower than the latest RH value. Exceptions are a meter replacement or a renewal reset.\n2. **No negative result:** The resulting RH value cannot be negative.\n3. **Date validation:** On the Update RH screen, a date is required and cannot be in the future.\n4. **Backdated updates:** When RH validation is enabled, the update date cannot be earlier than the component’s last RH update.\n5. **One update per day:** When validation is enabled, only one update per component is allowed per day.\n6. **Maximum daily increase:** When validation is enabled, the increase cannot exceed **25 hours per day** from the previous update.\n7. **Sail Admin override:** A Sail Admin can override the backdate, same-day, and 25-hour daily-increase limits.\n8. **Zero reading:** A zero reading requires confirmation that it is a renewal.\n9. **Meter replacement:** A meter replacement requires the old meter’s final reading.\n10. **Bulk Update RH:** A date is required, and zero readings are refused in bulk updates. Use the individual update for a zero/renewal reading.\n11. **Master components:** RH is updated on the Master component, and the increase is also applied to linked Inherited components.\n\nThe RH validation setting is **ON by default**, including when the vessel’s setting has never been saved.\n\n**Source:** *Technical - Knowledge: Running Hours (RH) validations when updating RH*, “Draft preview, revision 2” — Manual-derived, Code-verified; **draft preview, not published**.",
+    "check": {
+     "missing": [],
+     "forbidden": [],
+     "future_without_screen_qualifier": []
+    }
+   },
+   "served": {
+    "response": "The available RH validations are:\n\n1. **Reading cannot decrease**\n   - The new reading cannot be lower than the component’s latest RH value.\n   - Exceptions: **meter replacement** or **renewal reset**.\n   - The result cannot be negative.\n\n2. **Date validation on the Update RH screen**\n   - A date is required.\n   - The date cannot be in the future.\n   - When RH validation is ON, the date cannot be earlier than the component’s last RH update.\n\n3. **Daily update limits when vessel RH validation is ON**\n   - Only one update per component per day is allowed.\n   - The increase cannot exceed **25 hours per day**.\n   - RH validation is ON by default, including when the vessel setting has never been saved.\n   - A **Sail Admin** can override these three limits.\n\n4. **Zero-reading validation**\n   - A reading of zero requires confirmation that the meter is being renewed.\n   - Bulk Update RH refuses zero readings; use the individual update instead.\n\n5. **Meter replacement validation**\n   - A meter replacement requires the old meter’s final reading.\n\nThese validations apply in both **Office and Ship**. RH is updated on Master components, and the increase is also applied to linked Inherited components.\n\n**Source:** Technical - Knowledge: Running Hours (RH) validations when updating RH, “Knowledge entry, revision 2” (Manual-derived, Code-verified); Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026, section 1.1.6.3, p.39; Technical - PMS User Manual_Vessel Specific_R3_08.07.2026, section 1.1.6.3, p.33.",
+    "tools": [
+     "search_module_docs"
+    ],
+    "check": {
+     "missing": [],
+     "forbidden": [],
+     "future_without_screen_qualifier": [
+      "- the date cannot be in the future."
+     ]
+    },
+    "routeOnlyCitations": [
+     "Technical - Knowledge: Running Hours (RH) validations when updating RH — Knowledge entry, revision 2 (Manual-derived, Code-verified)",
+     "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — Introduction (p.32)",
+     "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — 1.1.6.3 HOW TO UPDATE RUNNING HOURS (p.39)",
+     "Technical - PMS User Manual_Vessel Specific_R3_08.07.2026 — 1.1.6.3 HOW TO UPDATE RUNNING HOURS. (p.33)",
+     "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026 — Introduction (p.38)"
+    ]
+   }
+  },
+  {
+   "question": null,
+   "title": "Updating the running hours of one component (Gear icon)",
+   "seeded": 200,
+   "entryId": "f0dc223c-7f4d-4a43-971a-04520ac5388f"
+  }
+ ]
+}

@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from . import agent, chat, db, llm, retrieval
+from . import agent, chat, db, kb_routes, llm, retrieval
 from .config import settings
 from .identity import peek_issuer, verify_identity
 
@@ -23,10 +23,13 @@ def prompt_record() -> dict[str, str]:
     fixed dummy routing, and the tool-loop instructions). Any wording change changes the hash."""
     sys_text, _ = retrieval.docs_prompt("Q", retrieval.Routed("answer", hits=[db.Hit(meta={"file": "F.pdf", "breadcrumb": "F > S"}, text="T", distance=0.5, module="technical")], module="technical"))
     h1 = hashlib.sha256(sys_text.encode()).hexdigest()[:16]
-    h2 = hashlib.sha256(agent.TOOL_LOOP_INSTRUCTIONS.encode()).hexdigest()[:16]
+    loop_text = agent.tool_loop_instructions("{module}") if settings().kb_rules_on else agent.TOOL_LOOP_INSTRUCTIONS
+    h2 = hashlib.sha256(loop_text.encode()).hexdigest()[:16]
     return {"version": agent.PROMPT_VERSION, "docsPromptSha": h1, "toolLoopPromptSha": h2, "combined": hashlib.sha256((h1 + h2).encode()).hexdigest()[:16]}
 
 app = FastAPI(title="SAIL AI Assistant", docs_url=None, redoc_url=None, openapi_url=None)
+# Knowledge management (30-Sep-2026): /kb (owner screen + API) and /feedback (review items from chat users).
+app.include_router(kb_routes.router)
 
 # 24-Sep-2026: module-instance registry hygiene, printed once at import/startup. Instances that reuse a signing key
 # or a secret, or whose signing key equals the shared documentation key, are REJECTED (dropped) by settings().

@@ -105,6 +105,23 @@ class Settings(BaseSettings):
 
     identity_clock_leeway_sec: int = 90
 
+    # ── knowledge management (30-Sep-2026, owner brief; pilot only until approved) ──────────────────────────────
+    # Knowledge TRAINERS (1-Oct-2026) are not configured here: they are grants in the assistant database (table
+    # kb_trainers, managed with `python -m app.kb_admin`), per module, matched on issuer + company + user id, so a grant
+    # or a revocation takes effect on the next request without a restart. Chat access is unchanged (module policy).
+    assistant_kb_session_hours: int = 8
+    # Answer-prompt rules for knowledge entries and missing evidence ("on" in the pilot). Off = prompts unchanged.
+    assistant_kb_rules: str = "off"
+    # Module context (Step 5, 30-Sep-2026): when the question names no module, the module the user is working in wins
+    # if its nearest passage is within this distance of the overall nearest (resolves 'RH' = Running Hours in Technical,
+    # Rest Hours in Crewing). A question that names another module keeps that module. 0 = off (served behaviour).
+    assistant_context_module_gap: float = 0.0
+    # Module glossary (30-Sep-2026): per-module abbreviations expanded in the SEARCH text only, when the question names
+    # no other module — {"technical":{"RH":"Running Hours"},"crewing":{"RH":"Rest Hours"}}. PROVEN need on the pilot:
+    # the Technical manuals say "Running Hours", so 'RH' questions fell under the relevance floor or drifted to Crewing.
+    # "{}" = off (served behaviour). The user's question itself is passed to the answer unchanged.
+    assistant_module_glossary: str = "{}"
+
     # ── derived ─────────────────────────────────────────────────────────────
     @property
     def sqlalchemy_url(self) -> str:
@@ -129,6 +146,25 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return sorted(_csv(self.assistant_cors_origins))
+
+    @property
+    def module_glossary(self) -> dict[str, dict[str, str]]:
+        """ASSISTANT_MODULE_GLOSSARY as {module: {ABBREV: expansion}}; anything malformed is ignored."""
+        try:
+            v = json.loads(self.assistant_module_glossary or "{}")
+        except json.JSONDecodeError:
+            return {}
+        out: dict[str, dict[str, str]] = {}
+        for mod, terms in (v.items() if isinstance(v, dict) else []):
+            if isinstance(terms, dict):
+                clean = {str(a).strip(): str(f).strip() for a, f in terms.items() if str(a).strip() and str(f).strip()}
+                if clean:
+                    out[str(mod).lower()] = clean
+        return out
+
+    @property
+    def kb_rules_on(self) -> bool:
+        return self.assistant_kb_rules.lower() == "on"
 
     @property
     def module_apis(self) -> dict[str, dict[str, Any]]:

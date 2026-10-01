@@ -1,0 +1,77 @@
+PASS  Technical trainer 1 sees only Technical  -> ['technical']
+PASS  Technical trainer 2 (second trainer of the same module) sees Technical  -> ['technical']
+PASS  Crewing trainer sees only Crewing  -> ['crewing']
+PASS  ordinary Sail Admin is not a trainer (role alone grants nothing)
+PASS  same user id in ANOTHER company inherits nothing
+PASS  same user id and company in ANOTHER environment (prod) inherits nothing
+PASS  a ship identity cannot open the knowledge screen (shore-only)  -> 403 {'error': 'Knowledge management is available in the office application only.'}
+PASS  widget eligibility: Technical trainer → technical  -> {'trainer': True, 'modules': ['technical']}
+PASS  widget eligibility: ordinary Sail Admin → none (icon hidden)
+PASS  ordinary user cannot create an entry (403)  -> 403 You are not a knowledge trainer for this module, scope and environment.
+PASS  Technical trainer cannot create a Crewing entry (403)  -> 403 You are not a knowledge trainer for this module, scope and environment.
+PASS  Crewing trainer cannot create a Technical entry (403)  -> 403 You are not a knowledge trainer for this module, scope and environment.
+PASS  company-scope trainer cannot publish for all companies (403)  -> 403 You are not a knowledge trainer for this module, scope and environment.
+PASS  a change without the x-kb-request header is refused (403)  -> 403
+PASS  sign-in with an invalid token is refused  -> 401
+PASS  trainer 1 creates a draft (environment dev)  -> 200 f15ba609-59dd-4f60-a7da-c93a58c2f215
+PASS  a DRAFT is never retrieved for an ordinary user
+PASS  publish refused while a point still needs expert confirmation (409)  -> Not published: 1 point(s) still need expert confirmation. Confirm or remove them before publishing.
+PASS  Test draft goes through the chatbot's tool loop (search_module_docs) and uses the draft  -> ['search_module_docs'] True
+PASS  Test draft answer follows the draft (7 seconds)  -> 1. Ensure you are the **Chief Engineer** and that counter 105855 is **not in use**. This applies in both **Office and Ship**.
+2. Open the **
+PASS  while being tested, the draft is invisible in an ordinary user's chatbot answer  -> The available module documentation does not describe how to reset the Zeta-9 counter 105855.
+
+Source: Not documented in the available SAIL m
+PASS  the SECOND Technical trainer can publish trainer 1's entry (revision 1)  -> 200 None
+PASS  published entry is retrieved and cited for an ordinary user
+PASS  ordinary user's chatbot answer gives the published guidance (7 seconds) and names the entry  -> onds**, until the display shows **0000**.
+4. Record the reset in the **remarks**.
+
+Source: *Technical - Knowledge: Resetting the Zeta-9 counter 105855*, Knowledge entry, revision 1 (Expert-confirmed).
+PASS  editing a published entry starts revision 2 as a draft
+PASS  unpublished edit is not served: still 7 seconds  -> 1. Ensure you are a **Chief Engineer** and that counter **105855 is not in use**. This applies in both **Office and Ship**.
+2. Open the **Ze
+PASS  a publish that fails validation is refused  -> 409 1 superseded passage(s) are no longer in the index or belong to another module. Remove them and pick again.
+PASS  after the failed publish revision 1 is still served
+PASS  revision 2 published  -> 200
+PASS  users now get revision 2 (9 seconds)
+PASS  rollback to revision 1 publishes it again as revision 3  -> 200 None
+PASS  after rollback users get the earlier content again (7 seconds)
+PASS  history keeps all three revisions and the audit trail
+PASS  a dev entry is NOT served to the same company's production users
+PASS  the dev trainer's session on production cannot read or change the dev entry
+PASS  a trainer without the share grant cannot create guidance shared by all environments (403)  -> 403 You are not a knowledge trainer for this module, scope and environment.
+PASS  the share-granted trainer creates guidance explicitly shared by all environments ('*')  -> 200 None
+PASS  shared guidance reaches dev users
+PASS  shared guidance reaches production users
+PASS  a non-share trainer can read the shared entry but not change it
+PASS  after retire the shared guidance is gone in both environments
+PASS  picked the manual passage the pilot actually cites for the probe question  -> 1.1.14.9 Postponements Do Not Auto-Revert -> 1 chunk(s)
+PASS  company trainer creates a COMPANY entry (own company, dev)  -> 200 None
+PASS  the global trainer of another company cannot open it (404)
+PASS  company B: superseded passage no longer given, company entry given  -> [{'module': 'Technical', 'manual': 'Technical - Knowledge: Company B postponement rule 105855', 'section': 'Knowledge entry, revision 1 (Expert-confirmed)', 'distance': 0.9113}, {'module': 'Technical', 'manual': 'Technic
+PASS  other company keeps the passage and never gets company B's entry  -> [{'module': 'Technical', 'manual': 'Technical - Recent Updates & Changed Behaviours (Operational) Notes', 'section': '1.1.14.9 Postponements Do Not Auto-Revert', 'distance': 0.8675}, {'module': 'Technical', 'manual': 'Te
+PASS  company B's production users are unaffected (dev entry)
+PASS  after retire company B gets the manual passage again
+PASS  global supersede (dev) applies to company A and company B
+PASS  a dev supersede does not hide the passage in production
+PASS  revision 2 without the supersede: the passage is back
+PASS  rollback to revision 1 restores its supersede: the passage is hidden again
+PASS  retire restores the passage for both companies
+PASS  ordinary users' reports create review items
+PASS  the reports changed no knowledge entry
+PASS  both Technical trainers get the company-A report
+PASS  global Technical trainers also get company B's report; the company-B trainer only company B's
+PASS  a production report does not reach dev trainers
+PASS  the Crewing trainer does not get Technical reports
+PASS  an ordinary user cannot read the review queue (403)
+PASS  'Create entry from this' links the report to the new entry
+PASS  a company trainer cannot close another company's report
+FAIL  after revocation, trainer 2's already-open session is refused (403)  -> revoked 1 grant(s) / 404 Knowledge entry not found.
+PASS  …and trainer 2 no longer sees the module
+PASS  re-granting restores access in the same session
+PASS  'RH' asked from Technical is answered from Technical
+PASS  an explicit Crewing question stays Crewing
+PASS  retired entry is no longer retrieved
+
+67/68 passed  (run 105855)

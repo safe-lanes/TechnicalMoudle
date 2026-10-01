@@ -161,7 +161,7 @@ class ManifestToolset(AbstractToolset[Deps]):
         deps.tools_used.append(name)
         args = deps.masker.unmask_json(tool_args) if deps.masker else tool_args  # G4
         if name == "search_module_docs":
-            result: Any = await search_docs_tool(str(args.get("query") or ""), deps.masker)
+            result: Any = await search_docs_tool(str(args.get("query") or ""), deps.masker, deps.ui_module)
         else:
             try:
                 out = await asyncio.wait_for(
@@ -295,7 +295,8 @@ class LoopResult:
 #      15-Sep) until measured on all suites and approved. Wording is hashed at import so /health shows what is running.
 def _prompt_version() -> str:
     from .config import settings
-    return "v6-evidence-rules-2026-09-18" if settings().assistant_docs_prompt.lower() == "v6" else "v5-plain-coverage-2026-09-15"
+    base = "v6-evidence-rules-2026-09-18" if settings().assistant_docs_prompt.lower() == "v6" else "v5-plain-coverage-2026-09-15"
+    return base + "+kb-rules-2026-09-30" if settings().kb_rules_on else base
 
 
 class _PV(str):
@@ -305,6 +306,13 @@ class _PV(str):
 
 
 PROMPT_VERSION = _PV()
+
+
+def tool_loop_instructions(module: str) -> str:
+    """The tool-loop system text; the knowledge-management rules are appended only when ASSISTANT_KB_RULES=on."""
+    from .retrieval import KB_ANSWER_RULES
+    text = TOOL_LOOP_INSTRUCTIONS.format(module=module)
+    return text + " " + KB_ANSWER_RULES if settings().kb_rules_on else text
 
 TOOL_LOOP_INSTRUCTIONS = (
     "You are the SAIL Maritime PMS assistant for the {module} module. "
@@ -417,7 +425,7 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     deps = Deps(masker=masker, ui_module=ui_module, identity_token=identity_token, started_at=time.monotonic(), instance=instance)
     token = current_masker.set(masker)
     try:
-        agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=TOOL_LOOP_INSTRUCTIONS.format(module=ui_module),
+        agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=tool_loop_instructions(ui_module),
                                         toolsets=[ManifestToolset(manifest_tools)], model_settings=_tool_loop_settings(), retries=0)
         result = await agent.run(message, deps=deps, message_history=history or None)
     finally:

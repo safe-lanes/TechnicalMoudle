@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Trash2, Bot } from "lucide-react";
+import { X, Send, Trash2, Bot, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatMessage, ChatLoadingIndicator } from "./ChatMessage";
 import { SuggestedPrompts } from "./SuggestedPrompts";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useChat";
+import { knowledgeEligibility, openKnowledgeManager } from "@/assistant-widget/assistantClient";
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -27,6 +28,15 @@ export function ChatPanel({
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // 1-Oct-2026: the "Manage knowledge" icon is shown only to knowledge trainers, as decided by the central assistant
+  // from the signed identity; checked once per page when the panel is first opened. Display only — the server checks again.
+  const [isTrainer, setIsTrainer] = useState(false);
+  const checkedRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen || checkedRef.current) return;
+    checkedRef.current = true;
+    knowledgeEligibility().then((r) => setIsTrainer(r.trainer));
+  }, [isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -73,6 +83,22 @@ export function ChatPanel({
             <h2 className="font-semibold text-sm" data-testid="text-chat-title">PMS Assistant</h2>
           </div>
           <div className="flex items-center gap-1">
+            {/* 30-Sep-2026: the knowledge screen decides server-side whether this user may change anything */}
+            {isTrainer && (
+            <Button
+              size="icon"
+              variant="ghost"
+              title="Manage knowledge"
+              aria-label="Manage knowledge"
+              onClick={() => {
+                openKnowledgeManager().catch((e) => console.warn("[assistant] knowledge screen:", e?.message || e));
+              }}
+              className="text-primary-foreground no-default-hover-elevate"
+              data-testid="button-manage-knowledge"
+            >
+              <BookOpen className="h-4 w-4" />
+            </Button>
+            )}
             {messages.length > 0 && (
               <Button
                 size="icon"
