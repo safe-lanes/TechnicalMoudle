@@ -38,7 +38,8 @@ VESSEL_MANUAL_GEAR = "3e5bd2bb5b823ac7f7aeaabaff607b9af272a0c3"   # Vessel manua
 ENTRIES: list[dict[str, Any]] = [
     {
         "question": "How to delete the jobs",
-        "check": {"must": [r"delete", r"trash", r"sail admin", r"hidden", r"work order"], "never": []},
+        "check": {"must": [r"delete", r"trash", r"sail admin", r"hidden", r"work order"],
+                  "never": [r"only[^.]{0,40}(sail admin|client admin)[^.]{0,40}(can|may|are able)", r"(can|may) (only )?be deleted (only )?by"]},
         "draft": {
             "module": "technical", "kind": "procedure", "scope": "global", "title": "Deleting a job",
             "body": (
@@ -50,13 +51,13 @@ ENTRIES: list[dict[str, Any]] = [
                 "What happens: the job is hidden from the normal Office and Vessel job views and cannot be restored through "
                 "normal editing. Its existing work orders and maintenance history are kept and still appear in the work orders "
                 "list.\n\n"
-                "Who can do it: the Delete button is shown to Sail Admin and Client Admin users only.\n\n"
+                "The Delete button is available to Sail Admin and Client Admin users.\n\n"
                 "Deactivate instead of delete: to stop using a job while keeping it available to the office, use Deactivate "
                 "Job. In the Component Register, open the component, click the red icon next to the job in its Jobs table and "
                 "confirm. The job no longer appears for vessel and department users; any active work orders for it continue "
                 "to completion.\n\n"
                 "Modify PMS change requests have no change type for deleting a job."),
-            "appliesTo": {"userTypes": ["Office"], "roles": ["Sail Admin", "Client Admin"], "conditions": "", "appVersion": ""},
+            "appliesTo": {"userTypes": ["Office"], "roles": [], "conditions": "", "appVersion": ""},
             "evidence": [
                 {"cls": "code", "reference": "client/src/pages/pms/JobsFormPage.tsx:1032-1041", "note": "Delete button; shown to Sail Admin / Client Admin; hidden in Modify/Edit mode (screen rule)"},
                 {"cls": "code", "reference": "client/src/pages/pms/JobsFormPage.tsx:1971-1973", "note": "Delete Job dialog text"},

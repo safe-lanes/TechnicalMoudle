@@ -9,8 +9,12 @@ Two parts:
 **How training works (decided 1 Oct 2026):**
 - Trainers are **SAIL staff**.
 - A trainer trains **one module** (for example Technical) for **all clients**.
-- Training is done on **dev**. There is **one assistant** for dev and production, so a **Publish is live for all clients
-  in dev and production at once**.
+- Training is done on **dev**. There is **one assistant** for dev and production.
+- **Publishing for all clients and environments is a policy we chose, not a technical necessity.** The assistant can keep
+  guidance separate per company or environment; we decided not to. So **"Publish for all clients and environments"
+  makes the guidance available to the chatbot for every client, in dev and production, at once**.
+- **This pilot is isolated.** It has its own copy of the chatbot's documents and its own service, and nothing published
+  in it reaches the real production chatbot.
 
 ---
 
@@ -18,14 +22,19 @@ Two parts:
 
 ### How the system knows who is a trainer
 
-- **The trainer list:** the assistant keeps it on the AI server. Each row holds a **user id**, a name, a company, a
-  module, and active/inactive.
-- **The check:** when someone opens "Manage knowledge" from the chatbot, PMS tells the assistant who is logged in. This
-  is the SAILERP user id from the signed login, and it cannot be faked in the browser. The assistant looks that id up in
-  the list. If an **active** row exists for a module, the person can train that module; otherwise they are refused.
+- **The trainer list:** the assistant keeps it on the AI server. Each row holds:
+  - the **issuer**, i.e. the application instance the trainer signs in through (for training: the dev instance);
+  - the **company** they log in with;
+  - the **user id**;
+  - a name, a module, and active/inactive.
+- **The check:** when someone opens "Manage knowledge" from the chatbot, PMS sends the assistant a signed note naming
+  the issuer, the company and the SAILERP user id from the verified login. None of these can be faked in the browser.
+  The assistant looks up a row where **issuer + company + user id all match**. If an **active** row exists for a module,
+  the person can train that module; otherwise they are refused.
+- **What gets nothing:**
+  - the same user id in another company;
+  - the same user id through another environment (issuer).
 - **Roles:** no role is involved. Being a Sail Admin does not make someone a trainer.
-- **Matching:** the user id **and** the company they log in with must match, so the same id in another company gets
-  nothing.
 - **When changes apply:** adding, deactivating or reactivating applies on the trainer's **next click**, even in a screen
   that is already open. The history of every change is kept.
 
@@ -80,14 +89,26 @@ The PMS server logs it each time the person opens the chatbot: `[assistant-api] 
 2. Write the guidance in plain steps. Add who it applies to, the supporting **evidence** (Manual-derived,
    Code-verified, Expert-confirmed) and any **points needing expert confirmation**.
 3. **Save draft.** It keeps your changes; nobody else sees a draft.
-4. **Test draft.** Type the question as a user would. The chatbot answers **the same way it answers users**, but with
-   your draft in place. Only you see this test. The green line tells you whether your draft was used.
-5. **Publish.** This revision becomes the chatbot's answer for **all clients, in dev and production, at once**.
-   Publishing is refused while a point still needs confirmation.
+4. **Test draft.** Type the question as a user would. The chatbot answers the way it answers users' **documentation
+   ("how do I…") questions**, with your draft in place. It does **not** cover live-data questions (work-order counts, due
+   lists and similar), which need the user's own data access. Only you see this test. The green line tells you whether
+   your draft was used.
+5. **Publish for all clients and environments.** This revision becomes **available to the chatbot** for every client, in
+   dev and production, at once. The chatbot uses it when it finds it relevant to a question; publishing does **not**
+   guarantee that every answer will use it, so check important questions with Test draft first. Publishing is refused
+   while a point still needs confirmation.
 6. **Later:**
    - **Edit and Publish again** to change it (a new revision);
    - **History → Restore** to go back to an earlier revision;
    - **Retire** (two clicks) to stop using the entry.
+
+### Writing guidance that goes to every client
+
+- **Conditions.** If the guidance depends on a setting, configuration or application version, write it in
+  **Conditions** / **Application version** (for example "only when the vessel's RH validation is ON").
+- **No client data.** When you start an entry from a user's report, write general guidance. Do **not** copy
+  client-specific data (vessel names, people, figures) from the report, because the entry is published for all
+  clients.
 
 ### Other parts of the screen
 

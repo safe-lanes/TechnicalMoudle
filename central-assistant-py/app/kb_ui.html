@@ -92,9 +92,9 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
     <section id="editor" hidden>
       <div class="row" style="justify-content:space-between">
         <div><span id="edStatus"></span><span id="edScope"></span><span class="muted small" id="edRev"></span></div>
-        <div class="row"><button id="saveDraft" title="Keep your changes as a draft. Nobody else sees a draft.">Save draft</button><button id="testJump" title="Ask the chatbot privately with this draft in place">Test draft</button><button id="publishBtn" class="primary" title="Make this revision the answer chatbot users get">Publish</button><button id="retireBtn" class="danger">Retire</button></div>
+        <div class="row"><button id="saveDraft" title="Keep your changes as a draft. Nobody else sees a draft.">Save draft</button><button id="testJump" title="Ask the chatbot privately with this draft in place">Test draft</button><button id="publishBtn" class="primary" title="Makes this revision available to the chatbot for all clients, in dev and production">Publish for all clients and environments</button><button id="retireBtn" class="danger">Retire</button></div>
       </div>
-      <p class="muted small" style="margin:6px 0 0">1 <strong>Save draft</strong> keeps your changes — nobody else sees them. 2 <strong>Test draft</strong> asks the chatbot privately with this draft in place. 3 <strong>Publish</strong> makes it the answer for chatbot users of <strong>all clients, in dev and production, at once</strong>; until then they keep the published version.</p>
+      <p class="muted small" style="margin:6px 0 0">1 <strong>Save draft</strong> keeps your changes — nobody else sees them. 2 <strong>Test draft</strong> asks the chatbot privately with this draft in place. 3 <strong>Publish for all clients and environments</strong> makes this revision available to the chatbot for <strong>every client, in dev and production, at once</strong>. The chatbot then uses it when it is relevant to a question (it is not guaranteed to appear in every answer). Until you publish, users keep the published version.</p>
       <div id="edMsg"></div>
       <div class="grid2">
         <div><label for="fTitle">Title</label><input type="text" id="fTitle" placeholder="e.g. Deleting a job"></div>
@@ -110,8 +110,8 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
         <div><label for="fRoles">Roles (comma separated)</label><input type="text" id="fRoles" placeholder="e.g. Sail Admin, Client Admin"></div>
       </div>
       <div class="grid2">
-        <div><label for="fConditions">Conditions</label><input type="text" id="fConditions" placeholder="e.g. vessel RH validation switched on"></div>
-        <div class="grid2"><div><label for="fVersion">Application version</label><input type="text" id="fVersion"></div><div><label>Environments</label><div class="muted" style="padding:7px 0">All (dev and production)</div></div></div>
+        <div><label for="fConditions">Conditions</label><input type="text" id="fConditions" placeholder="Any setting or configuration it depends on, e.g. vessel RH validation switched on"></div>
+        <div class="grid2"><div><label for="fVersion">Application version</label><input type="text" id="fVersion" placeholder="If it only applies to some versions"></div><div><label>Environments</label><div class="muted" style="padding:7px 0">All (dev and production)</div></div></div>
       </div>
 
       <div class="section"><h3>Supporting evidence</h3>
@@ -143,7 +143,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
     <section id="review" hidden>
       <div class="row" style="justify-content:space-between"><h2 style="margin:0;font-size:16px">Review queue</h2>
         <select id="reviewStatus" style="width:auto"><option value="new">New</option><option value="linked">Linked</option><option value="closed">Closed</option><option value="">All</option></select></div>
-      <p class="muted small">Answers reported by chatbot users. Reports never change the knowledge; create or update an entry to correct it.</p>
+      <p class="muted small">Answers reported by chatbot users of all clients. Reports never change the knowledge; create or update an entry to correct it. Guidance is published for <strong>all clients</strong>: do not copy client-specific data (vessel names, people, figures) from a report into an entry.</p>
       <div id="reviewList"></div>
     </section>
   </main>
@@ -300,7 +300,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
   }
   $("saveDraft").onclick = async () => { try { await save(); note($("edMsg"), "ok", "Draft saved. Chatbot users still see the published version."); } catch (e) { note($("edMsg"), "bad", e.message); } };
   $("publishBtn").onclick = async () => {
-    try { await save(); current = await api("POST", `/kb/api/entries/${current.entry.id}/publish`, {changeNote: $("fChange").value}); fill(workingRevision(current)); note($("edMsg"), "ok", `Published revision ${current.entry.published_revision}. The chatbot now uses it.`); await loadEntries(); }
+    try { await save(); current = await api("POST", `/kb/api/entries/${current.entry.id}/publish`, {changeNote: $("fChange").value}); fill(workingRevision(current)); note($("edMsg"), "ok", `Published revision ${current.entry.published_revision} for all clients and environments. The chatbot can now use it.`); await loadEntries(); }
     catch (e) { note($("edMsg"), "bad", e.message); }
   };
   let retireTimer = 0;
@@ -340,7 +340,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
       $("reviewList").querySelectorAll("[data-new]").forEach((el) => el.onclick = async () => {
         const it = items.find((x) => x.id === el.dataset.new);
         current = null; show("editor"); fill({title: it.question.slice(0, 120), kind: "correction", body: "", applies_to: {}, evidence: [], open_points: [], supersedes: [], internal_notes: `From review item ${it.id}: ${it.note || ""}`, change_note: ""});
-        pendingReviewId = it.id; note($("edMsg"), "warn", "New entry from a user report — it is linked to the report when you save it.");
+        pendingReviewId = it.id; note($("edMsg"), "warn", "New entry from a user report — it is linked to the report when you save it. Write general guidance: do not copy client-specific data from the report (it will be published for all clients).");
       });
       $("reviewList").querySelectorAll("[data-close]").forEach((el) => el.onclick = async () => { await api("POST", `/kb/api/review-items/${el.dataset.close}`, {status: "closed"}); loadReview(); loadReviewCount(); });
     } catch (e) { $("reviewList").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
