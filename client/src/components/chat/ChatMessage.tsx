@@ -1,14 +1,80 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm"; // 23-Sep-2026: tables in assistant answers rendered as raw pipes without GFM
-import { Bot, User } from "lucide-react";
+import { useState } from "react";
+import { Bot, Flag, User } from "lucide-react";
 import { useLocation } from "wouter";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useChat";
+import { reportAnswer } from "@/assistant-widget/assistantClient";
+
+/** 30-Sep-2026: "Report this answer" — files a review item for the module's knowledge trainers; it never changes the answer. */
+function ReportAnswer({ message }: { message: ChatMessageType }) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const [err, setErr] = useState("");
+
+  if (state === "sent") {
+    return <p className="mt-1 text-[11px] text-muted-foreground" data-testid="text-report-sent">Sent to the module's knowledge trainers for review. Thank you.</p>;
+  }
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+        onClick={() => setOpen(true)}
+        data-testid="button-report-answer"
+      >
+        <Flag className="h-3 w-3" /> Report this answer
+      </button>
+    );
+  }
+  const send = async () => {
+    setState("sending");
+    setErr("");
+    try {
+      await reportAnswer({ question: message.question ?? "", answer: message.content, note: note.trim(), citations: message.citations });
+      setState("sent");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setState("failed");
+    }
+  };
+  return (
+    <div className="mt-2 space-y-1" data-testid="form-report-answer">
+      <textarea
+        className="w-full rounded border bg-background p-1 text-xs text-foreground"
+        rows={3}
+        placeholder="What is wrong or missing in this answer?"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        data-testid="input-report-note"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="rounded bg-primary px-2 py-0.5 text-[11px] text-primary-foreground disabled:opacity-50"
+          disabled={state === "sending" || !note.trim()}
+          onClick={send}
+          data-testid="button-report-send"
+        >
+          {state === "sending" ? "Sending…" : "Send"}
+        </button>
+        <button type="button" className="text-[11px] text-muted-foreground" onClick={() => setOpen(false)} data-testid="button-report-cancel">
+          Cancel
+        </button>
+        {state === "failed" && <span className="text-[11px] text-destructive" data-testid="text-report-error">Could not send: {err}</span>}
+      </div>
+    </div>
+  );
+}
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  /** the central service supports reports (knowledgeEligibility().supported); hidden otherwise */
+  canReport?: boolean;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, canReport = false }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [, setLocation] = useLocation();
 
@@ -82,6 +148,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             ))}
           </div>
         )}
+        {!isUser && canReport && message.question && <ReportAnswer message={message} />}
       </div>
     </div>
   );
