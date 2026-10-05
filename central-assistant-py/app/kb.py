@@ -7,9 +7,11 @@ existing index; nothing here retrains a model or runs a separate training platfo
 Guarantees, all enforced here on the server:
   * Only TRAINERS may create, preview, publish, roll back or retire — granted per MODULE in the assistant database
     (kb_trainers, managed with `python -m app.kb_admin`), matched on the verified identity's issuer (the registered
-    application instance), company (tenant domain) AND user id. A role (even Sail Admin) grants nothing; the same user
-    id in another company or another environment gets nothing. Grants are read on EVERY request, so a revocation also
-    stops an existing session. Chat access stays with the module's own policy.
+    application instance) AND user id. Owner decision 5-Oct-2026: training happens on DEV only (our own SAILERP, one
+    login for all modules; trainers have no login on a client's production), so a grant can only be made for — and
+    only matches — an instance whose environment is in ASSISTANT_KB_TRAINER_ENVS (default 'dev'); the company is not
+    part of the match. A role (even Sail Admin) grants nothing; the same user id on production gets nothing. Grants are
+    read on EVERY request, so a revocation also stops an existing session. Chat access stays with the module's policy.
   * Owner decision 1-Oct-2026: trainers are SAIL staff and train the chatbot for ALL clients, on dev, for ALL
     environments (one central assistant). Every entry is therefore product-wide ('global') and applies in every
     environment ('*'); a publish is live for all clients at once. (The company / environment columns stay in the
@@ -106,22 +108,28 @@ class Access:
             raise KBError(403, "You are not a knowledge trainer for this module.")
 
 
-async def load_grants(issuer: str | None, tenant: str | None, user_id: str | None) -> dict[str, Grant]:
-    """Active grants for exactly this issuer + company (login domain) + user id — all three must match, none may be
-    empty: the same user id from another company or environment gets nothing."""
-    if not issuer or not tenant or not user_id:
+def is_trainer_instance(issuer: str | None) -> bool:
+    """A registered instance in a training environment (default: dev only)."""
+    env = env_of(issuer)
+    return env is not None and env.lower() in settings().kb_trainer_envs
+
+
+async def load_grants(issuer: str | None, user_id: str | None) -> dict[str, Grant]:
+    """Active grants for exactly this issuer + user id; both must be present and the issuer must be a training-environment
+    instance — the same user id from production (or any other environment) gets nothing."""
+    if not issuer or not user_id or not is_trainer_instance(issuer):
         return {}
     async with db.engine().connect() as c:
         rows = (await c.execute(text(
-            "SELECT module FROM kb_trainers WHERE issuer=:i AND tenant_domain=:t AND user_id=:u AND revoked_at IS NULL"),
-            {"i": issuer, "t": tenant, "u": user_id})).all()
+            "SELECT module FROM kb_trainers WHERE issuer=:i AND user_id=:u AND revoked_at IS NULL"),
+            {"i": issuer, "u": user_id})).all()
     return {r.module.lower(): Grant(r.module.lower()) for r in rows}
 
 
 async def access(sess: Session) -> Access:
     if (sess.user_type or "").lower() == "ship":
         return Access(sess, {})  # knowledge management is shore-only
-    return Access(sess, await load_grants(sess.iss, sess.tenant, sess.user_id))
+    return Access(sess, await load_grants(sess.iss, sess.user_id))
 
 
 async def require_trainer(sess: Session) -> Access:
@@ -188,7 +196,7 @@ async def eligibility(identity: dict[str, Any]) -> dict[str, Any]:
     every action is checked again on the server.)"""
     if (str(identity.get("userType") or "")).lower() == "ship":
         return {"trainer": False, "modules": []}
-    grants = await load_grants(identity.get("iss"), identity.get("tenantDomain"), str(identity.get("userId") or ""))
+    grants = await load_grants(identity.get("iss"), str(identity.get("userId") or ""))
     return {"trainer": bool(grants), "modules": sorted(grants)}
 
 
@@ -669,30 +677,61 @@ async def list_trainers(include_inactive: bool = True) -> list[dict[str, Any]]:
         for k in ("granted_at", "revoked_at"):
             d[k] = d[k].isoformat() if d.get(k) else None
         d["active"] = d["revoked_at"] is None
+        d["effective"] = d["active"] and is_trainer_instance(d["issuer"])  # an old non-dev grant matches nobody
         d["moduleLabel"] = MODULE_LABELS.get(d["module"], d["module"].title())
         out.append(d)
     return out
 
 
-async def grant_trainer(issuer: str, tenant: str, user_id: str, module: str, name: str, by: str, note: str = "") -> dict[str, Any]:
-    """Make a person a trainer of one module (all clients, all environments). Re-granting replaces the active grant;
-    the history keeps both."""
+def trainer_instances(module: str | None = None) -> list[str]:
+    """Registered training-environment (dev) instances, optionally of one module — where trainers sign in."""
+    return sorted(i for i, e in settings().module_instances.items()
+                  if is_trainer_instance(i) and (module is None or str(e.get("module") or "").lower() == module))
+
+
+def resolve_trainer_instance(module: str, issuer: str | None = None) -> str:
+    """The dev instance a grant for `module` is made on. Given an issuer it must be a dev instance OF that module;
+    without one, the module's only dev instance is used."""
+    choices = trainer_instances(module)
+    if issuer:
+        if issuer not in choices:
+            raise KBError(400, f"'{issuer}' is not a connected {'/'.join(sorted(settings().kb_trainer_envs))} instance of the "
+                               f"{MODULE_LABELS.get(module, module)} module — trainers are added for the training environment only.")
+        return issuer
+    if not choices:
+        raise KBError(400, f"The {MODULE_LABELS.get(module, module)} module's dev environment is not connected to the assistant yet.")
+    if len(choices) > 1:
+        raise KBError(400, f"More than one dev instance of {MODULE_LABELS.get(module, module)} is connected; choose one: {', '.join(choices)}.")
+    return choices[0]
+
+
+async def grant_trainer(user_id: str, module: str, name: str, by: str, note: str = "", issuer: str | None = None) -> dict[str, Any]:
+    """Make a person (their SAILERP dev user id) a trainer of one module (all clients, all environments). Re-granting
+    replaces the active grant; the history keeps both."""
     module = (module or "").lower().strip()
-    issuer, tenant, user_id, by = (issuer or "").strip(), (tenant or "").strip(), (user_id or "").strip(), (by or "").strip()
+    user_id, by = (user_id or "").strip(), (by or "").strip()
     if module not in MODULE_LABELS:
         raise KBError(400, f"Unknown module '{module}'.")
-    if issuer not in settings().module_instances:
-        raise KBError(400, f"'{issuer}' is not a registered application instance.")
-    if not tenant or not user_id or not by:
-        raise KBError(400, "User id, company (login domain) and 'granted by' are required.")
+    if not user_id or not by:
+        raise KBError(400, "User id and 'granted by' are required.")
+    iss = resolve_trainer_instance(module, (issuer or "").strip() or None)
     async with db.engine().begin() as c:
-        await c.execute(text("UPDATE kb_trainers SET revoked_at=now(), revoked_by=:b WHERE issuer=:i AND tenant_domain=:t AND user_id=:u "
-                             "AND module=:m AND revoked_at IS NULL"), {"b": by, "i": issuer, "t": tenant, "u": user_id, "m": module})
+        await c.execute(text("UPDATE kb_trainers SET revoked_at=now(), revoked_by=:b WHERE issuer=:i AND user_id=:u "
+                             "AND module=:m AND revoked_at IS NULL"), {"b": by, "i": iss, "u": user_id, "m": module})
         row = (await c.execute(text("INSERT INTO kb_trainers (issuer, tenant_domain, user_id, module, publish_scope, share_envs, display_name, "
-                                    "note, granted_by) VALUES (:i, :t, :u, :m, 'global', true, :n, :note, :b) RETURNING id"),
-                               {"i": issuer, "t": tenant, "u": user_id, "m": module, "n": (name or "").strip()[:120],
+                                    "note, granted_by) VALUES (:i, NULL, :u, :m, 'global', true, :n, :note, :b) RETURNING id"),
+                               {"i": iss, "u": user_id, "m": module, "n": (name or "").strip()[:120],
                                 "note": (note or "")[:300], "b": by})).first()
-    return {"ok": True, "id": row.id if row else None}
+    return {"ok": True, "id": row.id if row else None, "issuer": iss}
+
+
+async def revoke_trainer(user_id: str, module: str, by: str) -> int:
+    """Revoke a person's active grant(s) for one module (any dev instance). Returns how many were revoked."""
+    async with db.engine().begin() as c:
+        r = await c.execute(text("UPDATE kb_trainers SET revoked_at=now(), revoked_by=:b WHERE user_id=:u AND module=:m "
+                                 "AND revoked_at IS NULL"), {"b": (by or "admin")[:120], "u": (user_id or "").strip(),
+                                                             "m": (module or "").lower().strip()})
+    return int(r.rowcount or 0)
 
 
 async def deactivate_trainer(trainer_id: int, by: str) -> dict[str, Any]:
@@ -710,7 +749,7 @@ async def reactivate_trainer(trainer_id: int, by: str) -> dict[str, Any]:
         r = (await c.execute(text("SELECT * FROM kb_trainers WHERE id=:id"), {"id": trainer_id})).first()
     if not r:
         raise KBError(404, "Trainer grant not found.")
-    return await grant_trainer(r.issuer, r.tenant_domain, r.user_id, r.module, r.display_name or "", by, r.note or "")
+    return await grant_trainer(r.user_id, r.module, r.display_name or "", by, r.note or "", issuer=r.issuer)
 
 
 async def chatbot_users(q: str, limit: int = 20) -> list[dict[str, Any]]:
@@ -718,9 +757,9 @@ async def chatbot_users(q: str, limit: int = 20) -> list[dict[str, Any]]:
     like = f"%{(q or '').strip()}%"
     async with db.engine().connect() as c:
         rows = (await c.execute(text(
-            "SELECT user_id, max(user_name) AS user_name, tenant_domain, max(ts) AS last_seen FROM assistant_conversations "
-            "WHERE user_id IS NOT NULL AND user_id <> '' AND (user_id ILIKE :q OR coalesce(user_name, '') ILIKE :q OR "
-            "coalesce(tenant_domain, '') ILIKE :q) GROUP BY user_id, tenant_domain ORDER BY max(ts) DESC LIMIT :n"),
+            "SELECT user_id, max(user_name) AS user_name, max(tenant_domain) AS tenant_domain, max(ts) AS last_seen "
+            "FROM assistant_conversations WHERE user_id IS NOT NULL AND user_id <> '' AND (user_id ILIKE :q OR "
+            "coalesce(user_name, '') ILIKE :q) GROUP BY user_id ORDER BY max(ts) DESC LIMIT :n"),
             {"q": like, "n": limit})).all()
     return [{"userId": r.user_id, "name": r.user_name, "company": r.tenant_domain,
              "lastSeen": r.last_seen.isoformat() if r.last_seen else None} for r in rows]

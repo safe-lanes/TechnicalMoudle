@@ -13,7 +13,9 @@ DEV TEST accounts (pilot only; granted 1-Oct-2026):
 Owner decision 1-Oct-2026: trainers train ONE module for ALL clients and ALL environments (one central assistant,
 trained on dev) — every entry is product-wide and a publish is live everywhere at once. Trainers are managed on the
 AI-server page /admin/kb (admin token) or with `python -m app.kb_admin`; section 6 drives the page's API.
-  devtest-tech-1 @ pilot-b (same id, other company) and @ prod (same id and company, other environment): no grant
+Owner decision 5-Oct-2026: training happens on DEV only, so a grant is the module's dev instance + user id (no company):
+  devtest-tech-1 @ pilot-b (same id, other company login on dev): still the trainer
+  devtest-tech-1 on prod (same id, production instance): no grant — production can never match
 
 Content is a made-up topic ("Zeta-9 counter") so no answer can come from the manuals by accident; the manual passage
 used for the supersede checks is picked at run time from what the pilot index actually returns.
@@ -160,7 +162,7 @@ def main() -> int:
     user_prod = User("devtest-user", "pilot", "DEV TEST ordinary Sail Admin (production)", env="prod")
     ship = User("devtest-ship", "pilot", "DEV TEST ship user", user_type="Ship")
 
-    # ── 1. who may manage what (server-side, from issuer + company + user id) ──
+    # ── 1. who may manage what (server-side, from the dev instance + user id) ──
     for x in (t1, t2, crew, user, t1_other_co, t1_prod):
         x.sign_in()
     mods = lambda u: [m["module"] for m in u.kb("GET", "/me")[1].get("modules", [])]  # noqa: E731
@@ -168,8 +170,10 @@ def main() -> int:
     rec("Technical trainer 2 (second trainer of the same module) sees Technical", mods(t2) == ["technical"], mods(t2))
     rec("Crewing trainer sees only Crewing", mods(crew) == ["crewing"], mods(crew))
     rec("ordinary Sail Admin is not a trainer (role alone grants nothing)", user.kb("GET", "/me")[1].get("trainer") is False)
-    rec("same user id in ANOTHER company inherits nothing", t1_other_co.kb("GET", "/me")[1].get("trainer") is False)
-    rec("same user id and company in ANOTHER environment (prod) inherits nothing", t1_prod.kb("GET", "/me")[1].get("trainer") is False)
+    rec("same dev user id with another company login is still the trainer (company is not part of the match)",
+        mods(t1_other_co) == ["technical"], mods(t1_other_co))
+    rec("same user id on PRODUCTION is not a trainer (training on dev only)", t1_prod.kb("GET", "/me")[1].get("trainer") is False)
+    rec("widget eligibility on production: none (icon hidden)", t1_prod.eligibility().get("trainer") is False)
     s, b = ship.sign_in()
     rec("a ship identity cannot open the knowledge screen (shore-only)", s == 403, f"{s} {b}")
     rec("widget eligibility: Technical trainer → technical", t1.eligibility().get("modules") == ["technical"], t1.eligibility())
@@ -274,11 +278,11 @@ def main() -> int:
     rec("the Crewing trainer cannot close a Technical report", crew.kb("POST", f"/review-items/{fa.get('id')}", {"status": "closed"})[0] in (403, 404))
 
     # ── 6. revocation stops an EXISTING session ──
-    out = admin("revoke", "--issuer", "technical-dev", "--tenant", "pilot", "--user", "devtest-tech-2", "--module", "technical", "--by", "harness")
+    out = admin("revoke", "--user", "devtest-tech-2", "--module", "technical", "--by", "harness")
     s, b = t2.kb("PUT", f"/entries/{eid}/draft", entry_body(8))
     rec("after revocation, trainer 2's already-open session is refused (403)", "revoked 1" in out and s == 403, f"{out} / {s} {b.get('error')}")
     rec("…and trainer 2 no longer sees the module", t2.kb("GET", "/me")[1].get("trainer") is False)
-    admin("grant", "--issuer", "technical-dev", "--tenant", "pilot", "--user", "devtest-tech-2", "--module", "technical",
+    admin("grant", "--user", "devtest-tech-2", "--module", "technical",
           "--name", "DEV TEST Technical trainer 2", "--by", "harness (re-grant after revocation test)", "--note", "test account")
     rec("re-granting restores access in the same session", t2.kb("GET", "/me")[1].get("trainer") is True)
 
@@ -289,9 +293,17 @@ def main() -> int:
     s, b, _ = adm("GET", "/users?q=devtest-user")
     rec("user picker finds people who have used the chatbot", s == 200 and any(u["userId"] == "devtest-user" for u in b.get("users", [])), b)
     t3 = User("devtest-tech-3", "pilot", "DEV TEST Technical trainer 3 (added on the page)")
-    s, b, _ = adm("POST", "/trainers", {"issuer": "technical-dev", "company": "pilot", "userId": "devtest-tech-3", "module": "technical",
+    s, b, _ = adm("GET", "/trainers")
+    tech = [m for m in b.get("modules", []) if m["module"] == "technical"]
+    rec("admin page offers Technical on its dev system only", s == 200 and tech and tech[0]["instances"] == ["technical-dev"], tech)
+    s, b, _ = adm("POST", "/trainers", {"issuer": "technical-prod", "userId": "devtest-tech-9", "module": "technical", "by": "harness"})
+    rec("admin page refuses a trainer on a PRODUCTION system (400)", s == 400 and "training environment only" in str(b.get("error")), f"{s} {b.get('error')}")
+    s, b, _ = adm("POST", "/trainers", {"userId": "devtest-crew-9", "module": "audit", "by": "harness"})
+    rec("admin page refuses a module whose dev system is not connected (400)", s == 400 and "not connected" in str(b.get("error")), f"{s} {b.get('error')}")
+    s, b, _ = adm("POST", "/trainers", {"userId": "devtest-tech-3", "module": "technical",
                                         "name": "DEV TEST Technical trainer 3", "by": "harness", "note": "test account"})
-    rec("admin page adds a trainer", s == 200 and b.get("ok") is True, b)
+    rec("admin page adds a trainer with user id + module only (dev system picked automatically)",
+        s == 200 and b.get("ok") is True and b.get("issuer") == "technical-dev", b)
     t3.sign_in()
     rec("the new trainer can open the knowledge screen for Technical", [m["module"] for m in t3.kb("GET", "/me")[1].get("modules", [])] == ["technical"])
     tid = [t["id"] for t in adm("GET", "/trainers")[1]["trainers"] if t["user_id"] == "devtest-tech-3" and t["active"]][0]

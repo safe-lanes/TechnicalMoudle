@@ -52,6 +52,40 @@ def test_review_visibility() -> None:
     assert not kb.review_visible(a, "crewing", "a.com", "dev")
 
 
+def _instances(monkeypatch: pytest.MonkeyPatch, reg: dict[str, tuple[str, str]], envs: str | None = None) -> None:
+    monkeypatch.setenv("ASSISTANT_MODULE_INSTANCES", json.dumps({
+        iss: {"module": mod, "env": env, "url": f"http://127.0.0.1/{iss}", "secret": f"s-{iss}", "signingKey": f"k-{iss}"}
+        for iss, (mod, env) in reg.items()}))
+    if envs is not None:
+        monkeypatch.setenv("ASSISTANT_KB_TRAINER_ENVS", envs)
+    settings.cache_clear()
+
+
+def test_trainers_sign_in_on_dev_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Owner decision 5-Oct-2026: training on dev only; the company is not part of the match."""
+    _instances(monkeypatch, {"technical-dev": ("technical", "dev"), "technical-prod": ("technical", "prod")})
+    assert kb.is_trainer_instance("technical-dev")
+    assert not kb.is_trainer_instance("technical-prod")     # the same user id on production is never a trainer
+    assert not kb.is_trainer_instance("unregistered") and not kb.is_trainer_instance(None)
+    _instances(monkeypatch, {"technical-dev": ("technical", "dev"), "technical-prod": ("technical", "prod")}, envs="dev,prod")
+    assert kb.is_trainer_instance("technical-prod")         # only if the setting is widened on purpose
+
+
+def test_grant_instance_is_the_modules_dev_instance(monkeypatch: pytest.MonkeyPatch) -> None:
+    _instances(monkeypatch, {"technical-dev": ("technical", "dev"), "technical-prod": ("technical", "prod")})
+    assert kb.resolve_trainer_instance("technical") == "technical-dev"            # picked automatically
+    assert kb.resolve_trainer_instance("technical", "technical-dev") == "technical-dev"
+    with pytest.raises(kb.KBError, match="training environment only"):
+        kb.resolve_trainer_instance("technical", "technical-prod")                 # a production instance is refused
+    with pytest.raises(kb.KBError, match="not connected"):
+        kb.resolve_trainer_instance("crewing")                                     # crewing dev not registered yet
+    with pytest.raises(kb.KBError, match="training environment only"):
+        kb.resolve_trainer_instance("crewing", "technical-dev")                    # another module's instance
+    _instances(monkeypatch, {"technical-dev": ("technical", "dev"), "technical-dev2": ("technical", "dev")})
+    with pytest.raises(kb.KBError, match="choose one"):
+        kb.resolve_trainer_instance("technical")
+
+
 def rev(**over: object) -> dict:
     r = {"revision": 2, "title": "Deleting a job", "kind": "procedure", "body": "Open the Job form and click Delete (trash icon).",
          "applies_to": {"userTypes": ["Office"], "roles": ["Sail Admin"], "conditions": "", "environment": "", "appVersion": ""},

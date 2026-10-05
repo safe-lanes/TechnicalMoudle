@@ -219,9 +219,11 @@ async def admin_kb_page() -> HTMLResponse:
 @router.get("/admin/kb/api/trainers")
 async def admin_trainers(request: Request) -> Any:
     async def f(_r: Request) -> Any:
+        mods = settings().module_instances
         return {"trainers": await kb.list_trainers(),
-                "instances": [{"issuer": k, "env": v.get("env"), "module": v.get("module")} for k, v in settings().module_instances.items()],
-                "modules": [{"module": k, "label": v} for k, v in MODULE_LABELS.items()]}
+                "trainingEnvs": sorted(settings().kb_trainer_envs),
+                "modules": [{"module": k, "label": v, "instances": kb.trainer_instances(k)} for k, v in MODULE_LABELS.items()],
+                "instances": [{"issuer": k, "env": v.get("env"), "module": v.get("module")} for k, v in mods.items()]}
     return await _admin(f)(request)
 
 
@@ -229,8 +231,8 @@ async def admin_trainers(request: Request) -> Any:
 async def admin_grant(request: Request) -> Any:
     async def f(r: Request) -> Any:
         b = await _body(r)
-        return await kb.grant_trainer(str(b.get("issuer") or ""), str(b.get("company") or ""), str(b.get("userId") or ""),
-                                      str(b.get("module") or ""), str(b.get("name") or ""), str(b.get("by") or ""), str(b.get("note") or ""))
+        return await kb.grant_trainer(str(b.get("userId") or ""), str(b.get("module") or ""), str(b.get("name") or ""),
+                                      str(b.get("by") or ""), str(b.get("note") or ""), issuer=str(b.get("issuer") or "") or None)
     return await _admin(f)(request)
 
 

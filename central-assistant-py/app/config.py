@@ -107,8 +107,11 @@ class Settings(BaseSettings):
 
     # ── knowledge management (30-Sep-2026, owner brief; pilot only until approved) ──────────────────────────────
     # Knowledge TRAINERS (1-Oct-2026) are not configured here: they are grants in the assistant database (table
-    # kb_trainers, managed with `python -m app.kb_admin`), per module, matched on issuer + company + user id, so a grant
-    # or a revocation takes effect on the next request without a restart. Chat access is unchanged (module policy).
+    # kb_trainers, managed with `python -m app.kb_admin`), per module, matched on issuer + user id, so a grant or a
+    # revocation takes effect on the next request without a restart. Chat access is unchanged (module policy).
+    # Owner decision 5-Oct-2026: training happens on dev only (our own SAILERP; trainers have no login on a client's
+    # production), so trainers can be granted — and grants match — only for instances in these environments.
+    assistant_kb_trainer_envs: str = "dev"
     assistant_kb_session_hours: int = 8
     # Answer-prompt rules for knowledge entries and missing evidence ("on" in the pilot). Off = prompts unchanged.
     assistant_kb_rules: str = "off"
@@ -165,6 +168,10 @@ class Settings(BaseSettings):
     @property
     def kb_rules_on(self) -> bool:
         return self.assistant_kb_rules.lower() == "on"
+
+    @property
+    def kb_trainer_envs(self) -> set[str]:
+        return {e.strip().lower() for e in self.assistant_kb_trainer_envs.split(",") if e.strip()}
 
     @property
     def module_apis(self) -> dict[str, dict[str, Any]]:

@@ -45,7 +45,7 @@ th{color:var(--muted);font-weight:600;font-size:12px}
 <body>
 <header>
   <h1>Chatbot Trainers</h1>
-  <span class="muted small">Who may train the chatbot, per module. Trainers train for all clients and all environments.</span>
+  <span class="muted small">Who may train the chatbot, per module. Trainers sign in on dev and train for all clients and all environments.</span>
 </header>
 <main>
   <section class="card" id="gate">
@@ -58,16 +58,15 @@ th{color:var(--muted);font-weight:600;font-size:12px}
   <section class="card" id="add" hidden>
     <h2>Add a trainer</h2>
     <label for="find">Find a person (people who have used the chatbot)</label>
-    <input type="text" id="find" placeholder="Type a name, user id or company…" autocomplete="off">
+    <input type="text" id="find" placeholder="Type a name or user id…" autocomplete="off">
     <div class="pick" id="pick" hidden></div>
     <div class="grid">
-      <div><label for="fUser">User id (SAILERP)</label><input type="text" id="fUser"></div>
+      <div><label for="fUser">User id (SAILERP dev login)</label><input type="text" id="fUser"></div>
       <div><label for="fName">Name</label><input type="text" id="fName"></div>
-      <div><label for="fCompany">Company (login domain)</label><input type="text" id="fCompany"></div>
       <div><label for="fModule">Module</label><select id="fModule"></select></div>
-      <div><label for="fIssuer">Signs in through</label><select id="fIssuer"></select></div>
       <div><label for="fBy">Granted by</label><input type="text" id="fBy" placeholder="Your name"></div>
     </div>
+    <p class="muted small" id="envHint"></p>
     <label for="fNote">Note (optional)</label><input type="text" id="fNote">
     <div class="row" style="margin-top:10px"><button class="primary" id="grant">Add trainer</button></div>
     <div id="addMsg"></div>
@@ -77,7 +76,7 @@ th{color:var(--muted);font-weight:600;font-size:12px}
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">Trainers</h2>
       <label class="row small" style="margin:0;text-transform:none;font-weight:400"><input type="checkbox" id="showInactive"> Show inactive</label></div>
     <div id="listMsg"></div>
-    <div class="tablewrap"><table><thead><tr><th>Name</th><th>User id</th><th>Company</th><th>Module</th><th>Signs in through</th><th>Status</th><th>Granted</th><th></th></tr></thead>
+    <div class="tablewrap"><table><thead><tr><th>Name</th><th>User id</th><th>Module</th><th>Dev system</th><th>Status</th><th>Granted</th><th></th></tr></thead>
       <tbody id="rows"></tbody></table></div>
   </section>
 </main>
@@ -100,18 +99,29 @@ th{color:var(--muted);font-weight:600;font-size:12px}
   async function load() {
     data = await api("GET", "/admin/kb/api/trainers");
     $("gate").hidden = true; $("add").hidden = false; $("listCard").hidden = false;
-    $("fModule").innerHTML = data.modules.map((m) => `<option value="${esc(m.module)}">${esc(m.label)}</option>`).join("");
-    $("fIssuer").innerHTML = data.instances.map((i) => `<option value="${esc(i.issuer)}" ${i.env === "dev" ? "selected" : ""}>${esc(i.issuer)} (${esc(i.env)})</option>`).join("");
+    const prev = $("fModule").value;
+    $("fModule").innerHTML = data.modules.map((m) => m.instances.length
+      ? `<option value="${esc(m.module)}">${esc(m.label)}</option>`
+      : `<option value="${esc(m.module)}" disabled>${esc(m.label)} — dev not connected yet</option>`).join("");
+    if (prev) $("fModule").value = prev;
+    if (!$("fModule").value || $("fModule").selectedOptions[0]?.disabled) {
+      const first = data.modules.find((m) => m.instances.length); if (first) $("fModule").value = first.module;
+    }
+    $("envHint").textContent = `The trainer signs in on ${data.trainingEnvs.join("/")} with this user id. The same user id on production is never a trainer.`;
     render();
+  }
+  function status(t) {
+    if (!t.active) return `<span class="pill off">Inactive</span><div class="small muted">${esc((t.revoked_at || "").slice(0, 16).replace("T", " "))} by ${esc(t.revoked_by)}</div>`;
+    return t.effective ? `<span class="pill on">Active</span>` : `<span class="pill off">Active — not effective</span><div class="small muted">not a dev system</div>`;
   }
   function render() {
     const rows = data.trainers.filter((t) => $("showInactive").checked || t.active);
     $("rows").innerHTML = rows.length ? rows.map((t) => `<tr>
-      <td>${esc(t.display_name || "—")}</td><td>${esc(t.user_id)}</td><td>${esc(t.tenant_domain)}</td><td>${esc(t.moduleLabel)}</td><td>${esc(t.issuer)}</td>
-      <td><span class="pill ${t.active ? "on" : "off"}">${t.active ? "Active" : "Inactive"}</span>${t.active ? "" : `<div class="small muted">${esc((t.revoked_at || "").slice(0, 16).replace("T", " "))} by ${esc(t.revoked_by)}</div>`}</td>
+      <td>${esc(t.display_name || "—")}</td><td>${esc(t.user_id)}</td><td>${esc(t.moduleLabel)}</td><td>${esc(t.issuer)}</td>
+      <td>${status(t)}</td>
       <td class="small">${esc((t.granted_at || "").slice(0, 16).replace("T", " "))}<br><span class="muted">by ${esc(t.granted_by)}</span></td>
       <td>${t.active ? `<button class="danger" data-off="${t.id}">Deactivate</button>` : `<button data-on="${t.id}">Reactivate</button>`}</td></tr>`).join("")
-      : `<tr><td colspan="8" class="muted">No trainers yet.</td></tr>`;
+      : `<tr><td colspan="7" class="muted">No trainers yet.</td></tr>`;
     document.querySelectorAll("[data-off]").forEach((b) => b.onclick = () => change(b.dataset.off, "deactivate"));
     document.querySelectorAll("[data-on]").forEach((b) => b.onclick = () => change(b.dataset.on, "reactivate"));
   }
@@ -137,7 +147,7 @@ th{color:var(--muted);font-weight:600;font-size:12px}
         $("pick").innerHTML = r.users.map((u, i) => `<div tabindex="0" data-i="${i}"><strong>${esc(u.name || "(no name)")}</strong> · ${esc(u.userId)} · ${esc(u.company || "")}</div>`).join("") || `<div class="muted">Nobody found — type the user id below.</div>`;
         $("pick").hidden = false;
         $("pick").querySelectorAll("[data-i]").forEach((el) => {
-          const pickIt = () => { const u = r.users[+el.dataset.i]; $("fUser").value = u.userId; $("fName").value = u.name || ""; $("fCompany").value = u.company || ""; $("pick").hidden = true; };
+          const pickIt = () => { const u = r.users[+el.dataset.i]; $("fUser").value = u.userId; $("fName").value = u.name || ""; $("pick").hidden = true; };
           el.onclick = pickIt; el.onkeydown = (ev) => { if (ev.key === "Enter") pickIt(); };
         });
       } catch (e) { $("pick").innerHTML = `<div class="muted">${esc(e.message)}</div>`; $("pick").hidden = false; }
@@ -145,10 +155,10 @@ th{color:var(--muted);font-weight:600;font-size:12px}
   };
   $("grant").onclick = async () => {
     try {
-      await api("POST", "/admin/kb/api/trainers", {userId: $("fUser").value, name: $("fName").value, company: $("fCompany").value,
-        module: $("fModule").value, issuer: $("fIssuer").value, by: $("fBy").value, note: $("fNote").value});
-      note($("addMsg"), "ok", `${$("fName").value || $("fUser").value} is now a ${$("fModule").selectedOptions[0].textContent} trainer.`);
-      ["fUser", "fName", "fCompany", "fNote", "find"].forEach((id) => $(id).value = "");
+      const r = await api("POST", "/admin/kb/api/trainers", {userId: $("fUser").value, name: $("fName").value,
+        module: $("fModule").value, by: $("fBy").value, note: $("fNote").value});
+      note($("addMsg"), "ok", `${$("fName").value || $("fUser").value} is now a ${$("fModule").selectedOptions[0].textContent} trainer (signs in on ${r.issuer}).`);
+      ["fUser", "fName", "fNote", "find"].forEach((id) => $(id).value = "");
       await load();
     } catch (e) { note($("addMsg"), "bad", e.message); }
   };
