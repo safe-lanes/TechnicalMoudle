@@ -613,6 +613,8 @@ export async function getIhmInventoryStatus(
 
   interface IhmItem {
     id: number;
+    spareId?: string | number;
+    itemId?: string | number;
     vesselId: string;
     vesselName: string;
     itemCode: string;
