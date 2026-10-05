@@ -1225,6 +1225,9 @@ const Spares: React.FC = () => {
   // pushes the hierarchical (dotted-code) component filter down into SQL so the
   // page payload stays bounded even when a component is selected.
   const activeOnlyForRole = (isVessel || isHeadOfDept) && !isExternal;
+  const componentSparesExportScope = `${sparesScopeKey}|${activeOnlyForRole}|${pickerVessels.map(v => v.id).join(",")}`;
+  const componentSparesExportScopeRef = useRef(componentSparesExportScope);
+  componentSparesExportScopeRef.current = componentSparesExportScope;
 
   const { data: sparesResponse, isLoading, refetch } = useQuery<{ items: any[]; total: number }>({
     queryKey: [
@@ -2269,61 +2272,51 @@ const Spares: React.FC = () => {
   const exportComponentSparesToExcel = async () => {
     setExportingType('component');
     try {
-      const linksRes = await fetch(`/technical/api/inventory/spare-links/${vesselId}`);
-      if (!linksRes.ok) throw new Error('Failed to fetch spare-component links');
-      const linksJson = await linksRes.json();
-      const links: Array<{ spareId: number; spareUuid: string; componentId: string; vesselId: string }> = linksJson.data || [];
-
-      const sparesArray = Array.isArray(sparesData) ? sparesData : [];
-      const spareById = new Map<number, Spare>();
-      const spareByUuid = new Map<string, Spare>();
-      for (const s of sparesArray) {
-        spareById.set(s.id, s);
-        if (s.suuid) spareByUuid.set(s.suuid, s);
-      }
-
-      const componentsMap = new Map<string, { code: string; name: string }>();
-      for (const s of sparesArray) {
-        const lcs = s.linkedComponents || [];
-        for (const lc of lcs) {
-          if (!componentsMap.has(lc.componentId)) {
-            componentsMap.set(lc.componentId, { code: lc.componentCode, name: lc.componentName });
-          }
+      const assertCurrent = () => {
+        if (componentSparesExportScopeRef.current !== componentSparesExportScope) {
+          throw new Error("Vessel scope changed during export. Please export again for the selected scope.");
         }
+      };
+      const {
+        componentSparesVesselIds, fetchComponentSparesData,
+        buildComponentSparesWorkbook, downloadComponentSparesWorkbook,
+      } = await import("./componentSparesExport");
+      assertCurrent();
+      const vesselIds = componentSparesVesselIds(
+        vesselId, isMyVessels, assignedVesselIds, pickerVessels.map(v => v.id),
+      );
+      if (!sparesScopeReady || !vesselIds.length) {
+        toast({ title: "No Data", description: "No vessels available in the selected scope." });
+        return;
       }
-
+      const data = await fetchComponentSparesData(vesselIds, activeOnlyForRole, async url => {
+        const response = await fetch(url);
+        if (!response.ok) throw Object.assign(
+          new Error("Failed to fetch complete component-spare data. Export was not downloaded."),
+          { status: response.status },
+        );
+        return response.json();
+      }, assertCurrent);
+      if (!data.rows.length) {
+        toast({
+          title: "No Data",
+          description: "No eligible component-spare links available to export." +
+            (data.excludedUnavailableSpareLinks
+              ? ` Excluded ${data.excludedUnavailableSpareLinks} retained links to unavailable spares; these are not in the current inventory.`
+              : ""),
+        });
+        return;
+      }
       const now = new Date();
       const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
       const fname = `component_spares_${vesselId}_${ts}.xlsx`;
-      const exportRows: Record<string, any>[] = [];
-
-      for (const link of links) {
-        const spare = spareById.get(link.spareId) || spareByUuid.get(link.spareUuid);
-        const comp = componentsMap.get(link.componentId);
-        if (spare) {
-          exportRows.push(mapSpareToTemplateRow(spare, comp?.code || spare.componentCode || '', comp?.name || spare.componentName || ''));
-        } else {
-          const placeholderRow: Record<string, string> = {};
-          for (const field of SPARES_TEMPLATE_FIELDS) {
-            placeholderRow[field.header] = field.key === 'componentCode' ? (comp?.code || '')
-              : field.key === 'componentName' ? (comp?.name || '')
-              : field.key === 'partCode' ? `(spare #${link.spareId})`
-              : '';
-          }
-          exportRows.push(placeholderRow);
-        }
-      }
-
-      const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
-      const ws = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
-      ws['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Component Spares');
-      XLSX.writeFile(wb, fname);
-
+      await downloadComponentSparesWorkbook(buildComponentSparesWorkbook(data), fname, assertCurrent);
       toast({
         title: "Export Successful",
-        description: `Exported ${exportRows.length} of ${links.length} component-spare entries to ${fname}`
+        description: `Exported ${data.rows.length} component-spare entries to ${fname}` +
+          (data.excludedUnavailableSpareLinks
+            ? `. Excluded ${data.excludedUnavailableSpareLinks} retained links to unavailable spares; these are not in the current inventory.`
+            : "")
       });
       setExportDialogOpen(false);
     } catch (err: any) {
@@ -4165,7 +4158,7 @@ const Spares: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={exportComponentSparesToExcel}
-                  disabled={!!exportingType || !Array.isArray(sparesData) || sparesData.length === 0}
+                  disabled={!!exportingType || !sparesScopeReady}
                   data-testid="button-export-component-excel"
                 >
                   {exportingType === 'component' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}

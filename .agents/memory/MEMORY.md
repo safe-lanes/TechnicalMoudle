@@ -7,3 +7,4 @@
 - [Trailing-space Git paths](trailing-space-git-paths.md) — patch file headers may lose trailing spaces; verify exact path bytes and tracked state during cleanup.
 - [Local Playwright on Nix](local-playwright-nix.md) — direct shell browser checks must use the system Chromium wrapper, not the downloaded headless shell.
 - [Job export fidelity](job-export-fidelity.md) — preserve saved values and disclose import limitations; matching a template is not a guarantee of lossless re-import.
+- [Spare linkage integrity](spare-linkage-integrity.md) — imported spare links can point to another vessel's components; distinguish source-data defects from export mapping bugs.
