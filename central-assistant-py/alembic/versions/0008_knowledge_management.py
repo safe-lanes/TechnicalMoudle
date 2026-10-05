@@ -125,7 +125,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # 5-Oct-2026: knowledge rows (published AND private preview) live in assistant_chunks; remove them BEFORE dropping
+    # the columns that mark them, otherwise an older image would serve them as ordinary manual passages.
     _execute_each("""
+    DELETE FROM assistant_chunks WHERE kb_state IS NOT NULL OR kb_entry_id IS NOT NULL;
     DROP TABLE IF EXISTS kb_audit;
     DROP TABLE IF EXISTS kb_sessions;
     DROP TABLE IF EXISTS kb_review_items;
