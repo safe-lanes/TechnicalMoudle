@@ -41,7 +41,8 @@ SHORES = {"dev": ("http://localhost:5000", M / "local-test-env/.env.shore.exampl
           "prod": ("http://localhost:5001", M / "local-test-env/.env.shoreB.local")}
 SSH = ["ssh", "-i", os.environ.get("SSH_KEY", "C:/Users/GhaziAnwer/apigateway.pem"), "ubuntu@13.250.51.71"]
 # The admin token is read from the pilot container over SSH, kept in memory only and never printed.
-ADMIN_TOKEN = subprocess.run([*SSH, "docker exec sail-assistant-py-kbpilot printenv ADMIN_TOKEN"], capture_output=True, text=True).stdout.strip()
+CONTAINER = os.environ.get("KB_CONTAINER", "sail-assistant-py-kbpilot")  # 5-Oct: also the release candidate
+ADMIN_TOKEN = subprocess.run([*SSH, f"docker exec {CONTAINER} printenv ADMIN_TOKEN"], capture_output=True, text=True).stdout.strip()
 V = "743ef9d1-841a-11ed-aa7c-7003bca91a86"
 RUN = time.strftime("%H%M%S")
 TOPIC = f"Zeta-9 counter {RUN}"
@@ -85,7 +86,7 @@ def http(url: str, method: str = "GET", headers: dict[str, str] | None = None, b
 
 def admin(*args: str) -> str:
     """The real trainer-admin command inside the pilot container."""
-    cmd = "docker exec sail-assistant-py-kbpilot python -m app.kb_admin " + " ".join(f"'{a}'" for a in args)
+    cmd = f"docker exec {CONTAINER} python -m app.kb_admin " + " ".join(f"'{a}'" for a in args)
     return subprocess.run([*SSH, cmd], capture_output=True, text=True).stdout.strip()
 
 

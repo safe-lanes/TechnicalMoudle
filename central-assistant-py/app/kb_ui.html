@@ -230,7 +230,9 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
     const a = draft.applies_to || {};
     $("fOffice").checked = (a.userTypes || []).includes("Office"); $("fShip").checked = (a.userTypes || []).includes("Ship");
     $("fRoles").value = (a.roles || []).join(", "); $("fConditions").value = a.conditions || ""; $("fVersion").value = a.appVersion || "";
-    $("fNotes").value = draft.internal_notes || ""; $("fChange").value = "";
+    // 5-Oct-2026: an unpublished draft keeps its change note in the box (Save then Publish used to blank it); editing a
+    // published revision starts a new revision with an empty note.
+    $("fNotes").value = draft.internal_notes || ""; $("fChange").value = (draft.published_at ? "" : draft.change_note) || "";
     renderEvidence(); renderOpenPoints(); renderSupersedes(); renderHistory();
     const writable = !e || e.writable;
     ["saveDraft", "testJump", "publishBtn", "retireBtn", "pvAsk", "addEv", "addOp", "supSearch"].forEach((id) => $(id).disabled = !writable);
