@@ -576,7 +576,7 @@ export async function markSpareAsOrdered(spareId: number) {
   const now = new Date();
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dateStr = `${String(now.getDate()).padStart(2,'0')}-${months[now.getMonth()]}-${now.getFullYear()}`;
-  const updated = await repo.updateSpare(spareId, { lastOrderDate: dateStr });
+  const updated = await repo.updateSpare(String(spareId), { lastOrderDate: dateStr });
   return updated;
 }
 

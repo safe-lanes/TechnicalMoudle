@@ -339,7 +339,7 @@ export async function getSparesWithInventory(req: Request, res: Response) {
 export async function getSpareWithInventory(req: Request, res: Response) {
   try {
     const spareId = parseInt(req.params.spareId);
-    const spareWithInventory = await inventoryService.getSpareWithInventory(spareId);
+    const spareWithInventory = await inventoryService.getSpareWithInventory(String(spareId));
 
     if (!spareWithInventory) {
       return res.status(404).json({ success: false, error: "Spare not found" });

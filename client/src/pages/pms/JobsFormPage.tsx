@@ -137,7 +137,7 @@ const JobsFormPage: React.FC = () => {
   const { toast } = useToast();
   const { vesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
-  const { vessels } = useVessels();
+  const { data: vessels } = useVessels();
   
   const { ranks: rankOptions } = useRanks();
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
@@ -706,7 +706,7 @@ const JobsFormPage: React.FC = () => {
       ws.mergeCells(`A2:${lastColLetter}2`);
       const s = ws.getCell('A2');
       const exportVesselName = vessels.find((v: any) => v.id === vesselId)?.name || 'Vessel';
-      const exportJobTitle = templateData.woTitle || templateData.jobTitle || '';
+      const exportJobTitle = templateData.woTitle || '';
       s.value = `Work History — ${exportJobTitle || templateData.componentName || templateData.componentCode || 'Component'} — Job: ${templateData.woTemplateCode || '-'}`;
       s.font = { size: 12, bold: true, color: { argb: 'FF2C3E50' }, name: 'Arial' };
       s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
@@ -798,7 +798,7 @@ const JobsFormPage: React.FC = () => {
       const margin = 10;
 
       const pdfVesselName = vessels.find((v: any) => v.id === vesselId)?.name || 'Vessel';
-      const pdfJobTitle = templateData.woTitle || templateData.jobTitle || templateData.componentName || templateData.componentCode || '';
+      const pdfJobTitle = templateData.woTitle || templateData.componentName || templateData.componentCode || '';
       doc.setFillColor(30, 90, 142);
       doc.rect(0, 0, pageWidth, 38, 'F');
       doc.setTextColor(255, 255, 255);

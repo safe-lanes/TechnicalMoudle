@@ -838,7 +838,17 @@ export class JobDueScannerService {
     jobId: string, 
     reason: 'Planning' | 'Breakdown' | 'Other' = 'Planning',
     activeComponentCode?: string
-  ): Promise<{ success: boolean; workOrder?: any; message: string }> {
+  ): Promise<{
+    success: boolean;
+    workOrder?: any;
+    message: string;
+    blockingWorkOrder?: {
+      id: string;
+      workOrderNo: string;
+      status: string;
+      componentCode: string | null;
+    };
+  }> {
     const job = await storage.getJob(jobId);
     if (!job) {
       return { success: false, message: 'Job not found' };

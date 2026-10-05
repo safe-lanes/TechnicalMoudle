@@ -133,7 +133,7 @@ interface SparesHistoryItem {
   partName: string;
 }
 
-type EnrichedWorkOrder = WorkOrder & { computedStatus?: string; criticality?: string; jobPriority?: string };
+type EnrichedWorkOrder = WorkOrder & { computedStatus?: string; criticality?: string; jobPriority?: string; plannedDate?: string | null };
 
 type SortField = 'vessel' | 'overduePercent' | 'outstandingPercent' | 'compliancePercent' | 'lowStockItems' | 'overdueCount';
 type SortDir = 'asc' | 'desc';
@@ -578,10 +578,12 @@ const Dashboard = () => {
     hasDescendants: boolean;
     mode: 'me' | 'myTeam';
     appliedRankIds: string[];
+    vesselWideAccessGranted: boolean;
+    fallbackMode: 'vessel-wide' | 'own-rank' | 'none' | null;
   }
 
   interface ScopedOperationResponse {
-    workOrders: WorkOrder[];
+    workOrders: EnrichedWorkOrder[];
     scopeMeta: ScopeMeta;
   }
 
@@ -639,7 +641,7 @@ const Dashboard = () => {
   const fallbackMode = scopeMeta?.fallbackMode as string | null ?? null;
 
   // Fetch real work orders data
-  const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
+  const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<EnrichedWorkOrder[]>({
     queryKey: ['/technical/api/work-orders', effectiveVesselId],
     refetchOnMount: 'always',  // Always fetch fresh data when navigating to this page
     queryFn: async () => {
@@ -1702,7 +1704,7 @@ const Dashboard = () => {
   }, [filteredWorkOrdersData, workOrdersData]);
 
   const operationWOs = useMemo(() => {
-    const filterExec = (wos: WorkOrder[]) => wos.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    const filterExec = (wos: EnrichedWorkOrder[]) => wos.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     if (isAllVessels) return filterExec(workOrdersData);
     if (isAdminScope) return filterExec(workOrdersData);
     if (scopedResponse) return filterExec(scopedResponse.workOrders);
