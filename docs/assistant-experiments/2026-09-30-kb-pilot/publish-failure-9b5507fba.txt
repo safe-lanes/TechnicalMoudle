@@ -1,0 +1,10 @@
+PASS  revision 1 published: one served chunk, one supersede, all environments  -> {'entry': ('published', 1), 'chunks': [('kb:82a188d1-7889-459c-a816-8d00356a63cb:published', '1d756166afc5fc5c0d7ec93bbb662d7e', '28d46466ea8460ccef28bfef8bb839b6', '*', 'published', None, True)], 'su
+PASS  embedding failure refuses the publish (502, says the previous version is still in use)  -> 502 Not published: the entry could not be prepared for the index (RuntimeError). The previously published version is still in use.
+PASS  after the embedding failure: revision, searchable chunk (content+embedding) and supersedes UNCHANGED
+PASS  failure inside the transaction (after the new chunk was written) refuses the publish (500)  -> 500 Not published: the index update failed (RuntimeError); the previously published version is still in use.
+PASS  after the in-transaction failure: everything rolled back, revision 1 still served UNCHANGED
+PASS  instrument check: a real publish of revision 2 DOES change the snapshot (text changed, supersede removed)  -> {'entry': ('published', 2), 'chunks': [('kb:82a188d1-7889-459c-a816-8d00356a63cb:published', 'a16a9ba32313f19e344d01041e749773', '82e23173dde23c7cd5907d7685babbef', '*', 'published', None, False)], 's
+PASS  rollback to revision 1 restores revision 1's guidance text and its supersede (as revision 3)  -> {'entry': ('published', 3), 'chunks': [('kb:82a188d1-7889-459c-a816-8d00356a63cb:published', '9e7362d093597290ba69f6c4234b92d1', 'fbddcdf6a19cf5e509edb5726e43dd64', '*', 'published', None, True)], 'su
+PASS  retire removes the served chunk and the supersede  -> {'entry': ('retired', 3), 'chunks': [], 'supersedes': []}
+
+8/8 passed (entry 82a188d1-7889-459c-a816-8d00356a63cb, chunk digest fcafd9ab247b)

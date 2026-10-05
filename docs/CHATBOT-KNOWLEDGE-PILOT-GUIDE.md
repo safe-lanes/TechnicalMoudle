@@ -1,4 +1,4 @@
-# Chatbot knowledge — guide (pilot, updated 1 Oct 2026)
+# Chatbot knowledge — guide (pilot, updated 5 Oct 2026)
 
 Two parts:
 - **Part A** — for the administrator who decides who may train the chatbot.
@@ -20,21 +20,32 @@ Two parts:
 
 ## Part A — Assigning and removing trainers (administrator)
 
-### How the system knows who is a trainer
+### How the system knows who is a trainer (updated 5 Oct 2026)
 
-- **The trainer list:** the assistant keeps it on the AI server. Each row holds:
-  - the **issuer**, i.e. the application instance the trainer signs in through (for training: the dev instance);
-  - the **company** they log in with;
-  - the **user id**;
-  - a name, a module, and active/inactive.
+- **Training happens on dev only.** Dev is our own SAILERP, with one login for all modules (Technical, Crewing,
+  Audit & Safety). Trainers have no login on a client's production.
+- **The trainer list** is kept by the assistant on the AI server. Each row holds:
+  - the **user id** (the person's SAILERP dev login);
+  - a name;
+  - the **module** they train;
+  - the module's **dev system**, filled in automatically, for example `technical-dev`;
+  - active or inactive.
+  The **company is not used.**
 - **The check:** when someone opens "Manage knowledge" from the chatbot, PMS sends the assistant a signed note naming
-  the issuer, the company and the SAILERP user id from the verified login. None of these can be faked in the browser.
-  The assistant looks up a row where **issuer + company + user id all match**. If an **active** row exists for a module,
-  the person can train that module; otherwise they are refused.
+  the system and the SAILERP user id from the verified login. None of this can be faked in the browser. The person can
+  train a module only if an **active** row exists with **that dev system and that user id**.
 - **What gets nothing:**
-  - the same user id in another company;
-  - the same user id through another environment (issuer).
+  - **any login from production**, even with the same user id: nobody on production is ever a trainer;
+  - a module the person is not listed for (a Technical trainer cannot train Crewing).
 - **Roles:** no role is involved. Being a Sail Admin does not make someone a trainer.
+- **One module per row.** Example:
+  - Jeevan → Technical;
+  - the crewing trainer → Crewing;
+  - the audit trainer → Audit.
+- **Modules not yet connected:** a trainer can be added only for a module whose dev system is connected to the
+  assistant. Today that is **Technical only**. On the page, Crewing and Audit show "dev not connected yet". Connecting
+  them needs two things: the module's dev address registered on the assistant (same dev base address, with the
+  module's path), and that module sending the verified login to the assistant, as Technical does.
 - **When changes apply:** adding, deactivating or reactivating applies on the trainer's **next click**, even in a screen
   that is already open. The history of every change is kept.
 
@@ -43,17 +54,17 @@ Two parts:
 1. **Open it.** The page is at `/admin/kb` on the assistant. It is **not reachable from the internet**; open it on the AI
    server, for example through the SSH tunnel: `http://localhost:18047/admin/kb`.
 2. **Enter the assistant's admin token.** For the pilot it is the `ADMIN_TOKEN` line in
-   `~/central-assistant/kbpilot-r8.env` on the AI server. The pilot now has its **own** token; it no longer reuses the
-   live service's.
+   `~/central-assistant/kbpilot-r8.env` on the AI server. The pilot has its **own** token; it does not reuse the live
+   service's.
 3. **Add a trainer.**
-   1. Type a name, user id or company in **Find a person**. The list shows people who have used the chatbot.
-   2. Pick one, and the user id, name and company are filled in. If the person has never used the chatbot, type the
-      SAILERP user id and company yourself.
+   1. Type a name or user id in **Find a person**. The list shows people who have used the chatbot.
+   2. Pick one, and the user id and name are filled in. If the person has never used the chatbot, type their SAILERP dev
+      user id yourself (for example `Jeevan`).
    3. Choose the **module**.
-   4. Leave **Signs in through** on the dev instance, because training happens on dev.
-   5. Fill in **Granted by** and click **Add trainer**.
-4. **The list** shows every trainer with module and status. **Deactivate** removes access at once; **Reactivate** gives
-   it back. Tick **Show inactive** to see the history.
+   4. Fill in **Granted by** and click **Add trainer**.
+   The dev system is chosen automatically. The confirmation names it, for example "signs in on technical-dev".
+4. **The list** shows every trainer with module, dev system and status. **Deactivate** removes access at once;
+   **Reactivate** gives it back. Tick **Show inactive** to see the history.
 
 ### Option 2 — the command (same result)
 
@@ -61,16 +72,14 @@ The commands run on the AI server, inside the pilot container:
 
 ```bash
 docker exec sail-assistant-py-kbpilot python -m app.kb_admin list            # add --all for inactive ones
-docker exec sail-assistant-py-kbpilot python -m app.kb_admin grant \
-  --issuer technical-dev --tenant <login company> --user <SAILERP user id> --module technical --name "Smith" --by "Ghazi"
-docker exec sail-assistant-py-kbpilot python -m app.kb_admin revoke \
-  --issuer technical-dev --tenant <login company> --user <SAILERP user id> --module technical --by "Ghazi"
+docker exec sail-assistant-py-kbpilot python -m app.kb_admin grant   --user Jeevan --module technical --name "Jeevan" --by "Ghazi"
+docker exec sail-assistant-py-kbpilot python -m app.kb_admin revoke   --user Jeevan --module technical --by "Ghazi"
 ```
 
 ### Finding a user id when the person has not used the chatbot
 
 The PMS server logs it each time the person opens the chatbot: `[assistant-api] mint user=<id>`. It is also in the
-`master_users` table of their company's PMS database.
+`master_users` table of the dev PMS database.
 
 ---
 

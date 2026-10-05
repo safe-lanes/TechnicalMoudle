@@ -31,7 +31,7 @@ credentials, or deploys code is waiting for Ghazi's approval.
 | 4 | Pilot CORS: allow `https://dev.sl-sail.com` | pilot env | — |
 | 5 | Deploy the **widget change** (4 files on `chatbot-enterprise`) to **dev** PMS: "Report this answer" for everyone; the "Manage knowledge" icon only for trainers (decided by the assistant). Production PMS unchanged | dev server | deploying to dev |
 | 6 | Point **only Jeevan's browser** at the pilot: one-time per-browser setting `ASSISTANT_CENTRAL_URL = https://kb-pilot.sl-sail.com` (existing tester override in the widget; we give him a one-line instruction). Other dev users keep the live assistant | Jeevan's browser | — |
-| 7 | Grant Jeevan: `kb_admin grant --issuer technical-dev --tenant <his dev company domain> --user <his dev SAILERP user id> --module technical --scope global --name "Jeevan" --by Ghazi` | pilot | his real ids (from you) |
+| 7 | Grant Jeevan (5-Oct: dev system + user id, no company): `kb_admin grant --user Jeevan --module technical --name "Jeevan" --by Ghazi` — or the same on the Trainers page | pilot | confirmed: dev user id `Jeevan` |
 | 8 | Smoke test from outside, as Ghazi:<br>• real dev login → book icon → knowledge screen<br>• Test draft<br>• publish a DEV TEST entry → the widget cites it<br>• retire it<br>• one request **without** a token is refused | — | — |
 
 ## Authentication
@@ -66,6 +66,6 @@ Live is unaffected at every step.
 
 ## Information needed from you
 
-- Jeevan's SAILERP **user id** on dev, and his dev **company domain**.
+- ~~Jeevan's SAILERP user id on dev and company domain~~ — answered 5-Oct: user id `Jeevan` on dev; the company is no longer needed.
 - Approval for steps 1, 2, 3 and 5.
 - Whether step 6 or the alternative.
