@@ -224,15 +224,15 @@ describe('severe review: isolated source probes (not full API/database tests)', 
     },
   );
 
-  it('legacy name candidate changes feedback only', () => {
+  it('legacy feedback uses the actual component name and preserves code fallbacks', () => {
     const prop = probe.extract('server/services/workOrderService.ts', (node: any) =>
       probe.ts.isPropertyAssignment(node) && node.name.getText() === 'componentName'
-      && node.initializer.getText().includes('component.description'));
+      && node.initializer.getText().includes('component.name || component.componentCode'));
     const expression = prop.slice(prop.indexOf(':') + 1);
-    const context = { component: { name: 'Main Pump', componentCode: 'C1' }, existingWO: {} };
-    expect(probe.evaluate(`module.exports=${expression}`, context)).toBe('C1');
-    expect(probe.evaluate(`module.exports=${expression.replace('component.description', 'component.name')}`, context))
-      .toBe('Main Pump');
+    for (const [name, expected] of [['Main Pump', 'Main Pump'], [null, 'C1'], ['', 'C1']]) {
+      const context = { component: { name, componentCode: 'C1' }, existingWO: {} };
+      expect(probe.evaluate(`module.exports=${expression}`, context)).toBe(expected);
+    }
   });
 
   it('generic PATCH history guard treats SKIPPED as existing history (block-level reproduction)', async () => {

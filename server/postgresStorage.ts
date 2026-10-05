@@ -9,6 +9,8 @@ import {
   vessels,
   pmsVesselSettings,
   companyStandardGraceSettings,
+  type CompanyStandardGraceSettings,
+  type InsertCompanyStandardGraceSettings,
   companyApprovalSettings,
   type CompanyApprovalSettings,
   makers,
@@ -2275,7 +2277,7 @@ export class PostgresStorage {
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     if (history.length === 0) return [];
 
-    const workOrderIds = [...new Set(history.map(h => h.workOrderId))];
+    const workOrderIds = Array.from(new Set(history.map(h => h.workOrderId)));
     const anomalies = await db.select({
       workOrderId: workOrderAnomalies.workOrderId,
       daysLate: workOrderAnomalies.daysLate,
@@ -5192,7 +5194,7 @@ export class PostgresStorage {
     }
 
     const existingLinks = Array.isArray(defect.linkedDefects) ? defect.linkedDefects : [];
-    const mergedLinks = [...new Set([...existingLinks, ...linkedDefectIds])];
+    const mergedLinks = Array.from(new Set([...existingLinks, ...linkedDefectIds]));
 
     const result = await db.update(defects)
       .set({ linkedDefects: mergedLinks, updatedAt: new Date() })
@@ -9356,7 +9358,7 @@ export class PostgresStorage {
     }
   }
 
-  async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string }>> {
+  async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string | null }>> {
     const db = await getDb();
     const comp = await db.select().from(components).where(
       or(eq(components.cuuid, componentId), eq(components.id, componentId))
@@ -10631,7 +10633,7 @@ export class PostgresStorage {
     }
     
     // Add linked spares (deduplicated)
-    for (const spareId of linkedSpareIds) {
+    for (const spareId of Array.from(linkedSpareIds)) {
       if (!spareIdSet.has(spareId)) {
         spareIdSet.add(spareId);
         // Look up spare by integer ID to get suuid for getSpareWithInventory

@@ -342,7 +342,7 @@ export class WorkOrderService {
                     maxAllowed: componentActualRH,
                     componentId: component.cuuid || component.id,
                     componentCode: component.componentCode || existingWO.componentCode,
-                    componentName: component.description || component.componentCode || existingWO.componentCode,
+                    componentName: component.name || component.componentCode || existingWO.componentCode,
                     rhCounterType: component.rhCounterType || 'MASTER'
                   }
                 );
