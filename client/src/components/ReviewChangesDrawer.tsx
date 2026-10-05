@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useResolvedUserName } from "@/hooks/useResolvedUserName";
+import { componentErrorDescription } from "@/lib/componentErrorFeedback";
 
 interface ReviewChangesDrawerProps {
   isOpen: boolean;
@@ -82,8 +83,10 @@ export const ReviewChangesDrawer: React.FC<ReviewChangesDrawerProps> = ({
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to submit change request",
+        title: targetType === "component" ? "Change Request Submission Failed" : "Error",
+        description: targetType === "component"
+          ? componentErrorDescription(error, "The change request could not be submitted. Check your changes and try again.")
+          : "Failed to submit change request",
         variant: "destructive"
       });
     } finally {

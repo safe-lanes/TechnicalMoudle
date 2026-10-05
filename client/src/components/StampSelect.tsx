@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { ComponentLoadErrors } from "@/components/ComponentLoadErrors";
 
 // Strict master-first stamp picker (Task #366): components can only SELECT stamps
 // that already exist in the Rotation Item Master. Options are the vessel's
@@ -20,13 +21,14 @@ interface StampSelectProps {
   currentStamp?: string;
   className?: string;
   testId?: string;
+  componentFeedback?: boolean;
 }
 
 export default function StampSelect({
-  vesselId, value, onChange, disabled, currentStamp, className, testId,
+  vesselId, value, onChange, disabled, currentStamp, className, testId, componentFeedback = false,
 }: StampSelectProps) {
   const url = `/technical/api/rotational-items?vesselId=${encodeURIComponent(vesselId)}`;
-  const { data: items = [], isLoading } = useQuery<MasterItem[]>({
+  const { data: items = [], isLoading, error } = useQuery<MasterItem[]>({
     queryKey: [url],
     queryFn: () => fetch(url).then((r) => {
       if (!r.ok) throw new Error("Failed to load rotation items");
@@ -42,6 +44,8 @@ export default function StampSelect({
   const hasValue = value && selectable.some((it) => it.stamp === value);
 
   return (
+    <>
+    {componentFeedback && <ComponentLoadErrors failures={[["Stamps", error]]} />}
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -49,7 +53,7 @@ export default function StampSelect({
       className={className}
       data-testid={testId || "select-stamp"}
     >
-      <option value="">{isLoading ? "Loading stamps..." : "Select stamp..."}</option>
+      <option value="">{componentFeedback && error ? "Stamps could not be loaded" : isLoading ? "Loading stamps..." : "Select stamp..."}</option>
       {!hasValue && value && <option value={value}>{value}</option>}
       {selectable.map((it) => (
         <option key={it.riuuid} value={it.stamp}>
@@ -58,5 +62,6 @@ export default function StampSelect({
         </option>
       ))}
     </select>
+    </>
   );
 }

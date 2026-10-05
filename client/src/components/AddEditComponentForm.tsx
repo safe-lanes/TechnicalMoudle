@@ -38,6 +38,8 @@ import { FEATURES } from '@/config/features';
 import { formatProfessionalDate } from "@/lib/dateUtils";
 import { buildDraftJobPayload } from "@/lib/jobFormPayload";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
+import { componentErrorDescription, componentResponseError } from "@/lib/componentErrorFeedback";
+import { ComponentLoadErrors } from "@/components/ComponentLoadErrors";
 
 const SFI_FORMAT_HINT = "Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.";
 
@@ -47,6 +49,7 @@ export type { DraftJob };
 interface JobsSectionCProps {
   isEditMode: boolean;
   isLoadingJobs: boolean;
+  jobsLoadError?: unknown;
   componentJobs: any[];
   getPreviewData: <T>(data: T[], sectionId: string) => T[];
   showAllRows: Set<string>;
@@ -64,6 +67,7 @@ interface JobsSectionCProps {
 const JobsSectionC: React.FC<JobsSectionCProps> = ({
   isEditMode,
   isLoadingJobs,
+  jobsLoadError,
   componentJobs,
   getPreviewData,
   showAllRows,
@@ -91,8 +95,7 @@ const JobsSectionC: React.FC<JobsSectionCProps> = ({
       setJobToDeactivate(null);
     },
     onError: (error: any) => {
-      const message = error?.message || "Failed to deactivate job";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      toast({ title: "Job Deactivation Failed", description: componentErrorDescription(error, "The job could not be deactivated. Try again."), variant: "destructive" });
       setShowDeactivateDialog(false);
       setJobToDeactivate(null);
     },
@@ -192,6 +195,8 @@ const JobsSectionC: React.FC<JobsSectionCProps> = ({
                       Loading jobs...
                     </td>
                   </tr>
+                ) : jobsLoadError ? (
+                  <tr><td colSpan={7}><ComponentLoadErrors failures={[["Jobs", jobsLoadError]]} /></td></tr>
                 ) : componentJobs.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-gray-500">
@@ -322,11 +327,11 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [isOpen]);
 
-  const { data: makersList = [] } = useQuery<any[]>({
+  const { data: makersList = [], error: makersError } = useQuery<any[]>({
     queryKey: ['/technical/api/fleet/makers'],
   });
 
-  const { options: componentCategoryOptions, items: componentCategoryItems } = useMasterListOptions('componentCategory');
+  const { options: componentCategoryOptions, items: componentCategoryItems, error: categoryError } = useMasterListOptions('componentCategory');
 
   // Component data state - matches exact field structure from Components.tsx Section A
   // Boolean fields default to "No" per specification
@@ -369,53 +374,53 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const [isDataLoaded, setIsDataLoaded] = useState(!isEditMode);
 
   // Fetch existing component data if in edit mode
-  const { data: existingComponent, isLoading: isLoadingComponent } = useQuery<any>({
+  const { data: existingComponent, isLoading: isLoadingComponent, error: componentLoadError } = useQuery<any>({
     queryKey: ['/technical/api/components', componentId],
     enabled: isEditMode && !!componentId,
   });
 
   // Fetch related data for sections B-H (only in edit mode)
   // Filter jobs by vesselId at the database level
-  const { data: allJobs = [], isLoading: isLoadingJobs } = useQuery<any[]>({
+  const { data: allJobs = [], isLoading: isLoadingJobs, error: jobsError } = useQuery<any[]>({
     queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: isEditMode && !!vesselId,
   });
 
-  const { data: maintenanceHistory = [], isLoading: isLoadingHistory } = useQuery<any[]>({
+  const { data: maintenanceHistory = [], isLoading: isLoadingHistory, error: historyError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-maintenance-history/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
-  const { data: allSpares = [] } = useQuery<any[]>({
+  const { data: allSpares = [], error: sparesError } = useQuery<any[]>({
     queryKey: ['/technical/api/spares'],
     enabled: isEditMode,
   });
 
-  const { data: documents = [], isLoading: isLoadingDocs } = useQuery<any[]>({
+  const { data: documents = [], isLoading: isLoadingDocs, error: documentsError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-documents/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
-  const { data: classRegData = [], isLoading: isLoadingClassReg } = useQuery<any[]>({
+  const { data: classRegData = [], isLoading: isLoadingClassReg, error: classError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-class-regulatory/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
-  const { data: requisitions = [], isLoading: isLoadingRequisitions } = useQuery<any[]>({
+  const { data: requisitions = [], isLoading: isLoadingRequisitions, error: requisitionsError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-requisitions/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
-  const { data: allComponents = [] } = useQuery<any[]>({
+  const { data: allComponents = [], error: registerError } = useQuery<any[]>({
     queryKey: ['/technical/api/components'],
     enabled: isEditMode,
   });
 
-  const { data: addModeMasterComponents = [] } = useQuery<any[]>({
+  const { data: addModeMasterComponents = [], error: mastersError } = useQuery<any[]>({
     queryKey: ['/technical/api/rh-config/master-components', vesselId],
     queryFn: async () => {
       const res = await fetch(`/technical/api/rh-config/master-components/${vesselId}`);
-      if (!res.ok) throw new Error("Failed to fetch master components");
+      if (!res.ok) throw await componentResponseError(res);
       return res.json();
     },
     enabled: !!vesselId && componentData.rhCounterType === "INHERITED",
@@ -448,21 +453,21 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const rhCounterType = explicitRhType || autoDetectedType || 'NONE';
 
   // Fetch master component data if type is INHERITED
-  const { data: masterComponent, isLoading: isMasterLoading } = useQuery<any>({
+  const { data: masterComponent, isLoading: isMasterLoading, error: masterError } = useQuery<any>({
     queryKey: [`/technical/api/components/details/${rhMasterComponentId}`],
     enabled: isEditMode && rhCounterType === 'INHERITED' && !!rhMasterComponentId,
     staleTime: 5 * 60 * 1000,
   });
 
   // Fetch parent component for INHERITED type
-  const { data: rhParentComponent } = useQuery<any>({
+  const { data: rhParentComponent, error: rhParentError } = useQuery<any>({
     queryKey: [`/technical/api/components/details/${parentId}`],
     enabled: isEditMode && rhCounterType === 'INHERITED' && !!parentId,
     staleTime: 5 * 60 * 1000,
   });
 
   // Fetch running hours data for accurate timestamps (for MASTER type)
-  const { data: runningHoursData = [] } = useQuery<any[]>({
+  const { data: runningHoursData = [], error: rhError } = useQuery<any[]>({
     queryKey: [`/technical/api/running-hours/${componentId}`],
     enabled: isEditMode && !!componentId && rhCounterType === 'MASTER',
     staleTime: 60 * 1000,
@@ -488,7 +493,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const componentLastUpdated = existingComponent?.lastUpdated ?? existingComponent?.rhLastUpdated;
 
   // Unified loading state for INHERITED type
-  const isMasterPending = rhCounterType === 'INHERITED' && (isMasterLoading || masterComponent === undefined);
+  const isMasterPending = rhCounterType === 'INHERITED' && !masterError && (isMasterLoading || masterComponent === undefined);
 
   // Dummy date fallback for Last Updated when no real timestamp exists
   const DUMMY_DATE = '15 Dec 2025';
@@ -716,7 +721,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     const parentErr = getParentComponentError();
     if (parentErr) {
       errors['parentComponent'] = true;
-      setParentErrorMessage(parentErr);
+      setParentErrorMessage(componentErrorDescription(parentErr, "Select a valid parent component."));
       hasErrors = true;
     } else {
       setParentErrorMessage(null);
@@ -753,8 +758,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const handleSave = async () => {
     if (!validateMandatoryFields()) {
       toast({
-        title: "Validation Error",
-        description: "Please fill all mandatory fields before saving.",
+        title: "Component Save Failed",
+        description: "Complete the highlighted required fields before saving.",
         variant: "destructive",
       });
       return;
@@ -762,8 +767,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     if (componentData.maker && componentData.maker.trim()) {
       if (makersList.length === 0) {
         toast({
-          title: "Validation Error",
-          description: "Maker list is still loading. Please try again in a moment.",
+          title: "Component Save Failed",
+          description: makersError ? componentErrorDescription(makersError, "The Maker List could not be loaded. Refresh and try again.") : "The Maker List is loading. Wait a moment and try again.",
           variant: "destructive",
         });
         return;
@@ -771,8 +776,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       const validMaker = makersList.find((m: any) => m.makerName === componentData.maker);
       if (!validMaker) {
         toast({
-          title: "Validation Error",
-          description: "Please select a valid Maker from the Maker List.",
+          title: "Component Save Failed",
+          description: "Select a valid maker from the Maker List.",
           variant: "destructive",
         });
         return;
@@ -785,16 +790,16 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
     if (componentData.rotationalItem === "Yes" && !componentData.currentStamp.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Stamp is mandatory when Rotational Item is Yes.",
+        title: "Component Save Failed",
+        description: "Select a stamp when Rotational Item is set to Yes.",
         variant: "destructive",
       });
       return;
     }
     if (componentData.rhCounterType === "INHERITED" && !componentData.rhMasterComponentId) {
       toast({
-        title: "Validation Error",
-        description: "Please select a RH Counter Source from MASTER components.",
+        title: "Component Save Failed",
+        description: "Select a MASTER component as the RH Counter Source.",
         variant: "destructive",
       });
       return;
@@ -858,7 +863,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
               await apiRequest('POST', '/technical/api/jobs', jobPayload);
               successCount++;
             } catch (jobErr: any) {
-              jobErrors.push(draft.jobTitle);
+              jobErrors.push(`${draft.jobTitle}: ${componentErrorDescription(jobErr, "The job could not be created. Try again.")}`);
             }
           }
           if (jobErrors.length === 0) {
@@ -868,7 +873,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
             });
           } else {
             toast({
-              title: "Component Created",
+              title: "Component Saved — Some Jobs Failed",
               description: `Component saved. ${successCount} job${successCount !== 1 ? 's' : ''} created. Failed: ${jobErrors.join(', ')}.`,
               variant: "destructive",
             });
@@ -894,8 +899,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       onClose();
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to save component",
+        title: "Component Save Failed",
+        description: componentErrorDescription(error, "The component could not be saved. Check the entered values and try again."),
         variant: "destructive",
       });
     } finally {
@@ -958,6 +963,13 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-hidden p-0">
+        <ComponentLoadErrors failures={[
+          ["Component", componentLoadError], ["Maker List", makersError], ["Component Register", registerError],
+          ["Jobs", jobsError], ["Maintenance History", historyError], ["Spares", sparesError],
+          ["Documents", documentsError], ["Classification Data", classError], ["Requisitions", requisitionsError],
+          ["RH Sources", mastersError || masterError || rhParentError], ["Running Hours", rhError],
+          ["Component Categories", categoryError],
+        ]} />
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="text-lg font-semibold text-[#16569e]">
             {isEditMode ? "Edit Component" : "Add New Component"}
@@ -971,7 +983,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
           {/* Show loading state in edit mode while fetching data */}
           {isEditMode && (isLoadingComponent || !isDataLoaded) ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-gray-500">Loading component data...</div>
+              <div className="text-gray-500">{componentLoadError ? "Component data could not be loaded. Refresh and try again." : "Loading component data..."}</div>
             </div>
           ) : (
           <div className="space-y-4">
@@ -1085,7 +1097,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                     <Command>
                                       <CommandInput placeholder="Search makers..." data-testid="input-search-maker" />
                                       <CommandList className="max-h-[200px]">
-                                        <CommandEmpty>No makers found.</CommandEmpty>
+                                        <CommandEmpty>{makersError ? "Maker List could not be loaded. Refresh and try again." : "No makers found."}</CommandEmpty>
                                         <CommandGroup>
                                           {makersList.map((maker: any) => (
                                             <CommandItem
@@ -1221,6 +1233,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 Stamp{componentData.rotationalItem === "Yes" && <span className="text-red-500"> *</span>}
                               </label>
                               <StampSelect
+                                componentFeedback
                                 vesselId={vesselId}
                                 value={componentData.currentStamp}
                                 onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
@@ -1412,7 +1425,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                             <Command>
                                               <CommandInput placeholder="Search by code or name..." data-testid="input-search-rh-source-add" />
                                               <CommandList className="max-h-[200px]">
-                                                <CommandEmpty>No MASTER components found.</CommandEmpty>
+                                                <CommandEmpty>{mastersError ? "RH sources could not be loaded. Refresh and try again." : "No MASTER components found."}</CommandEmpty>
                                                 <CommandGroup>
                                                   {addModeMasterComponents.map((mc: any) => (
                                                     <CommandItem
@@ -1481,6 +1494,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                         <JobsSectionC
                           isEditMode={isEditMode}
                           isLoadingJobs={isLoadingJobs}
+                          jobsLoadError={jobsError}
                           componentJobs={componentJobs}
                           getPreviewData={getPreviewData}
                           showAllRows={showAllRows}
@@ -1508,7 +1522,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           ) : maintenanceHistory.length === 0 ? (
                             <div className="text-center py-8">
                               <div className="text-gray-400 text-sm">
-                                No maintenance history records found for this component
+                                {historyError ? "Maintenance history could not be loaded. Refresh and try again." : "No maintenance history records found for this component"}
                               </div>
                               <p className="text-xs text-gray-500 mt-2">
                                 History records are automatically created when work orders are approved and completed
@@ -1591,7 +1605,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           ) : componentSpares.length === 0 ? (
                             <div className="text-center py-8">
                               <div className="text-gray-400 text-sm">
-                                No spare parts linked to this component
+                                {sparesError ? "Spares could not be loaded. Refresh and try again." : "No spare parts linked to this component"}
                               </div>
                               <p className="text-xs text-gray-500 mt-2">
                                 Navigate to the Spares module to manage spare parts inventory
@@ -1687,7 +1701,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           ) : documents.length === 0 ? (
                             <div className="text-center py-8">
                               <div className="text-gray-400 text-sm">
-                                No drawings or manuals available for this component
+                                {documentsError ? "Documents could not be loaded. Refresh and try again." : "No drawings or manuals available for this component"}
                               </div>
                               <AdminOnly>
                                 <p className="text-xs text-gray-500 mt-2">
@@ -1767,7 +1781,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           ) : classRegData.length === 0 ? (
                             <div className="text-center py-8">
                               <div className="text-gray-400 text-sm">
-                                No classification & regulatory data found for this component
+                                {classError ? "Classification data could not be loaded. Refresh and try again." : "No classification & regulatory data found for this component"}
                               </div>
                               <AdminOnly>
                                 <p className="text-xs text-gray-500 mt-2">
@@ -1851,7 +1865,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           ) : requisitions.length === 0 ? (
                             <div className="text-center py-8">
                               <div className="text-gray-400 text-sm">
-                                No requisitions found for this component
+                                {requisitionsError ? "Requisitions could not be loaded. Refresh and try again." : "No requisitions found for this component"}
                               </div>
                               <p className="text-xs text-gray-500 mt-2">
                                 Requisitions for spares and services will appear here

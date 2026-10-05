@@ -22,6 +22,7 @@ import {
   ChevronDown, Search, Save, Edit2, Link
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { componentErrorDescription } from "@/lib/componentErrorFeedback";
 import { getComponentCategory } from "@/utils/componentUtils";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -705,8 +706,8 @@ export default function ComponentRegisterFormCR({
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: "Failed to submit change request",
+        title: "Change Request Submission Failed",
+        description: componentErrorDescription(error, "The change request could not be submitted. Check your changes and try again."),
         variant: "destructive"
       });
     }
@@ -721,7 +722,7 @@ export default function ComponentRegisterFormCR({
     
     if (invalidWOs && invalidWOs.length > 0) {
       toast({
-        title: "Validation Error",
+        title: "Change Request Submission Failed",
         description: "Please complete all work order edits before submitting",
         variant: "destructive"
       });
@@ -732,7 +733,7 @@ export default function ComponentRegisterFormCR({
     if (!payload || Object.keys(payload.diff).length === 0) {
       toast({
         title: "No Changes",
-        description: "No changes have been made to submit",
+        description: "Make a change before submitting the request.",
         variant: "destructive"
       });
       return;
