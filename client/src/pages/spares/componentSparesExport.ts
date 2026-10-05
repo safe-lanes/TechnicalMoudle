@@ -13,6 +13,28 @@ export interface ComponentSparesData {
 const deleted = (record: ExportRecord) => record.deleted === true || record.isDeleted === true;
 const inactive = (record: ExportRecord) => record.isActive === false;
 
+export function componentSparesFilename(
+  vesselId: string,
+  vessels: ReadonlyArray<{ id: string; name?: string | null }>,
+  now = new Date(),
+): string {
+  const vesselName = vesselId === "all" ? "All_Vessels"
+    : vesselId === "my" ? "My_Vessels"
+    : vessels.find(vessel => vessel.id === vesselId)?.name?.trim();
+  if (!vesselName) {
+    throw new Error("Vessel name is unavailable. Please wait for the vessel list to load and try exporting again.");
+  }
+  const safeName = vesselName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_");
+  const date = [
+    String(now.getDate()).padStart(2, "0"),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getFullYear()).padStart(4, "0"),
+  ].join("-");
+  const time = [now.getHours(), now.getMinutes(), now.getSeconds()]
+    .map(value => String(value).padStart(2, "0")).join("-");
+  return `${safeName}_Component_Spares_${date}_${time}.xlsx`;
+}
+
 export function componentSparesVesselIds(
   vesselId: string, isMyVessels: boolean, assignedIds: string[], pickerIds: string[],
 ) {

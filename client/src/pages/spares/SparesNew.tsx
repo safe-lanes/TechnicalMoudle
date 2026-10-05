@@ -128,7 +128,7 @@ const Spares: React.FC = () => {
     }
     return "";
   });
-  const { vesselId, setVesselId, isMyVessels, assignedVesselIds, pickerVessels } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds, pickerVessels, vessels: contextVessels } = useVessel();
   // 'my' aggregates across the assigned mini-fleet via the 'all' read path with a
   // vesselIds allow-list. The path segment becomes 'all'; the allow-list narrows it.
   const sparesScopeSegment = isMyVessels ? 'all' : vesselId;
@@ -2279,7 +2279,7 @@ const Spares: React.FC = () => {
       };
       const {
         componentSparesVesselIds, fetchComponentSparesData,
-        buildComponentSparesWorkbook, downloadComponentSparesWorkbook,
+        buildComponentSparesWorkbook, downloadComponentSparesWorkbook, componentSparesFilename,
       } = await import("./componentSparesExport");
       assertCurrent();
       const vesselIds = componentSparesVesselIds(
@@ -2307,9 +2307,7 @@ const Spares: React.FC = () => {
         });
         return;
       }
-      const now = new Date();
-      const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-      const fname = `component_spares_${vesselId}_${ts}.xlsx`;
+      const fname = componentSparesFilename(vesselId, contextVessels);
       await downloadComponentSparesWorkbook(buildComponentSparesWorkbook(data), fname, assertCurrent);
       toast({
         title: "Export Successful",

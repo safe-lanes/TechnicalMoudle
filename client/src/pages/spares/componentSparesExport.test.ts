@@ -3,9 +3,58 @@ import { test } from "node:test";
 import ExcelJS from "exceljs";
 import {
   buildComponentSparesWorkbook, componentSpareValues, componentSparesVesselIds,
-  fetchComponentSparesData, downloadComponentSparesWorkbook,
+  fetchComponentSparesData, downloadComponentSparesWorkbook, componentSparesFilename,
 } from "./componentSparesExport";
 import { SPARES_TEMPLATE_FIELDS } from "@shared/sparesTemplateFields";
+
+test("filename uses the selected vessel display name with the exact requested format", () => {
+  const now = new Date(2026, 9, 5, 14, 30, 45);
+  assert.equal(componentSparesFilename("v2", [
+    { id: "v1", name: "Other Vessel" }, { id: "v2", name: "Example Vessel" },
+  ], now), "Example Vessel_Component_Spares_05-10-2026_14-30-45.xlsx");
+});
+
+test("filename preserves spaces and replaces every filesystem-unsafe character", () => {
+  const now = new Date(2026, 9, 5, 14, 30, 45);
+  for (const unsafe of ['<', '>', ':', '"', '/', '\\', '|', '?', '*', '\u0000', '\u001f']) {
+    assert.equal(componentSparesFilename("v1", [{ id: "v1", name: `Sea${unsafe} Star` }], now),
+      "Sea_ Star_Component_Spares_05-10-2026_14-30-45.xlsx");
+  }
+  assert.equal(componentSparesFilename("v1", [{ id: "v1", name: "  Sea Star  " }], now),
+    "Sea Star_Component_Spares_05-10-2026_14-30-45.xlsx");
+});
+
+test("aggregate filenames describe All and My Vessels rather than a single vessel", () => {
+  const now = new Date(2026, 1, 3, 4, 5, 6);
+  assert.equal(componentSparesFilename("all", [], now),
+    "All_Vessels_Component_Spares_03-02-2026_04-05-06.xlsx");
+  assert.equal(componentSparesFilename("my", [], now),
+    "My_Vessels_Component_Spares_03-02-2026_04-05-06.xlsx");
+});
+
+test("filename uses browser-local date and time across a UTC date boundary", () => {
+  const previousTimezone = process.env.TZ;
+  try {
+    process.env.TZ = "Asia/Calcutta";
+    const instant = new Date("2026-10-04T19:35:06Z");
+    assert.equal(componentSparesFilename("v1", [{ id: "v1", name: "Sea Star" }], instant),
+      "Sea Star_Component_Spares_05-10-2026_01-05-06.xlsx");
+    process.env.TZ = "America/Los_Angeles";
+    assert.equal(componentSparesFilename("v1", [{ id: "v1", name: "Sea Star" }], instant),
+      "Sea Star_Component_Spares_04-10-2026_12-35-06.xlsx");
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
+});
+
+test("missing vessel names raise a clear error instead of silently naming files with a UUID", () => {
+  for (const vessels of [[], [{ id: "v1" }], [{ id: "v1", name: null }], [{ id: "v1", name: "  " }]]) {
+    assert.throws(() => componentSparesFilename("v1", vessels), /Vessel name is unavailable/);
+  }
+  assert.throws(() => componentSparesFilename("unknown", [{ id: "v1", name: "Sea Star" }]),
+    /Vessel name is unavailable/);
+});
 
 const component = (vesselId = "v1", suffix = "a") => ({
   id: `legacy-${vesselId}-${suffix}`, cuuid: `${vesselId}-${suffix}`, vesselId,
