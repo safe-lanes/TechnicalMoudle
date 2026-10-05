@@ -35,7 +35,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { FEATURES } from '@/config/features';
-import { SPARES_TEMPLATE_FIELDS } from '@shared/sparesTemplateFields';
 import { useVessels } from "@/hooks/useVessels";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 import { resolveSpareMakerDefault } from "./spareMakerDefault";
@@ -168,7 +167,7 @@ const Spares: React.FC = () => {
   const { isChangeMode } = useChangeMode();
   
   // UI Role context for role-based visibility
-  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const { uiRole, isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { isOfficeUser } = useAuth();
   const { resolvedUserName } = useResolvedUserName();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
@@ -1229,6 +1228,15 @@ const Spares: React.FC = () => {
   const componentSparesExportScopeRef = useRef(componentSparesExportScope);
   componentSparesExportScopeRef.current = componentSparesExportScope;
 
+  const uniqueSparesExportScope = JSON.stringify([
+    vesselId, activeOnlyForRole, uiRole, assignedVesselIds, contextVessels.map(v => v.id),
+  ]);
+  const uniqueSparesExportScopeRef = useRef({ key: uniqueSparesExportScope });
+  if (uniqueSparesExportScopeRef.current.key !== uniqueSparesExportScope) {
+    // Replace the token, so changing away and back also invalidates an export.
+    uniqueSparesExportScopeRef.current = { key: uniqueSparesExportScope };
+  }
+
   const { data: sparesResponse, isLoading, refetch } = useQuery<{ items: any[]; total: number }>({
     queryKey: [
       '/technical/api/inventory/spares-with-inventory',
@@ -2140,47 +2148,6 @@ const Spares: React.FC = () => {
     setSelectedComponentId(null);
   };
 
-  const mapSpareToTemplateRow = (spare: Spare, componentCode?: string, componentName?: string) => {
-    const row: Record<string, any> = {};
-    for (const field of SPARES_TEMPLATE_FIELDS) {
-      if (field.key === 'reserved') {
-        row[field.header] = '';
-        continue;
-      }
-      switch (field.key) {
-        case 'partCode': row[field.header] = spare.partCode || ''; break;
-        case 'fleetEquipmentCode': row[field.header] = spare.fleetEquipmentCode || ''; break;
-        case 'fleetEquipmentName': row[field.header] = ''; break;
-        case 'componentCode': row[field.header] = componentCode || spare.componentCode || ''; break;
-        case 'componentName': row[field.header] = componentName || spare.componentName || ''; break;
-        case 'partName': row[field.header] = spare.partName || ''; break;
-        case 'partNumber': row[field.header] = spare.partNumber || ''; break;
-        case 'uom': row[field.header] = spare.uom || ''; break;
-        case 'drawingNumber': row[field.header] = spare.drawingNumber || ''; break;
-        case 'positionNumber': row[field.header] = spare.positionNumber || ''; break;
-        case 'note': row[field.header] = spare.note || ''; break;
-        case 'specification': row[field.header] = spare.specification || ''; break;
-        case 'maker': row[field.header] = spare.maker || ''; break;
-        case 'makerCode': row[field.header] = spare.makerCode || ''; break;
-        case 'manualName': row[field.header] = spare.manualName || ''; break;
-        case 'pageNumber': row[field.header] = spare.pageNumber || ''; break;
-        case 'criticality': row[field.header] = spare.critical || spare.criticality || ''; break;
-        case 'totalRob': row[field.header] = spare.rob ?? 0; break;
-        case 'locationA': row[field.header] = spare.location || ''; break;
-        case 'locationARob': row[field.header] = spare.robLocationA ?? 0; break;
-        case 'locationB': row[field.header] = spare.location2 || ''; break;
-        case 'locationBRob': row[field.header] = spare.robLocationB ?? 0; break;
-        case 'minimumStock': row[field.header] = spare.min ?? 0; break;
-        case 'isActive': row[field.header] = spare.isActive === false ? 'No' : 'Yes'; break;
-        case 'ihm': row[field.header] = spare.ihm || ''; break;
-        case 'evidenceType': row[field.header] = spare.evidenceType || ''; break;
-        case 'isRotationItem': row[field.header] = spare.isRotationItem ? 'Yes' : 'No'; break;
-        default: row[field.header] = ''; break;
-      }
-    }
-    return row;
-  };
-
   const exportHistoryToExcel = () => {
     const now = new Date();
     const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
@@ -2230,31 +2197,44 @@ const Spares: React.FC = () => {
     });
   };
 
-  const exportUniqueSparesToExcel = () => {
+  const exportUniqueSparesToExcel = async () => {
+    if (exportingType) return;
+    const exportScope = uniqueSparesExportScopeRef.current;
     setExportingType('unique');
     try {
-      const now = new Date();
-      const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-      const fname = `spares_master_${vesselId}_${ts}.xlsx`;
-      const seenCodes = new Set<string>();
-      const exportRows: Record<string, any>[] = [];
-
-      for (const spare of filteredSpares) {
-        if (seenCodes.has(spare.partCode)) continue;
-        seenCodes.add(spare.partCode);
-        exportRows.push(mapSpareToTemplateRow(spare));
+      const assertCurrent = () => {
+        if (uniqueSparesExportScopeRef.current !== exportScope) {
+          throw new Error("Vessel or authorization scope changed during export. Please export again for the selected scope.");
+        }
+      };
+      const {
+        uniqueSparesVesselIds, fetchUniqueSparesData, uniqueSparesFilename,
+        buildUniqueSparesWorkbook, downloadUniqueSparesWorkbook,
+      } = await import("./uniqueSparesExport");
+      assertCurrent();
+      const vesselIds = uniqueSparesVesselIds(
+        vesselId, isMyVessels, assignedVesselIds, contextVessels.map(v => v.id),
+      );
+      if (!sparesScopeReady || !vesselIds.length) {
+        toast({ title: "No Data", description: "No vessels available in the selected scope." });
+        return;
       }
-
-      const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
-      const ws = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
-      ws['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Unique Spare Master');
-      XLSX.writeFile(wb, fname);
-
+      // Validate the display name before fetching; timestamp the finished export.
+      uniqueSparesFilename(vesselId, contextVessels);
+      const data = await fetchUniqueSparesData(vesselIds, activeOnlyForRole, async url => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to fetch complete unique-spare data. Export was not downloaded.");
+        return response.json();
+      }, assertCurrent);
+      if (!data.rows.length) {
+        toast({ title: "No Data", description: "No eligible unique spares available to export." });
+        return;
+      }
+      const fname = uniqueSparesFilename(vesselId, contextVessels);
+      await downloadUniqueSparesWorkbook(buildUniqueSparesWorkbook(data), fname, assertCurrent);
       toast({
         title: "Export Successful",
-        description: `Exported ${exportRows.length} unique spare master entries to ${fname}`
+        description: `Exported ${data.rows.length} unique spare master entries to ${fname}`
       });
       setExportDialogOpen(false);
     } catch (err: any) {
