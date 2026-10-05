@@ -1190,7 +1190,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createComponent(component: InsertComponent): Promise<Component> {
+  async createComponent(component: InsertComponent & { id?: Component["id"] }): Promise<Component> {
     const db = await getDb();
     const id = component.id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({
@@ -1477,7 +1477,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createFleetScopedComponent(component: InsertComponent): Promise<Component> {
+  async createFleetScopedComponent(component: InsertComponent & { id?: Component["id"] }): Promise<Component> {
     const db = await getDb();
     const id = component.id || `FC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({
@@ -8842,7 +8842,7 @@ export class PostgresStorage {
     }
     
     // Mark groups with 2+ defects as recurring
-    for (const [key, group] of defectGroups) {
+    for (const [key, group] of Array.from(defectGroups)) {
       if (group.length >= 2) {
         for (const defect of group) {
           const [updated] = await db.update(defects)
