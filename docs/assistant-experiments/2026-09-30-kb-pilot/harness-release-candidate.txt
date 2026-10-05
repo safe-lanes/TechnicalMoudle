@@ -1,0 +1,76 @@
+PASS  Technical trainer 1 sees only Technical  -> ['technical']
+PASS  Technical trainer 2 (second trainer of the same module) sees Technical  -> ['technical']
+PASS  Crewing trainer sees only Crewing  -> ['crewing']
+PASS  ordinary Sail Admin is not a trainer (role alone grants nothing)
+PASS  same dev user id with another company login is still the trainer (company is not part of the match)  -> ['technical']
+PASS  same user id on PRODUCTION is not a trainer (training on dev only)
+PASS  widget eligibility on production: none (icon hidden)
+PASS  a ship identity cannot open the knowledge screen (shore-only)  -> 403 {'error': 'Knowledge management is available in the office application only.'}
+PASS  widget eligibility: Technical trainer → technical  -> {'trainer': True, 'modules': ['technical']}
+PASS  widget eligibility: ordinary Sail Admin → none (icon hidden)
+PASS  ordinary user cannot create an entry (403)  -> 403 You are not a knowledge trainer for this module.
+PASS  Technical trainer cannot create a Crewing entry (403)  -> 403 You are not a knowledge trainer for this module.
+PASS  Crewing trainer cannot create a Technical entry (403)  -> 403 You are not a knowledge trainer for this module.
+PASS  a change without the x-kb-request header is refused (403)  -> 403
+PASS  sign-in with an invalid token is refused  -> 401
+PASS  trainer 1 creates a draft for all clients and all environments  -> 200 ee7169a8-ef2b-43a1-934f-67b7b7eb3b96
+PASS  a DRAFT is never retrieved for an ordinary user
+PASS  publish refused while a point still needs expert confirmation (409)  -> Not published: 1 point(s) still need expert confirmation. Confirm or remove them before publishing.
+PASS  Test draft goes through the chatbot's tool loop (search_module_docs) and uses the draft  -> ['search_module_docs'] True
+PASS  Test draft answer follows the draft (7 seconds)  -> 1. Ensure you are the **Chief Engineer** and that the counter is **not in use**. This procedure applies in both **Office and Ship**.
+2. Open
+PASS  while being tested, the draft is invisible in an ordinary user's chatbot answer  -> The available module documentation does not describe how to reset the Zeta-9 counter 163924.
+
+Source: Module documentation search — topic no
+PASS  the SECOND Technical trainer can publish trainer 1's entry (revision 1)  -> 200 None
+PASS  published entry is retrieved and cited for an ordinary user
+PASS  ordinary user's chatbot answer gives the published guidance (7 seconds) and names the entry  -> . Record the reset in the **remarks**.
+
+This applies in both **Office and Ship**.
+
+Source: *Technical - Knowledge: Resetting the Zeta-9 counter 163924*, Knowledge entry, revision 1 (Expert-confirmed).
+PASS  editing a published entry starts revision 2 as a draft
+PASS  unpublished edit is not served: still 7 seconds  -> 1. Ensure you are the **Chief Engineer** and that counter **163924 is not in use**. This applies in both **Office and Ship**.
+2. Open the **
+PASS  a publish that fails validation is refused  -> 409 1 superseded passage(s) are no longer in the index or belong to another module. Remove them and pick again.
+PASS  after the failed publish revision 1 is still served
+PASS  revision 2 published  -> 200
+PASS  users now get revision 2 (9 seconds)
+PASS  rollback to revision 1 publishes it again as revision 3  -> 200 None
+PASS  after rollback users get the earlier content again (7 seconds)
+PASS  history keeps all three revisions and the audit trail
+PASS  the entry published on dev reaches the same company's PRODUCTION users
+PASS  …and users of ANOTHER company
+PASS  the trainer's production login (no grant there) still cannot change it
+PASS  picked the manual passage the pilot actually cites for the probe question  -> 1.1.14.9 Postponements Do Not Auto-Revert -> 1 chunk(s)
+PASS  the supersede hides the passage for company A, company B and production
+PASS  revision 2 without the supersede: the passage is back
+PASS  rollback to revision 1 restores its supersede: the passage is hidden again
+PASS  retire restores the passage everywhere
+PASS  ordinary users' reports create review items
+PASS  the reports changed no knowledge entry
+PASS  both Technical trainers get every report (all companies, dev and production)
+PASS  the Crewing trainer does not get Technical reports
+PASS  an ordinary user cannot read the review queue (403)
+PASS  'Create entry from this' links the report to the new entry
+PASS  the Crewing trainer cannot close a Technical report
+PASS  after revocation, trainer 2's already-open session is refused (403)  -> revoked 1 grant(s) / 403 You are not (or no longer) a knowledge trainer for this module.
+PASS  …and trainer 2 no longer sees the module
+PASS  re-granting restores access in the same session
+PASS  admin page API refuses a wrong admin token (401)
+PASS  admin page itself is served (HTML)
+PASS  user picker finds people who have used the chatbot  -> {'users': [{'userId': 'devtest-user', 'name': 'DEV TEST ordinary Sail Admin (production)', 'company': 'pilot', 'lastSeen': '2026-10-05T11:13:44.590359+00:00'}, {'userId': 'devtest-user-b', 'name': 'DEV TEST ordinary Sail
+PASS  admin page offers Technical on its dev systems only (real dev + local pilot shore; never production)  -> [{'module': 'technical', 'label': 'Technical', 'instances': ['technical-dev', 'technical-pilotlocal']}]
+PASS  admin page refuses a trainer on a PRODUCTION system (400)  -> 400 'technical-pilotprod' is not a connected dev instance of the Technical module — trainers are added for the training environment only.
+PASS  admin page refuses a module whose dev system is not connected (400)  -> 400 The Audit module's dev environment is not connected to the assistant yet.
+PASS  with two dev systems for a module, the page asks which one (400)  -> 400 More than one dev instance of Technical is connected; choose one: technical-dev, technical-pilotlocal.
+PASS  admin page adds a trainer with user id + module (+ the chosen dev system)  -> {'ok': True, 'id': 5, 'issuer': 'technical-pilotlocal'}
+PASS  the new trainer can open the knowledge screen for Technical
+PASS  admin page deactivates; the trainer's open session is refused at once
+PASS  admin page reactivates; access returns in the same session
+PASS  history keeps the deactivated grant next to the active one
+PASS  'RH' asked from Technical is answered from Technical
+PASS  an explicit Crewing question stays Crewing
+PASS  retired entry is no longer retrieved
+
+66/66 passed  (run 163924)

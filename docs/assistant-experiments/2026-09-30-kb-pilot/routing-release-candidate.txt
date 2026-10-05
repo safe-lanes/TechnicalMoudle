@@ -1,0 +1,19 @@
+PASS  DEV mint -> token iss=technical-pilotlocal  -> 200 iss=technical-pilotlocal
+PASS  PROD mint -> token iss=technical-pilotprod  -> 200 iss=technical-pilotprod
+(DEV Data API today: overdue = 142, status 200)
+PASS  DEV token -> DEV data (142 overdue) via the shared assistant  -> 200 tools=['get_work_order_counts'] This vessel has **142 overdue work orders**.
+PASS  DEV call reached ONLY the dev instance (shore A log +1, shore B log +0)  -> A +1 B +0
+PASS  PROD token -> PROD instance (its registry has no such vessel -> not 142)  -> 200 tools=['get_work_order_counts'] I couldn’t retrieve the count because the system reports that vessel I
+PASS  PROD call reached ONLY the prod instance (shore B log +1, shore A log +0)  -> A +0 B +1
+PASS  DEV identity claiming the PROD environment (iss re-labelled) -> 401 bad-signature  -> 401 {'error': 'identity rejected: bad-signature'}
+PASS  unregistered issuer -> 401 unknown-issuer  -> 401 {'error': 'identity rejected: unknown-issuer'}
+PASS  routing claim removed after signing -> 401 bad-signature  -> 401 {'error': 'identity rejected: bad-signature'}
+PASS  token signed with the DEV key but WITHOUT an issuer -> 401 (not verifiable as a docs token either)  -> 401 {'error': 'identity rejected: bad-signature'}
+PASS  token carrying an injected callback address -> 401 bad-signature (addresses come only from the registry)  -> 401 {'error': 'identity rejected: bad-signature'}
+SKIP  docs-only token checks (shared key stays on the server; docs-only tokens are exercised by the server-side suites)
+PASS  DEV token documentation question -> answered via search_module_docs  -> 200 tools=['search_module_docs']
+PASS  PROD token presented to the DEV Data API -> 401  -> 401 {'error': 'unauthorized', 'message': 'identity rejected: bad-signature'}
+PASS  DEV token presented to the PROD Data API -> 401  -> 401 {'error': 'unauthorized', 'message': 'identity rejected: bad-signature'}
+PASS  PROD secret presented to the DEV Data API -> 401  -> 401 {'error': 'unauthorized', 'message': 'service secret required'}
+
+15/15 passed

@@ -1,5 +1,8 @@
 # Chatbot knowledge — guide (pilot, updated 5 Oct 2026)
 
+> **5 Oct 2026 — Part B is replaced** by `docs/CHATBOT-KNOWLEDGE-TRAINER-GUIDE.md` (normal application steps only; knowledge management moves to the official assistant — see `docs/CHATBOT-KNOWLEDGE-RELEASE-PLAN.md`). Part A (assigning trainers) still applies; on the official assistant use the container `sail-assistant-py-v8`.
+
+
 Two parts:
 - **Part A** — for the administrator who decides who may train the chatbot.
 - **Part B** — for trainers (for example Jeevan, for Technical).

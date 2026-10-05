@@ -1,0 +1,39 @@
+== A. OLD downgrade (v8-e58246b2a)
+rows before: 967
+
+rows after (965 = clean, 967 = knowledge left behind): 967
+== B. FIXED downgrade (v8-abe87ed1a)
+rows before: 967
+
+rows after: 965
+   alembic: 0007
+== C. today's live image v7-r2 on the rolled-back DB
+health ok= True chunks= 965 prompt= b31c3f9c6c1fe2e4
+== D. upgrade again (fixed image) is clean
+
+   alembic: 0011
+scratch removed
+===== RELEASE REGRESSION 2026-10-05T10:49:12Z: BASE=v7-r2 live config vs REL=v8-19e108451 release config =====
+{"ok":true,"store":"pgvector","indexSet":"kb-xref-e","chunks":965,"db":"connected","llmCalls":0,"prompt":{"version":"v5-plain-coverage-2026-09-15","docsPromptSha":"ff9ee87141ac1362","toolLoopPromptSha":"b0d7b8858d4c9f44","combined":"b31c3f9c6c1fe2e4"},"chatModel":"gpt-5.6-luna","temperature":"default","instances":["technical-demo","technical-dev","technical-prod"],"instancesRejected":[]}
+{"ok":true,"store":"pgvector","indexSet":"kb-xref-e","chunks":965,"db":"connected","llmCalls":0,"prompt":{"version":"v5-plain-coverage-2026-09-15+kb-rules-2026-09-30","docsPromptSha":"c0a1a431c8687aee","toolLoopPromptSha":"0550b0c3885e7a32","combined":"e9d7ba0117161ea1"},"chatModel":"gpt-5.6-luna","temperature":"default","instances":["technical-demo","technical-dev","technical-pilotlocal","technical-pilotprod","technical-prod"],"instancesRejected":[]}
+
+== totals ==
+   BASE       13/13
+   REL        13/13
+
+  routing+manual correct (expectations v1): BASE 18/18   REL 18/18
+  routing+manual correct (expectations v2, same responses): BASE 18/18   REL 18/18
+== totals ==
+   BASE           8/8
+   REL            8/8
+== totals: answer / citation / attribution / JOINT ==
+   BASE           11/12  12/12  12/12  JOINT 11/12
+   REL            11/12  12/12  12/12  JOINT 11/12
+   BASE           13/14
+   REL            13/14
+== totals (automatic floor; apply score_by by reading before concluding) ==
+   BASE         10/10
+   REL          9/10
+== totals (answer ∧ citation ∧ support, all runs) ==
+   BASE         35/57
+   REL          33/57
