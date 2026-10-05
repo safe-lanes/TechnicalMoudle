@@ -1,7 +1,19 @@
 # Pilot access plan — letting Jeevan test from his own computer
 
-**Status:** plan only. **Nothing below has been done.** Every step that exposes an address, changes DNS, nginx or
-credentials, or deploys code is waiting for Ghazi's approval.
+**Status (5 Oct 2026):** AI-server side DONE; waiting only for the chatbot screen change on dev (Nilesh deploys
+`replit_dev` to dev) and Jeevan's one browser setting.
+
+| Step | State |
+|---|---|
+| 1 DNS `kb-pilot.sl-sail.com` → 13.250.51.71 | DONE (owner, 5-Oct); resolves on public DNS |
+| 2 nginx + certificate (pilot only, `/admin` blocked) | DONE; checked from outside: health 200, `/admin` 403, no login 401, live assistant unchanged |
+| 3 Real dev PMS registered on the pilot as `technical-dev` (dev's keys copied on the server only, env `kbpilot-r9.env`); dev website allowed (CORS) | DONE; browser pre-check from `https://dev.sl-sail.com` 200, other sites 400. My local test shores renamed `technical-pilotlocal` / `technical-pilotprod` |
+| 4 Chatbot screen change on dev ("Report this answer", trainer book icon; Report hidden when the assistant does not support it) | READY on branch `feature/kb-pilot-dev-widget` (commit 329ee5d42 on top of replit_dev e08f76a49) — needs to reach `replit_dev`, then Nilesh deploys dev |
+| 5 Jeevan's browser setting | after step 4 |
+| 6 Jeevan = Technical trainer (`technical-dev` + user id `Jeevan`) | DONE |
+| 7 Smoke test with a real dev login | after step 4 |
+
+Pilot image `kbpilot-19e108451`: harness 66/66, publish failure 8/8.
 
 ## Goal
 
@@ -38,7 +50,7 @@ credentials, or deploys code is waiting for Ghazi's approval.
 
 - **Every pilot endpoint needs a signed identity.** It is minted by the dev PMS from Jeevan's verified SAILERP login (the
   same mechanism as the live chatbot). There is no anonymous access and no separate pilot password.
-- **The knowledge screen needs a trainer grant**, matched on issuer + company + user id, and checked on every request.
+- **The knowledge screen needs a trainer grant**, matched on the dev system + user id (no company), and checked on every request.
 - **Revoking Jeevan's grant** stops his access immediately, including an open screen.
 
 ## Isolation
