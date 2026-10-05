@@ -26,7 +26,7 @@ from sqlalchemy import text
 from app import db, kb, llm
 from app.config import settings
 
-SESS = kb.Session("script-publish-failure", "devtest-tech-1", "DEV TEST Technical trainer 1", "Sail Admin", "pilot", "technical-dev", "dev", "Office")
+SESS = kb.Session("script-publish-failure", "devtest-tech-1", "DEV TEST Technical trainer 1", "Sail Admin", "pilot", "technical-pilotlocal", "dev", "Office")
 results: list[tuple[str, bool]] = []
 
 

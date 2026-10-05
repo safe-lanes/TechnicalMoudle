@@ -2,8 +2,10 @@
 
 Identities are minted by the pilot PMS shores (`GET /technical/api/assistant/token`) from pilot logins, exactly as the
 widget does; the harness never signs an identity itself.
-  shore A :5000  instance technical-dev  (environment 'dev')   companies 'pilot' and 'pilot-b'
-  shore B :5001  instance technical-prod (environment 'prod' — SIMULATED production)  company 'pilot' (the same company)
+  shore A :5000  instance technical-pilotlocal (environment 'dev')   companies 'pilot' and 'pilot-b'
+  shore B :5001  instance technical-pilotprod  (environment 'prod' — SIMULATED production)  company 'pilot' (the same company)
+  (5-Oct-2026: the pilot also registers the REAL dev PMS as 'technical-dev' for Jeevan, so Technical has two dev
+  instances on the pilot and grants made here name the local one explicitly.)
 Assistant = the ISOLATED knowledge pilot (own database) through a local tunnel; the live service is not touched.
 Trainer grants are managed with the real admin command (`python -m app.kb_admin`) in the pilot container over SSH.
 
@@ -282,7 +284,7 @@ def main() -> int:
     s, b = t2.kb("PUT", f"/entries/{eid}/draft", entry_body(8))
     rec("after revocation, trainer 2's already-open session is refused (403)", "revoked 1" in out and s == 403, f"{out} / {s} {b.get('error')}")
     rec("…and trainer 2 no longer sees the module", t2.kb("GET", "/me")[1].get("trainer") is False)
-    admin("grant", "--user", "devtest-tech-2", "--module", "technical",
+    admin("grant", "--user", "devtest-tech-2", "--module", "technical", "--issuer", "technical-pilotlocal",
           "--name", "DEV TEST Technical trainer 2", "--by", "harness (re-grant after revocation test)", "--note", "test account")
     rec("re-granting restores access in the same session", t2.kb("GET", "/me")[1].get("trainer") is True)
 
@@ -295,15 +297,18 @@ def main() -> int:
     t3 = User("devtest-tech-3", "pilot", "DEV TEST Technical trainer 3 (added on the page)")
     s, b, _ = adm("GET", "/trainers")
     tech = [m for m in b.get("modules", []) if m["module"] == "technical"]
-    rec("admin page offers Technical on its dev system only", s == 200 and tech and tech[0]["instances"] == ["technical-dev"], tech)
-    s, b, _ = adm("POST", "/trainers", {"issuer": "technical-prod", "userId": "devtest-tech-9", "module": "technical", "by": "harness"})
+    rec("admin page offers Technical on its dev systems only (real dev + local pilot shore; never production)",
+        s == 200 and tech and tech[0]["instances"] == ["technical-dev", "technical-pilotlocal"], tech)
+    s, b, _ = adm("POST", "/trainers", {"issuer": "technical-pilotprod", "userId": "devtest-tech-9", "module": "technical", "by": "harness"})
     rec("admin page refuses a trainer on a PRODUCTION system (400)", s == 400 and "training environment only" in str(b.get("error")), f"{s} {b.get('error')}")
     s, b, _ = adm("POST", "/trainers", {"userId": "devtest-crew-9", "module": "audit", "by": "harness"})
     rec("admin page refuses a module whose dev system is not connected (400)", s == 400 and "not connected" in str(b.get("error")), f"{s} {b.get('error')}")
-    s, b, _ = adm("POST", "/trainers", {"userId": "devtest-tech-3", "module": "technical",
+    s, b, _ = adm("POST", "/trainers", {"userId": "devtest-tech-9", "module": "technical", "by": "harness"})
+    rec("with two dev systems for a module, the page asks which one (400)", s == 400 and "choose one" in str(b.get("error")), f"{s} {b.get('error')}")
+    s, b, _ = adm("POST", "/trainers", {"userId": "devtest-tech-3", "module": "technical", "issuer": "technical-pilotlocal",
                                         "name": "DEV TEST Technical trainer 3", "by": "harness", "note": "test account"})
-    rec("admin page adds a trainer with user id + module only (dev system picked automatically)",
-        s == 200 and b.get("ok") is True and b.get("issuer") == "technical-dev", b)
+    rec("admin page adds a trainer with user id + module (+ the chosen dev system)",
+        s == 200 and b.get("ok") is True and b.get("issuer") == "technical-pilotlocal", b)
     t3.sign_in()
     rec("the new trainer can open the knowledge screen for Technical", [m["module"] for m in t3.kb("GET", "/me")[1].get("modules", [])] == ["technical"])
     tid = [t["id"] for t in adm("GET", "/trainers")[1]["trainers"] if t["user_id"] == "devtest-tech-3" and t["active"]][0]

@@ -64,6 +64,7 @@ th{color:var(--muted);font-weight:600;font-size:12px}
       <div><label for="fUser">User id (SAILERP dev login)</label><input type="text" id="fUser"></div>
       <div><label for="fName">Name</label><input type="text" id="fName"></div>
       <div><label for="fModule">Module</label><select id="fModule"></select></div>
+      <div id="issuerBox" hidden><label for="fIssuer">Dev system</label><select id="fIssuer"></select></div>
       <div><label for="fBy">Granted by</label><input type="text" id="fBy" placeholder="Your name"></div>
     </div>
     <p class="muted small" id="envHint"></p>
@@ -107,8 +108,15 @@ th{color:var(--muted);font-weight:600;font-size:12px}
     if (!$("fModule").value || $("fModule").selectedOptions[0]?.disabled) {
       const first = data.modules.find((m) => m.instances.length); if (first) $("fModule").value = first.module;
     }
+    issuers();
     $("envHint").textContent = `The trainer signs in on ${data.trainingEnvs.join("/")} with this user id. The same user id on production is never a trainer.`;
     render();
+  }
+  function issuers() {  // a module normally has ONE dev system (picked automatically); choose only when it has several
+    const m = data.modules.find((x) => x.module === $("fModule").value);
+    const list = m ? m.instances : [];
+    $("fIssuer").innerHTML = list.map((i) => `<option value="${esc(i)}">${esc(i)}</option>`).join("");
+    $("issuerBox").hidden = list.length < 2;
   }
   function status(t) {
     if (!t.active) return `<span class="pill off">Inactive</span><div class="small muted">${esc((t.revoked_at || "").slice(0, 16).replace("T", " "))} by ${esc(t.revoked_by)}</div>`;
@@ -137,6 +145,7 @@ th{color:var(--muted);font-weight:600;font-size:12px}
   };
   $("token").onkeydown = (e) => { if (e.key === "Enter") $("enter").click(); };
   $("showInactive").onchange = render;
+  $("fModule").onchange = issuers;
   $("find").oninput = () => {
     clearTimeout(timer);
     timer = setTimeout(async () => {
@@ -156,7 +165,8 @@ th{color:var(--muted);font-weight:600;font-size:12px}
   $("grant").onclick = async () => {
     try {
       const r = await api("POST", "/admin/kb/api/trainers", {userId: $("fUser").value, name: $("fName").value,
-        module: $("fModule").value, by: $("fBy").value, note: $("fNote").value});
+        module: $("fModule").value, by: $("fBy").value, note: $("fNote").value,
+        issuer: $("issuerBox").hidden ? undefined : $("fIssuer").value});
       note($("addMsg"), "ok", `${$("fName").value || $("fUser").value} is now a ${$("fModule").selectedOptions[0].textContent} trainer (signs in on ${r.issuer}).`);
       ["fUser", "fName", "fNote", "find"].forEach((id) => $(id).value = "");
       await load();
