@@ -32,6 +32,7 @@ import MeterReplacedConfirmationDialog from "@/components/MeterReplacedConfirmat
 import { RENEWAL_ACTION_TYPES } from "@shared/schema";
 import { formatLocalDateTimeDDMMMYYYY } from "@shared/dateUtils";
 import { isRhValidationEnabledForComponent } from "./rhValidationPolicy";
+import { getRunningHoursErrorFeedback } from "./runningHoursErrorFeedback";
 
 interface ChildRHData {
   id: string;
@@ -814,8 +815,7 @@ const RunningHours = () => {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update running hours",
+        ...getRunningHoursErrorFeedback(error, "Failed to update running hours"),
         variant: "destructive"
       });
     }
@@ -857,8 +857,7 @@ const RunningHours = () => {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to perform bulk update",
+        ...getRunningHoursErrorFeedback(error, "Failed to perform bulk update"),
         variant: "destructive",
       });
     },
@@ -885,8 +884,7 @@ const RunningHours = () => {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update child running hours",
+        ...getRunningHoursErrorFeedback(error, "Failed to update child running hours"),
         variant: "destructive"
       });
     }

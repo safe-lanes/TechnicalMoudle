@@ -79,6 +79,7 @@ import { Marker } from "@/components/Marker";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection";
 import { WorkOrderDateInput } from "@/components/pms/WorkOrderDateInput";
+import { getLowerRunningHoursWarning, RunningHoursUpdateError } from "./runningHoursErrorFeedback";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -3126,15 +3127,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
-        if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate
-            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
-            : '';
-          throw new Error(
-            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
-            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before completing this Work Order.`
-          );
-        }
+        if (getLowerRunningHoursWarning(result)) throw new RunningHoursUpdateError(result);
         if (result.code === 'INVALID_RUNNING_HOURS') {
           throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
         }
@@ -3161,8 +3154,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       navigate("/pms/work-orders");
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to save work order",
+        ...(getLowerRunningHoursWarning(error) ?? {
+          title: "Error",
+          description: error.message || "Failed to save work order",
+        }),
         variant: "destructive",
       });
     }
@@ -3356,8 +3351,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       setSavedExecutionDataForCancel(null);
     } catch (error: any) {
       toast({
-        title: 'Save Failed',
-        description: error.message || 'Failed to save Part B changes.',
+        ...(getLowerRunningHoursWarning(error) ?? {
+          title: 'Save Failed',
+          description: error.message || 'Failed to save Part B changes.',
+        }),
         variant: 'destructive',
       });
     } finally {
@@ -3465,7 +3462,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       navigate('/pms/work-orders');
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save draft. Please try again.';
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast({ ...(getLowerRunningHoursWarning(err) ?? { title: 'Error', description: errorMessage }), variant: 'destructive' });
     } finally {
       setIsDraftSaving(false);
     }
@@ -3789,7 +3786,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create work order. Please try again.';
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast({ ...(getLowerRunningHoursWarning(err) ?? { title: 'Error', description: errorMessage }), variant: 'destructive' });
     } finally {
       setIsUnplannedSaving(false);
     }
@@ -3849,15 +3846,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
-        if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate
-            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
-            : '';
-          throw new Error(
-            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
-            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before approving this Work Order.`
-          );
-        }
+        if (getLowerRunningHoursWarning(result)) throw new RunningHoursUpdateError(result);
         // Task #240: MASTER component over the per-day RH rate cap — surface the Sail Admin override
         // affordance instead of a dead-end error toast.
         if (result.code === 'RH_OVERRIDE_REQUIRED' && !adminOverride) {
@@ -3899,8 +3888,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to approve work order",
+        ...(getLowerRunningHoursWarning(error) ?? {
+          title: "Error",
+          description: error.message || "Failed to approve work order",
+        }),
         variant: "destructive",
       });
     } finally {
