@@ -26,12 +26,12 @@ Evidence classes: **PROVEN** = run, output kept · **READ** = from code · **INF
 | Dev PMS (dev.sl-sail.com) | uses `https://assistant.sl-sail.com`; does **not** yet have the chatbot screen change | PROVEN (public JS bundle) |
 | Production PMS (sailerp.sl-sail.com) | uses `https://assistant.sl-sail.com`; no chatbot screen change | PROVEN (public JS bundle) |
 | `origin/replit_dev` | `329ee5d42` = the chatbot screen change (pushed 5 Oct, Ghazi OK) — waiting for Nilesh's dev deploy | PROVEN |
-| Assistant code to release | commit **`abe87ed1a`** on `chatbot-enterprise` (local; pushed head of `feature/chatbot-enterprise` is `9d163eaf2`) | — |
-| Release image | `sail-assistant-py:v8-abe87ed1a`, built on the AI server with `git archive abe87ed1a:central-assistant-py` | PROVEN |
+| Assistant code to release | commit **`51e866769`** on `chatbot-enterprise` (local; pushed head of `feature/chatbot-enterprise` is `9d163eaf2`). Differs from the tested `abe87ed1a` only in `app/kb_admin.py` (the rollback commands; a command-line tool, not loaded by the service) | PROVEN (file hashes) |
+| Release image | `sail-assistant-py:v8-51e866769`, built on the AI server with `git archive 51e866769:central-assistant-py` | PROVEN |
 
 ## 3. What changes
 
-**Assistant (`v7-r2` → `v8-abe87ed1a`)** — `git diff 890b47645 abe87ed1a -- central-assistant-py`:
+**Assistant (`v7-r2` → `v8-51e866769`)** — `git diff 890b47645 51e866769 -- central-assistant-py`:
 - knowledge management: entries, revisions, private preview, publish / restore / retire, supersedes, review queue,
   trainer list (`kb_trainers`) + trainer page `/admin/kb` (not public) + command `python -m app.kb_admin`;
 - migrations **0008–0011** (additive: new `kb_*` tables, four nullable columns on `assistant_chunks`);
@@ -55,7 +55,8 @@ Setup: live DB dumped (`~/central-assistant/backups/live-assistant-db-20261005T1
 |---|---|---|
 | Migration 0008–0011 on a copy of live data | clean; second run no-op | PROVEN |
 | Today's live image on the migrated database (switch overlap / fast rollback) | healthy, fingerprint `b31c3f9c`, no errors | PROVEN |
-| Rollback rehearsal (scratch copy with a published + a preview knowledge row) | OLD downgrade left the 2 rows behind (found → fixed in `abe87ed1a`); FIXED downgrade removes them, back to 0007; today's live image healthy on it; re-upgrade clean | PROVEN |
+| **Fast rollback with knowledge present** (previous image on the MIGRATED DB, a real published entry + a real private preview) | **Plain switch is UNSAFE:** the previous image gave an ordinary user the private draft's text word for word. **Corrected procedure** (`kb_admin rollback-hold` before switching): previous image retrieves neither draft nor published entry, manuals answer normally, status 0; `rollback-release` → release image serves the published entry again, draft still private — **6/6** (`scripts/verify_fast_rollback.py`) | PROVEN |
+| Rollback rehearsal — full downgrade (scratch copy with a published + a preview knowledge row) | OLD downgrade left the 2 rows behind (found → fixed in `abe87ed1a`); FIXED downgrade removes them, back to 0007; today's live image healthy on it; re-upgrade clean | PROVEN |
 | Knowledge harness (trainers, refusals, draft → test → publish → edit → restore → retire, all clients/environments, reports, revocation, trainer page) | **66/66** | PROVEN |
 | Publish failure (embedding outage / failure inside the transaction leave the served version unchanged) | **8/8** (pilot, same code) | PROVEN |
 | Live-data routing dev vs production (local test environments) | **15/15** — dev → dev Data API only (142 overdue = dev's own count), production → production only, cross-environment / forged / re-labelled identities refused | PROVEN |
@@ -63,7 +64,8 @@ Setup: live DB dumped (`~/central-assistant/backups/live-assistant-db-20261005T1
 | Change note lost on Save → Publish (found in the browser) | fixed in `e58246b2a`, re-checked in the browser | PROVEN |
 | Draft transfer (5 entries as unpublished drafts, attributed to development) | 5 imported, 0 served, 0 reports, 0 accounts carried; rerun = no-op | PROVEN |
 | Regression suites BASE vs REL | routing 13/13 = 13/13 · retrieval 18/18 = 18/18 · work orders 8/8 = 8/8 · frozen 11/12 = 11/12 · corrected 13/14 = 13/14 · fresh **10/10 vs 9/10** · manual coverage **35/57 vs 33/57** | PROVEN (numbers) |
-| Reading of the differences | fresh-audit-1: same 5 sections retrieved on both sides in every run; the failing run gives the same steps but not the word "mandatory/required". Manual coverage: 4 losses, each passing in 1–2 of 3 REL runs — 3 are wording only ("permanently removed" vs "removes", "create and release" vs "released", "open the existing record" vs "edit the existing"), 1 omits "auto-generated Master ID" in one run; 2 gains of the same kind. Same pattern as the 1-Oct run (34 vs 32); the 30-Sep run went the other way (33 vs 35) | READ (by me; no second reader; no captured model input, so a prompt effect cannot be excluded) |
+| The two cases in full (`docs/assistant-experiments/2026-09-30-kb-pilot/RELEASE-TWO-CASES-FULL-ANSWERS.md`) | fresh-audit-1 REL run 2 = **different wording** ("fields marked with \*" without "mandatory"; nothing missing). certsurveys-1 REL run 1 = **actual omission** of one stated fact (the auto-generated Master ID; all user steps correct). Also: two runs judged PASS (one per side) place the Master ID at Save instead of at New | READ (by me) |
+| Reading of the other differences | fresh-audit-1: same 5 sections retrieved on both sides in every run; the failing run gives the same steps but not the word "mandatory/required". Manual coverage: 4 losses, each passing in 1–2 of 3 REL runs — 3 are wording only ("permanently removed" vs "removes", "create and release" vs "released", "open the existing record" vs "edit the existing"), 1 omits "auto-generated Master ID" in one run; 2 gains of the same kind. Same pattern as the 1-Oct run (34 vs 32); the 30-Sep run went the other way (33 vs 35) | READ (by me; no second reader; no captured model input, so a prompt effect cannot be excluded) |
 
 Fingerprint: the image the suites ran on (`19e108451`) and the release image differ only in `app/kb_ui.html` (the
 knowledge screen) and the 0008 downgrade — prompt fingerprint identical (`e9d7ba01`). PROVEN (file hashes).
@@ -84,7 +86,7 @@ knowledge screen) and the 0008 downgrade — prompt fingerprint identical (`e9d7
 |---|---|---|
 | 0 | Nilesh deploys `replit_dev` (`329ee5d42`) to **dev** — any time; before the switch it shows nothing new (live answers the knowledge check with 404) | dev bundle contains `kb/eligibility` |
 | 1 | Fresh backup: `pg_dump` of `sail-assistant-db` → `~/central-assistant/backups/`; copy `v7.env` → `v7.env.bak-v8-<ts>` | dump size ≈ 276 MB |
-| 2 | Start `sail-assistant-py-v8` = image `v8-abe87ed1a`, env `v8-release.env`, network `technical-rag-net`, `127.0.0.1:8051→8000` (same as v7, new port); it migrates the live DB to 0011 on start. v7 keeps serving (PROVEN safe on a migrated copy) | `/health` on :8051: fingerprint `e9d7ba01`, instances dev/prod/demo, rejected [] ; alembic 0011 |
+| 2 | Start `sail-assistant-py-v8` = image `v8-51e866769`, env `v8-release.env`, network `technical-rag-net`, `127.0.0.1:8051→8000` (same as v7, new port); it migrates the live DB to 0011 on start. v7 keeps serving (PROVEN safe on a migrated copy) | `/health` on :8051: fingerprint `e9d7ba01`, instances dev/prod/demo, rejected [] ; alembic 0011 |
 | 3 | nginx: `assistant.conf` + `safelanes.conf:375` `8046 → 8051` (backups `*.bak-v8-<ts>`), `nginx -t`, reload | public `/health` = `e9d7ba01`; `/admin` 403; no-token chat 401; preflight from dev/prod/demo 200 |
 | 4 | Grant Jeevan: `docker exec sail-assistant-py-v8 python -m app.kb_admin grant --user Jeevan --module technical --name "Jeevan" --by "Ghazi"` (dev system picked automatically: `technical-dev`) | `kb_admin list` |
 | 5 | Import the 5 drafts: `kb_transfer_drafts.py import --in kb-drafts.json --dry-run`, then without `--dry-run` (export file already made from the pilot) | 5 drafts, 0 served |
@@ -95,11 +97,17 @@ knowledge screen) and the 0008 downgrade — prompt fingerprint identical (`e9d7
 
 ## 6. Rollback
 
-- **R1 (seconds, while nothing has been published on live):** nginx back to `8046` + reload; v7 still runs and works on
-  the migrated DB (PROVEN). Safe only while there are **no knowledge rows** (`SELECT count(*) FROM assistant_chunks WHERE
-  kb_state IS NOT NULL` = 0) — otherwise v7 would serve them as ordinary passages.
-- **R2 (after something was published):** export entries (`kb_transfer_drafts.py export` / `pg_dump`), stop v8, run
-  `alembic downgrade 0007` with the v8 image (removes knowledge rows first — rehearsed), nginx back to 8046.
+- **Never switch straight back to v7 once knowledge exists.** PROVEN unsafe: v7 searches by index set only and served a
+  private draft's text to an ordinary user.
+- **R1 — fast (about a minute), PROVEN:**
+  1. `docker exec sail-assistant-py-v8 python -m app.kb_admin rollback-hold --by "<who>"` — moves every knowledge row
+     (published and previews) out of the served index set; prints "served 0".
+  2. `docker exec sail-assistant-py-v8 python -m app.kb_admin rollback-status` — must say `served index set: 0`.
+  3. nginx `assistant.conf` + `safelanes.conf:375` back to `8046` (v7 still running), `nginx -t`, reload.
+  Knowledge entries stay in their own tables; users get the manuals only (replaced manual passages come back).
+  **Roll forward:** nginx to `8051`, then `kb_admin rollback-release --by "<who>"`.
+- **R2 — full:** after R1, stop v8 and run `alembic downgrade 0007` with the v8 image (removes knowledge rows first —
+  rehearsed), keeping the step-1 dump. Only if the database itself must return to the old version.
 - **R3:** restore the step-1 dump.
 
 ## 7. Decisions for Ghazi
