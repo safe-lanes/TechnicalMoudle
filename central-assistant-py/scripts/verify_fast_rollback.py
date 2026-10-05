@@ -10,13 +10,14 @@ after `kb_admin rollback-release`. Exit 0 = the corrected procedure is safe."""
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
 import time
+import urllib.request
 from typing import Any
 
-import httpx
 from sqlalchemy import text
 
 from app import db, kb
@@ -46,10 +47,13 @@ def entry(title: str, body: str) -> dict[str, Any]:
 async def ask(base: str, q: str, route_only: bool = True) -> dict[str, Any]:
     tok = sign_identity({"userId": "rollback-ordinary-user", "userName": "Ordinary user", "role": "Sail Admin",
                          "tenantDomain": "smoke-suite-tenant"}, settings().identity_signing_key, 60)
-    async with httpx.AsyncClient(timeout=120.0) as c:
-        r = await c.post(f"{base}/chat", headers={"x-assistant-identity": tok},
-                         json={"message": q, "routeOnly": route_only, "context": {"module": "technical"}})
-    return r.json()
+    req = urllib.request.Request(f"{base}/chat", method="POST", headers={"x-assistant-identity": tok, "content-type": "application/json"},
+                                 data=json.dumps({"message": q, "routeOnly": route_only, "context": {"module": "technical"}}).encode())
+
+    def call() -> dict[str, Any]:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return dict(json.loads(r.read()))
+    return await asyncio.to_thread(call)
 
 
 def cited(reply: dict[str, Any], title: str) -> bool:
