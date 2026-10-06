@@ -11,9 +11,9 @@
 4. After 5 wrong passwords the account is locked for 15 minutes. Ask Ghazi for a password reset if needed.
 5. Click **Sign out** when you finish.
 
-## Your drafts
+## Your drafts (PMS trainer)
 
-Five drafts are waiting for your review. Development prepared them from the application and its tests; you have not
+For Technical (PMS), five drafts are waiting for review. Development prepared them from the application and its tests; you have not
 confirmed them yet:
 
 - Deleting a job
