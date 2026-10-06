@@ -91,6 +91,7 @@ async def main() -> int:
     print(f"         citations: {[c.get('manual') for c in r_d.get('citations') or []][:4]}")
 
     # 2. corrected procedure: hold BEFORE switching
+    print(admin("writes-block", "--by", "rollback test", "--reason", "fast rollback test"))
     print(admin("rollback-hold", "--by", "rollback test"))
     print("rows:", await kb_rows())
     r_p, r_d = await ask(V7, P_Q), await ask(V7, D_Q)
@@ -102,10 +103,11 @@ async def main() -> int:
     rec("after HOLD — manuals still answer normally on the previous image", bool(man.get("citations")) and man.get("gate") == "answer",
         man.get("gate"))
     st = admin("rollback-status")
-    rec("rollback-status reports 0 knowledge rows in the served index set", "served index set: 0 " in st, st)
+    rec("rollback-status reports SAFE (0 served, writes blocked)", "served index set: 0;" in st and "SAFE to switch" in st, st)
 
     # 3. roll forward: release, the release image serves the published entry again; the draft stays private
     print(admin("rollback-release", "--by", "rollback test"))
+    print(admin("writes-unblock", "--by", "rollback test"))
     print("rows:", await kb_rows())
     r_p, r_d = await ask(V8, P_Q), await ask(V8, D_Q)
     rec("after RELEASE — release image serves the published entry again", cited(r_p, P_TITLE))
