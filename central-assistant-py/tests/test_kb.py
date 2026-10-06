@@ -149,3 +149,31 @@ def test_module_context_not_used_when_far() -> None:
     hits = sorted([hit("crewing", 0.80), hit("technical", 1.10)], key=lambda h: h.distance)
     r = retrieval.route(hits, "How do I appraise a seafarer?", "technical", {})
     assert r.module == "crewing"
+
+
+# ── trainer accounts (6-Oct-2026) ──────────────────────────────────────────────────────────────────────────────
+def test_password_hash_roundtrip_and_salt() -> None:
+    h1, h2 = kb.hash_password("correct horse battery staple"), kb.hash_password("correct horse battery staple")
+    assert h1 != h2 and h1.startswith("scrypt$")                 # salted: same password, different hash
+    assert kb.verify_password("correct horse battery staple", h1)
+    assert not kb.verify_password("correct horse battery stapl", h1)
+    assert not kb.verify_password("anything", "not-a-hash")      # malformed stored value never verifies
+
+
+def test_training_groups() -> None:
+    assert kb.expand_groups(["technical"]) == ["technical"]
+    assert kb.expand_groups(["audit_safety"]) == ["audit", "incident", "safety"]   # one business module, three parts
+    with pytest.raises(kb.KBError):
+        kb.expand_groups(["finance"])
+    with pytest.raises(kb.KBError):
+        kb.expand_groups([])
+    g = kb.module_groups(["audit", "incident", "safety"])
+    assert [x["label"] for x in g] == ["Audit & Safety"] and len(g[0]["modules"]) == 3
+    assert [x["group"] for x in kb.module_groups(["technical", "crewing"])] == ["technical", "crewing"]
+
+
+def test_username_rules() -> None:
+    assert kb._clean_username(" PMSTrainer ") == "pmstrainer"
+    for bad in ("ab", "has space", "x" * 41, "semi;colon"):
+        with pytest.raises(kb.KBError):
+            kb._clean_username(bad)

@@ -28,6 +28,7 @@ Guarantees, all enforced here on the server:
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import secrets
 import uuid
@@ -64,6 +65,7 @@ class Session:
     iss: str | None
     env: str | None = None
     user_type: str | None = None
+    account_id: int | None = None   # 6-Oct-2026: a trainer-ACCOUNT session (own login on the training page)
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,8 @@ async def load_grants(issuer: str | None, user_id: str | None, tenant: str | Non
 async def access(sess: Session) -> Access:
     if (sess.user_type or "").lower() == "ship":
         return Access(sess, {})  # knowledge management is shore-only
+    if sess.account_id is not None:  # trainer account: its modules, read on EVERY request (disable = no access at once)
+        return Access(sess, await account_grants(sess.account_id))
     return Access(sess, await load_grants(sess.iss, sess.user_id, sess.tenant))
 
 
@@ -176,7 +180,8 @@ async def get_session(sid: str | None) -> Session | None:
     if not r:
         return None
     m = r._mapping
-    return Session(m["id"], m["user_id"], m["user_name"], m["role"], m["tenant_domain"], m["iss"], m.get("env"), m.get("user_type"))
+    return Session(m["id"], m["user_id"], m["user_name"], m["role"], m["tenant_domain"], m["iss"], m.get("env"), m.get("user_type"),
+                   m.get("account_id"))
 
 
 async def end_session(sid: str) -> None:
@@ -187,9 +192,10 @@ async def end_session(sid: str) -> None:
 async def me(sess: Session) -> dict[str, Any]:
     a = await access(sess)
     return {"userId": sess.user_id, "userName": sess.user_name, "role": sess.role, "company": sess.tenant, "issuer": sess.iss,
-            "environment": sess.env, "trainer": bool(a.grants),
+            "environment": sess.env, "trainer": bool(a.grants), "account": sess.account_id is not None,
             "modules": [{"module": g.module, "label": MODULE_LABELS.get(g.module, g.module.title())}
                         for g in sorted(a.grants.values(), key=lambda x: x.module)],
+            "groups": module_groups(sorted(a.grants)),
             "moduleLabels": MODULE_LABELS}
 
 
@@ -708,6 +714,194 @@ async def annotate(entry_id: str, note: str, by: str) -> None:
         await c.execute(text("INSERT INTO kb_audit (entry_id, revision, action, actor_id, actor_name, detail) "
                              "VALUES (:e, NULL, 'note', :u, :n, CAST(:d AS jsonb))"),
                         {"e": entry_id, "u": by, "n": by, "d": _j({"note": note[:1000]})})
+
+
+# ── training MODULES as the business sees them (owner 6-Oct-2026) ─────────────────────────────────────────────
+# Audit & Safety is ONE application (SAILERP); the assistant's documents split it into audit / safety / incident. A
+# trainer of Audit & Safety trains all three parts; each entry still records its part so the chatbot files it correctly.
+TRAINING_GROUPS: dict[str, tuple[str, list[str]]] = {
+    "technical": ("Technical (PMS)", ["technical"]),
+    "crewing": ("Crewing", ["crewing"]),
+    "audit_safety": ("Audit & Safety", ["audit", "safety", "incident"]),
+}
+
+
+def module_groups(modules: list[str]) -> list[dict[str, Any]]:
+    """The training groups covered by these assistant modules (a group is shown when any of its parts is granted)."""
+    have = set(modules)
+    out = []
+    for gid, (label, parts) in TRAINING_GROUPS.items():
+        mine = [m for m in parts if m in have]
+        if mine:
+            out.append({"group": gid, "label": label, "modules": [{"module": m, "label": MODULE_LABELS.get(m, m.title())} for m in mine]})
+    return out
+
+
+# ── trainer ACCOUNTS: own login on the training page (owner decision 6-Oct-2026) ────────────────────────────
+# The domain team trains, so trainers sign in with a user id + password kept here (SAILERP role integration postponed).
+# Passwords are stored only as scrypt hashes (standard library). 5 wrong attempts lock the account for 15 minutes.
+# Disabling or resetting an account deletes its sessions, and every request re-reads the account (active + modules).
+_SCRYPT = {"n": 2 ** 14, "r": 8, "p": 1}
+LOCK_AFTER, LOCK_MINUTES, MIN_PASSWORD = 5, 15, 14
+ACCOUNT_ISS = "kb-account"
+_USERNAME_OK = set("abcdefghijklmnopqrstuvwxyz0123456789._-")
+
+
+def hash_password(pw: str) -> str:
+    salt = secrets.token_bytes(16)
+    h = hashlib.scrypt(pw.encode(), salt=salt, n=_SCRYPT["n"], r=_SCRYPT["r"], p=_SCRYPT["p"], dklen=32)
+    return f"scrypt${_SCRYPT['n']}${_SCRYPT['r']}${_SCRYPT['p']}${salt.hex()}${h.hex()}"
+
+
+def verify_password(pw: str, stored: str) -> bool:
+    try:
+        _alg, n, r, p, salt, h = stored.split("$")
+        got = hashlib.scrypt(pw.encode(), salt=bytes.fromhex(salt), n=int(n), r=int(r), p=int(p), dklen=len(h) // 2)
+        return hmac.compare_digest(got.hex(), h)
+    except Exception:
+        return False
+
+
+_DUMMY_HASH = hash_password(secrets.token_urlsafe(16))  # keeps unknown-user logins as slow as real ones
+
+
+def expand_groups(groups_or_modules: list[str]) -> list[str]:
+    """Accept training groups (technical / crewing / audit_safety) or assistant module names; return module names."""
+    mods: set[str] = set()
+    bad = []
+    for g in (x.strip().lower() for x in groups_or_modules if (x or "").strip()):
+        if g in TRAINING_GROUPS:
+            mods.update(TRAINING_GROUPS[g][1])
+        elif g in MODULE_LABELS:
+            mods.add(g)
+        else:
+            bad.append(g)
+    if not mods or bad:
+        raise KBError(400, f"Modules: one or more of {', '.join(TRAINING_GROUPS)}" + (f" (unknown: {', '.join(bad)})" if bad else "."))
+    return sorted(mods)
+
+
+def _clean_username(u: str) -> str:
+    u = (u or "").strip().lower()
+    if not (3 <= len(u) <= 40) or not set(u) <= _USERNAME_OK:
+        raise KBError(400, "User id: 3–40 characters, letters, digits, dot, dash or underscore.")
+    return u
+
+
+async def account_grants(account_id: int) -> dict[str, Grant]:
+    async with db.engine().connect() as c:
+        r = (await c.execute(text("SELECT modules FROM kb_accounts WHERE id=:id AND active"), {"id": account_id})).first()
+    return {m: Grant(m) for m in (r.modules if r else [])}
+
+
+async def login(username: str, password: str) -> Session:
+    """Trainer-account sign-in. One generic refusal for every failure (unknown user, wrong password, disabled, locked)."""
+    refused = KBError(401, "Wrong user id or password, or the account is disabled or temporarily locked.")
+    u = (username or "").strip().lower()
+    async with db.engine().begin() as c:
+        r = (await c.execute(text("SELECT * FROM kb_accounts WHERE username=:u FOR UPDATE"), {"u": u})).first()
+        if not r or not r.active or (r.locked_until and r.locked_until > _now()):
+            verify_password(password or "", _DUMMY_HASH)
+            raise refused
+        ok = verify_password(password or "", r.password_hash)
+        if not ok:  # count the failure (committed with this transaction), refuse below
+            n = r.failed_attempts + 1
+            lock = n >= LOCK_AFTER
+            await c.execute(text("UPDATE kb_accounts SET failed_attempts=:n, locked_until=CASE WHEN :l THEN now() + make_interval(mins => :m) "
+                                 "ELSE locked_until END WHERE id=:id"), {"n": 0 if lock else n, "l": lock, "m": LOCK_MINUTES, "id": r.id})
+            await c.execute(text("INSERT INTO kb_audit (entry_id, revision, action, actor_id, actor_name, detail) VALUES "
+                                 "(NULL, NULL, :a, :u, :u, CAST(:d AS jsonb))"),
+                            {"a": "account locked" if lock else "login failed", "u": f"kbacct:{u}", "d": _j({"attempt": n})})
+        else:
+            await c.execute(text("UPDATE kb_accounts SET failed_attempts=0, locked_until=NULL, last_login_at=now() WHERE id=:id"), {"id": r.id})
+    if not ok:
+        raise refused
+    sid = secrets.token_urlsafe(32)
+    hours = max(1, settings().assistant_kb_session_hours)
+    async with db.engine().begin() as c:
+        await c.execute(text(
+            "INSERT INTO kb_sessions (id, token_sha, user_id, user_name, role, tenant_domain, iss, env, user_type, expires_at, account_id) "
+            "VALUES (:id, :t, :u, :n, 'Trainer', NULL, :iss, 'dev', 'Office', now() + make_interval(hours => :h), :a)"),
+            {"id": sid, "t": hashlib.sha256(f"account-session:{sid}".encode()).hexdigest(), "u": f"kbacct:{u}",
+             "n": r.display_name or u, "iss": ACCOUNT_ISS, "h": hours, "a": r.id})
+        await c.execute(text("INSERT INTO kb_audit (entry_id, revision, action, actor_id, actor_name, detail) VALUES "
+                             "(NULL, NULL, 'login', :u, :n, '{}'::jsonb)"), {"u": f"kbacct:{u}", "n": r.display_name or u})
+    return Session(sid, f"kbacct:{u}", r.display_name or u, "Trainer", None, ACCOUNT_ISS, "dev", "Office", r.id)
+
+
+async def _account_admin_audit(c: Any, action: str, username: str, by: str, detail: dict[str, Any] | None = None) -> None:
+    await c.execute(text("INSERT INTO kb_audit (entry_id, revision, action, actor_id, actor_name, detail) VALUES "
+                         "(NULL, NULL, :a, :b, :b, CAST(:d AS jsonb))"),
+                    {"a": action, "b": (by or "admin")[:120], "d": _j({"account": username, **(detail or {})})})
+
+
+async def create_account(username: str, display_name: str, modules: list[str], password: str, by: str) -> dict[str, Any]:
+    u, mods = _clean_username(username), expand_groups(modules)
+    if len(password or "") < MIN_PASSWORD:
+        raise KBError(400, f"Password: at least {MIN_PASSWORD} characters.")
+    async with db.engine().begin() as c:
+        if (await c.execute(text("SELECT 1 FROM kb_accounts WHERE username=:u"), {"u": u})).first():
+            raise KBError(409, f"Account '{u}' already exists.")
+        await c.execute(text("INSERT INTO kb_accounts (username, display_name, modules, password_hash, created_by) "
+                             "VALUES (:u, :n, CAST(:m AS text[]), :h, :b)"),
+                        {"u": u, "n": (display_name or u).strip()[:120], "m": mods, "h": hash_password(password), "b": (by or "admin")[:120]})
+        await _account_admin_audit(c, "account created", u, by, {"modules": mods})
+    return {"ok": True, "username": u, "modules": mods}
+
+
+async def reset_account_password(username: str, password: str, by: str) -> dict[str, Any]:
+    """New password; ends the account's open sessions and clears a lock."""
+    u = _clean_username(username)
+    if len(password or "") < MIN_PASSWORD:
+        raise KBError(400, f"Password: at least {MIN_PASSWORD} characters.")
+    async with db.engine().begin() as c:
+        row = (await c.execute(text("UPDATE kb_accounts SET password_hash=:h, password_changed_at=now(), failed_attempts=0, locked_until=NULL "
+                                    "WHERE username=:u RETURNING id"), {"h": hash_password(password), "u": u})).first()
+        if not row:
+            raise KBError(404, f"No account '{u}'.")
+        ended = int((await c.execute(text("DELETE FROM kb_sessions WHERE account_id=:id"), {"id": row.id})).rowcount or 0)
+        await _account_admin_audit(c, "account password reset", u, by, {"sessionsEnded": ended})
+    return {"ok": True, "username": u, "sessionsEnded": ended}
+
+
+async def set_account_active(username: str, active: bool, by: str) -> dict[str, Any]:
+    """Disable (ends open sessions at once) or re-enable an account."""
+    u = _clean_username(username)
+    async with db.engine().begin() as c:
+        row = (await c.execute(text("UPDATE kb_accounts SET active=:a, disabled_at=CASE WHEN :a THEN NULL ELSE now() END, "
+                                    "disabled_by=CASE WHEN :a THEN NULL ELSE :b END, failed_attempts=0, locked_until=NULL "
+                                    "WHERE username=:u RETURNING id"), {"a": active, "b": (by or "admin")[:120], "u": u})).first()
+        if not row:
+            raise KBError(404, f"No account '{u}'.")
+        ended = 0 if active else int((await c.execute(text("DELETE FROM kb_sessions WHERE account_id=:id"), {"id": row.id})).rowcount or 0)
+        await _account_admin_audit(c, "account enabled" if active else "account disabled", u, by, {"sessionsEnded": ended})
+    return {"ok": True, "username": u, "active": active, "sessionsEnded": ended}
+
+
+async def set_account_modules(username: str, modules: list[str], by: str) -> dict[str, Any]:
+    u, mods = _clean_username(username), expand_groups(modules)
+    async with db.engine().begin() as c:
+        if not (await c.execute(text("UPDATE kb_accounts SET modules=CAST(:m AS text[]) WHERE username=:u RETURNING id"), {"m": mods, "u": u})).first():
+            raise KBError(404, f"No account '{u}'.")
+        await _account_admin_audit(c, "account modules changed", u, by, {"modules": mods})
+    return {"ok": True, "username": u, "modules": mods}
+
+
+async def list_accounts() -> list[dict[str, Any]]:
+    async with db.engine().connect() as c:
+        rows = (await c.execute(text("SELECT a.id, a.username, a.display_name, a.modules, a.active, a.locked_until, a.last_login_at, "
+                                     "a.password_changed_at, a.created_at, a.created_by, a.disabled_at, a.disabled_by, "
+                                     "(SELECT count(*) FROM kb_sessions s WHERE s.account_id=a.id AND s.expires_at > now()) AS open_sessions "
+                                     "FROM kb_accounts a ORDER BY a.username"))).all()
+    out = []
+    for r in rows:
+        d = dict(r._mapping)
+        for k in ("locked_until", "last_login_at", "password_changed_at", "created_at", "disabled_at"):
+            d[k] = d[k].isoformat() if d.get(k) else None
+        d["locked"] = bool(r.locked_until and r.locked_until > _now())
+        d["groups"] = [g["label"] for g in module_groups(list(r.modules or []))]
+        out.append(d)
+    return out
 
 
 # ── trainer administration (AI server only: /admin/kb page and `python -m app.kb_admin`) ────────────────────

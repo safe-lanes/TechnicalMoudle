@@ -8,6 +8,16 @@ AI-server page /admin/kb. Run inside the assistant container (it uses the servic
   python -m app.kb_admin revoke --user <SAILERP dev user id> --module technical --by "<who>"
   python -m app.kb_admin note   --entry <entry id> --text "…" --by "<who>"
   python -m app.kb_admin writes-block --by "<who>" --reason "…" | writes-unblock --by "<who>"
+
+Trainer ACCOUNTS (own login on the training page, 6-Oct-2026). The password is read from STANDARD INPUT only (never an
+argument, never printed):
+  printf '%s' "$PW" | python -m app.kb_admin account-create  --username pmstrainer --name "PMS trainer" --modules technical --by "<who>"
+  printf '%s' "$PW" | python -m app.kb_admin account-reset   --username pmstrainer --by "<who>"     (ends open sessions)
+  python -m app.kb_admin account-disable --username pmstrainer --by "<who>"                          (ends open sessions)
+  python -m app.kb_admin account-enable  --username pmstrainer --by "<who>"
+  python -m app.kb_admin account-modules --username pmstrainer --modules technical crewing --by "<who>"
+  python -m app.kb_admin account-list
+Modules: technical · crewing · audit_safety (= the audit, safety and incident parts).
   python -m app.kb_admin rollback-status | rollback-hold --by "<who>" | rollback-release --by "<who>"
 
 Fast rollback to an image WITHOUT knowledge management (5/6-Oct-2026): such an image searches assistant_chunks by index
@@ -104,6 +114,20 @@ async def main(argv: list[str]) -> None:
     wb.add_argument("--by", required=True)
     wb.add_argument("--reason", default="fast rollback")
     sub.add_parser("writes-unblock").add_argument("--by", required=True)
+    ac = sub.add_parser("account-create")
+    ac.add_argument("--username", required=True)
+    ac.add_argument("--name", default="")
+    ac.add_argument("--modules", nargs="+", required=True)
+    ac.add_argument("--by", required=True)
+    for name in ("account-reset", "account-disable", "account-enable"):
+        x = sub.add_parser(name)
+        x.add_argument("--username", required=True)
+        x.add_argument("--by", required=True)
+    am = sub.add_parser("account-modules")
+    am.add_argument("--username", required=True)
+    am.add_argument("--modules", nargs="+", required=True)
+    am.add_argument("--by", required=True)
+    sub.add_parser("account-list")
     sub.add_parser("rollback-status")
     for name in ("rollback-hold", "rollback-release"):
         sub.add_parser(name).add_argument("--by", required=True)
@@ -120,6 +144,27 @@ async def main(argv: list[str]) -> None:
                   + (f", company {a.company}" if a.company else ", any company"))
         elif a.cmd == "revoke":
             print(f"revoked {await kb.revoke_trainer(a.user, a.module, a.by)} grant(s)")
+        elif a.cmd.startswith("account-"):
+            try:
+                if a.cmd in ("account-create", "account-reset"):
+                    pw = sys.stdin.read().strip("\r\n")
+                    r = (await kb.create_account(a.username, a.name, a.modules, pw, a.by) if a.cmd == "account-create"
+                         else await kb.reset_account_password(a.username, pw, a.by))
+                elif a.cmd in ("account-disable", "account-enable"):
+                    r = await kb.set_account_active(a.username, a.cmd == "account-enable", a.by)
+                elif a.cmd == "account-modules":
+                    r = await kb.set_account_modules(a.username, a.modules, a.by)
+                else:
+                    for acc in await kb.list_accounts():
+                        state = "active" if acc["active"] else f"DISABLED {(acc['disabled_at'] or '')[:16]} by {acc['disabled_by']}"
+                        print(f"{acc['username']:<20} {acc['display_name'] or '':<24} {', '.join(acc['groups']) or '-':<26} "
+                              f"parts={','.join(acc['modules'])} · {state}{' · LOCKED' if acc['locked'] else ''} · "
+                              f"open sessions {acc['open_sessions']} · last login {(acc['last_login_at'] or '-')[:16]}")
+                    r = None
+            except kb.KBError as e:
+                sys.exit(e.message)
+            if r is not None:
+                print(json.dumps(r))
         elif a.cmd in ("writes-block", "writes-unblock"):
             r = await kb.set_write_block(a.cmd == "writes-block", a.by, getattr(a, "reason", ""))
             print(f"knowledge writes {'PAUSED' if r['blocked'] else 'resumed'} (waited {r['waitedSeconds']} s for writes in progress)")

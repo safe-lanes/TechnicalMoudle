@@ -68,11 +68,23 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
 
 <div id="gate" class="layout" hidden><div class="card" style="grid-column:1/-1"><div id="gateMsg" class="notice bad"></div></div></div>
 
+<div id="loginBox" class="layout" hidden>
+  <form class="card" id="loginForm" style="grid-column:1/-1;max-width:420px" autocomplete="on">
+    <h2 style="margin:0 0 4px;font-size:16px">Trainer sign-in</h2>
+    <p class="muted small" style="margin:0 0 6px">Sign in with your trainer account to train the chatbot for your module.</p>
+    <label for="lgUser">User id</label><input type="text" id="lgUser" autocomplete="username" required>
+    <label for="lgPass">Password</label><input type="password" id="lgPass" autocomplete="current-password" required>
+    <div class="row" style="margin-top:10px"><button class="primary" id="lgGo" type="submit">Sign in</button></div>
+    <div id="lgMsg"></div>
+  </form>
+</div>
+
 <div id="app" class="layout" hidden>
   <aside class="rail">
     <div class="card">
-      <label for="module">Module</label>
-      <select id="module"></select>
+      <div id="groupBox"><label for="group">Module</label><select id="group"></select></div>
+      <div id="groupOne" class="muted" style="padding:2px 0 4px;font-weight:600" hidden></div>
+      <div id="partBox"><label for="module">Part</label><select id="module"></select></div>
       <div class="tabs" style="margin-top:10px">
         <button id="tabEntries" aria-pressed="true">Entries</button>
         <button id="tabReview" aria-pressed="false">Review queue <span id="reviewCount"></span></button>
@@ -162,6 +174,8 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
     if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
     const r = await fetch(path, opt);
     const j = await r.json().catch(() => ({}));
+    // a session ended on the server (account disabled / password reset / expired) → back to the sign-in form
+    if (r.status === 401 && me && path !== "/kb/api/login" && path !== "/kb/api/me") { me = null; showLogin(); note($("lgMsg"), "bad", j.error || "Your session has ended. Please sign in again."); }
     if (!r.ok) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), {status: r.status});
     return j;
   }
@@ -173,19 +187,44 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
       history.replaceState(null, "", location.pathname);  // the token never stays in the address bar
       try { me = await api("POST", "/kb/api/session", {token: decodeURIComponent(m[1])}); } catch (e) { return gate(e.message); }
     } else {
-      try { me = await api("GET", "/kb/api/me"); } catch (e) { return gate(e.status === 401 ? "Open the knowledge screen from the application (it signs you in)." : e.message); }
+      try { me = await api("GET", "/kb/api/me"); } catch (e) { return e.status === 401 ? showLogin() : gate(e.message); }
     }
     $("who").textContent = `${me.userName || me.userId}${me.company ? " · " + me.company : ""}`;
     $("logout").hidden = false;
     if (!me.trainer) return gate("You are signed in, but you are not a knowledge trainer for any module. Report wrong answers from the chat window instead.");
-    $("who").textContent += ` · ${me.environment}`;
-    $("module").innerHTML = me.modules.map((m) => `<option value="${esc(m.module)}">${esc(m.label)}</option>`).join("");
+    if (!me.account) $("who").textContent += ` · ${me.environment}`;
+    // 6-Oct-2026: training modules as the business sees them (Audit & Safety = audit + safety + incident parts); only the
+    // signed-in trainer's modules are listed (the server enforces them on every request); one module opens automatically.
+    const groups = me.groups && me.groups.length ? me.groups : me.modules.map((m) => ({group: m.module, label: m.label, modules: [m]}));
+    $("group").innerHTML = groups.map((g, i) => `<option value="${i}">${esc(g.label)}</option>`).join("");
+    const one = groups.length === 1;
+    $("groupBox").hidden = one; $("groupOne").hidden = !one; $("groupOne").textContent = one ? groups[0].label : "";
+    const setParts = () => {
+      const g = groups[+$("group").value || 0];
+      $("module").innerHTML = g.modules.map((m) => `<option value="${esc(m.module)}">${esc(m.label)}</option>`).join("");
+      $("partBox").hidden = g.modules.length < 2;
+    };
+    setParts();
+    $("group").onchange = () => { setParts(); $("module").onchange(); };
     $("fKind").innerHTML = Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
 
     $("app").hidden = false;
     await loadEntries(); await loadReviewCount();
   }
-  function gate(msg) { $("gate").hidden = false; $("app").hidden = true; $("gateMsg").textContent = msg; }
+  function gate(msg) { $("gate").hidden = false; $("app").hidden = true; $("loginBox").hidden = true; $("gateMsg").textContent = msg; }
+  function showLogin() {
+    $("loginBox").hidden = false; $("app").hidden = true; $("gate").hidden = true; $("who").textContent = "Not signed in"; $("logout").hidden = true;
+    setTimeout(() => $("lgUser").focus(), 0);
+  }
+  $("loginForm").onsubmit = async (ev) => {
+    ev.preventDefault();
+    $("lgGo").disabled = true; note($("lgMsg"), "", "");
+    try {
+      await api("POST", "/kb/api/login", {username: $("lgUser").value.trim(), password: $("lgPass").value});
+      $("lgPass").value = ""; $("loginBox").hidden = true; await signIn();
+    } catch (e) { note($("lgMsg"), "bad", e.message); $("lgPass").value = ""; }
+    finally { $("lgGo").disabled = false; }
+  };
 
   async function loadEntries() {
     const q = new URLSearchParams({module: $("module").value, status: $("statusFilter").value});
@@ -329,7 +368,7 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1p
   $("tabEntries").onclick = () => { show(current ? "editor" : "none"); if (!current) $("empty").hidden = false; };
   $("tabReview").onclick = async () => { show("review"); await loadReview(); loadReviewCount(); };
   $("reviewStatus").onchange = loadReview;
-  $("logout").onclick = async () => { await api("POST", "/kb/api/logout", {}).catch(() => {}); gate("Signed out."); $("logout").hidden = true; };
+  $("logout").onclick = async () => { await api("POST", "/kb/api/logout", {}).catch(() => {}); showLogin(); note($("lgMsg"), "ok", "Signed out."); };
 
   async function loadReview() {
     try {

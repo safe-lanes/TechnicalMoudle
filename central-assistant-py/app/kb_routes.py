@@ -60,7 +60,7 @@ async def _session(request: Request, *, change: bool) -> kb.Session:
         raise kb.KBError(403, "Request refused (missing x-kb-request header).")
     sess = await kb.get_session(request.cookies.get(COOKIE))
     if not sess:
-        raise kb.KBError(401, "Your session has ended. Open the knowledge screen again from the application.")
+        raise kb.KBError(401, "Your session has ended. Please sign in again.")
     return sess
 
 
@@ -79,6 +79,22 @@ async def kb_session(request: Request) -> Any:
         return JSONResponse({"error": f"Sign-in refused ({why}). Open the knowledge screen again from the application."}, status_code=401)
     try:
         sess = await kb.create_session(ident, token)
+    except kb.KBError as e:
+        return _err(e)
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    res = JSONResponse(await kb.me(sess))
+    res.set_cookie(COOKIE, sess.id, httponly=True, samesite="strict", secure=secure, max_age=settings().assistant_kb_session_hours * 3600, path="/")
+    return res
+
+
+@router.post("/kb/api/login")
+async def kb_login(request: Request) -> Any:
+    """Trainer-account sign-in (6-Oct-2026): user id + password; the account's modules are read on every request."""
+    if request.headers.get("x-kb-request") != "1":
+        return JSONResponse({"error": "Request refused (missing x-kb-request header)."}, status_code=403)
+    b = await _body(request)
+    try:
+        sess = await kb.login(str(b.get("username") or ""), str(b.get("password") or ""))
     except kb.KBError as e:
         return _err(e)
     secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
@@ -248,6 +264,24 @@ async def admin_deactivate(request: Request, trainer_id: int) -> Any:
 async def admin_reactivate(request: Request, trainer_id: int) -> Any:
     async def f(r: Request) -> Any:
         return await kb.reactivate_trainer(trainer_id, str((await _body(r)).get("by") or "admin page"))
+    return await _admin(f)(request)
+
+
+@router.get("/admin/kb/api/accounts")
+async def admin_accounts(request: Request) -> Any:
+    async def f(_r: Request) -> Any:
+        return {"accounts": await kb.list_accounts(),
+                "groups": [{"group": k, "label": v[0], "modules": v[1]} for k, v in kb.TRAINING_GROUPS.items()]}
+    return await _admin(f)(request)
+
+
+@router.post("/admin/kb/api/accounts/{username}/{action}")
+async def admin_account_action(request: Request, username: str, action: str) -> Any:
+    """disable / enable (passwords are set and reset with `python -m app.kb_admin`, never shown on a page)."""
+    async def f(r: Request) -> Any:
+        if action not in ("disable", "enable"):
+            raise kb.KBError(404, "Unknown action.")
+        return await kb.set_account_active(username, action == "enable", str((await _body(r)).get("by") or "admin page"))
     return await _admin(f)(request)
 
 
