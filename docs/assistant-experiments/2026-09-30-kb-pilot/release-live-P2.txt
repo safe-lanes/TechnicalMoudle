@@ -1,0 +1,2 @@
+assistant.sl-sail.com | How do I delete a job? | gate not_documented | tools None | cites [] | That isn't covered in the module documentation I have. Please rephrase, or contact support
+assistant.sl-sail.com | How do I complete a work order? | gate answer | tools None | cites ['Technical - PMS User Manual_Vessel Speci', 'Technical - PMS User Manual For Office_S'] | The procedure differs slightly between Ship and Office:  ### On the ship  1. Open the **Wo

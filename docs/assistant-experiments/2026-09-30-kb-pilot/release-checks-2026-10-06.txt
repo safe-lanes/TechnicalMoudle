@@ -1,0 +1,26 @@
+live dump for scratch: 275845088 bytes; live alembic 0007
+scratch alembic after release image start: 0013
+PASS  A. trainer ACCOUNT signs in over HTTP (final image)  -> 200
+PASS  A. account creates a draft while writes are open  -> 200
+PASS  A. during the write block: account Test draft refused (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  A. during the write block: account Publish refused (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  A. during the write block: account Save draft refused (503)  -> 503
+PASS  A. nothing was written to the served index while blocked  -> 0 -> 0
+PASS  A. after unblocking, the account publishes normally  -> 200
+PASS  A. account Test draft works after unblocking (private preview row present)  -> 200
+PASS  A. release image serves the PUBLISHED entry to an ordinary user  -> ['Technical - Knowledge: Release check gauge 092810']
+held 2 knowledge row(s): kb-xref-e -> kb-xref-e#kb-hold
+PASS  A. block + hold done: 0 knowledge rows in the served index  -> 0
+
+phase A: 10/10 passed
+== starting the OLD image (v7-r2) on the 0013 scratch database (no migration step, as in a fast rollback)
+PASS  B. scratch database is at migration 0013  -> 0013
+PASS  B. old image (v7-r2) is healthy on the 0013 database  -> 200 b31c3f9c6c1fe2e4
+PASS  B. old image retrieves NO knowledge (published or draft) after the hold  -> []
+PASS  B. old image still answers a normal documentation question from the manuals  -> answer
+released 2 knowledge row(s): kb-xref-e#kb-hold -> kb-xref-e
+PASS  B. roll forward (release + unblock): release image serves the published entry again
+
+phase B: 5/5 passed
+old image log errors: 0
+scratch removed

@@ -1,0 +1,12 @@
+PASS  account pmstrainer exists and is active  -> ['technical']
+PASS  pmstrainer is a trainer of exactly its module  -> [{'module': 'technical', 'label': 'Technical'}]
+PASS  pmstrainer sees the imported drafts in technical  -> ['Deleting a job', 'Deactivating a component', 'Running Hours (RH) counter types', 'Running Hours (RH) validations when updating RH', 'Updating the running hours of one component (Gear icon)']
+PASS  the draft 'Deleting a job' opens
+PASS  it is unpublished (draft revision, nothing served)
+PASS  pmstrainer is refused in another module (crewing)  -> 403
+PASS  Test draft answers privately with the draft in place (chatbot answer path)  -> ['search_module_docs'] 1. In **Office**, open the job so the **Job** form is displayed.
+2. Click the red **Delete** (trash)
+PASS  an ordinary user's answer to the same question does NOT use the draft  -> []
+PASS  nothing is published  -> 0
+
+9/9 passed
