@@ -1,13 +1,15 @@
 # Training the chatbot — guide for trainers
 
-*For Jeevan (Technical). Other modules' trainers follow the same steps in their own module once it is connected.*
+*For the trainers of Technical (PMS), Crewing and Audit & Safety. Published guidance is used for all companies, within your module.*
 
-## Open the knowledge screen
+## Sign in
 
-1. Log in to **SAILERP dev** as usual and open **Technical**.
-2. Open the **chatbot**.
-3. Click the **book icon** at the top of the chatbot ("Manage knowledge"). Only trainers see it.
-4. The knowledge screen opens in a new tab, already signed in as you, showing your module.
+1. Open the training page: **https://assistant.sl-sail.com/kb** (pilot: https://kb-pilot.sl-sail.com/kb).
+2. Enter your **trainer user id** and **password** (given to you personally — do not share them).
+3. Your module opens by itself (Technical (PMS), Crewing, or Audit & Safety). Audit & Safety trainers choose the
+   **Part** (Audit, Safety or Incident) each entry belongs to.
+4. After 5 wrong passwords the account is locked for 15 minutes. Ask Ghazi for a password reset if needed.
+5. Click **Sign out** when you finish.
 
 ## Your drafts
 

@@ -1,0 +1,27 @@
+PASS  login without the x-kb-request header is refused (403)  -> 403
+PASS  wrong password → 401 with a generic message  -> Wrong user id or password, or the account is disabled or temporarily locked.
+PASS  unknown user → the SAME generic 401  -> Wrong user id or password, or the account is disabled or temporarily locked.
+PASS  PMS trainer signs in (user id not case-sensitive)  -> 200
+PASS  PMS trainer sees only Technical (PMS)  -> [{'group': 'technical', 'label': 'Technical (PMS)', 'modules': [{'module': 'technical', 'label': 'Technical'}]}]
+PASS  Audit & Safety trainer sees ONE module 'Audit & Safety' with its parts audit / incident / safety  -> [{'group': 'audit_safety', 'label': 'Audit & Safety', 'modules': [{'module': 'audit', 'label': 'Audit'}, {'module': 'safety', 'label': 'Safety'}, {'module': 'incident', 'label': 'Incident'}]}]
+PASS  Crewing trainer sees only Crewing  -> [{'group': 'crewing', 'label': 'Crewing', 'modules': [{'module': 'crewing', 'label': 'Crewing'}]}]
+PASS  PMS trainer cannot create a Crewing entry (403)  -> 403 You are not a knowledge trainer for this module.
+PASS  PMS trainer cannot create a Safety entry (403)  -> 403
+PASS  Audit & Safety trainer cannot create a Technical entry (403)  -> 403
+PASS  Audit & Safety trainer creates a Safety-part draft  -> 200
+PASS  Crewing trainer cannot list Technical entries  -> 200 0
+PASS  PMS trainer creates a Technical draft  -> 200
+PASS  Test draft works with an account session (private, chatbot answer path)  -> 200 ['search_module_docs']
+PASS  Publish works with an account session (no approver)  -> 200 None
+PASS  history records the account as author/publisher  -> ['TEST PMS trainer', 'TEST PMS trainer', 'TEST PMS trainer']
+PASS  disable → the open session is refused at once (401)  -> 401 ended 1
+PASS  a disabled account cannot sign in  -> 401
+PASS  enable → signs in again  -> 200
+PASS  password reset → the open session is refused (401)  -> 401
+PASS  old password refused, new password accepted  -> 401 / 200
+PASS  5 wrong attempts lock the account: the right password is refused  -> 401
+PASS  lock recorded on the account (15 minutes)  -> True
+PASS  reset clears the lock  -> 200
+PASS  only a salted scrypt hash is stored (no password text)  -> scrypt$
+
+25/25 passed (run 082359)

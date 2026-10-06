@@ -1,6 +1,6 @@
 # Chatbot knowledge management — release to the official assistant (plan for approval)
 
-**Prepared 5 Oct 2026, final update 6 Oct 2026. Nothing below has been done on the live service.** The live assistant, its database, nginx and
+**Prepared 5 Oct 2026, updated 6 Oct 2026 (trainer accounts). Nothing below has been done on the live service.** The live assistant, its database, nginx and
 the dev/production PMS are unchanged. Every step marked ⏸ waits for Ghazi's approval.
 
 Evidence classes: **PROVEN** = run, output kept · **READ** = from code · **INFERRED** = deduction (basis stated).
@@ -26,8 +26,9 @@ Evidence classes: **PROVEN** = run, output kept · **READ** = from code · **INF
 | Dev PMS (dev.sl-sail.com) | uses `https://assistant.sl-sail.com`; does **not** yet have the chatbot screen change | PROVEN (public JS bundle) |
 | Production PMS (sailerp.sl-sail.com) | uses `https://assistant.sl-sail.com`; no chatbot screen change | PROVEN (public JS bundle) |
 | `origin/replit_dev` | `329ee5d42` = the chatbot screen change (pushed 5 Oct, Ghazi OK) — waiting for Nilesh's dev deploy | PROVEN |
-| Assistant code to release | **final commit `8d81b1f1f`** on `chatbot-enterprise` (local; `de30da779` after it changes only a test script; pushed head of `feature/chatbot-enterprise` is `9d163eaf2`) | PROVEN |
-| **Release image** | **`sail-assistant-py:v8-8d81b1f1f`**, built on the AI server with `git archive 8d81b1f1f:central-assistant-py` | PROVEN |
+| Assistant code to release | **final commit `fe04a9997`** (trainer accounts, 6 Oct) — earlier final `8d81b1f1f` on `chatbot-enterprise` (local; `de30da779` after it changes only a test script; pushed head of `feature/chatbot-enterprise` is `9d163eaf2`) | PROVEN |
+| **Release image** | **`sail-assistant-py:v8-fe04a9997`**, built on the AI server with `git archive fe04a9997:central-assistant-py`; it runs the isolated pilot now | PROVEN |
+| **Trainer access (owner decision 6 Oct)** | **own login on the training page**: accounts `pmstrainer` (Technical/PMS), `crewtrainer` (Crewing), `audsafetytrainer` (Audit & Safety = audit + safety + incident parts) — created on the pilot; passwords only in `C:\Users\GhaziAnwer\local-only\kb-trainer-accounts.txt` (your account only; server copy shredded). Direct link, no Technical change. SAILERP role integration postponed | PROVEN (pilot) |
 | Change since the broad test round (`abe87ed1a`) | `51e866769` rollback hold commands (CLI) · `8d81b1f1f` **knowledge write block** (migration 0012 + a guard in every knowledge write) and an **optional company on trainer grants** — tested by the targeted checks in §4; the broad suites / harness / browser run were **not** repeated (bounded, as asked) | — |
 | Jeevan's verified identity | dev user id **`362`** ("Jeevan Naik"), company **`rsms`** (25 Sep–5 Oct) and **`rsms05102026`** (6 Oct), role Sail Admin — from the live chatbot log; the chats came from `https://dev.sl-sail.com` (nginx referer at the same minutes). The login id is NOT "Jeevan". User `66` "Jeevan" (SL - Demo Use) is the **demo** site (`erp.sl-sail.com`) | user id + company PROVEN (signed identities in the log); dev site INFERRED from timing (every request in those minutes came from dev) |
 
@@ -61,6 +62,7 @@ Rows marked **(final image)** ran on `v8-8d81b1f1f` (6 Oct, scratch copies); the
 | Migration 0008–0011 on a copy of live data | clean; second run no-op | PROVEN |
 | Today's live image on the migrated database (switch overlap / fast rollback) | healthy, fingerprint `b31c3f9c`, no errors | PROVEN |
 | **Fast rollback with knowledge present** (previous image on the MIGRATED DB, a real published entry + a real private preview) | **Plain switch is UNSAFE:** the previous image gave an ordinary user the private draft's text word for word. **Corrected procedure** (`kb_admin rollback-hold` before switching): previous image retrieves neither draft nor published entry, manuals answer normally, status 0; `rollback-release` → release image serves the published entry again, draft still private — **6/6** (`scripts/verify_fast_rollback.py`) | PROVEN |
+| **Trainer accounts (pilot, `v8-fe04a9997`)** (`scripts/verify_kb_accounts.py`) | **25/25**: header check; wrong password and unknown user get the same generic refusal; each account sees only its module (Audit & Safety = one module, three parts); other modules refused on the server (403); Test draft and Publish work with an account session; history names the account; disable → open session refused at once, sign-in refused; enable → works again; password reset → open session refused, old password refused, new accepted; 5 wrong attempts lock (right password refused), reset clears it; only a salted scrypt hash stored. Browser: sign-in form; a one-module account opens straight into its module; Audit & Safety opens as one module with a Part picker (screenshots `screenshots-2026-10-06/`). From outside: page 200, refused login 401, admin 403 | PROVEN |
 | **Knowledge write block — concurrency (final image)** (`scripts/verify_rollback_write_block.py`, scratch copy) | **18/18**: a publish already inside its transaction → the block **waited 3.3 s** and that publish committed; while blocked, publish / Test draft / create / save / retire / restore all refused (503) and nothing written; hold → 0 served, later Test draft / publish still refused; release brings rows back with writes still blocked; a publish whose preparation began before the block is refused at its transaction; hold refuses unless writes are blocked; grant with a company matches only that company, without one any company. Migration 0012 second run = no-op | PROVEN |
 | **Fast rollback, full order (final image)** | block → hold → status "SAFE" → (previous image retrieves nothing from knowledge, manuals normal) → release → unblock → published entry back, draft private — **6/6**; the plain switch still leaks the draft (finding kept) | PROVEN |
 | Rollback rehearsal — full downgrade (scratch copy with a published + a preview knowledge row) | OLD downgrade left the 2 rows behind (found → fixed in `abe87ed1a`); FIXED downgrade removes them, back to 0007; today's live image healthy on it; re-upgrade clean | PROVEN |
@@ -99,9 +101,9 @@ unchanged (`e9d7ba01`).
 |---|---|---|
 | 0 | Nilesh deploys `replit_dev` (`329ee5d42`) to **dev** — any time; before the switch it shows nothing new (live answers the knowledge check with 404) | dev bundle contains `kb/eligibility` |
 | 1 | Fresh backup: `pg_dump` of `sail-assistant-db` → `~/central-assistant/backups/`; copy `v7.env` → `v7.env.bak-v8-<ts>` | dump size ≈ 276 MB |
-| 2 | Start `sail-assistant-py-v8` = image **`v8-8d81b1f1f`**, env `v8-release.env`, network `technical-rag-net`, `127.0.0.1:8051→8000`; it migrates the live DB to **0012** on start. v7 keeps serving (PROVEN on a migrated copy) | `/health` on :8051: fingerprint `e9d7ba01`, instances dev/prod/demo, rejected []; alembic 0012; `kb_admin rollback-status` → writes blocked: False |
+| 2 | Start `sail-assistant-py-v8` = image **`v8-fe04a9997`**, env `v8-release.env`, network `technical-rag-net`, `127.0.0.1:8051→8000`; it migrates the live DB to **0013** on start. v7 keeps serving (PROVEN on a migrated copy) | `/health` on :8051: fingerprint `e9d7ba01`, instances dev/prod/demo, rejected []; alembic 0013; `kb_admin rollback-status` → writes blocked: False |
 | 3 | nginx `assistant.conf` + `safelanes.conf:375` `8046 → 8051` (backups `*.bak-v8-<ts>`), `nginx -t`, reload | public `/health` = `e9d7ba01`; `/admin` 403; no-token chat 401; preflight from dev/prod/demo 200 |
-| 4 | **Register Jeevan** by his verified login, Technical only: `docker exec sail-assistant-py-v8 python -m app.kb_admin grant --user 362 --module technical --name "Jeevan Naik" --by "Ghazi" [--company <see §7>] --note "verified dev login 362"` — dev system picked automatically (`technical-dev`, the only dev instance). No role-based grant: Sail Admin alone gives nothing (PROVEN in the harness) | `kb_admin list` shows one Technical grant for 362 via technical-dev |
+| 4 | **Trainer accounts:** copy the 3 accounts (hashed passwords only) from the pilot DB to the live DB (`kb_accounts` rows for pmstrainer / crewtrainer / audsafetytrainer) — the passwords in the restricted file stay valid; or create new ones with `kb_admin account-create` (password from stdin) and update the file. No SAILERP/role-based grant | `kb_admin account-list` shows the 3 accounts, active |
 | 5 | Import the 5 drafts: `kb_transfer_drafts.py import --in kb-drafts.json --dry-run`, then without `--dry-run` | 5 drafts, 0 served |
 | 6 | **Post-deployment checks** (below) | all pass |
 | 7 | Send Jeevan the short guide (§8) | — |
@@ -113,8 +115,8 @@ unchanged (`e9d7ba01`).
 |---|---|---|---|
 | C1 | Ghazi (or any user), dev or production | Open the chatbot in Technical and ask a **documentation question**, e.g. "How do I complete a work order?" | normal answer citing the PMS user manual |
 | C2 | An **authorised production user** (Ghazi), production SAILERP → Technical | Ask **one live-data question** for a vessel they can see, e.g. "How many overdue work orders does <vessel> have?" | the number matches the Work Orders screen for that vessel; I confirm on the server that the call went to the production Data API (`technical-prod`) |
-| C3 | **Jeevan**, SAILERP **dev** → Technical | Open the chatbot → **book icon (Manage knowledge)** → open one of the 5 drafts → **Test draft** with a question | the knowledge screen opens signed in as him, shows Technical and the 5 drafts; the test answer is shown privately ("draft, not published"). **Do not publish.** |
-| C4 | an ordinary dev user (optional) | open the chatbot | no book icon |
+| C3 | **The PMS trainer** (pmstrainer) | Open `https://assistant.sl-sail.com/kb` → sign in → Technical (PMS) opens by itself → open one of the 5 drafts → **Test draft** with a question | private test answer shown ("draft, not published"). **Do not publish.** |
+| C4 | anyone | a wrong password | generic refusal; 5 wrong attempts lock the account for 15 minutes |
 
 ## 6. Rollback
 
@@ -136,7 +138,7 @@ unchanged (`e9d7ba01`).
 ## 7. Decisions for Ghazi
 
 1. **Approve the rollout (§5)** — steps 1–6 on the live assistant (step 0 is Nilesh's dev deploy).
-2. **Jeevan's company on the grant:** his verified dev login shows company `rsms` until 5 Oct and `rsms05102026` on
+2. ~~Jeevan's company on the grant~~ — **superseded 6 Oct by the trainer accounts** (no SAILERP identity needed for training). Previously: his verified dev login shows company `rsms` until 5 Oct and `rsms05102026` on
    6 Oct. Recording a company makes the grant match only that company — it would have stopped working when the company
    changed. Options: (a) **no company** (dev system + user id 362; your 5-Oct decision), (b) `rsms`, (c) `rsms05102026`.
    Which company is Jeevan's real dev company is a question for you / Jeevan.
