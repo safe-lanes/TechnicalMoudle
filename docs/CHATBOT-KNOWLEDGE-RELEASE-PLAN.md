@@ -1,152 +1,104 @@
-# Chatbot knowledge management — release to the official assistant (plan for approval)
+# Chatbot knowledge management — release to the official assistant
 
-**Prepared 5 Oct 2026, updated 6 Oct 2026 (trainer accounts). Nothing below has been done on the live service.** The live assistant, its database, nginx and
-the dev/production PMS are unchanged. Every step marked ⏸ waits for Ghazi's approval.
-
+**Version 6 Oct 2026 (direct trainer login). Release approved by Ghazi on 6 Oct, subject to the release checks in §5.**
 Evidence classes: **PROVEN** = run, output kept · **READ** = from code · **INFERRED** = deduction (basis stated).
 
----
+## 1. What is released
 
-## 1. Goal (owner brief, 5 Oct)
+- **Trainers sign in on the training page itself** — `https://assistant.sl-sail.com/kb` — with a trainer user id and
+  password. No SAILERP identity, company registration or Technical change is needed (owner decision 6 Oct; SAILERP role
+  integration postponed). Accounts:
 
-- Trainers work **only through the application**: SAILERP dev → Technical → chatbot → **Manage knowledge**. No browser
-  settings, no console, no tokens.
-- The dev application uses the **official assistant** `https://assistant.sl-sail.com`. Drafts and Test draft are private;
-  **Publish** makes the guidance available to that module's users of **all clients, in dev and production**.
-- Live-data routing stays per environment (dev questions → dev Data API, production → production).
-- Only assigned module trainers can manage knowledge (Sail Admin alone grants nothing); a trainer publishes without a
-  second approver; reports and drafts never become knowledge by themselves.
+  | Account | Module | Parts |
+  |---|---|---|
+  | `pmstrainer` | Technical (PMS) | technical |
+  | `crewtrainer` | Crewing | crewing |
+  | `audsafetytrainer` | Audit & Safety (one module) | Audit · Safety · Incident (picked per entry) |
 
-## 2. Current state (checked 5 Oct)
+- After sign-in only the account's module is shown; a one-module account opens it directly. The server enforces the
+  module on every request. Disable / password reset end open sessions at once; 5 wrong passwords lock for 15 minutes.
+- Draft → **Test draft** (private) → **Publish** (no approver) → history / restore / retire. Publishing makes the guidance
+  available to that module's users of **all companies** on the live chatbot (dev and production).
+- Normal chat, live-data routing and chat access are unchanged. Reports never become knowledge by themselves.
 
-| Item | Now | Evidence |
+## 2. Release artefacts
+
+| Item | Value |
+|---|---|
+| Code | `chatbot-enterprise`, final code commit **`fe04a9997`** (docs commits after it) |
+| Image | **`sail-assistant-py:v8-fe04a9997`** (built on the AI server from `git archive fe04a9997:central-assistant-py`) |
+| Database migrations | **0008–0013** (additive): knowledge tables, `kb_maintenance` (0012, rollback write block), `kb_accounts` + `kb_sessions.account_id` (0013, trainer accounts). Live is at **0007** before the release |
+| Settings | `~/central-assistant/v8-release.env` = live `v7.env` + `ASSISTANT_KB_RULES=on`, `ASSISTANT_CONTEXT_MODULE_GAP=0.15`, `ASSISTANT_MODULE_GLOSSARY` (RH), `ASSISTANT_KB_TRAINER_ENVS=dev` (tested settings; owner: keep ON) |
+| Live accounts | created fresh on live (passwords different from the pilot), saved only in `C:\Users\GhaziAnwer\local-only\kb-trainer-accounts-LIVE.txt` |
+| Drafts | the 5 Technical drafts, imported **unpublished**, attributed to development (`scripts/kb_transfer_drafts.py`) |
+| Not carried to live | pilot sessions, test accounts, pilot passwords/hashes, old SAILERP-style trainer grants (`kb_trainers` stays empty) |
+
+## 3. Tests and the image each ran on
+
+| Check | Image | Result |
 |---|---|---|
-| Live assistant | container `sail-assistant-py-v7`, image `v7-r2` (= `central-assistant-py` of replit_dev `890b47645`), prompt fingerprint `b31c3f9c`, instances technical-dev/-prod/-demo | PROVEN (`docker inspect`, `/health`) |
-| Live assistant database | `sail-assistant-db`, migration **0007**, index `kb-xref-e` 965 sections, 344 MB | PROVEN |
-| Dev PMS (dev.sl-sail.com) | uses `https://assistant.sl-sail.com`; does **not** yet have the chatbot screen change | PROVEN (public JS bundle) |
-| Production PMS (sailerp.sl-sail.com) | uses `https://assistant.sl-sail.com`; no chatbot screen change | PROVEN (public JS bundle) |
-| `origin/replit_dev` | `329ee5d42` = the chatbot screen change (pushed 5 Oct, Ghazi OK) — waiting for Nilesh's dev deploy | PROVEN |
-| Assistant code to release | **final commit `fe04a9997`** (trainer accounts, 6 Oct) — earlier final `8d81b1f1f` on `chatbot-enterprise` (local; `de30da779` after it changes only a test script; pushed head of `feature/chatbot-enterprise` is `9d163eaf2`) | PROVEN |
-| **Release image** | **`sail-assistant-py:v8-fe04a9997`**, built on the AI server with `git archive fe04a9997:central-assistant-py`; it runs the isolated pilot now | PROVEN |
-| **Trainer access (owner decision 6 Oct)** | **own login on the training page**: accounts `pmstrainer` (Technical/PMS), `crewtrainer` (Crewing), `audsafetytrainer` (Audit & Safety = audit + safety + incident parts) — created on the pilot; passwords only in `C:\Users\GhaziAnwer\local-only\kb-trainer-accounts.txt` (your account only; server copy shredded). Direct link, no Technical change. SAILERP role integration postponed | PROVEN (pilot) |
-| Change since the broad test round (`abe87ed1a`) | `51e866769` rollback hold commands (CLI) · `8d81b1f1f` **knowledge write block** (migration 0012 + a guard in every knowledge write) and an **optional company on trainer grants** — tested by the targeted checks in §4; the broad suites / harness / browser run were **not** repeated (bounded, as asked) | — |
-| Jeevan's verified identity | dev user id **`362`** ("Jeevan Naik"), company **`rsms`** (25 Sep–5 Oct) and **`rsms05102026`** (6 Oct), role Sail Admin — from the live chatbot log; the chats came from `https://dev.sl-sail.com` (nginx referer at the same minutes). The login id is NOT "Jeevan". User `66` "Jeevan" (SL - Demo Use) is the **demo** site (`erp.sl-sail.com`) | user id + company PROVEN (signed identities in the log); dev site INFERRED from timing (every request in those minutes came from dev) |
+| Regression suites BASE (live image) vs REL — routing, retrieval, work orders, frozen, corrected, fresh, manual coverage | `19e108451` | equal except fresh 10→9 and manual coverage 35→33 (wording; see §6) |
+| Knowledge harness (draft → test → publish → edit → restore → retire, all companies/environments, reports, revocation) | `19e108451` | 66/66 |
+| Live-data routing dev vs production (local test environments) | `19e108451` | 15/15 |
+| Browser flow without overrides (book icon path) | `19e108451` | PROVEN |
+| Publish failure (embedding outage / in-transaction failure leave the served version unchanged) | pilot `7550c9000` (same publish code) | 8/8 |
+| Draft transfer (5 unpublished drafts, rerun no-op) | `19e108451` | PROVEN |
+| Full downgrade rehearsal (0008 downgrade removes knowledge rows) | `abe87ed1a` | PROVEN |
+| Change note kept through Save → Publish | `e58246b2a` (browser) | PROVEN |
+| Write block concurrency (drain, refusals for every write type, hold/release order) | `8d81b1f1f` | 18/18 |
+| Fast rollback, full order (block → hold → old image serves no knowledge → release → unblock) | `8d81b1f1f` | 6/6 |
+| Trainer accounts (login, modules, server enforcement, Test draft/Publish with account, disable/reset/lockout, hash only) + browser sign-in | `fe04a9997` (pilot) | 25/25 (twice) + PROVEN |
+| **Release check: account-authenticated Publish and Test draft refused during the write block** | `fe04a9997` (scratch) | see §5 |
+| **Release check: old image compatible with migration 0013 after the hold procedure** | `fe04a9997` + `v7-r2` (scratch) | see §5 |
 
-## 3. What changes
+The broad suites, harness and routing test were not repeated on `fe04a9997` (bounded, as agreed). Changes since
+`19e108451` are the rollback commands, the write block and the trainer accounts; the prompt fingerprint is unchanged
+(`e9d7ba01`).
 
-**Assistant (`v7-r2` → `v8-8d81b1f1f`)** — `git diff 890b47645 8d81b1f1f -- central-assistant-py`:
-- knowledge management: entries, revisions, private preview, publish / restore / retire, supersedes, review queue,
-  trainer list (`kb_trainers`) + trainer page `/admin/kb` (not public) + command `python -m app.kb_admin`;
-- migrations **0008–0012** (additive: new `kb_*` tables incl. `kb_maintenance`, four nullable columns on `assistant_chunks`);
-- **write block** for rollback: every knowledge write (create, save, Test draft, publish, restore, retire) checks a
-  maintenance flag under a shared database lock; `kb_admin writes-block` waits for writes in progress and refuses the rest;
-- three answer settings switched on in the release env (they were tested together with the knowledge rules):
-  `ASSISTANT_KB_RULES=on` (how the chatbot treats knowledge entries / missing evidence),
-  `ASSISTANT_CONTEXT_MODULE_GAP=0.15` (the user's current module wins when the question names none — "RH" in Technical
-  = Running Hours), `ASSISTANT_MODULE_GLOSSARY` (RH = Running Hours in Technical, Rest Hours in Crewing — search text
-  only); plus `ASSISTANT_KB_TRAINER_ENVS=dev`. **Decision for Ghazi** — see §7.
-- release env file prepared on the server: `~/central-assistant/v8-release.env` = `v7.env` + exactly these four lines
-  (registry, keys, CORS, model, index unchanged).
-
-**Technical PMS** — `replit_dev 329ee5d42` (4 chatbot screen files, no server/DB change): "Report this answer" (only
-when the assistant supports it) and the "Manage knowledge" book icon (only for trainers, decided by the assistant).
-
-## 4. Test results (release candidate on a COPY of the live database; live untouched)
-
-Setup: live DB dumped (`~/central-assistant/backups/live-assistant-db-20261005T104402Z.dump`, 276 MB) and restored twice:
-**BASE** = today's live image + live env (:8049) · **REL** = release image + release env (:8048), migrated to 0011.
-Rows marked **(final image)** ran on `v8-8d81b1f1f` (6 Oct, scratch copies); the others on `abe87ed1a`/`19e108451`.
-
-| Check | Result | Class |
-|---|---|---|
-| Migration 0008–0011 on a copy of live data | clean; second run no-op | PROVEN |
-| Today's live image on the migrated database (switch overlap / fast rollback) | healthy, fingerprint `b31c3f9c`, no errors | PROVEN |
-| **Fast rollback with knowledge present** (previous image on the MIGRATED DB, a real published entry + a real private preview) | **Plain switch is UNSAFE:** the previous image gave an ordinary user the private draft's text word for word. **Corrected procedure** (`kb_admin rollback-hold` before switching): previous image retrieves neither draft nor published entry, manuals answer normally, status 0; `rollback-release` → release image serves the published entry again, draft still private — **6/6** (`scripts/verify_fast_rollback.py`) | PROVEN |
-| **Trainer accounts (pilot, `v8-fe04a9997`)** (`scripts/verify_kb_accounts.py`) | **25/25**: header check; wrong password and unknown user get the same generic refusal; each account sees only its module (Audit & Safety = one module, three parts); other modules refused on the server (403); Test draft and Publish work with an account session; history names the account; disable → open session refused at once, sign-in refused; enable → works again; password reset → open session refused, old password refused, new accepted; 5 wrong attempts lock (right password refused), reset clears it; only a salted scrypt hash stored. Browser: sign-in form; a one-module account opens straight into its module; Audit & Safety opens as one module with a Part picker (screenshots `screenshots-2026-10-06/`). From outside: page 200, refused login 401, admin 403 | PROVEN |
-| **Knowledge write block — concurrency (final image)** (`scripts/verify_rollback_write_block.py`, scratch copy) | **18/18**: a publish already inside its transaction → the block **waited 3.3 s** and that publish committed; while blocked, publish / Test draft / create / save / retire / restore all refused (503) and nothing written; hold → 0 served, later Test draft / publish still refused; release brings rows back with writes still blocked; a publish whose preparation began before the block is refused at its transaction; hold refuses unless writes are blocked; grant with a company matches only that company, without one any company. Migration 0012 second run = no-op | PROVEN |
-| **Fast rollback, full order (final image)** | block → hold → status "SAFE" → (previous image retrieves nothing from knowledge, manuals normal) → release → unblock → published entry back, draft private — **6/6**; the plain switch still leaks the draft (finding kept) | PROVEN |
-| Rollback rehearsal — full downgrade (scratch copy with a published + a preview knowledge row) | OLD downgrade left the 2 rows behind (found → fixed in `abe87ed1a`); FIXED downgrade removes them, back to 0007; today's live image healthy on it; re-upgrade clean | PROVEN |
-| Knowledge harness (trainers, refusals, draft → test → publish → edit → restore → retire, all clients/environments, reports, revocation, trainer page) | **66/66** | PROVEN |
-| Publish failure (embedding outage / failure inside the transaction leave the served version unchanged) | **8/8** (pilot, same code) | PROVEN |
-| Live-data routing dev vs production (local test environments) | **15/15** — dev → dev Data API only (142 overdue = dev's own count), production → production only, cross-environment / forged / re-labelled identities refused | PROVEN |
-| Normal browser flow, **no browser override** (release PMS code `329ee5d42` → candidate; the assistant address comes from the app's own setting) | trainer sees the book icon → knowledge screen opens signed in, Technical only, the 5 transferred drafts listed; Test draft private ("draft, not published"); Publish without approver; an **ordinary user on the simulated production** gets revision 2 cited as a knowledge entry; Report this answer works; Restore → users get revision 1 again; Retire → no longer used; ordinary dev user: no book icon | PROVEN |
-| Change note lost on Save → Publish (found in the browser) | fixed in `e58246b2a`, re-checked in the browser | PROVEN |
-| Draft transfer (5 entries as unpublished drafts, attributed to development) | 5 imported, 0 served, 0 reports, 0 accounts carried; rerun = no-op | PROVEN |
-| Regression suites BASE vs REL | routing 13/13 = 13/13 · retrieval 18/18 = 18/18 · work orders 8/8 = 8/8 · frozen 11/12 = 11/12 · corrected 13/14 = 13/14 · fresh **10/10 vs 9/10** · manual coverage **35/57 vs 33/57** | PROVEN (numbers) |
-| **Known answer limitations** (the two cases in full: `docs/assistant-experiments/2026-09-30-kb-pilot/RELEASE-TWO-CASES-FULL-ANSWERS.md`) | **Audit inspection fields (fresh-audit-1):** equivalent wording — "fields marked with \*" without the word "mandatory"; nothing missing. **Master certificate (certsurveys-1):** an **omission** in one release run — the auto-generated Master ID is not mentioned (all user steps correct). **New/Save timing:** saying the Master ID appears at Save (the manual: when New adds the row) is **incorrect and occurs on both versions** (one run each) — existing behaviour, not introduced by this release | READ (by me) |
-| Reading of the other differences | fresh-audit-1: same 5 sections retrieved on both sides in every run; the failing run gives the same steps but not the word "mandatory/required". Manual coverage: 4 losses, each passing in 1–2 of 3 REL runs — 3 are wording only ("permanently removed" vs "removes", "create and release" vs "released", "open the existing record" vs "edit the existing"), 1 omits "auto-generated Master ID" in one run; 2 gains of the same kind. Same pattern as the 1-Oct run (34 vs 32); the 30-Sep run went the other way (33 vs 35) | READ (by me; no second reader; no captured model input, so a prompt effect cannot be excluded) |
-
-Fingerprint: the image the suites ran on (`19e108451`) and `abe87ed1a` differ only in `app/kb_ui.html` and the 0008
-downgrade; the final image adds the write block, the rollback commands and the optional company match — prompt
-fingerprint identical (`e9d7ba01`). PROVEN (file hashes / health).
-
-**Not repeated on the final image (bounded):** the knowledge harness (66), the browser flow and the regression suites
-ran on `abe87ed1a`/`19e108451`. The final image adds the write guard (exercised for every write type by the 18 targeted
-checks) and the optional company match (a grant without a company behaves exactly as before). Prompt fingerprint
-unchanged (`e9d7ba01`).
-
-**Not tested (and why):**
-- A **real SAILERP dev login** through the real dev PMS → needs Nilesh's dev deploy and a real login (I never enter
-  passwords). It is step 8 of the rollout.
-- **Real production Data API** after the switch — identity verification and routing are unchanged by this release (READ:
-  `identity.py` has no diff between `890b47645` and `abe87ed1a`; `chat.py`/`agent.py` only add the knowledge filter,
-  the preview flag and the knowledge rules — the registered instance is passed through as before); production routing
-  was proven on 28 Sep.
-- The browser runs were on the local test environments (Office users; the local pilot has no SAILERP login page — the
-  login session is placed in the browser by a helper; the assistant address is NOT overridden).
-
-## 5. Rollout (⏸ each step after approval; ~30 min; live chat keeps working throughout)
+## 4. Rollout (live chat keeps working throughout; v7 stays running for rollback)
 
 | # | Step | Check |
 |---|---|---|
-| 0 | Nilesh deploys `replit_dev` (`329ee5d42`) to **dev** — any time; before the switch it shows nothing new (live answers the knowledge check with 404) | dev bundle contains `kb/eligibility` |
-| 1 | Fresh backup: `pg_dump` of `sail-assistant-db` → `~/central-assistant/backups/`; copy `v7.env` → `v7.env.bak-v8-<ts>` | dump size ≈ 276 MB |
-| 2 | Start `sail-assistant-py-v8` = image **`v8-fe04a9997`**, env `v8-release.env`, network `technical-rag-net`, `127.0.0.1:8051→8000`; it migrates the live DB to **0013** on start. v7 keeps serving (PROVEN on a migrated copy) | `/health` on :8051: fingerprint `e9d7ba01`, instances dev/prod/demo, rejected []; alembic 0013; `kb_admin rollback-status` → writes blocked: False |
-| 3 | nginx `assistant.conf` + `safelanes.conf:375` `8046 → 8051` (backups `*.bak-v8-<ts>`), `nginx -t`, reload | public `/health` = `e9d7ba01`; `/admin` 403; no-token chat 401; preflight from dev/prod/demo 200 |
-| 4 | **Trainer accounts:** copy the 3 accounts (hashed passwords only) from the pilot DB to the live DB (`kb_accounts` rows for pmstrainer / crewtrainer / audsafetytrainer) — the passwords in the restricted file stay valid; or create new ones with `kb_admin account-create` (password from stdin) and update the file. No SAILERP/role-based grant | `kb_admin account-list` shows the 3 accounts, active |
-| 5 | Import the 5 drafts: `kb_transfer_drafts.py import --in kb-drafts.json --dry-run`, then without `--dry-run` | 5 drafts, 0 served |
-| 6 | **Post-deployment checks** (below) | all pass |
-| 7 | Send Jeevan the short guide (§8) | — |
-| 8 | After a few days without problems: remove the knowledge pilot (nginx `kbpilot.conf` + certificate, DNS `kb-pilot` (Naveel), containers `sail-assistant-py-kbpilot*`, `sail-kbpilot-db`, the dev keys in `kbpilot-r9.env`), the release candidates (`sail-assistant-py-rel`, `-relbase`, `sail-assistant-reldb`, `-relbasedb`, test env files) and finally `sail-assistant-py-v7` | — |
+| 1 | Fresh backup: `pg_dump` of `sail-assistant-db` → `~/central-assistant/backups/`; copy `v7.env` and both nginx files (`*.bak-v8-<ts>`) | dump present, size ≈ live DB |
+| 2 | Start `sail-assistant-py-v8` = `v8-fe04a9997`, env `v8-release.env`, network `technical-rag-net`, `127.0.0.1:8051→8000`; it migrates the live DB to **0013** | `/health` on :8051 fingerprint `e9d7ba01`, instances dev/prod/demo, rejected []; alembic 0013; `rollback-status` writes blocked False |
+| 3 | Create the 3 live accounts (fresh passwords via stdin; file outside Git) | `account-list` = exactly the 3 accounts, right modules |
+| 4 | Import the 5 drafts (dry-run, then real) | 5 drafts, 0 served |
+| 5 | `pmstrainer` can open and test the drafts (on :8051, before switching) | entries listed; Test draft private; draft not served |
+| 6 | nginx `assistant.conf` + `safelanes.conf:375` `8046 → 8051`, `nginx -t`, reload | public health `e9d7ba01`; `/admin` 403; no-token chat 401; dev/prod/demo preflight 200; `/kb` page 200 |
+| 7 | Post-switch checks (§4.1) | all pass |
 
-### Post-deployment checks (normal application screens only — no console, no tokens, no real publish)
+### 4.1 Post-switch checks
 
-| # | Who | What | Pass when |
-|---|---|---|---|
-| C1 | Ghazi (or any user), dev or production | Open the chatbot in Technical and ask a **documentation question**, e.g. "How do I complete a work order?" | normal answer citing the PMS user manual |
-| C2 | An **authorised production user** (Ghazi), production SAILERP → Technical | Ask **one live-data question** for a vessel they can see, e.g. "How many overdue work orders does <vessel> have?" | the number matches the Work Orders screen for that vessel; I confirm on the server that the call went to the production Data API (`technical-prod`) |
-| C3 | **The PMS trainer** (pmstrainer) | Open `https://assistant.sl-sail.com/kb` → sign in → Technical (PMS) opens by itself → open one of the 5 drafts → **Test draft** with a question | private test answer shown ("draft, not published"). **Do not publish.** |
-| C4 | anyone | a wrong password | generic refusal; 5 wrong attempts lock the account for 15 minutes |
+| # | What | Who |
+|---|---|---|
+| P1 | Trainer sign-in page served; refused sign-in for an unknown user; account permissions + private preview on live data | me |
+| P2 | A normal documentation answer through the public address | me (documentation-only identity) |
+| P3 | **Trainer sign-in with a real password** → Technical opens → Test draft on one of the 5 drafts (do not publish) | **you / the PMS trainer** (I do not type real passwords) |
+| P4 | **One authorised production live-data answer**: production SAILERP → Technical → chatbot → e.g. "How many overdue work orders does <vessel> have?"; I confirm on the server that it went to `technical-prod` | **you** (needs a real production login) |
 
-## 6. Rollback
+## 5. Release checks before switching (owner, 6 Oct)
 
-- **Never switch straight back to v7 once knowledge exists.** PROVEN unsafe: v7 searches by index set only and served a
-  private draft's text to an ordinary user.
-- **R1 — fast (about a minute), PROVEN (final image):**
-  1. `docker exec sail-assistant-py-v8 python -m app.kb_admin writes-block --by "<who>" --reason "rollback"` — pauses
-     every knowledge write; it **waits for writes already in progress** to finish and refuses all later ones.
-  2. `... kb_admin rollback-hold --by "<who>"` — moves every knowledge row (published and previews) out of the served
-     index set (refused unless step 1 is done).
-  3. `... kb_admin rollback-status` — must print `served index set: 0 ... writes blocked: True -> SAFE to switch`.
-  4. nginx `assistant.conf` + `safelanes.conf:375` back to `8046` (v7 still running), `nginx -t`, reload.
-  **Writes stay blocked** while v7 serves. Knowledge entries stay in their own tables; users get the manuals only.
-  **Roll forward:** nginx to `8051` → `kb_admin rollback-release` (only while blocked) → `kb_admin writes-unblock`.
-- **R2 — full:** after R1, stop v8 and run `alembic downgrade 0007` with the v8 image (removes knowledge rows first —
-  rehearsed), keeping the step-1 dump. Only if the database itself must return to the old version.
-- **R3:** restore the step-1 dump.
+Filled in at release — see §7 (release log).
 
-## 7. Decisions for Ghazi
+## 6. Known answer limitations (unchanged by this release)
 
-1. **Approve the rollout (§5)** — steps 1–6 on the live assistant (step 0 is Nilesh's dev deploy).
-2. ~~Jeevan's company on the grant~~ — **superseded 6 Oct by the trainer accounts** (no SAILERP identity needed for training). Previously: his verified dev login shows company `rsms` until 5 Oct and `rsms05102026` on
-   6 Oct. Recording a company makes the grant match only that company — it would have stopped working when the company
-   changed. Options: (a) **no company** (dev system + user id 362; your 5-Oct decision), (b) `rsms`, (c) `rsms05102026`.
-   Which company is Jeevan's real dev company is a question for you / Jeevan.
-3. **Production PMS:** when `replit_dev` is next deployed to production, production users will see **"Report this
-   answer"** (reports go to the Technical trainers' queue; they never change answers). No book icon on production. OK?
-4. **Push** `chatbot-enterprise` to `feature/chatbot-enterprise`: the local commits after `9d163eaf2` (plan commit last).
-5. Settings: the three tested answer settings stay ON (your instruction).
+- **Audit inspection fields:** equivalent wording ("fields marked with \*" without "mandatory"); nothing missing.
+- **Master certificate:** an **omission** in one release run (the auto-generated Master ID not mentioned).
+- **New/Save timing:** saying the Master ID appears at Save (manual: when New adds the row) is **incorrect and occurs on
+  both versions** — existing behaviour. Full texts: `docs/assistant-experiments/2026-09-30-kb-pilot/RELEASE-TWO-CASES-FULL-ANSWERS.md`.
 
-## 8. Guide for Jeevan
+## 6a. Rollback
 
-`docs/CHATBOT-KNOWLEDGE-TRAINER-GUIDE.md` — normal application steps only.
+- **Never switch straight back to v7 once knowledge exists** (PROVEN unsafe: v7 would serve a private draft's text).
+- **R1 — fast (about a minute):**
+  1. `docker exec sail-assistant-py-v8 python -m app.kb_admin writes-block --by "<who>" --reason "rollback"` (waits for
+     writes in progress, refuses the rest — trainers see "paused for maintenance")
+  2. `... kb_admin rollback-hold --by "<who>"`
+  3. `... kb_admin rollback-status` → must say `served index set: 0 … writes blocked: True -> SAFE to switch`
+  4. nginx `assistant.conf` + `safelanes.conf:375` back to `8046`, `nginx -t`, reload. Writes stay blocked while v7 serves.
+  Roll forward: nginx to `8051` → `rollback-release` → `writes-unblock`.
+- **R2:** after R1, stop v8 and `alembic downgrade 0007` with the v8 image (rehearsed). **R3:** restore the step-1 dump.
+
+## 7. Release log
+
+(Completed at release.)

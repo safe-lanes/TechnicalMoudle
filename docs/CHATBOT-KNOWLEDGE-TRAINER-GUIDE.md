@@ -4,7 +4,7 @@
 
 ## Sign in
 
-1. Open the training page: **https://assistant.sl-sail.com/kb** (pilot: https://kb-pilot.sl-sail.com/kb).
+1. Open the training page: **https://assistant.sl-sail.com/kb**.
 2. Enter your **trainer user id** and **password** (given to you personally — do not share them).
 3. Your module opens by itself (Technical (PMS), Crewing, or Audit & Safety). Audit & Safety trainers choose the
    **Part** (Audit, Safety or Incident) each entry belongs to.
