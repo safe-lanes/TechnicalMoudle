@@ -63,7 +63,7 @@ The broad suites, harness and routing test were not repeated on `fe04a9997` (bou
 | 2 | Start `sail-assistant-py-v8` = `v8-fe04a9997`, env `v8-release.env`, network `technical-rag-net`, `127.0.0.1:8051→8000`; it migrates the live DB to **0013** | `/health` on :8051 fingerprint `e9d7ba01`, instances dev/prod/demo, rejected []; alembic 0013; `rollback-status` writes blocked False |
 | 3 | Create the 3 live accounts (fresh passwords via stdin; file outside Git) | `account-list` = exactly the 3 accounts, right modules |
 | 4 | Import the 5 drafts (dry-run, then real) | 5 drafts, 0 served |
-| 5 | `pmstrainer` can open and test the drafts (on :8051, before switching) | entries listed; Test draft private; draft not served |
+| 5 | `pmstrainer` can open and test the drafts — **only AFTER the switch** (see the 6 Oct incident in §7: a Test draft creates a preview row that the old image would serve while it is still live) | entries listed; Test draft private; draft not served to ordinary users |
 | 6 | nginx `assistant.conf` + `safelanes.conf:375` `8046 → 8051`, `nginx -t`, reload | public health `e9d7ba01`; `/admin` 403; no-token chat 401; dev/prod/demo preflight 200; `/kb` page 200 |
 | 7 | Post-switch checks (§4.1) | all pass |
 
@@ -76,9 +76,15 @@ The broad suites, harness and routing test were not repeated on `fe04a9997` (bou
 | P3 | **Trainer sign-in with a real password** → Technical opens → Test draft on one of the 5 drafts (do not publish) | **you / the PMS trainer** (I do not type real passwords) |
 | P4 | **One authorised production live-data answer**: production SAILERP → Technical → chatbot → e.g. "How many overdue work orders does <vessel> have?"; I confirm on the server that it went to `technical-prod` | **you** (needs a real production login) |
 
-## 5. Release checks before switching (owner, 6 Oct)
+## 5. Release checks before switching (owner, 6 Oct) — PASSED
 
-Filled in at release — see §7 (release log).
+On a scratch copy of the **live** database (dumped 6 Oct, migration 0007 → 0013 on start), image `v8-fe04a9997`
+(`scripts/verify_release_scratch.py`, evidence `release-checks-2026-10-06.txt`):
+- **A 10/10** — a trainer **account** signed in over HTTP is refused **Test draft, Publish and Save** during the write
+  block (503), nothing written; after unblocking it publishes and tests normally.
+- **B 5/5** — after block + hold, the **old image `v7-r2` runs on the 0013 database** (health ok, fingerprint `b31c3f9c`,
+  no log errors), retrieves **no knowledge** (published or draft) and still answers manual questions; release + unblock
+  brings the entry back on the release image.
 
 ## 6. Known answer limitations (unchanged by this release)
 
@@ -99,6 +105,22 @@ Filled in at release — see §7 (release log).
   Roll forward: nginx to `8051` → `rollback-release` → `writes-unblock`.
 - **R2:** after R1, stop v8 and `alembic downgrade 0007` with the v8 image (rehearsed). **R3:** restore the step-1 dump.
 
-## 7. Release log
+## 7. Release log — 6 Oct 2026 (UTC)
 
-(Completed at release.)
+| Time | Step | Result |
+|---|---|---|
+| — | Push `feature/chatbot-enterprise` | **`4d546cab4`** (normal push; image code = `fe04a9997`, later commits docs/tests only) |
+| 09:30 | Backups | `backups/live-assistant-db-pre-v8-20261006T093008Z.dump` (276 MB, readable, migration 0007), `v7.env.bak-v8-20261006T093008Z`, `assistant.conf` / `safelanes.conf` `.bak-v8-20261006T093008Z` |
+| ~09:31 | `sail-assistant-py-v8` started (`v8-fe04a9997`, `127.0.0.1:8051`) | live DB **0013**; health `e9d7ba01`, instances dev/prod/demo, rejected []; knowledge tables empty (0 trainers, 0 accounts, 0 entries, 0 sessions) |
+| ~09:35 | 3 live accounts | `pmstrainer` (technical), `crewtrainer` (crewing), `audsafetytrainer` (audit, safety, incident); fresh passwords, none equal to a pilot password; file `C:\Users\GhaziAnwer\local-only\kb-trainer-accounts-LIVE.txt` (owner-only ACL, server copy shredded); no pilot sessions, test accounts or grants |
+| ~09:37 | 5 drafts imported | unpublished (draft rev 1), 0 served |
+| 09:39 | pmstrainer check (permissions, no password) | 9/9 |
+| **09:39:41–09:40:46** | **INCIDENT — my error** | the Test draft in that check created a **private preview row in the shared live DB while v7 was still the live service**; v7 does not filter knowledge rows and **served the draft "Deleting a job" to one request — my own check (`release-check`)**. The conversation log shows **no other user** in that window. Row deleted at 09:40:46; v7 re-checked: "not documented". Cause: testing a draft before the switch. Procedure fixed (step 5 after the switch) |
+| 09:41:34 | **nginx switched** `8046 → 8051` (both lines), `nginx -t` ok, reload | public: health `e9d7ba01`, `/admin/kb` 403, chat without login 401, bad trainer login 401 (generic), `/kb` 200, preflight dev/prod/demo 200, `/assistant/` path ok |
+| ~09:45 | **P1** pmstrainer opens + privately tests drafts on live; ordinary user (public address) does not get the draft; nothing published | 9/9 |
+| ~09:46 | **P2** documentation answer through the public address | answered from the PMS user manuals |
+| — | **P3** real trainer sign-in → Test draft (no publish) | **waiting — Ghazi / PMS trainer** |
+| — | **P4** one authorised production live-data answer | **waiting — Ghazi** (I confirm the call reached `technical-prod`) |
+
+State after release: `sail-assistant-py-v7` still running (rollback; not in the public path); 1 private preview row exists →
+**rollback must use the R1 order (writes-block → hold → status SAFE → switch)**. Pilot and rollback resources kept.
