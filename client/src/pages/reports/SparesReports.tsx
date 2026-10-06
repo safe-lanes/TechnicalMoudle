@@ -583,7 +583,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
   if (activeDetailReport === 'spares-low-stock') {
     return (
       <LowStockAlertReport
-        onBack={() => setActiveDetailReport(embedded ? selectedReportId : null)}
+        onBack={() => setActiveDetailReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId}
         source="spares"
         embedded={embedded}
@@ -596,7 +596,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
   if (activeDetailReport === 'spares-critical-parts') {
     return (
       <CriticalSparesReport
-        onBack={() => setActiveDetailReport(embedded ? selectedReportId : null)}
+        onBack={() => setActiveDetailReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
         globalVessels={globalVessels}
@@ -608,7 +608,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
   if (activeDetailReport === 'spares-consumption-analysis') {
     return (
       <SparesConsumptionPatternReport
-        onBack={() => setActiveDetailReport(embedded ? selectedReportId : null)}
+        onBack={() => setActiveDetailReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
         globalVessels={globalVessels}

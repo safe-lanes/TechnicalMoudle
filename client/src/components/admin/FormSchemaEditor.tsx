@@ -82,10 +82,7 @@ export default function FormSchemaEditor({
   // Update schema mutation
   const updateSchemaMutation = useMutation({
     mutationFn: (schemaJson: any) =>
-      apiRequest(`/technical/api/admin/forms/${version.formId}/versions/${version.id}/schema`, {
-        method: 'PUT',
-        body: JSON.stringify({ schemaJson }),
-      }),
+      apiRequest('PUT', `/technical/api/admin/forms/${version.formId}/versions/${version.id}/schema`, { schemaJson }),
     onSuccess: () => {
       toast({
         title: 'Success',
@@ -105,10 +102,7 @@ export default function FormSchemaEditor({
   // Publish version mutation
   const publishMutation = useMutation({
     mutationFn: (changelog: string) =>
-      apiRequest(`/technical/api/admin/forms/${version.formId}/versions/${version.id}/publish`, {
-        method: 'POST',
-        body: JSON.stringify({ userId: 'admin', changelog }),
-      }),
+      apiRequest('POST', `/technical/api/admin/forms/${version.formId}/versions/${version.id}/publish`, { userId: 'admin', changelog }),
     onSuccess: () => {
       toast({
         title: 'Success',
@@ -130,9 +124,7 @@ export default function FormSchemaEditor({
   // Discard draft mutation
   const discardMutation = useMutation({
     mutationFn: () =>
-      apiRequest(`/technical/api/admin/forms/${version.formId}/versions/${version.id}/discard`, {
-        method: 'POST',
-      }),
+      apiRequest('POST', `/technical/api/admin/forms/${version.formId}/versions/${version.id}/discard`),
     onSuccess: () => {
       toast({
         title: 'Success',

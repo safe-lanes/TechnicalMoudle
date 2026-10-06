@@ -51,7 +51,11 @@ export class RunningHoursService {
   /**
    * Validate running hours update data
    */
-  validateRunningHoursUpdate(updateData: Partial<CascadeRunningHoursRequest>): {
+  validateRunningHoursUpdate(updateData: {
+    componentId?: string;
+    newRunningHours?: number | null;
+    updatedBy?: string;
+  }): {
     valid: boolean;
     errors: string[];
   } {

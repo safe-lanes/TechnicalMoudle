@@ -19,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateByUrlPrefix } from "@/lib/queryClient";
+import { componentErrorDescription, componentResponseError } from "@/lib/componentErrorFeedback";
+import { ComponentLoadErrors } from "@/components/ComponentLoadErrors";
 
 interface RotationalItemRow {
   riuuid: string;
@@ -51,7 +53,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
   const [newRh, setNewRh] = useState("0");
   const [stampFilter, setStampFilter] = useState("");
 
-  const { data: items = [], isLoading } = useQuery<RotationalItemRow[]>({
+  const { data: items = [], isLoading, error: itemsError } = useQuery<RotationalItemRow[]>({
     queryKey: [`/technical/api/rotational-items?vesselId=${vesselId}`],
     enabled: open && !!vesselId,
   });
@@ -95,8 +97,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || err.message || "Replacement failed");
+        throw await componentResponseError(res);
       }
       return res.json();
     },
@@ -119,7 +120,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
       onSwapped?.();
     },
     onError: (err: any) => {
-      toast({ title: "Replacement failed", description: err.message, variant: "destructive" });
+      toast({ title: "Rotational Item Replacement Failed", description: componentErrorDescription(err, "The rotational item could not be replaced. Check the stamp and try again."), variant: "destructive" });
     },
   });
 
@@ -133,6 +134,7 @@ export const ReplaceRotationalItemDialog: React.FC<Props> = ({
         <DialogHeader>
           <DialogTitle>Replace Rotational Item</DialogTitle>
         </DialogHeader>
+        <ComponentLoadErrors failures={[["Rotational Items", itemsError]]} />
         <div className="space-y-3 text-sm">
           <div className="text-gray-600">
             {componentName} — currently installed stamp:{" "}

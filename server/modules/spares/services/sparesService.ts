@@ -415,7 +415,7 @@ export async function consumeFromLocation(paramsRaw: any, bodyRaw: any) {
   const { quantity, location, userId, remarks, workOrderRef } = bodyResult.data;
 
   const result = await repo.consumeSpareFromLocation(
-    spareId, quantity, location, userId || 'system', remarks, workOrderRef
+    String(spareId), quantity, location, userId || 'system', remarks, workOrderRef
   );
 
   // Rule #9: Warn if shortage occurred
@@ -478,7 +478,7 @@ export async function receiveToLocation(paramsRaw: any, bodyRaw: any) {
   const { quantity, location, userId, remarks, supplierPO, dateLocal } = bodyResult.data;
 
   const result = await repo.receiveSpareToLocation(
-    spareId, quantity, location, userId || 'system', remarks, supplierPO, dateLocal
+    String(spareId), quantity, location, userId || 'system', remarks, supplierPO, dateLocal
   );
 
   return { validationError: false, response: { success: true, data: result } };

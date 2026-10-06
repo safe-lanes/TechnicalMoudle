@@ -52,6 +52,7 @@ interface MaintenanceReport {
   priority: 'high' | 'medium' | 'low';
   lastGenerated?: string;
   estimatedTime: string;
+  hidden?: boolean;
 }
 
 interface MaintenanceReportsProps {
@@ -798,12 +799,21 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           daysUntilDue: row.daysUntilDue !== null ? row.daysUntilDue : '-'
         }));
 
+        const totalOverdueJobs = data.reduce(
+          (total: number, row: { overdueJobs: number }) => total + row.overdueJobs, 0
+        );
+        const totalTrackedWorkOrders = data.reduce(
+          (total: number, row: { totalWorkOrders: number }) => total + row.totalWorkOrders, 0
+        );
+
         const summary = [
           { label: 'Total Critical Equipment', value: data.length },
           { label: 'Critical Only', value: data.filter((d: any) => d.isCritical === 'Yes' && d.isClassItem !== 'Yes').length },
           { label: 'Class Item Only', value: data.filter((d: any) => d.isClassItem === 'Yes' && d.isCritical !== 'Yes').length },
           { label: 'Both Critical & Class', value: data.filter((d: any) => d.isCritical === 'Yes' && d.isClassItem === 'Yes').length },
           { label: 'With Overdue Jobs', value: data.filter((d: any) => (d.overdueJobs || 0) > 0).length, color: 'highlight' },
+          { label: 'Total Overdue WOs', value: totalOverdueJobs },
+          { label: 'Total Tracked WOs', value: totalTrackedWorkOrders },
           { label: (effectiveDateRange?.from || effectiveDateRange?.to) ? 'Due in Period' : 'Due Soon (7 days)', value: data.filter((d: any) => (d.dueSoonJobs || 0) > 0).length }
         ];
 
@@ -816,6 +826,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           bothCriticalAndClass: data.filter((d: any) => d.isCritical === 'Yes' && d.isClassItem === 'Yes').length,
           equipmentWithOverdue: data.filter((d: any) => (d.overdueJobs || 0) > 0).length,
           equipmentDueSoon: data.filter((d: any) => (d.dueSoonJobs || 0) > 0).length,
+          totalOverdueJobs,
+          totalTrackedWorkOrders,
         };
         pdfReportGenerator.generateCriticalEquipmentReport(
           { 

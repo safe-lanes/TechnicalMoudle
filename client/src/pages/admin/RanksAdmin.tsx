@@ -191,7 +191,7 @@ export default function RanksAdmin() {
     return true;
   }).sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const categories = [...new Set(ranksData.map(r => r.category).filter(Boolean))];
+  const categories = Array.from(new Set(ranksData.map(r => r.category).filter(Boolean)));
   const isSaving = saveRanksMutation.isPending;
 
   const renderRanksTab = () => (

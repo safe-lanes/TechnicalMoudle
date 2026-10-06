@@ -27,10 +27,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
-import { downloadAuthedFile } from "@/lib/authedDownload";
 import { useVessels } from "@/hooks/useVessels";
 import { useDepartmentOptions, useMasterListOptions } from "@/hooks/useDepartments";
 import type { ComponentDocument } from "@shared/schema";
+import { componentErrorDescription, componentResponseError, downloadComponentDocument } from "@/lib/componentErrorFeedback";
+import { ComponentLoadErrors } from "@/components/ComponentLoadErrors";
 
 interface ComponentNode {
   id: string;
@@ -58,8 +59,8 @@ export default function ComponentRegisterAddEdit({
   const [, setLocation] = useLocation();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { options: departmentOptions } = useDepartmentOptions();
-  const { options: componentCategoryOptions, items: componentCategoryItems } = useMasterListOptions('componentCategory');
+  const { options: departmentOptions, error: departmentsError } = useDepartmentOptions();
+  const { options: componentCategoryOptions, items: componentCategoryItems, error: categoryError } = useMasterListOptions('componentCategory');
   const { canCreate: canCreatePerm, canEdit: canEditPerm } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTreeNode, setSelectedTreeNode] = useState<string | null>(null);
@@ -74,7 +75,7 @@ export default function ComponentRegisterAddEdit({
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const { data: makersList = [] } = useQuery<any[]>({
+  const { data: makersList = [], error: makersError } = useQuery<any[]>({
     queryKey: ['/technical/api/fleet/makers'],
   });
 
@@ -141,11 +142,11 @@ export default function ComponentRegisterAddEdit({
   const originalIsActiveRef = useRef<string | null>(null);
   const [rhSourceOpen, setRhSourceOpen] = useState(false);
 
-  const { data: masterComponents = [] } = useQuery<any[]>({
+  const { data: masterComponents = [], error: mastersError } = useQuery<any[]>({
     queryKey: ['/technical/api/rh-config/master-components', vesselId],
     queryFn: async () => {
       const res = await fetch(`/technical/api/rh-config/master-components/${vesselId}`);
-      if (!res.ok) throw new Error("Failed to fetch master components");
+      if (!res.ok) throw await componentResponseError(res);
       return res.json();
     },
     enabled: !!vesselId && componentData.rhCounterType === "INHERITED",
@@ -169,8 +170,7 @@ export default function ComponentRegisterAddEdit({
       setJobToDeactivate(null);
     },
     onError: (error: any) => {
-      const message = error?.message || "Failed to deactivate job";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      toast({ title: "Job Deactivation Failed", description: componentErrorDescription(error, "The job could not be deactivated. Try again."), variant: "destructive" });
       setShowJobDeactivateDialog(false);
       setJobToDeactivate(null);
     },
@@ -197,7 +197,7 @@ export default function ComponentRegisterAddEdit({
     information: "",
   });
 
-  const { data: components = [], isLoading: isLoadingComponents } = useQuery<any[]>({
+  const { data: components = [], isLoading: isLoadingComponents, error: registerError } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
   });
 
@@ -263,25 +263,25 @@ export default function ComponentRegisterAddEdit({
     }
   }, [parentComponent?.code, componentId, components, vesselId, componentData.componentCode]);
 
-  const { data: existingComponent, isLoading: isLoadingComponent } = useQuery<any>({
+  const { data: existingComponent, isLoading: isLoadingComponent, error: componentLoadError } = useQuery<any>({
     queryKey: [`/technical/api/components/details/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   // Filter jobs by vesselId at the database level
-  const { data: allJobs = [] } = useQuery<any[]>({
+  const { data: allJobs = [], error: jobsError } = useQuery<any[]>({
     queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: isEditMode && !!vesselId,
   });
 
-  const { data: allSpares = [] } = useQuery<any[]>({
+  const { data: allSpares = [], error: sparesError } = useQuery<any[]>({
     queryKey: ['/technical/api/spares'],
     enabled: isEditMode,
   });
 
   const activeComponentId = componentId || selectedComponentId;
 
-  const { data: maintenanceHistory = [] } = useQuery<any[]>({
+  const { data: maintenanceHistory = [], error: historyError } = useQuery<any[]>({
     queryKey: ['/technical/api/component-maintenance-history', activeComponentId],
     queryFn: async () => {
       if (!activeComponentId) return [];
@@ -289,15 +289,14 @@ export default function ComponentRegisterAddEdit({
         credentials: 'include',
       });
       if (!response.ok) {
-        if (response.status === 404) return [];
-        throw new Error('Failed to fetch maintenance history');
+        throw await componentResponseError(response);
       }
       return response.json();
     },
     enabled: !!activeComponentId,
   });
   
-  const { data: componentDocuments = [], isLoading: isLoadingDocuments, refetch: refetchDocuments } = useQuery<ComponentDocument[]>({
+  const { data: componentDocuments = [], isLoading: isLoadingDocuments, refetch: refetchDocuments, error: documentsError } = useQuery<ComponentDocument[]>({
     queryKey: ['/technical/api/component-documents', activeComponentId],
     queryFn: async () => {
       if (!activeComponentId) return [];
@@ -305,8 +304,7 @@ export default function ComponentRegisterAddEdit({
         credentials: 'include',
       });
       if (!response.ok) {
-        if (response.status === 404) return [];
-        throw new Error('Failed to fetch documents');
+        throw await componentResponseError(response);
       }
       return response.json();
     },
@@ -338,8 +336,8 @@ export default function ComponentRegisterAddEdit({
 
     if (!compId || !compCode) {
       toast({
-        title: "Error",
-        description: "Please select a component first before uploading documents.",
+        title: "Document Upload Failed",
+        description: "Select a component before uploading documents.",
         variant: "destructive",
       });
       return;
@@ -352,8 +350,8 @@ export default function ComponentRegisterAddEdit({
 
     if (!validTypes.includes(file.type)) {
       toast({
-        title: "Invalid file type",
-        description: "Please upload PDF, Word, or image files only.",
+        title: "Document Upload Failed",
+        description: "Upload a PDF, Word (.doc or .docx), JPEG, or PNG file.",
         variant: "destructive",
       });
       return;
@@ -361,8 +359,8 @@ export default function ComponentRegisterAddEdit({
 
     if (file.size > maxSize) {
       toast({
-        title: "File too large",
-        description: "File size must be less than 25MB.",
+        title: "Document Upload Failed",
+        description: "The selected file exceeds 25 MB. Choose a smaller file.",
         variant: "destructive",
       });
       return;
@@ -390,8 +388,7 @@ export default function ComponentRegisterAddEdit({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload document');
+        throw await componentResponseError(response);
       }
 
       toast({
@@ -402,8 +399,8 @@ export default function ComponentRegisterAddEdit({
       refetchDocuments();
     } catch (error: any) {
       toast({
-        title: "Upload Failed",
-        description: error.message || "Failed to upload document",
+        title: "Document Upload Failed",
+        description: `${file.name}: ${componentErrorDescription(error, "The document could not be uploaded. Try again.")}`,
         variant: "destructive",
       });
     } finally {
@@ -416,11 +413,11 @@ export default function ComponentRegisterAddEdit({
 
   const handleViewDocument = async (docId: number) => {
     try {
-      await downloadAuthedFile(`/technical/api/component-documents/${docId}/download`);
+      await downloadComponentDocument(`/technical/api/component-documents/${docId}/download`);
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to open document",
+        title: "Document Open Failed",
+        description: `${componentDocuments.find(doc => doc.id === docId)?.fileName || "Document"}: ${componentErrorDescription(error, "The document could not be opened. Refresh the document list and try again.")}`,
         variant: "destructive",
       });
     }
@@ -438,7 +435,7 @@ export default function ComponentRegisterAddEdit({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete document');
+        throw await componentResponseError(response);
       }
 
       toast({
@@ -449,8 +446,8 @@ export default function ComponentRegisterAddEdit({
       refetchDocuments();
     } catch (error: any) {
       toast({
-        title: "Delete Failed",
-        description: error.message || "Failed to delete document",
+        title: "Document Deletion Failed",
+        description: `${docName}: ${componentErrorDescription(error, "The document could not be deleted. Try again.")}`,
         variant: "destructive",
       });
     }
@@ -846,7 +843,7 @@ export default function ComponentRegisterAddEdit({
     const requiredPerm = isEditMode ? canEditPerm("pms-components") : canCreatePerm("pms-components");
     if (!requiredPerm) {
       toast({
-        title: "Permission Denied",
+        title: "Component Save Failed",
         description: isEditMode ? "You do not have permission to edit components." : "You do not have permission to create components.",
         variant: "destructive",
       });
@@ -854,8 +851,8 @@ export default function ComponentRegisterAddEdit({
     }
     if (!validateMandatoryFields()) {
       toast({
-        title: "Validation Error",
-        description: "Please fill all mandatory fields before saving.",
+        title: "Component Save Failed",
+        description: "Complete the highlighted required fields before saving.",
         variant: "destructive",
       });
       return;
@@ -863,8 +860,8 @@ export default function ComponentRegisterAddEdit({
     if (componentData.maker && componentData.maker.trim()) {
       if (makersList.length === 0) {
         toast({
-          title: "Validation Error",
-          description: "Maker list is still loading. Please try again in a moment.",
+          title: "Component Save Failed",
+          description: makersError ? componentErrorDescription(makersError, "The Maker List could not be loaded. Refresh and try again.") : "The Maker List is loading. Wait a moment and try again.",
           variant: "destructive",
         });
         return;
@@ -872,8 +869,8 @@ export default function ComponentRegisterAddEdit({
       const validMaker = makersList.find((m: any) => m.makerName === componentData.maker);
       if (!validMaker) {
         toast({
-          title: "Validation Error",
-          description: "Please select a valid Maker from the Maker List.",
+          title: "Component Save Failed",
+          description: "Select a valid maker from the Maker List.",
           variant: "destructive",
         });
         return;
@@ -886,16 +883,16 @@ export default function ComponentRegisterAddEdit({
     }
     if (componentData.rotationalItem === "Yes" && !componentData.currentStamp.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Stamp is mandatory when Rotational Item is Yes.",
+        title: "Component Save Failed",
+        description: "Select a stamp when Rotational Item is set to Yes.",
         variant: "destructive",
       });
       return;
     }
     if (componentData.rhCounterType === "INHERITED" && !componentData.rhMasterComponentId) {
       toast({
-        title: "Validation Error",
-        description: "Please select a RH Counter Source from MASTER components.",
+        title: "Component Save Failed",
+        description: "Select a MASTER component as the RH Counter Source.",
         variant: "destructive",
       });
       return;
@@ -942,13 +939,9 @@ export default function ComponentRegisterAddEdit({
               vesselId: vesselId || payload.vesselId,
             });
           } catch (inactivateError: any) {
-            let errorMsg = "Component has active linked items. Deactivate them first.";
-            try {
-              const parsed = JSON.parse(inactivateError.message.replace(/^\d+:\s*/, ''));
-              errorMsg = parsed.error || errorMsg;
-            } catch {}
+            const errorMsg = componentErrorDescription(inactivateError, "The component could not be deactivated. Refresh the register and try again.");
             toast({
-              title: "Cannot Deactivate",
+              title: "Component Deactivation Failed",
               description: errorMsg,
               variant: "destructive",
             });
@@ -999,8 +992,8 @@ export default function ComponentRegisterAddEdit({
       onBack();
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to save component",
+        title: "Component Save Failed",
+        description: componentErrorDescription(error, "The component could not be saved. Check the entered values and try again."),
         variant: "destructive",
       });
     } finally {
@@ -1160,6 +1153,12 @@ export default function ComponentRegisterAddEdit({
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
+      <ComponentLoadErrors failures={[
+        ["Component", componentLoadError], ["Component Register", registerError], ["Maker List", makersError],
+        ["RH Sources", mastersError], ["Jobs", jobsError], ["Spares", sparesError],
+        ["Maintenance History", historyError], ["Documents", documentsError],
+        ["Departments", departmentsError], ["Component Categories", categoryError],
+      ]} />
       <div className="px-6 py-4 bg-white border-b">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900">
@@ -1383,7 +1382,7 @@ export default function ComponentRegisterAddEdit({
                           <Command>
                             <CommandInput placeholder="Search makers..." data-testid="input-search-maker" />
                             <CommandList className="max-h-[200px]">
-                              <CommandEmpty>No makers found.</CommandEmpty>
+                              <CommandEmpty>{makersError ? "Maker List could not be loaded. Refresh and try again." : "No makers found."}</CommandEmpty>
                               <CommandGroup>
                                 {makersList.map((maker: any) => (
                                   <CommandItem
@@ -1498,6 +1497,7 @@ export default function ComponentRegisterAddEdit({
                       Stamp{componentData.rotationalItem === "Yes" && <span className="text-red-500"> *</span>}
                     </label>
                     <StampSelect
+                      componentFeedback
                       vesselId={vesselId}
                       value={componentData.currentStamp}
                       onChange={(stamp) => handleFieldChange('currentStamp', stamp)}
@@ -1709,7 +1709,7 @@ export default function ComponentRegisterAddEdit({
                                   <Command>
                                     <CommandInput placeholder="Search by code or name..." data-testid="input-search-rh-source" />
                                     <CommandList className="max-h-[200px]">
-                                      <CommandEmpty>No MASTER components found.</CommandEmpty>
+                                      <CommandEmpty>{mastersError ? "RH sources could not be loaded. Refresh and try again." : "No MASTER components found."}</CommandEmpty>
                                       <CommandGroup>
                                         {masterComponents
                                           .filter((m: any) => m.id !== (componentId || selectedComponentId))
@@ -1885,7 +1885,7 @@ export default function ComponentRegisterAddEdit({
                           }) : (
                             <tr>
                               <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
-                                No work orders found
+                                {jobsError ? "Jobs could not be loaded. Refresh and try again." : "No work orders found"}
                               </td>
                             </tr>
                           )}
@@ -1942,7 +1942,7 @@ export default function ComponentRegisterAddEdit({
                       )) : (
                         <tr>
                           <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
-                            No maintenance history found
+                            {historyError ? "Maintenance history could not be loaded. Refresh and try again." : "No maintenance history found"}
                           </td>
                         </tr>
                       )}

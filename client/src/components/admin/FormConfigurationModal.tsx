@@ -54,7 +54,7 @@ interface FormVersion {
   changes: string;
   fieldLabels: Record<string, string>;
   deletedFields: Set<string>;
-  customFields: any[];
+  customFields: Record<string, any[]>;
   customSections: any[];
   componentData: any;
 }

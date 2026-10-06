@@ -105,7 +105,7 @@ export default function RichTextEditor({
       const editor = quillRef.current.getEditor();
       
       // Set minimum height
-      const editorContainer = editor.container;
+      const editorContainer = editor.root.parentElement;
       if (editorContainer) {
         editorContainer.style.minHeight = height;
         editorContainer.style.maxHeight = '400px';
@@ -113,8 +113,8 @@ export default function RichTextEditor({
       }
       
       // Prevent toolbar buttons from submitting forms
-      const toolbar = editorContainer.previousSibling as HTMLElement;
-      if (toolbar && toolbar.classList.contains('ql-toolbar')) {
+      const toolbar = editorContainer?.previousElementSibling;
+      if (toolbar instanceof HTMLElement && toolbar.classList.contains('ql-toolbar')) {
         const buttons = toolbar.querySelectorAll('button');
         buttons.forEach(button => {
           button.type = 'button';
@@ -144,7 +144,7 @@ export default function RichTextEditor({
           "quill-editor"
         )}
       />
-      <style jsx global>{`
+      <style>{`
         .quill-editor .ql-container {
           min-height: ${height};
           max-height: 400px;

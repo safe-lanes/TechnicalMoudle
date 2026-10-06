@@ -118,7 +118,7 @@ export async function bulkUpsert(components: InsertComponent[]): Promise<{ creat
 export async function setRunningHours(params: {
   componentId: string;
   newRHValue: number;
-  updateSource: string;
+  updateSource: Parameters<typeof storage.setComponentRunningHours>[0]['updateSource'];
   userId: string;
   lastUpdatedDate?: string;
 }) {
@@ -155,6 +155,10 @@ export async function deleteDocument(id: number) {
 
 export async function findClassRegulatory(componentId: string) {
   return storage.getComponentClassRegulatory(componentId);
+}
+
+export async function findClassRegulatoryItem(id: number) {
+  return storage.getComponentClassRegulatoryItem(id);
 }
 
 export async function createClassRegulatory(data: any) {

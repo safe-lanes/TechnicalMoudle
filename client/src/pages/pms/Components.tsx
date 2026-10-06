@@ -36,7 +36,6 @@ import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, parseDate } from "@/lib/dateUtils";
-import { downloadAuthedFile } from "@/lib/authedDownload";
 import {
   Select,
   SelectContent,
@@ -55,6 +54,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkOrderViewerSheet } from "@/components/WorkOrderViewerSheet";
+import { componentErrorDescription, componentResponseError, downloadComponentDocument } from "@/lib/componentErrorFeedback";
+import { ComponentLoadErrors } from "@/components/ComponentLoadErrors";
 
 interface ComponentNode {
   id: string;
@@ -140,7 +141,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     return change ? (change.newValue || change.currentValue) : null;
   };
 
-  const { items: componentCategoryItems } = useMasterListOptions('componentCategory');
+  const { items: componentCategoryItems, error: categoryError } = useMasterListOptions('componentCategory');
 
   const deriveComponentCategory = (codeOrId: string): string => {
     if (!codeOrId) return '';
@@ -327,6 +328,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
   return (
     <div className="space-y-4">
+      <ComponentLoadErrors failures={[["Component Categories", categoryError]]} />
       {selectedComponent && (
         <ReplaceRotationalItemDialog
           open={showReplaceDialog}
@@ -772,7 +774,7 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   const { isModifyMode } = useModifyMode();
   
   // Fetch running hours data for the selected component
-  const { data: runningHoursData } = useQuery<any>({
+  const { data: runningHoursData, error: rhLoadError } = useQuery<any>({
     queryKey: [`/technical/api/running-hours/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
@@ -882,6 +884,7 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   
   return (
     <div className="space-y-4">
+      <ComponentLoadErrors failures={[["Running Hours", rhLoadError]]} />
       <WOAgGridTable
         columnDefs={runningHoursColumnDefs}
         rowData={runningHoursRow}
@@ -997,13 +1000,13 @@ const JobActionCell: React.FC<{
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.blockingWorkOrder) {
+        const errorData = await response.clone().json().catch(() => ({}));
+        if (errorData?.blockingWorkOrder) {
           const err: any = new Error('PLANNED_WO_EXISTS');
           err.isPlannedWOBlock = true;
           throw err;
         }
-        throw new Error(errorData.message || errorData.error || 'Failed to generate work order');
+        throw await componentResponseError(response);
       }
       
       return response.json();
@@ -1023,14 +1026,14 @@ const JobActionCell: React.FC<{
     onError: (error: any) => {
       if (error.isPlannedWOBlock) {
         toast({
-          title: "A planned Work Order already exists for this maintenance job.",
+          title: "Work Order Already Planned",
           description: "Please complete the existing planned Work Order from the WO section before proceeding.",
           variant: "destructive"
         });
       } else {
         toast({
-          title: "Error",
-          description: error.message || "Failed to generate work order",
+          title: /inactive/i.test(error.message || "") ? "Work Order Creation Blocked" : "Work Order Creation Failed",
+          description: componentErrorDescription(error, "The work order could not be created. Try again."),
           variant: "destructive"
         });
       }
@@ -1118,7 +1121,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const ROWS_PER_PAGE = 10;
   
   // Fetch jobs filtered by vesselId at the database level
-  const { data: allJobs = [], isLoading } = useQuery<any[]>({
+  const { data: allJobs = [], isLoading, error: jobsLoadError } = useQuery<any[]>({
     queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: !!vesselId,
   });
@@ -1294,6 +1297,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     ];
   }, [componentCode, isClientAdmin, isExternal, isSailAdmin, toast]);
 
+  if (jobsLoadError) return <ComponentLoadErrors failures={[["Jobs", jobsLoadError]]} />;
   return (
     <>
       <div>
@@ -1405,7 +1409,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   // NOTE: Must use actualId (database UUID) not id (tree node code) for API calls
   // Only enable query when actualId exists (real component nodes, not category nodes)
   const componentDbId = selectedComponent?.actualId;
-  const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
+  const { data: maintenanceHistory = [], isLoading, error: historyLoadError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-maintenance-history/${componentDbId}`],
     enabled: !!componentDbId,
   });
@@ -1502,6 +1506,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view maintenance history</div>;
   }
+  if (historyLoadError) return <ComponentLoadErrors failures={[["Maintenance History", historyLoadError]]} />;
   
   return (
     <div className="space-y-4">
@@ -1635,7 +1640,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   
   const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
   
-  const { data: vesselComponents = [] } = useQuery<any[]>({
+  const { data: vesselComponents = [], error: vesselComponentsError } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
     enabled: !!vesselId,
   });
@@ -1648,12 +1653,12 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code) : undefined;
   const selectedComponentCode = selectedComponent?.code;
   
-  const { data: sparesWithInventory = [], isLoading: sparesLoading } = useQuery<SpareWithInventoryData[]>({
+  const { data: sparesWithInventory = [], isLoading: sparesLoading, error: sparesLoadError } = useQuery<SpareWithInventoryData[]>({
     queryKey: ['/technical/api/inventory/spares-by-component-code', vesselId, selectedComponentCode],
     queryFn: async () => {
       if (!vesselId || !selectedComponentCode) return [];
       const res = await fetch(`/technical/api/inventory/spares-by-component-code/${vesselId}/${encodeURIComponent(selectedComponentCode)}`);
-      if (!res.ok) throw new Error('Failed to fetch spares');
+      if (!res.ok) throw await componentResponseError(res);
       const json = await res.json();
       return json.data || [];
     },
@@ -1919,6 +1924,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view associated spares</div>;
   }
+  if (sparesLoadError || vesselComponentsError) return <ComponentLoadErrors failures={[["Spares", sparesLoadError], ["Component Register", vesselComponentsError]]} />;
   
   return (
     <div>
@@ -2194,7 +2200,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     { id: "4", type: "Trouble shooting Guide", fileType: "Manual" },
   ];
 
-  const { data: documents = [], isLoading, refetch: refetchDocuments } = useQuery<any[]>({
+  const { data: documents = [], isLoading, refetch: refetchDocuments, error: documentsLoadError } = useQuery<any[]>({
     queryKey: ['/technical/api/component-documents', selectedComponent?.actualId],
     queryFn: async () => {
       if (!selectedComponent?.actualId) return [];
@@ -2202,8 +2208,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
         credentials: 'include',
       });
       if (!response.ok) {
-        if (response.status === 404) return [];
-        throw new Error('Failed to fetch documents');
+        throw await componentResponseError(response);
       }
       return response.json();
     },
@@ -2228,14 +2233,18 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     fileType: string
   ) => {
     const files = event.target.files;
-    if (!files || files.length === 0 || !selectedComponent?.actualId) return;
+    if (!files || files.length === 0) return;
+    if (!selectedComponent?.actualId) {
+      toast({ title: "Document Upload Failed", description: "Select a component before uploading documents.", variant: "destructive" });
+      return;
+    }
 
     const existingDocs = getDocumentsForType(docType);
     const slotsAvailable = MAX_FILES_PER_TYPE - existingDocs.length;
     if (slotsAvailable <= 0) {
       toast({
-        title: "Limit reached",
-        description: `Maximum ${MAX_FILES_PER_TYPE} documents per type. Delete an existing document first.`,
+        title: "Document Upload Blocked",
+        description: `Maximum ${MAX_FILES_PER_TYPE} documents for ${docType}. Delete an existing document first.`,
         variant: "destructive",
       });
       event.target.value = '';
@@ -2257,16 +2266,16 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
       const file = files[i];
       if (!validTypes.includes(file.type)) {
         toast({
-          title: "Invalid file type",
-          description: `"${file.name}" is not a supported file type. Skipped.`,
+          title: "Document Upload Failed",
+          description: `"${file.name}" was skipped. Upload a PDF, Word (.doc or .docx), JPEG, or PNG file.`,
           variant: "destructive",
         });
         continue;
       }
       if (file.size > maxSize) {
         toast({
-          title: "File too large",
-          description: `"${file.name}" exceeds 25MB. Skipped.`,
+          title: "Document Upload Failed",
+          description: `"${file.name}" exceeds 25 MB and was skipped. Choose a smaller file.`,
           variant: "destructive",
         });
         continue;
@@ -2282,8 +2291,8 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     const filesToUpload = validFiles.slice(0, slotsAvailable);
     if (validFiles.length > slotsAvailable) {
       toast({
-        title: "Some files skipped",
-        description: `Only ${slotsAvailable} slot(s) remaining. ${validFiles.length - slotsAvailable} file(s) were not uploaded.`,
+        title: "Document Upload — Some Files Skipped",
+        description: `Only ${slotsAvailable} slot(s) remaining for ${docType}. ${validFiles.length - slotsAvailable} file(s) were not uploaded.`,
         variant: "destructive",
       });
     }
@@ -2313,15 +2322,14 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
           });
 
           if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error((errorData as any).error || 'Failed to upload document');
+            throw await componentResponseError(response);
           }
           successCount++;
         } catch (err: any) {
           failCount++;
           toast({
-            title: "Upload Failed",
-            description: `"${file.name}": ${err.message || "Failed to upload."}`,
+            title: "Document Upload Failed",
+            description: `"${file.name}": ${componentErrorDescription(err, "The document could not be uploaded. Try again.")}`,
             variant: "destructive",
           });
         }
@@ -2344,11 +2352,11 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 
   const handleViewDocument = async (docId: number) => {
     try {
-      await downloadAuthedFile(`/technical/api/component-documents/${docId}/download`);
+      await downloadComponentDocument(`/technical/api/component-documents/${docId}/download`);
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to open document",
+        title: "Document Open Failed",
+        description: `${documents.find(doc => doc.id === docId)?.fileName || "Document"}: ${componentErrorDescription(error, "The document could not be opened. Refresh the document list and try again.")}`,
         variant: "destructive",
       });
     }
@@ -2361,11 +2369,11 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
         method: 'DELETE',
         credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to delete document');
+      if (!response.ok) throw await componentResponseError(response);
       toast({ title: "Document Deleted", description: `${docName} has been deleted.` });
       refetchDocuments();
     } catch (error: any) {
-      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+      toast({ title: "Document Deletion Failed", description: `${docName}: ${componentErrorDescription(error, "The document could not be deleted. Try again.")}`, variant: "destructive" });
     }
   };
 
@@ -2391,6 +2399,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   if (isLoading) {
     return <div className="text-sm text-gray-500">Loading documents...</div>;
   }
+  if (documentsLoadError) return <ComponentLoadErrors failures={[["Documents", documentsLoadError]]} />;
 
   return (
     <div className="space-y-1">
@@ -2466,7 +2475,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 
 const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   // Fetch class regulatory data for the selected component
-  const { data: classRegData = [], isLoading } = useQuery<any[]>({
+  const { data: classRegData = [], isLoading, error: classLoadError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-class-regulatory/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
@@ -2478,6 +2487,7 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
   if (isLoading) {
     return <div className="text-sm text-gray-500">Loading classification & regulatory data...</div>;
   }
+  if (classLoadError) return <ComponentLoadErrors failures={[["Classification Data", classLoadError]]} />;
   
   const record = classRegData[0] || {};
 
@@ -2561,7 +2571,7 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
 
 const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   // Fetch requisitions for the selected component
-  const { data: requisitions = [], isLoading } = useQuery<any[]>({
+  const { data: requisitions = [], isLoading, error: requisitionsLoadError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-requisitions/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
@@ -2573,6 +2583,7 @@ const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }>
   if (isLoading) {
     return <div className="text-sm text-gray-500">Loading requisitions...</div>;
   }
+  if (requisitionsLoadError) return <ComponentLoadErrors failures={[["Requisitions", requisitionsLoadError]]} />;
   
   if (requisitions.length === 0) {
     return (
@@ -2680,6 +2691,7 @@ const Components: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [validationErrorDialogOpen, setValidationErrorDialogOpen] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
+  const [validationErrorTitle, setValidationErrorTitle] = useState('Component Deletion Blocked');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const componentTreeScrollRef = useRef<HTMLDivElement>(null);
   const hydratedViewStateVesselRef = useRef<string | null>(null);
@@ -2704,7 +2716,7 @@ const Components: React.FC = () => {
   }, [vesselId]);
   
   // Fetch components from API and build tree
-  const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
+  const { data: fetchedComponents = [], isLoading: isLoadingComponents, error: registerLoadError } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
     enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my',
   });
@@ -2714,13 +2726,13 @@ const Components: React.FC = () => {
       const response = await fetch(`/technical/api/components/${componentId}`, {
         method: 'DELETE',
       });
-      const data = await response.json();
+      const data = await response.clone().json().catch(() => ({}));
       if (!response.ok) {
-        const error: any = new Error(data.error || 'Failed to delete component');
-        error.code = data.code;
-        error.activeChildrenCount = data.activeChildrenCount;
-        error.activeJobsCount = data.activeJobsCount;
-        error.linkedSparesCount = data.linkedSparesCount;
+        const error: any = await componentResponseError(response);
+        error.code = data?.code;
+        error.activeChildrenCount = data?.activeChildrenCount;
+        error.activeJobsCount = data?.activeJobsCount;
+        error.linkedSparesCount = data?.linkedSparesCount;
         throw error;
       }
       return data;
@@ -2737,15 +2749,17 @@ const Components: React.FC = () => {
     },
     onError: (error: any) => {
       setDeleteDialogOpen(false);
-      let message = error.message;
+      let message = componentErrorDescription(error, "The component could not be deleted. Refresh the register and try again.");
       if (error.code === 'ACTIVE_CHILDREN') {
-        message = `This component has ${error.activeChildrenCount || ''} active child component(s). Please deactivate the child components first before deleting this component.`;
+        message = `This component has ${error.activeChildrenCount ?? ''} active child component(s). Please deactivate the child components first before deleting this component.`;
       } else if (error.code === 'ACTIVE_JOBS') {
-        message = `This component cannot be deleted because it has ${error.activeJobsCount || ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
+        message = `This component cannot be deleted because it has ${error.activeJobsCount ?? ''} active Job(s) linked to it. Please deactivate or delete all linked Jobs first.`;
       } else if (error.code === 'ACTIVE_SPARES' || error.code === 'LINKED_SPARES') {
-        message = `This component cannot be deleted because it has ${error.linkedSparesCount || ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
+        message = `This component cannot be deleted because it has ${error.linkedSparesCount ?? ''} active Spare(s) linked to it. Please deactivate or delete all linked Spares first.`;
       }
       setValidationErrorMessage(message);
+      setValidationErrorTitle(['ACTIVE_CHILDREN', 'ACTIVE_JOBS', 'ACTIVE_SPARES', 'LINKED_SPARES'].includes(error.code)
+        ? "Component Deletion Blocked" : "Component Deletion Failed");
       setValidationErrorDialogOpen(true);
     },
   });
@@ -2762,8 +2776,13 @@ const Components: React.FC = () => {
   };
 
   const handleExportComponents = useCallback(() => {
+    if (registerLoadError) {
+      toast({ title: "Component Export Failed", description: componentErrorDescription(registerLoadError, "The component register could not be loaded. Refresh and try exporting again."), variant: "destructive" });
+      return;
+    }
+    try {
     if (!fetchedComponents || fetchedComponents.length === 0) {
-      toast({ title: "No Data", description: "No component data available to export.", variant: "destructive" });
+      toast({ title: "Component Export Failed", description: "There are no components to export for the current selection.", variant: "destructive" });
       return;
     }
 
@@ -2831,7 +2850,10 @@ const Components: React.FC = () => {
     XLSX.writeFile(wb, filename);
 
     toast({ title: "Export Successful", description: `Exported ${exportData.length} components to ${filename}` });
-  }, [fetchedComponents, toast]);
+    } catch (error) {
+      toast({ title: "Component Export Failed", description: componentErrorDescription(error, "The component export file could not be created. Try again."), variant: "destructive" });
+    }
+  }, [fetchedComponents, registerLoadError, toast]);
 
   // Build component tree from fetched data
   const componentTreeData = React.useMemo(() => {
@@ -3196,7 +3218,10 @@ const Components: React.FC = () => {
       
       // Fetch the change request data
       fetch(`/technical/api/change-requests/${changeRequestId}`)
-        .then(res => res.json())
+        .then(async res => {
+          if (!res.ok) throw await componentResponseError(res);
+          return res.json();
+        })
         .then(data => {
           setChangeRequestData(data);
           if (data.proposedChangesJson) {
@@ -3224,8 +3249,8 @@ const Components: React.FC = () => {
         .catch(err => {
           console.error('Failed to load change request data:', err);
           toast({
-            title: "Error",
-            description: "Failed to load change request data",
+            title: "Change Request Load Failed",
+            description: componentErrorDescription(err, "The change request could not be loaded. Refresh and try again."),
             variant: "destructive"
           });
         });
@@ -3418,7 +3443,7 @@ const Components: React.FC = () => {
     if (!selectedComponent) {
       toast({
         title: "No Selection",
-        description: "Please select a component to expand.",
+        description: "Select a component to expand.",
       });
       return;
     }
@@ -3578,7 +3603,7 @@ const Components: React.FC = () => {
     if (isDescendantOf(editTreeData, dragSourceCode, targetCode)) {
       toast({
         title: "Invalid Move",
-        description: "Cannot move a component under its own descendant — this would create a circular hierarchy.",
+        description: "A component cannot be moved beneath one of its descendants. Choose a different parent.",
         variant: "destructive",
       });
       setDragSourceCode(null);
@@ -3704,10 +3729,9 @@ const Components: React.FC = () => {
           : "Sort order saved successfully",
       });
     } catch (error: any) {
-      const errorMsg = error?.message || "Failed to save sort order";
       toast({
-        title: "Error",
-        description: errorMsg.includes('Circular') ? errorMsg : "Failed to save sort order",
+        title: "Component Order Save Failed",
+        description: componentErrorDescription(error, "The component order could not be saved. Refresh the register and try again."),
         variant: "destructive",
       });
     } finally {
@@ -3840,8 +3864,8 @@ const Components: React.FC = () => {
   const handleModifySubmit = async () => {
     if (!selectedComponent) {
       toast({
-        title: "Please select a component",
-        description: "You must select a component to modify before submitting",
+        title: "Change Request Submission Failed",
+        description: "Select a component before submitting a change request.",
         variant: "destructive"
       });
       return;
@@ -3865,7 +3889,7 @@ const Components: React.FC = () => {
     if (proposedChanges.length === 0) {
       toast({
         title: "No changes detected",
-        description: "Please make some modifications before submitting",
+        description: "Make a change before submitting the request.",
         variant: "destructive"
       });
       return;
@@ -3942,15 +3966,13 @@ const Components: React.FC = () => {
         // Navigate back to Modify PMS
         setLocation('/pms/modify-pms');
       } else {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        throw new Error(errorData.error || 'Failed to submit change request');
+        throw await componentResponseError(response);
       }
     } catch (error) {
       console.error('Submission error:', error);
       toast({
-        title: "Submission failed",
-        description: (error as Error).message || "Failed to submit change request. Please try again.",
+        title: "Change Request Submission Failed",
+        description: componentErrorDescription(error, "The change request could not be submitted. Check your changes and try again."),
         variant: "destructive"
       });
     }
@@ -3977,6 +3999,7 @@ const Components: React.FC = () => {
 
   return (
     <div className={`flex h-full min-h-0 flex-col ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`}>
+      <ComponentLoadErrors failures={[["Component Register", registerLoadError]]} />
       {/* Header - Fixed */}
       <div className="flex-shrink-0 space-y-4 pb-4">
         {/* Change Mode Banner */}
@@ -4522,7 +4545,7 @@ const Components: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertCircle className="h-5 w-5" />
-              Cannot Delete Component
+              {validationErrorTitle}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600" data-testid="text-validation-error-message">

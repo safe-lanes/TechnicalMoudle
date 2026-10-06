@@ -47,7 +47,8 @@ import {
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import WorkInstructionsDialog from "@/components/WorkInstructionsDialog";
-import { useToast } from "@/hooks/use-toast";
+import { useWorkOrderToast as useToast } from "@/hooks/use-work-order-toast";
+import { WorkOrderResponseError, workOrderResponseError, workOrderErrorDescription, workOrderNumber } from "@/lib/workOrderErrorFeedback";
 import { useRanks, ensureRankInOptions } from "@/hooks/useRanks";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -79,6 +80,7 @@ import { Marker } from "@/components/Marker";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection";
 import { WorkOrderDateInput } from "@/components/pms/WorkOrderDateInput";
+import { getLowerRunningHoursWarning, RunningHoursUpdateError } from "./runningHoursErrorFeedback";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -293,6 +295,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
+    level2ReviewerRankId: null as string | null,
     jobPriority: "Medium",
     classRelated: "No",
     department: "",
@@ -800,7 +803,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       ws.mergeCells(`A2:${lastColLetter}2`);
       const s = ws.getCell('A2');
       const exportVesselName = vessels.find(v => v.id === (vesselId || contextVesselId))?.name || 'Vessel';
-      const exportJobTitle = templateData.woTitle || templateData.jobTitle || '';
+      const exportJobTitle = templateData.woTitle || '';
       s.value = `Work History — ${exportJobTitle || templateData.componentName || templateData.componentCode || 'Component'} — ${workOrderNo || 'Work Order'}`;
       s.font = { size: 12, bold: true, color: { argb: 'FF2C3E50' }, name: 'Arial' };
       s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
@@ -892,7 +895,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const margin = 10;
 
       const pdfVesselName = vessels.find(v => v.id === (vesselId || contextVesselId))?.name || 'Vessel';
-      const pdfJobTitle = templateData.woTitle || templateData.jobTitle || templateData.componentName || templateData.componentCode || '';
+      const pdfJobTitle = templateData.woTitle || templateData.componentName || templateData.componentCode || '';
       doc.setFillColor(30, 90, 142);
       doc.rect(0, 0, pageWidth, 38, 'F');
       doc.setTextColor(255, 255, 255);
@@ -1010,6 +1013,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     operationalForms: "No",
     startDateTime: "",
     completionDateTime: "",
+    executionAssignedTo: "",
     dateOfCompletion: "",
     runningHours: "",
     performedBy: "",
@@ -1018,6 +1022,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     manhours: "",
     workCarriedOut: "",
     jobExperienceNotes: "",
+    remarks: "",
+    completionRemarks: "",
     previousReading: "",
     currentReading: "",
     // RH accuracy (migration 139): B2.1 completion-time RH and B3 date the
@@ -1410,6 +1416,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     });
   };
 
+  const handleReviewerChange = (value: string | null) => {
+    hasUserTouchedForm.current = true;
+    setTemplateData(prev => {
+      if (isModifyMode && trackFieldChange) {
+        trackFieldChange('level2ReviewerRankId', value, prev.level2ReviewerRankId);
+      }
+      return { ...prev, level2ReviewerRankId: value };
+    });
+  };
+
+  const handleSafetyRequirementsChange = (value: typeof templateData.safetyRequirements) => {
+    hasUserTouchedForm.current = true;
+    setTemplateData(prev => {
+      if (isModifyMode && trackFieldChange) {
+        trackFieldChange('safetyRequirements', value, prev.safetyRequirements);
+      }
+      return { ...prev, safetyRequirements: value };
+    });
+  };
+
   const autoCalcTotalTime = (data: typeof executionData) => {
     const startDate = data.startDateTime ? data.startDateTime.split('T')[0] : '';
     const startTime = data.startDateTime ? data.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
@@ -1468,7 +1494,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (result.isValid) {
         setRhValidation({
           status: result.requiresJustification ? 'warning' : 'valid',
-          message: result.errorMessage,
+          message: result.requiresJustification || result.errorMessage
+            ? workOrderErrorDescription(result.errorMessage, "Check the Current Reading and Current Reading Date.", { readingDate: true })
+            : result.errorMessage,
           validRange: result.validRange,
           utilizationRate: result.utilizationRate,
           previousEntry: result.previousEntry,
@@ -1479,7 +1507,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       } else {
         setRhValidation({
           status: 'invalid',
-          message: result.errorMessage,
+          message: workOrderErrorDescription(result.errorMessage, "The running hours reading could not be validated. Check the Current Reading and Current Reading Date.", { readingDate: true }),
           validRange: result.validRange,
           utilizationRate: result.utilizationRate,
           previousEntry: result.previousEntry,
@@ -1511,7 +1539,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         performRHValidation(String(result.currentRH));
       }
     } catch {
-      toast({ title: "Error", description: "Failed to fetch current running hours from module.", variant: "destructive" });
+      toast({ title: "Running Hours Load Failed", description: "Failed to fetch current running hours from module.", variant: "destructive" });
     }
   };
 
@@ -1743,7 +1771,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       console.error('Error fetching linked spares for A2:', error);
       setA2LinkedSpares([]);
       toast({
-        title: "Error",
+        title: "Spare Parts Load Failed",
         description: "Failed to fetch spare parts for this component.",
         variant: "destructive"
       });
@@ -1825,7 +1853,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     } catch (error) {
       console.error('Error fetching linked spares:', error);
       toast({
-        title: "Error",
+        title: "Spare Parts Load Failed",
         description: "Failed to fetch spare parts for this component.",
         variant: "destructive"
       });
@@ -2116,8 +2144,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           body: formData,
         });
         if (!uploadRes.ok) {
-          const errBody = await uploadRes.json().catch(() => ({}));
-          throw new Error(errBody.message || errBody.error || `Upload failed for ${file.name}`);
+          throw await workOrderResponseError(uploadRes);
         }
         succeededIds.push(id);
         console.log(`// TEMP-TRACE [pending-flush] MATCHED+uploaded temp=${id} file="${file.name}" -> WO=${targetWoId}`);
@@ -2247,8 +2274,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         });
 
         if (!response.ok) {
-          const errBody = await response.json().catch(() => ({}));
-          throw new Error(errBody.message || errBody.error || `Failed to upload ${file.name}`);
+          throw await workOrderResponseError(response);
         }
 
         const result = await response.json();
@@ -2281,8 +2307,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     } catch (error: any) {
       console.error('Upload error:', error);
       toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload document. Please try again.",
+        title: uploadedCount > 0 ? "Documents Partially Uploaded" : "Document Upload Failed",
+        description: uploadedCount > 0
+          ? `${uploadedCount} file(s) uploaded. ${workOrderErrorDescription(error, "The remaining documents could not be uploaded. Please try again.")}`
+          : error,
         variant: "destructive"
       });
       event.target.value = '';
@@ -2343,7 +2371,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         console.error('View error:', error);
         toast({
           title: "View failed",
-          description: "Failed to open document. Please try again.",
+          description: error,
           variant: "destructive"
         });
       }
@@ -2356,7 +2384,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (fetchUrl) {
       try {
         const response = await fetch(fetchUrl);
-        if (!response.ok) throw new Error('Failed to retrieve document');
+        if (!response.ok) throw await workOrderResponseError(response);
         const result = await response.json();
         const blob = dataUrlToBlob(result.dataUrl);
         const objectUrl = URL.createObjectURL(blob);
@@ -2371,7 +2399,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         console.error('Download error:', error);
         toast({
           title: "Download failed",
-          description: "Failed to download document. Please try again.",
+          description: error,
           variant: "destructive"
         });
       }
@@ -2401,14 +2429,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const response = await fetch(`/technical/api/work-order-documents/${documentToDelete.documentId}`, {
           method: 'DELETE'
         });
-        if (!response.ok) throw new Error('Failed to delete document');
+        if (!response.ok) throw await workOrderResponseError(response);
         setWoDocuments(prev => prev.filter(d => d.id !== documentToDelete.documentId));
       } else {
         const fileKeyEncoded = encodeURIComponent(documentToDelete.fileKey.substring(1));
         const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`, {
           method: 'DELETE'
         });
-        if (!response.ok) throw new Error('Failed to delete document');
+        if (!response.ok) throw await workOrderResponseError(response);
       }
 
       setExecutionData(prev => ({
@@ -2429,7 +2457,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       console.error('Delete error:', error);
       toast({
         title: "Delete failed",
-        description: "Failed to delete document. Please try again.",
+        description: error,
         variant: "destructive"
       });
     }
@@ -2692,10 +2720,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) {
-        hardErrors.push("No. of Persons must be a positive whole number (≥ 1).");
+        hardErrors.push("Number of Persons must be a whole number from 1 to 50.");
       }
       if (noOfPersonsStr && parseInt(noOfPersonsStr, 10) > 50) {
-        hardErrors.push("No. of Persons cannot exceed 50.");
+        hardErrors.push("Number of Persons must be a whole number from 1 to 50.");
       }
 
       if (executionData.totalTimeHours && !isNaN(totalTimeVal)) {
@@ -2720,7 +2748,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (isRhDrivenCounter && currentRHValue) {
         const currentRHNum = parseFloat(currentRHValue);
         if (isNaN(currentRHNum) || currentRHNum < 0) {
-          hardErrors.push("Current Reading must be a positive number (≥ 0).");
+          hardErrors.push("Current Reading must be a valid number that is zero or greater.");
         }
       }
 
@@ -2899,7 +2927,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
         const result = await response.json();
         if (!response.ok) {
-          throw new Error(result.error || 'Failed to save draft');
+          throw new WorkOrderResponseError(result);
         }
 
         await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
@@ -2923,7 +2951,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         if (!isReadyForSubmission) {
           toast({
             title: "Validation Error",
-            description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save Draft" to save your progress instead.`,
+            description: `Complete the required Part B fields before submitting: ${missingFields.join(', ')}. Use "Save Draft" to keep your progress.`,
             variant: "destructive",
           });
           return;
@@ -2954,7 +2982,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
           const result = await response.json();
           if (!response.ok) {
-            throw new Error(result.error || 'Failed to save work order');
+            throw new WorkOrderResponseError(result);
           }
 
           await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
@@ -3102,19 +3130,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
-        if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate
-            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
-            : '';
-          throw new Error(
-            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
-            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before completing this Work Order.`
-          );
-        }
+        if (getLowerRunningHoursWarning(result)) throw new RunningHoursUpdateError(result);
         if (result.code === 'INVALID_RUNNING_HOURS') {
-          throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
+          throw new WorkOrderResponseError(result);
         }
-        throw new Error(result.error || 'Failed to save work order');
+        throw new WorkOrderResponseError(result);
       }
 
       // Invalidate all work orders-related caches so the updated status is reflected
@@ -3137,8 +3157,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       navigate("/pms/work-orders");
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to save work order",
+        ...(getLowerRunningHoursWarning(error) ?? {
+          title: "Error",
+          description: error.message || "Failed to save work order",
+        }),
         variant: "destructive",
       });
     }
@@ -3244,7 +3266,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           : templateData.maintenanceBasis === 'Running Hours'
             ? parseInt(normalizedFrequency, 10)
             : undefined,
-        level2ReviewerRankId: (templateData as any).level2ReviewerRankId || null,
+        level2ReviewerRankId: templateData.level2ReviewerRankId || null,
         lastDoneRH: (templateData as any).lastDoneRH ? String((templateData as any).lastDoneRH).trim() : null,
         lastDoneDate: mapLastCompletedOnToLastDoneDate((templateData as any).lastCompletedOn),
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
@@ -3265,8 +3287,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       navigate("/pms/components");
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create job",
+        title: "Job Creation Failed",
+        description: error,
         variant: "destructive",
       });
     }
@@ -3332,8 +3354,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       setSavedExecutionDataForCancel(null);
     } catch (error: any) {
       toast({
-        title: 'Save Failed',
-        description: error.message || 'Failed to save Part B changes.',
+        ...(getLowerRunningHoursWarning(error) ?? {
+          title: 'Save Failed',
+          description: error.message || 'Failed to save Part B changes.',
+        }),
         variant: 'destructive',
       });
     } finally {
@@ -3441,7 +3465,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       navigate('/pms/work-orders');
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save draft. Please try again.';
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast({ ...(getLowerRunningHoursWarning(err) ?? { title: 'Work Order Draft Save Failed', description: errorMessage }), variant: 'destructive' });
     } finally {
       setIsDraftSaving(false);
     }
@@ -3505,8 +3529,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       hardErrors.push(`The Head of Department (${hodLabel}) cannot both perform and approve the work. The server will assign ${hodLabel} as approver based on the vessel org chart.`);
     }
 
-    if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) hardErrors.push('No. of Persons must be a positive whole number (≥ 1).');
-    if (noOfPersonsStr && parseInt(noOfPersonsStr, 10) > 50) hardErrors.push('No. of Persons cannot exceed 50.');
+    if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) hardErrors.push('Number of Persons must be a whole number from 1 to 50.');
+    if (noOfPersonsStr && parseInt(noOfPersonsStr, 10) > 50) hardErrors.push('Number of Persons must be a whole number from 1 to 50.');
 
     if (executionData.totalTimeHours && !isNaN(totalTimeVal)) {
       if (totalTimeVal <= 0) hardErrors.push('Total Time Taken must be greater than 0.');
@@ -3522,7 +3546,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     if (isRhDrivenCounter && currentRHValue) {
       const currentRHNum = parseFloat(currentRHValue);
-      if (isNaN(currentRHNum) || currentRHNum < 0) hardErrors.push('Current Reading must be a positive number (≥ 0).');
+      if (isNaN(currentRHNum) || currentRHNum < 0) hardErrors.push('Current Reading must be a valid number that is zero or greater.');
     }
 
     if (isRhDrivenCounter && rhBackdateError && !isRejectedWO) {
@@ -3662,7 +3686,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (!isReadyForSubmission) {
       toast({
         title: 'Validation Error',
-        description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save" to save as a draft instead.`,
+        description: `Complete the required Part B fields before submitting: ${missingFields.join(', ')}. Use "Save" to keep your progress as a draft.`,
         variant: 'destructive',
       });
       return;
@@ -3765,7 +3789,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create work order. Please try again.';
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast({ ...(getLowerRunningHoursWarning(err) ?? { title: 'Work Order Creation Failed', description: errorMessage }), variant: 'destructive' });
     } finally {
       setIsUnplannedSaving(false);
     }
@@ -3825,25 +3849,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
-        if (result.code === 'LOWER_THAN_CURRENT_RH') {
-          const currentDate = result.currentRHDate
-            ? ` recorded on ${formatWorkOrderDateDDMMYYYY(result.currentRHDate, result.currentRHDate)}`
-            : '';
-          throw new Error(
-            `Current Reading (${result.submittedRH} RH) cannot be lower than the latest component Running Hours ` +
-            `(${result.currentRH} RH${currentDate}). Correct the Current Reading before approving this Work Order.`
-          );
-        }
+        if (getLowerRunningHoursWarning(result)) throw new RunningHoursUpdateError(result);
         // Task #240: MASTER component over the per-day RH rate cap — surface the Sail Admin override
         // affordance instead of a dead-end error toast.
         if (result.code === 'RH_OVERRIDE_REQUIRED' && !adminOverride) {
           setRhOverridePrompt({
-            message: result.error || 'The running-hours increase for this completion exceeds the allowed daily rate.',
+            message: workOrderErrorDescription(result, 'The running-hours increase for this completion exceeds the allowed daily rate.'),
             canOverride: !!result.canOverride
           });
           return;
         }
-        throw new Error(result.error || 'Failed to approve work order');
+        throw new WorkOrderResponseError(result);
       }
 
       const lowerRhSkipped = result.rhUpdateSkipped || result.rhUpdateOutcome === 'skipped_lower';
@@ -3875,8 +3891,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to approve work order",
+        ...(getLowerRunningHoursWarning(error) ?? {
+          title: "Approval Blocked",
+          description: error,
+        }),
         variant: "destructive",
       });
     } finally {
@@ -3914,7 +3932,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to reject work order');
+        throw new WorkOrderResponseError(result);
       }
 
       setCurrentWorkOrderStatus('Rejected');
@@ -3938,8 +3956,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to reject work order",
+        title: "Work Order Rejection Failed",
+        description: error,
         variant: "destructive",
       });
     } finally {
@@ -3955,13 +3973,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         reviewerComments: reviewerComments || null,
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Failed to mark as reviewed');
+      if (!response.ok) throw new WorkOrderResponseError(result);
       setCurrentWorkOrderStatus('Completed');
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       toast({ title: 'Reviewed', description: 'Work order has been marked as reviewed.' });
       navigate('/pms/work-orders');
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to process review', variant: 'destructive' });
+      toast({ title: 'Work Order Review Failed', description: error, variant: 'destructive' });
     } finally {
       setIsProcessingReview(false);
     }
@@ -3975,13 +3993,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         reviewerComments: reviewerComments || null,
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Failed to reopen work order');
+      if (!response.ok) throw new WorkOrderResponseError(result);
       setCurrentWorkOrderStatus('Pending Approval');
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       toast({ title: 'Reopened', description: 'Work order sent back for revision.' });
       navigate('/pms/work-orders');
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to reopen work order', variant: 'destructive' });
+      toast({ title: 'Work Order Reopen Failed', description: error, variant: 'destructive' });
     } finally {
       setIsProcessingReview(false);
     }
@@ -4737,8 +4755,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.L2R">Level 2 Reviewer (Rank)</Label>
                   <Select
-                    value={(templateData as any).level2ReviewerRankId || ''}
-                    onValueChange={(value) => handleTemplateChange('level2ReviewerRankId', value || null)}
+                    value={templateData.level2ReviewerRankId || ''}
+                    onValueChange={(value) => handleReviewerChange(value || null)}
                     disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-level2-reviewer-rank">
@@ -5127,14 +5145,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       value={(templateData.safetyRequirements?.ppeRequirements || []).join('\n')}
                       onChange={(e) => {
                         const lines = e.target.value.split('\n');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           ppeRequirements: lines,
                         });
                       }}
                       onBlur={() => {
                         const cleaned = (templateData.safetyRequirements?.ppeRequirements || []).filter((s: string) => s.trim() !== '');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           ppeRequirements: cleaned,
                         });
@@ -5150,14 +5168,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       value={(templateData.safetyRequirements?.permitRequirements || []).join('\n')}
                       onChange={(e) => {
                         const lines = e.target.value.split('\n');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           permitRequirements: lines,
                         });
                       }}
                       onBlur={() => {
                         const cleaned = (templateData.safetyRequirements?.permitRequirements || []).filter((s: string) => s.trim() !== '');
-                        handleTemplateChange('safetyRequirements', {
+                        handleSafetyRequirementsChange({
                           ...templateData.safetyRequirements,
                           permitRequirements: cleaned,
                         });
@@ -5365,7 +5383,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                               {hasFilters ? 'No matching history entries' : 'No data available'}
                             </td>
                           </tr>
-                        ) : displayData.map((row: any, idx: number) => {
+                        ) : displayData.map((row, idx) => {
                           const isExpanded = expandedHistoryIndex === idx;
                           return (
                             <React.Fragment key={idx}>
@@ -7429,10 +7447,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 variant="inline"
               >
                 <div className="space-y-4">
-                  {!!(templateData as any).level2ReviewerRankId && (
+                  {!!templateData.level2ReviewerRankId && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800" data-testid="text-reviewer-rank-info">
                       <span className="font-medium">Reviewer Rank:</span>
-                      <span>{(templateData as any).level2ReviewerRankId}</span>
+                      <span>{templateData.level2ReviewerRankId}</span>
                     </div>
                   )}
                   <div className="space-y-2">
@@ -7957,14 +7975,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               Invalid Running Hours Entry
             </DialogTitle>
             <DialogDescription className="text-sm pt-2">
-              You cannot save this work order because the Running Hours value is physically impossible.
+              The running hours reading did not pass validation. Check the Current Reading and Current Reading Date.
             </DialogDescription>
           </DialogHeader>
 
           {rhErrorDetails && (
             <div className="space-y-3 py-2 text-sm">
               <div className="bg-red-50 p-3 rounded-lg space-y-1">
-                <div className="font-medium text-red-800">Issue: {rhErrorDetails.validationStatus?.replace(/_/g, ' ')}</div>
+                <div className="font-medium text-red-800">{workOrderErrorDescription(rhErrorDetails.errorMessage, "Check the Current Reading and Current Reading Date.", { readingDate: true })}</div>
                 {rhErrorDetails.previousEntry && (
                   <div className="text-red-700">Previous RH Entry: {rhErrorDetails.previousEntry.runningHours} hrs on {formatWorkOrderDateDDMMYYYY(rhErrorDetails.previousEntry.date, rhErrorDetails.previousEntry.date)}</div>
                 )}
@@ -7974,8 +7992,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {rhErrorDetails.daysBetweenPrevious > 0 && (
                   <>
                     <div className="text-red-700">Days Between: {rhErrorDetails.daysBetweenPrevious} days</div>
-                    <div className="text-red-700">Your Increase: {rhErrorDetails.actualIncrease?.toFixed(0)} hours</div>
-                    <div className="text-red-700">Maximum Possible: {rhErrorDetails.maxPossibleIncrease?.toFixed(0)} hours ({rhErrorDetails.daysBetweenPrevious} days × 24 hrs/day)</div>
+                    {workOrderNumber(rhErrorDetails.actualIncrease) !== undefined && <div className="text-red-700">Your Increase: {workOrderNumber(rhErrorDetails.actualIncrease)} hours</div>}
+                    {workOrderNumber(rhErrorDetails.maxPossibleIncrease) !== undefined && <div className="text-red-700">Maximum Allowed Increase: {workOrderNumber(rhErrorDetails.maxPossibleIncrease)} hours</div>}
                   </>
                 )}
               </div>

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { useWorkOrderToast as useToast } from "@/hooks/use-work-order-toast";
+import { workOrderResponseError } from "@/lib/workOrderErrorFeedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -138,7 +139,7 @@ function comparePlannerItems(a: PlannerItem, b: PlannerItem, field: SortField, d
 }
 
 export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkOrderPlannerProps) {
-  const { toast } = useToast();
+  const { toast } = useToast("Planner Save Failed");
 
   const [selectedDays, setSelectedDays] = useState("30");
   const [customDays, setCustomDays] = useState("");
@@ -275,8 +276,8 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       queryClient.invalidateQueries({ queryKey: ["/technical/api/work-orders/planner"] });
       toast({ title: "Saved", description: "Planned date updated" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save planned date", variant: "destructive" });
+    onError: (error) => {
+      toast({ title: "Planner Save Failed", description: error, variant: "destructive" });
     },
   });
 
@@ -295,8 +296,8 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       setBulkDate("");
       toast({ title: "Bulk Update Complete", description: `${data.total} planned date${data.total !== 1 ? "s" : ""} saved` });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to bulk save planned dates", variant: "destructive" });
+    onError: (error) => {
+      toast({ title: "Planner Bulk Save Failed", description: error, variant: "destructive" });
     },
   });
 
@@ -395,7 +396,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: sortedItems }),
       });
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) throw await workOrderResponseError(response);
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -408,8 +409,8 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       document.body.removeChild(a);
 
       toast({ title: "Export Complete", description: "Planner exported to Excel" });
-    } catch {
-      toast({ title: "Export Failed", description: "Failed to export planner data", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export Failed", description: error, variant: "destructive" });
     }
   };
 

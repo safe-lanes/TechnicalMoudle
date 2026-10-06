@@ -722,7 +722,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   if (selectedReport === 'stores-inventory-status') {
     return (
       <StoresInventoryStatusReport
-        onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
+        onBack={() => setSelectedReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
         globalVessels={globalVessels}
@@ -734,7 +734,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   if (selectedReport === 'chemicals-tracking') {
     return (
       <ChemicalsExpiryReport
-        onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
+        onBack={() => setSelectedReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
         globalVessels={globalVessels}
@@ -746,7 +746,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   if (selectedReport === 'low-stock-alert') {
     return (
       <LowStockAlertReport
-        onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
+        onBack={() => setSelectedReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId}
         source="stores"
         embedded={embedded}
@@ -759,7 +759,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   if (selectedReport === 'stores-consumption-analysis') {
     return (
       <ConsumptionPatternReport
-        onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
+        onBack={() => setSelectedReport(embedded ? (selectedReportId ?? null) : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
         globalVessels={globalVessels}

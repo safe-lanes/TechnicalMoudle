@@ -140,3 +140,55 @@ describe('P0.1/P0.4 requirePermission — opt-in enforcement on the forwarded ro
     expect(r.res.statusCode).toBe(403);
   });
 });
+
+describe('Conflict Review view and edit grants', () => {
+  const view = requirePermission('admin-sync-conflicts', 'view', { enforce: true });
+  const edit = requirePermission('admin-sync-conflicts', 'edit', { enforce: true });
+  const dashboardCount = requirePermission('admin-sync-dashboard', 'view', { enforce: true });
+  const check = async (headers: Record<string, string>, mw: any) => {
+    const req = mkReq(headers);
+    await run(mockAuthMiddleware, req);
+    return run(mw, req);
+  };
+  beforeEach(() => {
+    vi.mocked(storage.getRoleByName).mockReset();
+    vi.mocked(storage.getRoleMenuPermissions).mockReset();
+    vi.mocked(storage.getActiveMenuItems).mockReset();
+    vi.mocked(storage.getRoleByName).mockResolvedValue({ ruid: 'r1' } as any);
+    vi.mocked(storage.getActiveMenuItems).mockResolvedValue([
+      { name: 'admin-sync-conflicts', muid: 'review' },
+      { name: 'admin-sync-dashboard', muid: 'dashboard' },
+    ] as any);
+  });
+  it('rejects requests with no authenticated user even for unconfigured and bypass roles', async () => {
+    const result = await run(view, mkReq());
+    expect(result.res.statusCode).toBe(401);
+  });
+  it.each([office('Admin'), ship('Vessel User')])('allows configured view-only identities to read but not resolve (%o)', async headers => {
+    vi.mocked(storage.getRoleMenuPermissions).mockResolvedValue([{ menuMuid: 'review', canView: true, canEdit: false }] as any);
+    expect((await check(headers, view)).nexted).toBe(true);
+    expect((await check(headers, edit)).res.statusCode).toBe(403);
+  });
+  it('keeps dashboard counts available without disclosing review rows', async () => {
+    vi.mocked(storage.getRoleMenuPermissions).mockResolvedValue([{ menuMuid: 'dashboard', canView: true, canEdit: true }] as any);
+    expect((await check(office('Admin'), dashboardCount)).nexted).toBe(true);
+    expect((await check(office('Admin'), view)).res.statusCode).toBe(403);
+    expect((await check(office('Admin'), edit)).res.statusCode).toBe(403);
+  });
+  it('denies false and missing review flags for configured roles', async () => {
+    vi.mocked(storage.getRoleMenuPermissions).mockResolvedValue([{ menuMuid: 'review', canView: false, canEdit: false }] as any);
+    expect((await check(ship('Vessel User'), view)).res.statusCode).toBe(403);
+    vi.mocked(storage.getRoleMenuPermissions).mockResolvedValue([{ menuMuid: 'dashboard', canView: true }] as any);
+    expect((await check(ship('Vessel User'), view)).res.statusCode).toBe(403);
+  });
+  it('bypasses Sail/PMS Admin and retains unconfigured fail-open', async () => {
+    for (const role of ['Sail Admin', 'PMS Admin']) {
+      expect((await check(office(role), view)).nexted).toBe(true);
+      expect((await check(office(role), edit)).nexted).toBe(true);
+    }
+    expect(storage.getRoleByName).not.toHaveBeenCalled();
+    vi.mocked(storage.getRoleByName).mockResolvedValue(undefined as any);
+    expect((await check(ship('New Role'), view)).nexted).toBe(true);
+    expect((await check(ship('New Role'), edit)).nexted).toBe(true);
+  });
+});

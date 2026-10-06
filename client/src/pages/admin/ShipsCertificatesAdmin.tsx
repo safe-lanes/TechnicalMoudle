@@ -1158,11 +1158,13 @@ export default function ShipsCertificatesAdmin() {
   
   // Save the new certificate entry
   const saveNewEntry = () => {
+    const category = newEntryData.category;
+    const group = newEntryData.group;
     const missingFields: string[] = [];
     if (!newEntryData.certificateName?.trim()) missingFields.push("Certificate Name");
-    if (!newEntryData.category) missingFields.push("Category");
-    if (!newEntryData.group) missingFields.push("Group");
-    if (missingFields.length > 0) {
+    if (!category) missingFields.push("Category");
+    if (!group) missingFields.push("Group");
+    if (missingFields.length > 0 || !category || !group) {
       const fieldList = missingFields.length <= 2
         ? missingFields.join(" and ")
         : `${missingFields.slice(0, -1).join(", ")}, and ${missingFields[missingFields.length - 1]}`;
@@ -1171,7 +1173,7 @@ export default function ShipsCertificatesAdmin() {
     }
     
     // Generate Master ID
-    const masterId = generateMasterId(newEntryData.category, newEntryData.group);
+    const masterId = generateMasterId(category, group);
     
     // Generate new ID and sequence (add to end)
     const newId = Math.max(...masterData.map(c => c.id), 0) + 1;
@@ -1182,8 +1184,8 @@ export default function ShipsCertificatesAdmin() {
       sequence: newSequence,
       masterId,
       certificateName: newEntryData.certificateName?.trim() || "",
-      category: newEntryData.category,
-      group: newEntryData.group,
+      category,
+      group,
       requirementRef: newEntryData.requirementRef || "",
       applicableToCompany: newEntryData.applicableToCompany || false,
       certificateLabel: newEntryData.certificateLabel || "",

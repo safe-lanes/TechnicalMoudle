@@ -46,7 +46,8 @@ import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { WorkOrder, InsertWorkOrder, WorkOrderWithLeadTime } from "@shared/schema";
 import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
-import { useToast } from "@/hooks/use-toast";
+import { useWorkOrderToast as useToast } from "@/hooks/use-work-order-toast";
+import { workOrderResponseError } from "@/lib/workOrderErrorFeedback";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 import { formatWorkOrderExportDueValue } from "./workOrderExportDueValue";
@@ -199,6 +200,7 @@ function writeListState(key: string, value: unknown) {
 }
 
 const WorkOrders: React.FC = () => {
+  const [componentJobsExportIssues, setComponentJobsExportIssues] = useState<string[] | null>(null);
   const [searchTerm, setSearchTerm] = useState(() => readListState<string>('workOrdersSearch', ""));
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(() => readListState<PeriodFilterValue | null>('workOrdersPeriodFilter', null));
   const [selectedRank, setSelectedRank] = useState(() => readListState<string>('workOrdersRank', ""));
@@ -257,7 +259,7 @@ const WorkOrders: React.FC = () => {
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location, setLocation] = useLocation();
-  const { toast } = useToast();
+  const { toast } = useToast("Work Order Update Failed");
   const { vesselId, setVesselId, isMyVessels, assignedVesselIds, applyVesselScope, pickerVessels, myVesselsEmpty } = useVessel();
   // 'my' aggregate scope with no assigned vessels yields nothing — don't fetch.
   const vesselScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
@@ -310,7 +312,7 @@ const WorkOrders: React.FC = () => {
         params.set('sortDir', woSortDir);
       }
       const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch work orders');
+      if (!response.ok) throw await workOrderResponseError(response);
       const json = await response.json();
       return json.data as WorkOrdersPageEnvelope;
     },
@@ -325,7 +327,7 @@ const WorkOrders: React.FC = () => {
     const params = new URLSearchParams();
     applyVesselScope(params);
     const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
-    if (!response.ok) throw new Error('Failed to fetch work orders');
+    if (!response.ok) throw await workOrderResponseError(response);
     return await response.json() as WorkOrderWithHydratedData[];
   }, [applyVesselScope]);
 
@@ -335,13 +337,13 @@ const WorkOrders: React.FC = () => {
   const approvalTierCounts = woEnvelope?.approvalTierCounts;
   const uniqueRanks = woEnvelope?.rankOptions ?? [];
 
-  const { data: allVesselJobs = [] } = useQuery<any[]>({
+  const { data: allVesselJobs = [], isError: componentJobsLoadError } = useQuery<any[]>({
     queryKey: ['/technical/api/jobs', vesselScopeKey],
     queryFn: async () => {
       const params = new URLSearchParams();
       applyVesselScope(params);
       const response = await fetch(`/technical/api/jobs?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch jobs');
+      if (!response.ok) throw await workOrderResponseError(response);
       return await response.json();
     },
     enabled: vesselScopeReady,
@@ -381,7 +383,7 @@ const WorkOrders: React.FC = () => {
       toast({ title: "Success", description: "Work order created successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to create work order" });
+      toast({ title: "Work Order Creation Failed", description: error.message || "Failed to create work order", variant: "destructive" });
     }
   });
   
@@ -406,7 +408,7 @@ const WorkOrders: React.FC = () => {
       }
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to update work order" });
+      toast({ title: "Work Order Update Failed", description: error.message || "Failed to update work order", variant: "destructive" });
     }
   });
   
@@ -421,7 +423,7 @@ const WorkOrders: React.FC = () => {
       toast({ title: "Success", description: "Work order deleted successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to delete work order" });
+      toast({ title: "Work Order Delete Failed", description: error.message || "Failed to delete work order", variant: "destructive" });
     }
   });
 
@@ -440,7 +442,7 @@ const WorkOrders: React.FC = () => {
       });
     },
     onError: (error: any) => {
-      toast({ title: "Generation failed", description: error.message || "Failed to generate work orders" });
+      toast({ title: "Generation failed", description: error.message || "Failed to generate work orders", variant: "destructive" });
     }
   });
 
@@ -1069,7 +1071,7 @@ const WorkOrders: React.FC = () => {
       setPostponeApprovalWorkOrder(null);
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to approve postponement', variant: 'destructive' });
+      toast({ title: 'Approval Blocked', description: error, variant: 'destructive' });
     },
   });
 
@@ -1087,7 +1089,7 @@ const WorkOrders: React.FC = () => {
       setPostponeApprovalWorkOrder(null);
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to reject postponement', variant: 'destructive' });
+      toast({ title: 'Postponement Rejection Failed', description: error, variant: 'destructive' });
     },
   });
 
@@ -1167,7 +1169,7 @@ const WorkOrders: React.FC = () => {
       setPostponeDialogOpen(false);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to submit postponement request", variant: "destructive" });
+      toast({ title: "Postponement Failed", description: error, variant: "destructive" });
     },
   });
 
@@ -1182,7 +1184,7 @@ const WorkOrders: React.FC = () => {
       setRePostponeDialogOpen(false);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to submit re-postponement request", variant: "destructive" });
+      toast({ title: "Re-postponement Failed", description: error, variant: "destructive" });
     },
   });
 
@@ -1289,7 +1291,7 @@ const WorkOrders: React.FC = () => {
 
       toast({ title: "Export Complete", description: `Exported ${rows.length} work orders to Excel` });
     } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to export work orders to Excel" });
+      toast({ title: "Export Failed", description: err, variant: "destructive" });
     }
     setExportingType(null);
   };
@@ -1372,78 +1374,44 @@ const WorkOrders: React.FC = () => {
 
       toast({ title: "Export Complete", description: `Exported ${data.length} work orders to PDF` });
     } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to export work orders to PDF" });
+      toast({ title: "Export Failed", description: err, variant: "destructive" });
     }
     setExportingType(null);
   };
 
-  const exportComponentJobsExcel = () => {
+  const exportComponentJobsExcel = async () => {
     if (!allVesselJobs || allVesselJobs.length === 0) {
       toast({ title: "No Data", description: "No component jobs available to export.", variant: "destructive" });
       return;
     }
     setExportingType('cj-excel');
     try {
-      const now = new Date();
-      const timestamp = format(now, 'yyyyMMdd_HHmm');
-      const vessel = vessels.find(v => v.id === vesselId);
-      const vCode = (vessel as any)?.vesselCode || (vessel as any)?.code || '';
-
-      const rows = allVesselJobs.map((job: any) => {
-        let sparePartsStr = '';
-        if (Array.isArray(job.requiredSpareParts) && job.requiredSpareParts.length > 0) {
-          sparePartsStr = job.requiredSpareParts
-            .map((sp: any) => {
-              const code = sp.partCode || sp.spareCode || sp.code || '';
-              const qty = sp.quantity || sp.qty || 1;
-              return code ? `${code}:${qty}` : '';
-            })
-            .filter(Boolean)
-            .join(', ');
-        }
-
-        return {
-          'Fleet Equipment Code': job.fleetEquipmentCode || '',
-          'Component Code': job.componentCode || '',
-          'Component Name': job.componentName || '',
-          'Job Code': job.jobNo || '',
-          'Job Title': job.jobTitle || '',
-          'Job Description': job.jobDescription || job.briefWorkDescription || '',
-          'Department': job.department || '',
-          'Responsible Rank': job.assignedTo || '',
-          'Schedule Type': job.maintenanceBasis || job.frequencyType || '',
-          'Calendar Interval': job.frequencyValue || '',
-          'Interval Unit': job.frequencyUnit || '',
-          'RH Interval': job.intervalRunningHour != null ? String(job.intervalRunningHour) : (job.maintenanceBasis === 'Running Hours' ? (job.frequencyValue || '') : ''),
-          'Last Done Date': job.lastDoneDate || '',
-          'Last Done RH': job.lastDoneRH || '',
-          'Critical Yes/No': job.criticality === 'Yes' || job.criticality === true ? 'Yes' : (job.criticality === 'No' || job.criticality === false ? 'No' : (job.criticality || '')),
-          'Estimated Hours': job.estimatedManHours != null ? String(job.estimatedManHours) : '',
-          'Spare Parts Required': sparePartsStr,
-          'IS Active': job.isActive === true ? 'Yes' : (job.isActive === false ? 'No' : (job.isActive || '')),
-          'Vessel Code': vCode,
-          'Maker Code': '',
-          'Class Survey Code': '',
-        };
+      const { buildComponentJobsWorkbook, componentJobsFilename, downloadComponentJobsWorkbook } = await import("./componentJobsExport");
+      const params = new URLSearchParams();
+      applyVesselScope(params);
+      const [response, rankResult] = await Promise.all([
+        fetch(`/technical/api/components?${params.toString()}`),
+        fetch("/technical/api/admin/available-ranks")
+          .then(async response => response.ok ? await response.json() : null)
+          .catch(() => null),
+      ]);
+      if (!response.ok) throw new Error("Failed to read linked component records. Please try again.");
+      const components = await response.json();
+      if (!Array.isArray(components)) throw new Error("Unexpected component response. Export was not downloaded.");
+      const ranks = Array.isArray(rankResult) ? rankResult : undefined;
+      const { workbook, issues, rowCount } = buildComponentJobsWorkbook(allVesselJobs, components, vessels, ranks);
+      if (!ranks) issues.unshift("Rank Master could not be read. Approver values have not been checked; use the import preview to validate them.");
+      await downloadComponentJobsWorkbook(workbook, componentJobsFilename(vesselName));
+      setComponentJobsExportIssues(issues);
+      toast({
+        title: issues.length ? "Export Complete — Review Needed" : "Export Complete",
+        description: `Exported ${rowCount} component jobs to Excel${issues.length ? ` with ${issues.length} review notices.` : "."}`,
       });
-
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = [
-        { wch: 20 }, { wch: 18 }, { wch: 30 }, { wch: 15 }, { wch: 40 },
-        { wch: 50 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 18 },
-        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-        { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 15 },
-        { wch: 18 },
-      ];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Vessel_Job');
-      XLSX.writeFile(wb, `${vesselName}_Component_Jobs_${timestamp}.xlsx`);
-
-      toast({ title: "Export Complete", description: `Exported ${rows.length} component jobs to Excel` });
     } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to export component jobs to Excel" });
+      toast({ title: "Export Failed", description: err instanceof Error ? err.message : "Failed to export component jobs to Excel", variant: "destructive" });
+    } finally {
+      setExportingType(null);
     }
-    setExportingType(null);
   };
 
   if (showPlanner) {
@@ -1956,6 +1924,7 @@ const WorkOrders: React.FC = () => {
                 <span className="font-medium text-gray-900">Export Component Jobs</span>
               </div>
               <p className="text-sm text-gray-500">All jobs linked to components for this vessel in import sheet format</p>
+              {componentJobsLoadError && <p className="text-sm text-red-600">Jobs could not be loaded. Refresh this page before exporting.</p>}
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -2011,6 +1980,38 @@ const WorkOrders: React.FC = () => {
       )}
 
 
+      <Dialog open={componentJobsExportIssues !== null} onOpenChange={open => { if (!open) setComponentJobsExportIssues(null); }}>
+        <DialogContent className="sm:max-w-2xl" data-testid="dialog-component-jobs-export-review">
+          <DialogHeader>
+            <DialogTitle>Component Jobs Export — Import Review</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            The workbook has been downloaded. Saved values have not been changed.
+            Run the job import preview before importing: ranks, spare codes, existing jobs and
+            vessel/component references still need to pass the current import checks.
+            Importing in Add mode may reject jobs that already exist.
+          </p>
+          <p className="text-sm text-gray-600">
+            The template&apos;s legacy dropdowns include Testing, Repair, Replacement, Calibration
+            and Critical priority, which current job import validation rejects.
+            Tool quantities are preserved in Name:Quantity text; the current importer does not
+            restore them as separate quantities.
+          </p>
+          {componentJobsExportIssues && componentJobsExportIssues.length > 0 ? (
+            <div className="max-h-72 overflow-y-auto rounded border p-3 text-sm" data-testid="component-jobs-export-issues">
+              <p className="font-medium mb-2">{componentJobsExportIssues.length} review notices</p>
+              <ul className="list-disc pl-5 space-y-1">
+                {componentJobsExportIssues.map((issue, index) => <li className="break-words" key={index}>{issue}</li>)}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm">No missing required fields or known value-format issues were found by the export checks. This is not an import approval.</p>
+          )}
+          <div className="flex justify-end">
+            <Button onClick={() => setComponentJobsExportIssues(null)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Modify Mode Sticky Footer */}
       {isModifyMode && (
         <ModifyStickyFooter

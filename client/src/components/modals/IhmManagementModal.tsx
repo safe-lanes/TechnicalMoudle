@@ -9,6 +9,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IHM_MATERIALS, IHM_PRESENCE, IHM_EVIDENCE_TYPES } from '@/config/features';
+import type { IhmItem } from '@shared/schema';
+
+type IhmHydrationData = Pick<IhmItem,
+  'presence' | 'materials' | 'evidenceType' | 'evidenceFileName' | 'verifiedDate' | 'supplier' | 'remarks'
+>;
 
 interface IhmManagementModalProps {
   isOpen: boolean;
@@ -37,7 +42,7 @@ const IhmManagementModal: React.FC<IhmManagementModalProps> = ({
   const [remarks, setRemarks] = useState<string>('');
   
   // Fetch existing IHM data
-  const { data: existingData } = useQuery({
+  const { data: existingData } = useQuery<IhmHydrationData | null>({
     queryKey: [`/technical/api/ihm/${type}/${type === 'component' ? componentId : spareId}`],
     enabled: isOpen && !!(componentId || spareId),
   });

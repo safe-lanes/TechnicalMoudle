@@ -110,8 +110,8 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
 
       {/* ── Page header ── */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900" data-testid="text-master-data-title">Master Data</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage and maintain key master data for PMS.</p>
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="text-master-data-title">Fleet Master Data</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage and maintain key Fleet Master Data for PMS.</p>
       </div>
 
       {/* ── Section 1: 7 cards, no bar header ── */}

@@ -9,6 +9,8 @@ import {
   vessels,
   pmsVesselSettings,
   companyStandardGraceSettings,
+  type CompanyStandardGraceSettings,
+  type InsertCompanyStandardGraceSettings,
   companyApprovalSettings,
   type CompanyApprovalSettings,
   makers,
@@ -1188,7 +1190,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createComponent(component: InsertComponent): Promise<Component> {
+  async createComponent(component: InsertComponent & { id?: Component["id"] }): Promise<Component> {
     const db = await getDb();
     const id = component.id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({
@@ -1475,7 +1477,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createFleetScopedComponent(component: InsertComponent): Promise<Component> {
+  async createFleetScopedComponent(component: InsertComponent & { id?: Component["id"] }): Promise<Component> {
     const db = await getDb();
     const id = component.id || `FC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({
@@ -2275,7 +2277,7 @@ export class PostgresStorage {
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     if (history.length === 0) return [];
 
-    const workOrderIds = [...new Set(history.map(h => h.workOrderId))];
+    const workOrderIds = Array.from(new Set(history.map(h => h.workOrderId)));
     const anomalies = await db.select({
       workOrderId: workOrderAnomalies.workOrderId,
       daysLate: workOrderAnomalies.daysLate,
@@ -5192,7 +5194,7 @@ export class PostgresStorage {
     }
 
     const existingLinks = Array.isArray(defect.linkedDefects) ? defect.linkedDefects : [];
-    const mergedLinks = [...new Set([...existingLinks, ...linkedDefectIds])];
+    const mergedLinks = Array.from(new Set([...existingLinks, ...linkedDefectIds]));
 
     const result = await db.update(defects)
       .set({ linkedDefects: mergedLinks, updatedAt: new Date() })
@@ -8840,7 +8842,7 @@ export class PostgresStorage {
     }
     
     // Mark groups with 2+ defects as recurring
-    for (const [key, group] of defectGroups) {
+    for (const [key, group] of Array.from(defectGroups)) {
       if (group.length >= 2) {
         for (const defect of group) {
           const [updated] = await db.update(defects)
@@ -9356,7 +9358,7 @@ export class PostgresStorage {
     }
   }
 
-  async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string }>> {
+  async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string | null }>> {
     const db = await getDb();
     const comp = await db.select().from(components).where(
       or(eq(components.cuuid, componentId), eq(components.id, componentId))
@@ -10631,7 +10633,7 @@ export class PostgresStorage {
     }
     
     // Add linked spares (deduplicated)
-    for (const spareId of linkedSpareIds) {
+    for (const spareId of Array.from(linkedSpareIds)) {
       if (!spareIdSet.has(spareId)) {
         spareIdSet.add(spareId);
         // Look up spare by integer ID to get suuid for getSpareWithInventory

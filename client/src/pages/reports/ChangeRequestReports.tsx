@@ -298,9 +298,9 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   };
 
   const generateChangeRequestReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
-    if (!reportData) {
+    if (!reportData || !summary) {
       if (mode === 'download') {
-        toast({ title: "No Data", description: "No report data available to export.", variant: "destructive" });
+        throw new Error("No report data available to export.");
       }
       return;
     }
@@ -430,6 +430,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       }
 
       default:
+        if (mode === 'download') throw new Error("This report is not yet implemented.");
         toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });
     }
   };
@@ -501,7 +502,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
     } catch (error) {
       console.error('Error generating report:', error);
-      toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
+      toast({ title: "Generation Failed", description: format === 'PDF' && error instanceof Error ? error.message : "Failed to generate report.", variant: "destructive" });
     } finally {
       setGeneratingReports(prev => {
         const newSet = new Set(prev);

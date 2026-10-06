@@ -104,7 +104,7 @@ interface VesselSurvey {
   surveyLabel: string;
   requirementRef: string;
   companyGroup: string;
-  applicable: boolean;
+  applicable?: boolean;
 }
 
 export default function ShipsSurveysAdmin() {
