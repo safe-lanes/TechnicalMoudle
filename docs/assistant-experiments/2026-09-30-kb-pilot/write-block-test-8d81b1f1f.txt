@@ -1,0 +1,37 @@
+== migrate scratch to head (0012), then a second run must be a no-op
+0
+alembic: 0012; maintenance row: 1|f
+PASS  A. block WAITS for a write already in its transaction (drain)  -> waited 3.3 s ({'blocked': True, 'waitedSeconds': 3.34})
+PASS  A. that in-progress publish commits normally  -> served 1
+PASS  B. publish refused while blocked (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  B. Test draft (preview) refused while blocked (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  B. create refused while blocked (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  B. save draft refused while blocked (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  B. retire refused while blocked (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  B. restore refused while blocked (503)  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  B. nothing new was written while blocked  -> served 1
+held 1 knowledge row(s): kb-xref-e -> kb-xref-e#kb-hold
+PASS  C. hold moves every knowledge row out of the served set  -> served 0
+PASS  C. a Test draft after the hold is refused and adds nothing  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  C. a publish after the hold is refused and adds nothing  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+released 1 knowledge row(s): kb-xref-e#kb-hold -> kb-xref-e
+PASS  D. release brings the rows back while writes stay blocked  -> served 1, blocked True
+PASS  E. block is immediate when no write is inside a transaction  -> 0.03 s
+PASS  E. a publish prepared before the block is refused at its transaction  -> 503 Knowledge changes are paused for maintenance. Nothing was saved — please try again later.
+PASS  F. hold refuses while writes are NOT blocked  -> refused: run `writes-block` first — knowledge writes must stay paused while rows are held or released
+PASS  G. grant WITH company matches only that company  -> co-A ['technical'] · co-B []
+PASS  G. grant WITHOUT company matches any company (unchanged behaviour)  -> ['technical']
+
+18/18 passed (run 053009)
+exit=0
+== the admin commands themselves (CLI), on the same scratch DB
+refused: run `writes-block` first — knowledge writes must stay paused while rows are held or released
+knowledge writes PAUSED (waited 0.31 s for writes in progress)
+held 0 knowledge row(s): kb-xref-e -> kb-xref-e#kb-hold
+now: served 0, held 0
+knowledge rows in the served index set: 0; held: 0; writes blocked: True -> SAFE to switch to an older image
+released 0 knowledge row(s): kb-xref-e#kb-hold -> kb-xref-e
+now: served 0, held 0 — writes stay paused until `writes-unblock`
+knowledge writes resumed (waited 0.31 s for writes in progress)
+knowledge rows in the served index set: 0; held: 0; writes blocked: False -> NOT safe to switch yet
+scratch removed

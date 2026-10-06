@@ -1,0 +1,26 @@
+alembic on scratch: 0011
+port 8052 ok True prompt b31c3f9c6c1fe2e4
+port 8053 ok True prompt e9d7ba0117161ea1
+rows: {'kb-xref-e/manual': 965, 'kb-xref-e/preview': 1, 'kb-xref-e/published': 1}
+FINDING  plain fast rollback (previous image, knowledge rows left in place): {'draft retrieved': True, 'draft text in the answer': True, 'published entry retrieved': True}
+         answer to the draft question: 'To service the Lambda-5 valve 053358 in the Office:\n\n1. Close the bypass.\n2. Turn the purple handle three times.\n3. Record the service.\n\nThis is from a private, unpublished draft preview, revision 1, although it is marked expert-confirmed.\n\nSource: Draft preview, revision 1, “Servicing the Lambda-5 '
+         citations: ['Technical - Knowledge: Servicing the Lambda-5 valve 053358']
+knowledge writes PAUSED (waited 0.13 s for writes in progress)
+held 2 knowledge row(s): kb-xref-e -> kb-xref-e#kb-hold
+now: served 0, held 2
+rows: {'kb-xref-e/manual': 965, 'kb-xref-e#kb-hold/preview': 1, 'kb-xref-e#kb-hold/published': 1}
+PASS  after HOLD — previous image retrieves neither the draft nor the published entry  -> []
+PASS  after HOLD — previous image's answer has no draft text  -> That isn't covered in the module documentation I have. Please rephrase, or contact support if you believe it should be documented.
+PASS  after HOLD — manuals still answer normally on the previous image  -> answer
+PASS  rollback-status reports SAFE (0 served, writes blocked)  -> knowledge rows in the served index set: 0; held: 2; writes blocked: True -> SAFE to switch to an older image
+released 2 knowledge row(s): kb-xref-e#kb-hold -> kb-xref-e
+now: served 2, held 0 — writes stay paused until `writes-unblock`
+knowledge writes resumed (waited 0.14 s for writes in progress)
+rows: {'kb-xref-e/manual': 965, 'kb-xref-e/preview': 1, 'kb-xref-e/published': 1}
+PASS  after RELEASE — release image serves the published entry again
+PASS  after RELEASE — release image still keeps the draft private
+
+plain fast rollback: UNSAFE — drafts reachable
+6/6 passed (run 053358)
+exit=0
+scratch removed
