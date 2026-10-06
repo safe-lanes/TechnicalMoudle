@@ -26,7 +26,7 @@ from app.identity import sign_identity
 V8 = os.environ["V8_URL"]
 V7 = os.environ.get("V7_URL", "")
 PHASE = os.environ.get("phase", "A")
-STATE = "/tmp/release-scratch-state.json"
+STATE = os.environ.get("STATE_FILE", "/tmp/release-scratch-state.json")  # shared between the phase A and B runs
 results: list[tuple[str, bool]] = []
 
 
