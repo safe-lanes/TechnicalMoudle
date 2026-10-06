@@ -114,22 +114,24 @@ def is_trainer_instance(issuer: str | None) -> bool:
     return env is not None and env.lower() in settings().kb_trainer_envs
 
 
-async def load_grants(issuer: str | None, user_id: str | None) -> dict[str, Grant]:
+async def load_grants(issuer: str | None, user_id: str | None, tenant: str | None = None) -> dict[str, Grant]:
     """Active grants for exactly this issuer + user id; both must be present and the issuer must be a training-environment
-    instance — the same user id from production (or any other environment) gets nothing."""
+    instance — the same user id from production (or any other environment) gets nothing. 6-Oct-2026: a grant that records
+    a company (tenant_domain) also requires the login's company to match; a grant without one matches any company."""
     if not issuer or not user_id or not is_trainer_instance(issuer):
         return {}
     async with db.engine().connect() as c:
         rows = (await c.execute(text(
-            "SELECT module FROM kb_trainers WHERE issuer=:i AND user_id=:u AND revoked_at IS NULL"),
-            {"i": issuer, "u": user_id})).all()
+            "SELECT module FROM kb_trainers WHERE issuer=:i AND user_id=:u AND revoked_at IS NULL "
+            "AND (tenant_domain IS NULL OR tenant_domain = :t)"),
+            {"i": issuer, "u": user_id, "t": tenant or ""})).all()
     return {r.module.lower(): Grant(r.module.lower()) for r in rows}
 
 
 async def access(sess: Session) -> Access:
     if (sess.user_type or "").lower() == "ship":
         return Access(sess, {})  # knowledge management is shore-only
-    return Access(sess, await load_grants(sess.iss, sess.user_id))
+    return Access(sess, await load_grants(sess.iss, sess.user_id, sess.tenant))
 
 
 async def require_trainer(sess: Session) -> Access:
@@ -196,7 +198,7 @@ async def eligibility(identity: dict[str, Any]) -> dict[str, Any]:
     every action is checked again on the server.)"""
     if (str(identity.get("userType") or "")).lower() == "ship":
         return {"trainer": False, "modules": []}
-    grants = await load_grants(identity.get("iss"), str(identity.get("userId") or ""))
+    grants = await load_grants(identity.get("iss"), str(identity.get("userId") or ""), identity.get("tenantDomain"))
     return {"trainer": bool(grants), "modules": sorted(grants)}
 
 
@@ -393,6 +395,7 @@ async def create_entry(sess: Session, b: dict[str, Any]) -> dict[str, Any]:
         raise KBError(400, "Add a title.")
     eid = str(uuid.uuid4())
     async with db.engine().begin() as c:
+        await _write_guard(c)
         await c.execute(text("INSERT INTO kb_entries (id, module, kind, title, scope_tenant, env_scope, status, draft_revision, created_by, "
                              "created_by_name) VALUES (:id, :m, :k, :t, :s, :env, 'draft', 1, :u, :n)"),
                         {"id": eid, "m": module, "k": r["kind"], "t": r["title"], "s": scope_tenant, "env": env_scope,
@@ -409,6 +412,7 @@ async def save_draft(sess: Session, entry_id: str, b: dict[str, Any]) -> dict[st
     """Save the draft. Editing a published or retired entry starts a NEW draft revision; the served revision is untouched."""
     r = _clean_revision_input(b)
     async with db.engine().begin() as c:
+        await _write_guard(c)
         e, _a = await _writable_entry(c, sess, entry_id)
         if e["draft_revision"]:
             n = e["draft_revision"]
@@ -436,6 +440,42 @@ async def _prepare_chunk(entry: dict[str, Any], rev: dict[str, Any], *, preview:
     return body, meta, "[" + ",".join(f"{x:.8f}" for x in vec) + "]"
 
 
+# ── write block for a safe fast rollback (6-Oct-2026) ─────────────────────────────────────────────────────────
+# Every knowledge write takes the SHARED lock and checks the flag inside its own transaction; set_write_block takes the
+# EXCLUSIVE lock, so it waits until writes already inside a transaction have committed, and every later write is refused.
+WRITE_LOCK_KEY = 724600501
+
+
+async def _write_guard(c: Any) -> None:
+    await c.execute(text("SELECT pg_advisory_xact_lock_shared(:k)"), {"k": WRITE_LOCK_KEY})
+    r = (await c.execute(text("SELECT writes_blocked FROM kb_maintenance WHERE id = 1"))).first()
+    if r and r.writes_blocked:
+        raise KBError(503, "Knowledge changes are paused for maintenance. Nothing was saved — please try again later.")
+
+
+async def set_write_block(blocked: bool, by: str, reason: str = "", wait_seconds: int = 120) -> dict[str, Any]:
+    """Pause (or resume) all knowledge writes. Pausing waits — up to wait_seconds — for writes already in progress."""
+    t0 = _now()
+    async with db.engine().begin() as c:
+        await c.execute(text(f"SET LOCAL lock_timeout = '{int(wait_seconds)}s'"))
+        await c.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": WRITE_LOCK_KEY})
+        await c.execute(text("UPDATE kb_maintenance SET writes_blocked=:b, reason=:r, changed_by=:by, changed_at=now() WHERE id = 1"),
+                        {"b": blocked, "r": (reason or "")[:300], "by": (by or "admin")[:120]})
+        await c.execute(text("INSERT INTO kb_audit (entry_id, revision, action, actor_id, actor_name, detail) VALUES "
+                             "(NULL, NULL, :a, :by, :by, CAST(:d AS jsonb))"),
+                        {"a": "knowledge writes paused" if blocked else "knowledge writes resumed", "by": (by or "admin")[:120],
+                         "d": _j({"reason": reason or ""})})
+    return {"blocked": blocked, "waitedSeconds": round((_now() - t0).total_seconds(), 2)}
+
+
+async def write_block_state(c: Any | None = None) -> bool:
+    if c is not None:
+        r = (await c.execute(text("SELECT writes_blocked FROM kb_maintenance WHERE id = 1"))).first()
+        return bool(r and r.writes_blocked)
+    async with db.engine().connect() as cc:
+        return await write_block_state(cc)
+
+
 async def _write_chunk(c: Any, entry: dict[str, Any], body: str, meta: dict[str, Any], vec: str, state: str) -> None:
     cid = f"kb:{entry['id']}:{state}"
     await c.execute(text("DELETE FROM assistant_chunks WHERE index_set=:s AND id=:id"), {"s": settings().assistant_index_set, "id": cid})
@@ -460,6 +500,7 @@ async def prepare_preview(sess: Session, entry_id: str) -> dict[str, Any]:
         rev = await _draft_rev(c, e)
     body, meta, vec = await _prepare_chunk(e, rev, preview=True, published_by=None)
     async with db.engine().begin() as c:
+        await _write_guard(c)
         await _write_chunk(c, e, body, meta, vec, "preview")
         await _audit(c, sess, entry_id, rev["revision"], "preview prepared")
     return {"revision": rev["revision"], "text": body, "supersedes": rev["supersedes"]}
@@ -530,6 +571,7 @@ async def publish(sess: Session, entry_id: str, change_note: str | None = None, 
                            "The previously published version is still in use.") from ex
     try:
         async with db.engine().begin() as c:
+            await _write_guard(c)
             ids = await _validate_supersedes(c, e, rev)
             await _write_chunk(c, e, body, meta, vec, "published")
             await c.execute(text("DELETE FROM assistant_chunks WHERE index_set=:s AND id=:id"),
@@ -561,6 +603,7 @@ async def rollback(sess: Session, entry_id: str, target: int) -> dict[str, Any]:
     """Re-publish an earlier revision as a NEW revision (history stays linear); any open draft is kept in history.
     The earlier revision's supersedes come back with it (publish rewrites them from the revision)."""
     async with db.engine().begin() as c:
+        await _write_guard(c)
         e, _a = await _writable_entry(c, sess, entry_id)
         old = await _revision(c, entry_id, target)
         if not old["published_at"]:
@@ -576,6 +619,7 @@ async def rollback(sess: Session, entry_id: str, target: int) -> dict[str, Any]:
 async def retire(sess: Session, entry_id: str, reason: str | None = None) -> dict[str, Any]:
     """Stop serving the entry; the passages it superseded are served again. The history stays."""
     async with db.engine().begin() as c:
+        await _write_guard(c)
         e, a = await _writable_entry(c, sess, entry_id)
         await c.execute(text("DELETE FROM assistant_chunks WHERE index_set=:s AND kb_entry_id=:e"), {"s": settings().assistant_index_set, "e": entry_id})
         await c.execute(text("DELETE FROM kb_supersedes WHERE entry_id=:e"), {"e": entry_id})
@@ -705,8 +749,10 @@ def resolve_trainer_instance(module: str, issuer: str | None = None) -> str:
     return choices[0]
 
 
-async def grant_trainer(user_id: str, module: str, name: str, by: str, note: str = "", issuer: str | None = None) -> dict[str, Any]:
-    """Make a person (their SAILERP dev user id) a trainer of one module (all clients, all environments). Re-granting
+async def grant_trainer(user_id: str, module: str, name: str, by: str, note: str = "", issuer: str | None = None,
+                        company: str | None = None) -> dict[str, Any]:
+    """Make a person (their VERIFIED SAILERP dev user id, as the signed login carries it — not a display name) a trainer
+    of one module (all clients, all environments). `company`, when given, must also match the login's company. Re-granting
     replaces the active grant; the history keeps both."""
     module = (module or "").lower().strip()
     user_id, by = (user_id or "").strip(), (by or "").strip()
@@ -719,8 +765,8 @@ async def grant_trainer(user_id: str, module: str, name: str, by: str, note: str
         await c.execute(text("UPDATE kb_trainers SET revoked_at=now(), revoked_by=:b WHERE issuer=:i AND user_id=:u "
                              "AND module=:m AND revoked_at IS NULL"), {"b": by, "i": iss, "u": user_id, "m": module})
         row = (await c.execute(text("INSERT INTO kb_trainers (issuer, tenant_domain, user_id, module, publish_scope, share_envs, display_name, "
-                                    "note, granted_by) VALUES (:i, NULL, :u, :m, 'global', true, :n, :note, :b) RETURNING id"),
-                               {"i": iss, "u": user_id, "m": module, "n": (name or "").strip()[:120],
+                                    "note, granted_by) VALUES (:i, :co, :u, :m, 'global', true, :n, :note, :b) RETURNING id"),
+                               {"i": iss, "co": (company or "").strip() or None, "u": user_id, "m": module, "n": (name or "").strip()[:120],
                                 "note": (note or "")[:300], "b": by})).first()
     return {"ok": True, "id": row.id if row else None, "issuer": iss}
 
@@ -749,7 +795,7 @@ async def reactivate_trainer(trainer_id: int, by: str) -> dict[str, Any]:
         r = (await c.execute(text("SELECT * FROM kb_trainers WHERE id=:id"), {"id": trainer_id})).first()
     if not r:
         raise KBError(404, "Trainer grant not found.")
-    return await grant_trainer(r.user_id, r.module, r.display_name or "", by, r.note or "", issuer=r.issuer)
+    return await grant_trainer(r.user_id, r.module, r.display_name or "", by, r.note or "", issuer=r.issuer, company=r.tenant_domain)
 
 
 async def chatbot_users(q: str, limit: int = 20) -> list[dict[str, Any]]:

@@ -232,7 +232,8 @@ async def admin_grant(request: Request) -> Any:
     async def f(r: Request) -> Any:
         b = await _body(r)
         return await kb.grant_trainer(str(b.get("userId") or ""), str(b.get("module") or ""), str(b.get("name") or ""),
-                                      str(b.get("by") or ""), str(b.get("note") or ""), issuer=str(b.get("issuer") or "") or None)
+                                      str(b.get("by") or ""), str(b.get("note") or ""), issuer=str(b.get("issuer") or "") or None,
+                                      company=str(b.get("company") or "") or None)
     return await _admin(f)(request)
 
 
