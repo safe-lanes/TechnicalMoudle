@@ -46,7 +46,8 @@ import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { WorkOrder, InsertWorkOrder, WorkOrderWithLeadTime } from "@shared/schema";
 import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
-import { useToast } from "@/hooks/use-toast";
+import { useWorkOrderToast as useToast } from "@/hooks/use-work-order-toast";
+import { workOrderResponseError } from "@/lib/workOrderErrorFeedback";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 import { formatWorkOrderExportDueValue } from "./workOrderExportDueValue";
@@ -258,7 +259,7 @@ const WorkOrders: React.FC = () => {
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location, setLocation] = useLocation();
-  const { toast } = useToast();
+  const { toast } = useToast("Work Order Update Failed");
   const { vesselId, setVesselId, isMyVessels, assignedVesselIds, applyVesselScope, pickerVessels, myVesselsEmpty } = useVessel();
   // 'my' aggregate scope with no assigned vessels yields nothing — don't fetch.
   const vesselScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
@@ -311,7 +312,7 @@ const WorkOrders: React.FC = () => {
         params.set('sortDir', woSortDir);
       }
       const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch work orders');
+      if (!response.ok) throw await workOrderResponseError(response);
       const json = await response.json();
       return json.data as WorkOrdersPageEnvelope;
     },
@@ -326,7 +327,7 @@ const WorkOrders: React.FC = () => {
     const params = new URLSearchParams();
     applyVesselScope(params);
     const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
-    if (!response.ok) throw new Error('Failed to fetch work orders');
+    if (!response.ok) throw await workOrderResponseError(response);
     return await response.json() as WorkOrderWithHydratedData[];
   }, [applyVesselScope]);
 
@@ -342,7 +343,7 @@ const WorkOrders: React.FC = () => {
       const params = new URLSearchParams();
       applyVesselScope(params);
       const response = await fetch(`/technical/api/jobs?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch jobs');
+      if (!response.ok) throw await workOrderResponseError(response);
       return await response.json();
     },
     enabled: vesselScopeReady,
@@ -382,7 +383,7 @@ const WorkOrders: React.FC = () => {
       toast({ title: "Success", description: "Work order created successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to create work order" });
+      toast({ title: "Work Order Creation Failed", description: error.message || "Failed to create work order", variant: "destructive" });
     }
   });
   
@@ -407,7 +408,7 @@ const WorkOrders: React.FC = () => {
       }
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to update work order" });
+      toast({ title: "Work Order Update Failed", description: error.message || "Failed to update work order", variant: "destructive" });
     }
   });
   
@@ -422,7 +423,7 @@ const WorkOrders: React.FC = () => {
       toast({ title: "Success", description: "Work order deleted successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to delete work order" });
+      toast({ title: "Work Order Delete Failed", description: error.message || "Failed to delete work order", variant: "destructive" });
     }
   });
 
@@ -441,7 +442,7 @@ const WorkOrders: React.FC = () => {
       });
     },
     onError: (error: any) => {
-      toast({ title: "Generation failed", description: error.message || "Failed to generate work orders" });
+      toast({ title: "Generation failed", description: error.message || "Failed to generate work orders", variant: "destructive" });
     }
   });
 
@@ -1070,7 +1071,7 @@ const WorkOrders: React.FC = () => {
       setPostponeApprovalWorkOrder(null);
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to approve postponement', variant: 'destructive' });
+      toast({ title: 'Approval Blocked', description: error, variant: 'destructive' });
     },
   });
 
@@ -1088,7 +1089,7 @@ const WorkOrders: React.FC = () => {
       setPostponeApprovalWorkOrder(null);
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to reject postponement', variant: 'destructive' });
+      toast({ title: 'Postponement Rejection Failed', description: error, variant: 'destructive' });
     },
   });
 
@@ -1168,7 +1169,7 @@ const WorkOrders: React.FC = () => {
       setPostponeDialogOpen(false);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to submit postponement request", variant: "destructive" });
+      toast({ title: "Postponement Failed", description: error, variant: "destructive" });
     },
   });
 
@@ -1183,7 +1184,7 @@ const WorkOrders: React.FC = () => {
       setRePostponeDialogOpen(false);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to submit re-postponement request", variant: "destructive" });
+      toast({ title: "Re-postponement Failed", description: error, variant: "destructive" });
     },
   });
 
@@ -1290,7 +1291,7 @@ const WorkOrders: React.FC = () => {
 
       toast({ title: "Export Complete", description: `Exported ${rows.length} work orders to Excel` });
     } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to export work orders to Excel" });
+      toast({ title: "Export Failed", description: err, variant: "destructive" });
     }
     setExportingType(null);
   };
@@ -1373,7 +1374,7 @@ const WorkOrders: React.FC = () => {
 
       toast({ title: "Export Complete", description: `Exported ${data.length} work orders to PDF` });
     } catch (err) {
-      toast({ title: "Export Failed", description: "Failed to export work orders to PDF" });
+      toast({ title: "Export Failed", description: err, variant: "destructive" });
     }
     setExportingType(null);
   };

@@ -14,3 +14,9 @@ For Component Register Maker/Code rejection, keep the backend's complete correct
 **Why:** The acceptance example requires that exact sentence; the problem is the HTTP/JSON wrapper, not the validation rule or Maker selection.
 
 **How to apply:** Future copy changes should preserve the specific reason and corrective instruction, and must not silently change which inputs the server accepts.
+
+Do not classify readable field-label prefixes or underscored spare part numbers as diagnostic codes.
+
+**Why:** Broad case-insensitive code detection suppressed useful field validation; matching every uppercase underscore token also risks hiding legitimate spare identifiers and stock quantities.
+
+**How to apply:** Recognize machine codes in diagnostic positions, not every token in a sentence. Include human field labels and underscored spare identifiers in formatter fixtures.
