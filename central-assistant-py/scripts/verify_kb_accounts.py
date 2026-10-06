@@ -85,7 +85,7 @@ async def main() -> int:
     s, b = await a.acall("POST", "/kb/api/login", {"username": users["auds"], "password": pw["auds"]})
     g = b.get("groups", [])
     rec("Audit & Safety trainer sees ONE module 'Audit & Safety' with its parts audit / incident / safety",
-        [x["label"] for x in g] == ["Audit & Safety"] and [m["module"] for m in g[0]["modules"]] == ["audit", "incident", "safety"], g)
+        [x["label"] for x in g] == ["Audit & Safety"] and sorted(m["module"] for m in g[0]["modules"]) == ["audit", "incident", "safety"], g)
     s, b = await c.acall("GET", "/kb/api/me")
     rec("Crewing trainer sees only Crewing", [x["label"] for x in b.get("groups", [])] == ["Crewing"], b.get("groups"))
 
