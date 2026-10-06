@@ -7,6 +7,66 @@ Evidence: the SAILERP code read is the local copy at `C:\Users\GhaziAnwer\sailap
 **2026-05-18** (`43b153381`) — not pulled (shared live branch). Everything marked READ-SAILERP may have changed since and
 must be confirmed by the SAILERP team. PMS and assistant facts are from the current code and the live chatbot log.
 
+## 0. Update 6 Oct (later) — the three clarifications, on CURRENT code
+
+SAILERP read from a separate checkout `C:\Users\GhaziAnwer\sailapp\sail_backend_latest` = `origin/development_final`
+**`13def9cbe` (6 Oct 2026)** (`git fetch` + `git worktree add --detach`; the existing working branch and `.env` untouched).
+Production branch `production_build` = `8473cd404` (1 Oct), 2 115 commits behind development_final. PMS read from
+`origin/replit_dev` (`329ee5d42`).
+
+### 0.1 SAILERP, current code (READ-latest)
+- **Still one role per user** (`user.roleId`); still per-user permission tables (`smsuserpermission`). Unchanged conclusion:
+  a Trainer *role* would replace the operational role → use a per-user flag.
+- **Login token** = `{ id, domain, userType }`; `id` = the **login record id** (`login.id`). Ids are company-specific.
+- **Authentication:** 1 698 routes use `@Auth()` — a real guard (token checked against the `token` table). It
+  **authenticates only**; it does not check rights.
+- **Rights check exists but is unused:** `@AuthWithPermission('<menu route>', 'edit')` → `PermissionsGuard` checks the
+  caller's role against `roleaccess` for that menu (added 30 Jun 2026). Used on **0** endpoints today.
+- **User edit** `PUT /api/v1/user/:userId` has `@Auth()` only, and `updateUserProfile` (480 lines) never checks the
+  caller's rights → in code, **any logged-in user can update any user, including the role**. (Finding F2 below.)
+
+### 0.2 Existing chat access — the Technical PMS DOES need a change (READ, current replit_dev)
+- The chatbot button is shown **only when the UI role is Sail Admin** (`ChatButton.tsx`: `!isSailAdmin → hidden`).
+- The server issues the chatbot identity only to roles in `ASSISTANT_ALLOWED_ROLES` (default `Sail Admin`, 403 otherwise).
+- The book icon and the knowledge screen both need that identity → **a trainer with another operational role cannot reach
+  Manage knowledge today.** "Technical PMS needs no change" was wrong; it holds only for trainers who are Sail Admins
+  (Jeevan is).
+- **Smallest change, chat access unchanged:** a separate **knowledge-only identity** (`GET /technical/api/assistant/kb-token`,
+  dev instance only, any verified office user, claim `scope: "kb"`). The assistant accepts `scope: "kb"` only for the trainer
+  check and the knowledge screen — **`/chat` refuses it**. The widget shows a **"Manage knowledge"** button (no chat) to a
+  non-Sail-Admin user only when the assistant says they are a trainer. Sail Admins see the chatbot exactly as today.
+
+### 0.3 Protecting the Trainer flag (SAILERP)
+- **Not** on the general user-edit endpoint (it checks no rights — F2).
+- A **dedicated endpoint** `PUT /api/v1/chatbot/trainers/:userId` (and the list `GET`) using the existing
+  `@AuthWithPermission('admin/chatbot-trainers', 'edit')`, with a new menu right **granted only to the administrator role(s)
+  you choose** in `roleaccess`; it **refuses self-assignment** (caller's login = target) and records who/when.
+- The server-to-server list the AI server reads (`GET /api/v1/chatbot/trainers/export`) uses a **service secret**, not a
+  user login.
+
+### 0.4 Findings to track separately (not confirmed live defects — verify with the SAILERP team / Nilesh)
+| # | Finding | Class | Who verifies |
+|---|---|---|---|
+| F1 | Master-data feed `GET /api/v1/crewmasterdata/getallmasterdata/*` (users, vessels…) has no `@Auth()` and is excluded from the tenant middleware; the PMS calls it without credentials | READ-latest | SAILERP team (is it network-restricted?) |
+| F2 | `PUT /api/v1/user/:userId` authenticates but checks no rights → any logged-in user could change any user's role via the API | READ-latest | SAILERP team |
+| F3 | Login query interpolates the username into SQL (`l.username='${username}'`) | READ-latest | SAILERP team |
+| F4 | PMS master-data sync keys users by `uuid` (SAILERP now also sends `id` = login id) → the PMS's server-side role lookup by verified login id cannot match → the role likely comes from the browser profile (`ASSISTANT_ROLE_FALLBACK=profile`) | READ (both sides) + INFERRED (env) | Nilesh: dev PM2 log `[assistant-api] mint user=362 role=… (profile-header)` |
+
+### 0.5 Revised effort
+| Part | Who | Estimate |
+|---|---|---|
+| SAILERP: flag + menu right + protected assign endpoint (no self-assign) + export endpoint (secret) + checkbox screen + dev deploy | SAILERP team | ~1.5–2.5 days (their estimate needed) |
+| PMS: knowledge-only identity endpoint + "Manage knowledge" button for trainers who are not Sail Admins | me (Nilesh deploys) | ~0.5–1 day |
+| AI server: SAILERP directory client (cache ≤ 60 s, fail closed), page = eligible list + module ticks, `scope: kb` handling, company + login match, tests | me | ~1.5 days |
+| End-to-end on dev (tick → appears; untick → refused ≤ 60 s; module removal → immediate; non-Sail-Admin trainer reaches Manage knowledge but not chat) | me | ~0.5 day |
+
+### 0.6 Temporary arrangement (if Jeevan should train before this is built)
+AI-managed grant, Technical only: **dev system `technical-dev` + login id `362` + company** — his verified dev login shows
+`rsms` (25 Sep–5 Oct) and `rsms05102026` (6 Oct). **Which company is his real dev company must be confirmed** (you /
+Jeevan); the grant is then made for that company only. He is a Sail Admin, so no PMS change is needed for him.
+
+---
+
 ## 1. What exists today
 
 | Fact | Class |
@@ -53,7 +113,7 @@ GET /api/v1/chatbot/trainers  ◄──────  - admin ticks modules per p
      knowledge still serves all companies within the module);
    - access check on **every** knowledge request (including open screens) = *in the SAILERP trainer list* **and**
      *assigned that module*; the widget's book icon uses the same check.
-3. **Technical PMS:** **no change** — the chatbot identity already carries the verified login id and company.
+3. **Technical PMS:** ~~no change~~ — **superseded by §0.2**: a knowledge-only identity + a Manage-knowledge button for trainers who are not Sail Admins.
 4. **Crewing / SAILERP (Audit & Safety) chatbots:** unchanged by this; when they are connected later, the same trainer
    list and module assignments apply.
 
