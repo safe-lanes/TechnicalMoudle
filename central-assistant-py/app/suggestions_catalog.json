@@ -1,0 +1,34 @@
+{
+  "_about": "Starter questions for the shared chat widget (GET /suggestions). Each question names the manual file and section it is answered from; the service serves a question ONLY while that exact (module, file, section) is a published manual passage in the served index set, so a removed or renamed manual hides its questions instead of leaving them unanswerable. Add questions only after checking the answer on a pilot (scripts/verify_suggestions.py). Never reference knowledge drafts or another module's manuals.",
+  "technical": [
+    {"question": "How do I complete a work order?", "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf", "section": "1.1.5.6 HOW TO COMPLETE THE WORK ORDER"},
+    {"question": "How do I update running hours?", "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf", "section": "1.1.6.3 HOW TO UPDATE RUNNING HOURS"},
+    {"question": "How do I create an unplanned work order?", "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf", "section": "1.1.5.2 HOW TO CREATE AN UNPLANNED WORK ORDER"},
+    {"question": "How do I add a new spare part?", "file": "Technical - PMS User Manual For Office_Sail Admin_R2_08.06.2026.pdf", "section": "1.1.7.2 HOW TO ADD NEW SPARE"}
+  ],
+  "crewing": [
+    {"question": "How do I create a new crew record?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.2.1.3 HOW TO CREATE A NEW CREW RECORD"},
+    {"question": "How do I add records to the crew pool?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.3.1.5 HOW TO ADD RECORDS TO CREW POOL"},
+    {"question": "How do I approve or reject a rotation plan?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.5.3.3 HOW TO APPROVE OR REJECT A ROTATION PLAN"},
+    {"question": "How do I download the IMO crew list?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.4.1.3 HOW TO DOWNLOAD THE IMO CREW LIST / US CREW LIST"},
+    {"question": "How do I record an approval decision on a promotion?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.6.1.4 HOW TO RECORD AN APPROVAL DECISION"},
+    {"question": "How do I create a new post incident test record?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.8.4.3 HOW TO CREATE A NEW POST INCIDENT TEST RECORD"}
+  ],
+  "audit": [
+    {"question": "How do I create a new preparation?", "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf", "section": "3.1 HOW TO CREATE NEW PREPARATION"},
+    {"question": "How do I change the checklist chapters of a preparation?", "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf", "section": "4.2 HOW TO CHANGE CHECKLIST CHAPTERS"},
+    {"question": "How do I upload a SIRE or CDI inspection report in History?", "file": "Audit - History Manual_R1_30.06.2026.pdf", "section": "2.2 METHOD 2: - SIRE\\CDI UPLOAD"},
+    {"question": "How do I access Fleet Sharing?", "file": "Audit - Fleet Sharing Manual- Office_R1_30.06.2026.pdf", "section": "1.0 HOW TO ACCESS FLEET SHARING"}
+  ],
+  "safety": [
+    {"question": "How do I create a new MOC?", "file": "Safety - MOC User Manual_Office_R0_31.03.2026.pdf", "section": "4. HOW TO CREATE A NEW MOC"},
+    {"question": "How do I create an office risk assessment?", "file": "Safety - Risk Assessment User Manual_Office_R1_30.05.2026.pdf", "section": "6.1 HOW TO CREATE A OFFICE RISK ASSESSMENT"},
+    {"question": "How do I open a new safety meeting form?", "file": "Safety - Safety Meeting User Manual_R1_31.05.2026.pdf", "section": "1.5 HOW TO OPEN NEW SAFETY MEETING FORM"},
+    {"question": "How do I download forms and checklists from the SMS?", "file": "Safety - SMS User Manual_Office_R0_31.01.2026.pdf", "section": "3.1.2 How to download forms and checklists"}
+  ],
+  "incident": [
+    {"question": "How do I create a new incident record?", "file": "Incident - Incident User Manual R0_20.05.2026.pdf", "section": "3. HOW TO CREATE A NEW INCIDENT RECORD"},
+    {"question": "How do I create a new near miss?", "file": "Incident - Near Miss User Manual R1_30.05.2026.pdf", "section": "3. HOW TO CREATE A NEW NEAR MISS"},
+    {"question": "How do I access Lesson Learnt?", "file": "Incident - Lesson Learnt User Manual_Vessel_R0_30.05.2026.pdf", "section": "1. HOW TO ACCESS LESSON LEARNT"}
+  ]
+}

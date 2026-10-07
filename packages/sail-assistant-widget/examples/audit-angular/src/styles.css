@@ -1,0 +1,10 @@
+/* Like SAILERP: global box-sizing, Roboto body font, aggressive component-wide rules, and the fixed sync button at
+   bottom-right (z-index 1000) that the widget must not cover (it is configured with a larger offset). */
+* { box-sizing: border-box; }
+body { font-family: Roboto, 'Helvetica Neue', sans-serif; margin: 0; background: #eef2f6; color: #222; }
+div { line-height: 2 !important; }
+button { background: #0b6; color: #fff; border: 0; padding: 6px 12px; border-radius: 3px; cursor: pointer; margin-right: 6px; }
+.mock-banner { background: #ffe08a; padding: 8px 12px; border: 1px solid #c90; margin: 12px 20px; }
+.sync-button { position: fixed; bottom: 20px; right: 20px; z-index: 1000; width: 48px; height: 48px; border-radius: 50%; background: #c60; }
+nav a { margin-right: 12px; }
+main { padding: 0 20px; }

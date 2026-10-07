@@ -1,0 +1,13 @@
+{
+  "name": "@sail/assistant-widget",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Framework-neutral SAIL AI Assistant chat widget (one JS bundle for Angular, React and plain HTML hosts).",
+  "type": "module",
+  "scripts": {
+    "build": "vite build --config vite.config.mts && node scripts/write-integrity.mjs",
+    "test": "vitest run --config vitest.config.mts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "//": "No dependencies of its own: it builds with the repository's root node_modules (react 18.3.1, react-dom, react-markdown 10, remark-gfm 4, vite 5). The OUTPUT bundle contains everything; hosts install nothing."
+}

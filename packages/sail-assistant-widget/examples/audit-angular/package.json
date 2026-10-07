@@ -1,0 +1,29 @@
+{
+  "name": "sail-assistant-example-audit-angular",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Isolated example matching SAILERP Audit & Safety's frontend (sails-web-app development_final @ 5ec343ad): Angular 19.2.14 standalone, @angular-builders/custom-webpack:browser (webpack), RxJS 6.5.4, zone.js 0.15, TypeScript 5.8.3. Loads the SAME pinned widget bundle via angular.json scripts.",
+  "scripts": {
+    "build": "ng build --base-href /audit-app/"
+  },
+  "dependencies": {
+    "@angular/animations": "19.2.14",
+    "@angular/common": "19.2.14",
+    "@angular/compiler": "19.2.14",
+    "@angular/core": "19.2.14",
+    "@angular/forms": "19.2.14",
+    "@angular/platform-browser": "19.2.14",
+    "@angular/platform-browser-dynamic": "19.2.14",
+    "@angular/router": "19.2.14",
+    "rxjs": "6.5.4",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.1"
+  },
+  "devDependencies": {
+    "@angular-builders/custom-webpack": "^19.0.1",
+    "@angular-devkit/build-angular": "^19.2.15",
+    "@angular/cli": "^19.2.15",
+    "@angular/compiler-cli": "19.2.14",
+    "typescript": "5.8.3"
+  }
+}

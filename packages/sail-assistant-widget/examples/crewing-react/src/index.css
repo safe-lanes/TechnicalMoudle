@@ -1,0 +1,8 @@
+/* Like Crewing: Tailwind preflight applied globally, plus a few aggressive global rules. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { font-family: 'Mulish', 'Roboto', sans-serif; }
+button { text-transform: uppercase !important; }
+.toaster-like { position: fixed; right: 16px; bottom: 16px; z-index: 99999; }

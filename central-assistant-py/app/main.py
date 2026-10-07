@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from . import agent, chat, db, kb_routes, llm, retrieval
+from . import agent, chat, db, kb_routes, llm, retrieval, suggestions
 from .config import settings
 from .identity import peek_issuer, verify_identity
 
@@ -152,6 +152,28 @@ async def post_chat(request: Request) -> Any:
     except Exception as e:
         print(f"[assistant] {e}")
         return JSONResponse(chat.GENERIC_ERR, status_code=200)
+
+
+@app.get("/suggestions")
+async def get_suggestions(request: Request) -> Any:
+    """Starter questions for the shared chat widget (7-Oct-2026): only questions answered by the requested module's own
+    published manuals (app/suggestions.py). Same identity check as /chat; [] when none qualify."""
+    s = settings()
+    tok = request.headers.get("x-assistant-identity")
+    iss = peek_issuer(tok)
+    instance = s.module_instances.get(iss) if iss else None
+    if iss and not instance:
+        return JSONResponse({"error": "identity rejected: unknown-issuer"}, status_code=401)
+    v = verify_identity(tok, instance["signingKey"] if instance else s.identity_signing_key, s.identity_clock_leeway_sec)
+    if not v.ok or v.identity is None:
+        return JSONResponse({"error": f"identity rejected: {v.reason}"}, status_code=401)
+    module = str(request.query_params.get("module") or "").strip().lower()
+    try:
+        questions = await suggestions.for_module(module, v.identity)
+    except Exception as e:
+        print(f"[assistant] suggestions: {e}")
+        questions = []  # fail closed: no suggestions rather than invented ones
+    return {"module": module, "questions": questions}
 
 
 @app.post("/rate")

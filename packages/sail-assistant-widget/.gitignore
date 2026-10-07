@@ -1,0 +1,8 @@
+node_modules/
+examples/*/node_modules/
+examples/*/dist/
+examples/*/.angular/
+test-results/
+playwright-report/
+# Built bundles ARE committed (pinned, with integrity files); source maps are published with the bundle but not committed.
+dist/**/*.map

@@ -105,6 +105,25 @@ async def resolve_pair(tenant_domain: str, tuid: str | None, module: str) -> tup
         return row, row.get("inserted") is True
 
 
+async def pair_enabled(tenant_domain: str, module: str) -> bool:
+    """Read-only twin of resolve_pair for the starter-question endpoint: never registers a pair. A pair not yet seen is
+    ON (the same default resolve_pair registers); one an administrator switched off stays off."""
+    async with engine().connect() as c:
+        r = (await c.execute(text("SELECT enabled FROM assistant_pairs WHERE tenant_domain=:t AND module=:m"),
+                             {"t": tenant_domain, "m": module})).first()
+        return True if r is None else bool(r[0])
+
+
+async def manual_sections(module: str) -> set[tuple[str, str]]:
+    """(file, section title) of every published MANUAL passage of one module in the served index set — company-wide
+    manuals only (no tenant copy, no knowledge entry, no draft). The source check behind the starter questions."""
+    async with engine().connect() as c:
+        rows = await c.execute(text(
+            "SELECT DISTINCT file, section_title FROM assistant_chunks WHERE index_set=:s AND lower(module)=:m "
+            "AND kb_state IS NULL AND tenant_domain IS NULL"), {"s": settings().assistant_index_set, "m": module})
+        return {(str(r[0]), str(r[1] or "")) for r in rows}
+
+
 async def list_pairs() -> list[dict[str, Any]]:
     async with engine().connect() as c:
         return [_row(r) for r in await c.execute(text("SELECT * FROM assistant_pairs ORDER BY first_seen DESC"))]
