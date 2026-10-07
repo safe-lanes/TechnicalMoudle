@@ -13,6 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { CheckCircle, X, RotateCcw, GitPullRequest, AlertTriangle, Info, Pencil } from "lucide-react";
 import type { ChangeRequest } from "@shared/schema";
 import { useResolvedUserName } from "@/hooks/useResolvedUserName";
+import { OfficeReviewerRoleMultiSelect, formatOfficeReviewerRoles } from "@/components/pms/OfficeReviewerRoleMultiSelect";
+import { normalizeOfficeReviewerRoles, officeReviewerRolesEqual } from "@shared/officeReviewer";
 
 interface ApproveRejectModalProps {
   open: boolean;
@@ -32,8 +34,8 @@ export default function ApproveRejectModal({
   const { toast } = useToast();
   const { resolvedUserName } = useResolvedUserName();
   const [comment, setComment] = useState("");
-  // Per-field override state: key = field name, value = approver-edited text
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  // Reviewer arrays stay native arrays; all other proposed values retain their scalar editor.
+  const [overrides, setOverrides] = useState<Record<string, string | string[]>>({});
 
   // Fetch change request details
   const { data: changeRequest, isLoading } = useQuery<ChangeRequest>({
@@ -44,6 +46,9 @@ export default function ApproveRejectModal({
       return response.json();
     },
     enabled: open && !!requestId
+  });
+  const { data: officeReviewerRoles } = useQuery<Array<{ ruid: string; assignedRole: string; roletype: string; sortOrder: number | null }>>({
+    queryKey: ['/technical/api/admin/roles'],
   });
 
   // Parse proposed changes once
@@ -57,7 +62,7 @@ export default function ApproveRejectModal({
   }, [changeRequest]);
 
   const approveMutation = useMutation({
-    mutationFn: async (overriddenChanges: Array<{ field: string; approverNewValue: string }>) => {
+    mutationFn: async (overriddenChanges: Array<{ field: string; approverNewValue: string | string[] }>) => {
       return apiRequest('PUT', `/technical/api/change-requests/${requestId}/approve`, {
         comment,
         reviewerId: resolvedUserName,
@@ -157,12 +162,14 @@ export default function ApproveRejectModal({
         const overriddenChanges = proposedChanges
           .filter(change => {
             const key = change.field;
-            const originalStr = String(change.newValue ?? '');
-            return overrides[key] !== undefined && overrides[key] !== originalStr;
+            if (key === 'officeReviewerRoleRuids') {
+              return overrides[key] !== undefined && !officeReviewerRolesEqual(overrides[key], change.newValue);
+            }
+            return overrides[key] !== undefined && overrides[key] !== String(change.newValue ?? '');
           })
           .map(change => ({
             field: change.field,
-            approverNewValue: overrides[change.field],
+            approverNewValue: overrides[change.field]!,
           }));
         approveMutation.mutate(overriddenChanges);
         break;
@@ -233,6 +240,9 @@ export default function ApproveRejectModal({
   // Determine how many fields the approver has modified from the original
   const modifiedCount = proposedChanges.filter(change => {
     const key = change.field;
+    if (key === 'officeReviewerRoleRuids') {
+      return overrides[key] !== undefined && !officeReviewerRolesEqual(overrides[key], change.newValue);
+    }
     return overrides[key] !== undefined && overrides[key] !== String(change.newValue ?? '');
   }).length;
 
@@ -309,33 +319,62 @@ export default function ApproveRejectModal({
                   <tbody>
                     {proposedChanges.map((change, idx) => {
                       const fieldKey = change.field;
-                      const originalNewValue = String(change.newValue ?? '');
-                      const currentValue = overrides[fieldKey] ?? originalNewValue;
-                      const isModified = overrides[fieldKey] !== undefined && overrides[fieldKey] !== originalNewValue;
+                      const isReviewerRoles = fieldKey === 'officeReviewerRoleRuids';
+                      const originalNewValue = isReviewerRoles
+                        ? normalizeOfficeReviewerRoles(change.newValue)
+                        : String(change.newValue ?? '');
+                      const currentValue = overrides[fieldKey] !== undefined
+                        ? overrides[fieldKey]
+                        : originalNewValue;
+                      const isModified = isReviewerRoles
+                        ? overrides[fieldKey] !== undefined && !officeReviewerRolesEqual(overrides[fieldKey], change.newValue)
+                        : overrides[fieldKey] !== undefined && overrides[fieldKey] !== originalNewValue;
+                      const oldDisplayValue = isReviewerRoles
+                        ? formatOfficeReviewerRoles(change.oldValue, officeReviewerRoles)
+                        : String(change.oldValue ?? '—');
+                      const proposedDisplayValue = isReviewerRoles
+                        ? formatOfficeReviewerRoles(change.newValue, officeReviewerRoles)
+                        : String(change.newValue ?? '');
 
                       return (
                         <tr key={idx} className={`border-b last:border-0 ${isModified ? 'bg-amber-50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                           {/* Field name */}
                           <td className="px-3 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                            {change.field}
+                            {isReviewerRoles ? 'Office Reviewer' : change.field}
                           </td>
 
                           {/* Previous (old) value — always read-only */}
                           <td className="px-3 py-2">
                             <span
                               className="inline-block bg-gray-100 text-gray-700 rounded px-2 py-0.5 text-xs max-w-full truncate"
-                              title={String(change.oldValue ?? '—')}
+                              title={oldDisplayValue}
                             >
-                              {String(change.oldValue ?? '—')}
+                              {oldDisplayValue}
                             </span>
                           </td>
 
                           {/* New value — editable input when action === 'approve' */}
                           <td className="px-3 py-2">
-                            {action === 'approve' ? (
+                            {action === 'approve' && isReviewerRoles ? (
+                              <div className="min-w-48 space-y-1.5">
+                                <OfficeReviewerRoleMultiSelect
+                                  id={`approval-override-${idx}`}
+                                  value={Array.isArray(currentValue) ? currentValue : []}
+                                  onChange={(next) => setOverrides((prev) => ({ ...prev, [fieldKey]: normalizeOfficeReviewerRoles(next) }))}
+                                />
+                                {isModified && (
+                                  <Badge
+                                    className="bg-amber-100 text-amber-700 border-amber-300 text-xs px-1.5 py-0"
+                                    data-testid={`badge-modified-${fieldKey}`}
+                                  >
+                                    Modified
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : action === 'approve' ? (
                               <div className="flex items-center gap-1.5">
                                 <Input
-                                  value={currentValue}
+                                  value={typeof currentValue === 'string' ? currentValue : ''}
                                   onChange={(e) =>
                                     setOverrides(prev => ({ ...prev, [fieldKey]: e.target.value }))
                                   }
@@ -354,9 +393,9 @@ export default function ApproveRejectModal({
                             ) : (
                               <span
                                 className="inline-block bg-green-50 text-green-800 border border-green-200 rounded px-2 py-0.5 text-xs max-w-full truncate"
-                                title={originalNewValue}
+                                title={proposedDisplayValue}
                               >
-                                {originalNewValue || '—'}
+                                {proposedDisplayValue || '—'}
                               </span>
                             )}
                           </td>

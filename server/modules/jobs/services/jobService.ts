@@ -1,5 +1,6 @@
 import * as repo from '../repositories/jobRepository';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../shared/errors';
+import { officeReviewerRoleRuidsSchema } from '../../../../shared/officeReviewer';
 
 interface UserInfo {
   username: string;
@@ -107,6 +108,7 @@ export async function createJob(body: any) {
   }
   delete createInput.lastCompletedDate;
   delete createInput.lastCompletedOn;
+  delete createInput.level2ReviewerRankId;
   let jobData = jobCreateSchema.parse(createInput);
 
   if (jobData.lastDoneDate) {
@@ -287,6 +289,12 @@ export async function updateJob(id: string, body: any) {
   const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import('@shared/dateUtils');
 
   let updateData = { ...body };
+  delete updateData.level2ReviewerRankId;
+  if (Object.prototype.hasOwnProperty.call(updateData, 'officeReviewerRoleRuids')) {
+    const result = officeReviewerRoleRuidsSchema.safeParse(updateData.officeReviewerRoleRuids);
+    if (!result.success) throw new ValidationError('Office Reviewer must be an array of unique nonempty role IDs');
+    updateData.officeReviewerRoleRuids = result.data.slice().sort();
+  }
   if (!Object.prototype.hasOwnProperty.call(updateData, 'lastDoneDate')) {
     if (Object.prototype.hasOwnProperty.call(updateData, 'lastCompletedDate')) {
       updateData.lastDoneDate = updateData.lastCompletedDate;

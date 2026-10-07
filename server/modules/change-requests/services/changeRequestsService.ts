@@ -395,7 +395,7 @@ export async function approveChangeRequest(id: number, body: {
   comment: string;
   reviewerId?: string;
   role?: string;
-  overriddenChanges?: Array<{ field: string; approverNewValue: string }>;
+  overriddenChanges?: Array<{ field: string; approverNewValue: string | string[] }>;
 }) {
   const { comment, reviewerId, role, overriddenChanges } = body;
 

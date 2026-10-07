@@ -36,6 +36,8 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 import JobSafetyRequirementsEditor from "@/components/pms/JobSafetyRequirementsEditor";
 import { buildJobSafetyUpdate, type JobSafetyDraft } from "@/lib/jobSafetyRequirements";
+import { OfficeReviewerRoleMultiSelect } from "@/components/pms/OfficeReviewerRoleMultiSelect";
+import { normalizeOfficeReviewerRoles, officeReviewerRolesEqual } from "@shared/officeReviewer";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "select" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
   <div className="space-y-2">
@@ -230,7 +232,7 @@ const JobsFormPage: React.FC = () => {
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
-    level2ReviewerRankId: "",
+    officeReviewerRoleRuids: [] as string[],
     jobPriority: "Medium",
     classRelated: "No",
     department: "",
@@ -288,7 +290,7 @@ const JobsFormPage: React.FC = () => {
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           nextDueReading: context.templateData.nextDueRH || '',
           briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || '',
-          level2ReviewerRankId: context.templateData.level2ReviewerRankId || ''
+          officeReviewerRoleRuids: normalizeOfficeReviewerRoles(context.templateData.officeReviewerRoleRuids)
         };
         
         setTemplateData(prev => ({
@@ -310,12 +312,15 @@ const JobsFormPage: React.FC = () => {
 
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
+    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
         changedFields.push(field);
       }
+    }
+    if (!officeReviewerRolesEqual(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)) {
+      changedFields.push('officeReviewerRoleRuids');
     }
     return changedFields;
   };
@@ -464,8 +469,8 @@ const JobsFormPage: React.FC = () => {
       if (templateData.approver !== originalData.approver) {
         updatePayload.approver = templateData.approver;
       }
-      if (templateData.level2ReviewerRankId !== originalData.level2ReviewerRankId) {
-        updatePayload.level2ReviewerRankId = templateData.level2ReviewerRankId || null;
+      if (!officeReviewerRolesEqual(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)) {
+        updatePayload.officeReviewerRoleRuids = normalizeOfficeReviewerRoles(templateData.officeReviewerRoleRuids);
       }
       if (templateData.jobPriority !== originalData.jobPriority) {
         updatePayload.jobPriority = templateData.jobPriority;
@@ -1351,20 +1356,22 @@ const JobsFormPage: React.FC = () => {
                     labelMarker="JF.A1.19"
                     valueMarker="JF.A1.20"
                   />
-                  <EditableField 
-                    label="Level 2 Reviewer (Rank)" 
-                    field="level2ReviewerRankId"
-                    value={templateData.level2ReviewerRankId} 
-                    originalValue={originalData.level2ReviewerRankId}
-                    onChange={handleFieldChange}
-                    isModifyMode={isModifyMode}
-                    isEditMode={isEditMode}
-                    type="select"
-                    options={ensureRankInOptions([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId)}
-                    displayValue={getRankLabel([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId) || templateData.level2ReviewerRankId || '— None —'}
-                    labelMarker="JF.A1.L2R.1"
-                    valueMarker="JF.A1.L2R.2"
-                  />
+                  <div className="space-y-2">
+                    <Label className={`text-sm ${!officeReviewerRolesEqual(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids) && isModifyMode ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid="JF.A1.L2R.1">
+                      <Marker id="JF.A1.L2R.1" />Office Reviewer
+                      {!officeReviewerRolesEqual(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids) && isModifyMode && ' (Modified)'}
+                    </Label>
+                    <OfficeReviewerRoleMultiSelect
+                      id="job-office-reviewer"
+                      value={templateData.officeReviewerRoleRuids}
+                      onChange={(officeReviewerRoleRuids) => setTemplateData((prev) => ({ ...prev, officeReviewerRoleRuids: normalizeOfficeReviewerRoles(officeReviewerRoleRuids) }))}
+                      disabled={!isModifyMode && !isEditMode}
+                    />
+                    <div data-testid="JF.A1.L2R.2" />
+                    {!officeReviewerRolesEqual(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids) && isModifyMode && (
+                      <p className="text-xs text-gray-500">Original selection: {normalizeOfficeReviewerRoles(originalData.officeReviewerRoleRuids).join(", ") || "— None —"}</p>
+                    )}
+                  </div>
                   <EditableField 
                     label="Job Priority" 
                     field="jobPriority"

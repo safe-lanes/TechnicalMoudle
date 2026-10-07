@@ -1,4 +1,12 @@
 import { randomUUID } from 'crypto';
+import {
+  type ApprovalFieldOverride,
+  approvalValuesEqual,
+  normalizeApprovalOverride,
+  normalizeOfficeReviewerRoles,
+  validateOfficeReviewerRoles,
+  isOfficeReviewerField,
+} from '../shared/officeReviewer';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { getDb } from './db';
 import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
@@ -2749,9 +2757,14 @@ export class PostgresStorage {
 
   async createJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
+    const jobData = { ...job };
+    delete jobData.level2ReviewerRankId;
+    jobData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+      db, Object.prototype.hasOwnProperty.call(jobData, 'officeReviewerRoleRuids') ? jobData.officeReviewerRoleRuids : [], [],
+    );
     const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(jobs).values({
-      ...job,
+      ...jobData,
       id,
       juuid: randomUUID(),
       dataScope: job.dataScope || 'vessel',
@@ -2761,8 +2774,20 @@ export class PostgresStorage {
 
   async updateJob(id: string, data: Partial<InsertJob>): Promise<Job> {
     const db = await getDb();
+    const safeData = { ...data };
+    delete safeData.level2ReviewerRankId;
+    if (Object.prototype.hasOwnProperty.call(safeData, 'officeReviewerRoleRuids')) {
+      const existing = (await db.select().from(jobs).where(and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+      )).limit(1))[0];
+      if (!existing) throw new Error(`Job ${id} not found`);
+      safeData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+        db, safeData.officeReviewerRoleRuids, existing.officeReviewerRoleRuids,
+      );
+    }
     const result = await db.update(jobs)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...safeData, updatedAt: new Date() })
       .where(and(
         or(eq(jobs.juuid, id), eq(jobs.id, id)),
         or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
@@ -2772,6 +2797,23 @@ export class PostgresStorage {
       throw new Error(`Job ${id} not found`);
     }
     return result[0];
+  }
+
+  /** Shared by ordinary Job writes and final CR application (using the same tx). */
+  private async validateJobReviewerSelection(db: any, value: unknown, existing: unknown): Promise<string[]> {
+    try {
+      // Retained selections need no catalog lookup; this also tolerates catalog lag.
+      const retained = new Set(normalizeOfficeReviewerRoles(existing));
+      const additions = Array.isArray(value) ? value.filter(id => !retained.has(id)) : [];
+      const active = additions.length ? await db.select({ ruid: admnRoleMaster.ruid })
+        .from(admnRoleMaster).where(and(
+          eq(admnRoleMaster.isActive, true),
+          or(eq(admnRoleMaster.isDeleted, false), isNull(admnRoleMaster.isDeleted)),
+        )) : [];
+      return validateOfficeReviewerRoles(value, existing, active.map((role: { ruid: string }) => role.ruid));
+    } catch (error) {
+      throw new ValidationError(error instanceof Error ? error.message : 'Invalid Office Reviewer selection');
+    }
   }
 
   /** Atomic cycle-and-estimate write; retry against a fresh Job on a failed CAS. */
@@ -5972,6 +6014,7 @@ export class PostgresStorage {
 
   async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
     const db = await getDb();
+    await this.validateReviewerChangeRequest(db, request);
     const result = await db.insert(changeRequest).values({
       ...request,
       targetType: request.targetType || null,
@@ -5992,6 +6035,13 @@ export class PostgresStorage {
     const db = await getDb();
     // Fetch existing for sync field logging
     const existingCR = await this.getChangeRequest(id);
+    if (existingCR && (
+      Object.prototype.hasOwnProperty.call(data, 'proposedChangesJson') ||
+      Object.prototype.hasOwnProperty.call(data, 'targetType') ||
+      Object.prototype.hasOwnProperty.call(data, 'targetId')
+    )) {
+      await this.validateReviewerChangeRequest(db, { ...existingCR, ...data });
+    }
     const result = await db.update(changeRequest)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(changeRequest.id, id))
@@ -6004,6 +6054,28 @@ export class PostgresStorage {
       try { await logFieldChanges('change_request', existingCR.cruuid, (existingCR as any).vesselId || null, existingCR, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CR update:', e); }
     }
     return result[0];
+  }
+
+  private async validateReviewerChangeRequest(
+    db: any,
+    request: { targetType?: string | null; targetId?: string | null; proposedChangesJson?: unknown },
+  ): Promise<void> {
+    if (!Array.isArray(request.proposedChangesJson)) return;
+    const changes = request.proposedChangesJson.filter(change =>
+      typeof change?.field === 'string' && isOfficeReviewerField(change.field),
+    );
+    if (!changes.length) return;
+    if (request.targetType !== 'job' || !request.targetId) {
+      throw new ValidationError('Office Reviewer configuration must target a Job');
+    }
+    const job = (await db.select().from(jobs).where(and(
+      or(eq(jobs.juuid, request.targetId), eq(jobs.id, request.targetId)),
+      or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+    )).limit(1))[0];
+    if (!job) throw new ValidationError('Office Reviewer target Job not found');
+    for (const change of changes) {
+      await this.validateJobReviewerSelection(db, change.newValue, job.officeReviewerRoleRuids);
+    }
   }
 
   async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
@@ -6133,7 +6205,7 @@ export class PostgresStorage {
 
   // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
 
-  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string, overriddenChanges?: ApprovalFieldOverride[]): Promise<ChangeRequest> {
     return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, new Date(), overriddenChanges);
   }
 
@@ -6147,7 +6219,7 @@ export class PostgresStorage {
     reviewerId: string,
     comment: string,
     now: Date,
-    overriddenChanges?: Array<{ field: string; approverNewValue: string }>
+    overriddenChanges?: ApprovalFieldOverride[]
   ): Promise<ChangeRequest> {
     const db = await getDb();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
@@ -6200,11 +6272,11 @@ export class PostgresStorage {
 
         // Map from field -> { approverNewValue, modifiedBy, modifiedAt }
         // Earlier levels go in first so that higher levels can override them.
-        const accumulatedOverrideMap = new Map<string, { approverNewValue: string; modifiedBy: string; modifiedAt: string }>();
+        const accumulatedOverrideMap = new Map<string, { approverNewValue: string | string[]; modifiedBy: string; modifiedAt: string }>();
         for (const partial of partialApprovals) {
           for (const ov of (partial.overriddenFields || [])) {
             accumulatedOverrideMap.set(String(ov.field), {
-              approverNewValue: String(ov.approverNewValue ?? ''),
+              approverNewValue: normalizeApprovalOverride(String(ov.field), ov.approverNewValue),
               modifiedBy: String(ov.modifiedBy ?? partial.approvedBy ?? ''),
               modifiedAt: String(ov.modifiedAt ?? partial.approvedAt ?? now.toISOString())
             });
@@ -6213,7 +6285,7 @@ export class PostgresStorage {
         // Final approver's overrides take precedence over all previous levels
         for (const ov of (overriddenChanges || [])) {
           accumulatedOverrideMap.set(ov.field, {
-            approverNewValue: ov.approverNewValue,
+            approverNewValue: normalizeApprovalOverride(ov.field, ov.approverNewValue),
             modifiedBy: reviewerId,
             modifiedAt: now.toISOString()
           });
@@ -6239,7 +6311,7 @@ export class PostgresStorage {
         const overriddenFields: Array<{
           field: string;
           originalNewValue: any;
-          approverNewValue: string;
+          approverNewValue: string | string[];
           modifiedBy: string;
           modifiedAt: string;
         }> = [];
@@ -6248,7 +6320,7 @@ export class PostgresStorage {
             (c: any) => (c.field ?? c.columnName) === field
           );
           const originalNewValue = original?.newValue ?? null;
-          if (String(originalNewValue ?? '') !== overrideData.approverNewValue) {
+          if (!approvalValuesEqual(field, originalNewValue, overrideData.approverNewValue)) {
             overriddenFields.push({
               field,
               originalNewValue,
@@ -6269,7 +6341,7 @@ export class PostgresStorage {
           appliedFieldCount?: number;
           appliedError?: string;
           comments?: string;
-          overriddenFields?: Array<{ field: string; originalNewValue: any; approverNewValue: string; modifiedBy: string; modifiedAt: string }>;
+          overriddenFields?: Array<{ field: string; originalNewValue: any; approverNewValue: string | string[]; modifiedBy: string; modifiedAt: string }>;
         } = {
           revisionNumber: newRevisionNumber,
           approvedBy: reviewerId,
@@ -6311,9 +6383,36 @@ export class PostgresStorage {
     }
   }
 
-  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: ApprovalFieldOverride[]): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
+    if (overriddenChanges) {
+      if (!Array.isArray(overriddenChanges)) throw new ValidationError('Invalid approval overrides');
+      try {
+        overriddenChanges = overriddenChanges.map(override => {
+          if (!override || typeof override.field !== 'string') throw new Error('Invalid approval override field');
+          return {
+            field: override.field,
+            approverNewValue: normalizeApprovalOverride(override.field, override.approverNewValue),
+          };
+        });
+      } catch (error) {
+        throw new ValidationError(error instanceof Error ? error.message : 'Invalid approval overrides');
+      }
+      const reviewerOverrides = overriddenChanges.filter(override => isOfficeReviewerField(override.field));
+      if (reviewerOverrides.length) {
+        const proposed = Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson as any[] : [];
+        for (const override of reviewerOverrides) {
+          if (!proposed.some(change => change.field === override.field)) {
+            throw new ValidationError('Office Reviewer override must match a proposed field');
+          }
+        }
+        await this.validateReviewerChangeRequest(await getDb(), {
+          ...existing,
+          proposedChangesJson: reviewerOverrides.map(override => ({ field: override.field, newValue: override.approverNewValue })),
+        });
+      }
+    }
 
     // Load approval steps for this CR
     const steps = await this.getChangeRequestApprovalSteps(id);
@@ -6605,6 +6704,12 @@ export class PostgresStorage {
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
+    delete safeUpdateData.level2ReviewerRankId;
+    if (Object.prototype.hasOwnProperty.call(safeUpdateData, 'officeReviewerRoleRuids')) {
+      safeUpdateData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+        tx, safeUpdateData.officeReviewerRoleRuids, beforeState.officeReviewerRoleRuids,
+      );
+    }
 
     // Legacy field translations for jobs - UI uses different field names than schema
     // woTitle -> jobTitle (UI uses woTitle for display, schema uses jobTitle)

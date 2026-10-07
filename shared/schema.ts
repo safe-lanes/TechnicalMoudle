@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { updatedAtColumn, updatedAtColumnTz } from "./schemaHelpers";
+import { officeReviewerRoleRuidsSchema } from "./officeReviewer";
 
 // User roles enum - Ship (vessel-based user), Office (shore-based user), PMS Admin (full system access)
 export const userRoleEnum = pgEnum("user_role", ["Ship", "Office", "PMS Admin", "Sail Admin"]);
@@ -1209,6 +1210,7 @@ export const jobs = pgTable("jobs", {
   jobDescription: text("job_description"), // Detailed job description
   approver: text("approver"), // Rank who approves the job
   level2ReviewerRankId: text("level2_reviewer_rank_id"), // Optional second-stage reviewer rank (Level 2 Office Review)
+  officeReviewerRoleRuids: jsonb("office_reviewer_role_ruids").$type<string[]>().default([]),
   department: text("department"),
   
   // Template data (Part A)
@@ -1242,7 +1244,9 @@ export const jobs = pgTable("jobs", {
   nextDueDateIdx: index("idx_job_next_due").on(table.nextDueDate),
 }));
 
-export const insertJobSchema = createInsertSchema(jobs).omit({
+export const insertJobSchema = createInsertSchema(jobs).extend({
+  officeReviewerRoleRuids: officeReviewerRoleRuidsSchema.optional().default([]),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

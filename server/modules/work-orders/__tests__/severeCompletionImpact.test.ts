@@ -195,13 +195,22 @@ describe('severe review: actual completion services with isolated persistence', 
   });
 
   it('Level 2 bulk transition does not run finalization or backfill', async () => {
-    job.level2ReviewerRankId = 'reviewer-rank';
+    job.officeReviewerRoleRuids = ['reviewer-role'];
     const result = await bulkApprove([wo.id], 'Chief Engineer', 'Reviewed',
       'Maintenance was delayed because the equipment was unavailable during shutdown.');
     expect(result.results.failed).toEqual([]);
     expect(wo.status).toBe('Pending Office Review');
     expect(repo.createMaintenanceHistory).not.toHaveBeenCalled();
     expect(repo.performInventoryTransaction).not.toHaveBeenCalled();
+  });
+
+  it('legacy Office with an empty new selection follows normal bulk approval', async () => {
+    job.level2ReviewerRankId = 'Office';
+    job.officeReviewerRoleRuids = [];
+    const result = await bulkApprove([wo.id], 'Chief Engineer', 'Reviewed',
+      'Maintenance was delayed because the equipment was unavailable during shutdown.');
+    expect(result.results.failed).toEqual([]);
+    expect(wo.status).toBe('Completed');
   });
 });
 

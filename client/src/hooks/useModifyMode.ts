@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
+import { officeReviewerRolesEqual } from "@shared/officeReviewer";
 
 interface FieldChange {
   fieldName: string;
@@ -80,10 +81,14 @@ export function useModifyMode() {
   // Track field changes
   const trackFieldChange = useCallback((fieldName: string, newValue: any, oldValue?: any) => {
     setState(prev => {
-      const originalValue = oldValue !== undefined ? oldValue : prev.originalSnapshot[fieldName];
+      const originalValue = fieldName === 'officeReviewerRoleRuids'
+        ? (prev.fieldChanges[fieldName]?.originalValue ?? prev.originalSnapshot[fieldName] ?? oldValue ?? [])
+        : (oldValue !== undefined ? oldValue : prev.originalSnapshot[fieldName]);
       
       // If the new value equals the original value, remove the change
-      if (newValue === originalValue) {
+      if (fieldName === 'officeReviewerRoleRuids'
+        ? officeReviewerRolesEqual(newValue, originalValue)
+        : newValue === originalValue) {
         const { [fieldName]: removed, ...remainingChanges } = prev.fieldChanges;
         return {
           ...prev,

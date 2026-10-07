@@ -2194,7 +2194,6 @@ export async function performImport(
         // Approver is validated against the Rank Master (admAvailableRanks); persist the
         // file's Approver value (no longer copied from Assigned To).
         approver: row['Approver'] || null,
-        level2ReviewerRankId: row['Reviewer Rank'] ? String(row['Reviewer Rank']).trim() || null : null,
         jobPriority: row['Job Priority'] || null,
         lastDoneDate: lastDoneDate,         // Store Last Done date (for Calendar jobs)
         nextDueDate: nextDueDate,           // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar jobs)

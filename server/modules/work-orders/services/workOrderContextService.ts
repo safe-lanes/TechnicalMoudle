@@ -311,7 +311,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     intervalRunningHour: job.intervalRunningHour?.toString() || '',
     assignedTo: job.assignedTo || workOrder.assignedTo,
     approver: job.approver,
-    level2ReviewerRankId: (job as any).level2ReviewerRankId || null,
+    officeReviewerRoleRuids: job.officeReviewerRoleRuids ?? [],
     department: job.department,
     jobPriority: job.jobPriority,
     classRelated: job.classRelated,
