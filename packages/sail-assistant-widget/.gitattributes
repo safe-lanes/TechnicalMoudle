@@ -1,0 +1,2 @@
+# Built bundles are byte-exact (Subresource Integrity hashes): never convert line endings.
+dist/** -text

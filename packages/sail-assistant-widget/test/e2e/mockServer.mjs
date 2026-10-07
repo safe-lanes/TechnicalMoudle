@@ -35,8 +35,30 @@ function resetState() {
 }
 
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
-function mintMock(identity, ttl = 60) {
+// LIVE PILOT MODE (only when LIVE_SIGNING_KEY_FILE is set): the token endpoints sign REAL identity tokens with a
+// PILOT-ONLY instance key read from that env file (ASSISTANT_IDENTITY_SIGNING_KEY=…, never logged), issuer LIVE_ISSUER,
+// so a real central assistant pilot accepts them. The identity itself is still MOCK (no module login happened).
+const LIVE = (() => {
+  const f = process.env.LIVE_SIGNING_KEY_FILE;
+  if (!f) return null;
+  const line = readFileSync(f, 'utf8').split(/\r?\n/).find((l) => l.startsWith('ASSISTANT_IDENTITY_SIGNING_KEY='));
+  const key = line ? line.slice(line.indexOf('=') + 1).split(' #')[0].trim().replace(/^"|"$/g, '') : '';
+  if (!key) throw new Error('LIVE_SIGNING_KEY_FILE has no ASSISTANT_IDENTITY_SIGNING_KEY');
+  return { key, iss: process.env.LIVE_ISSUER || 'technical-pilotlocal' };
+})();
+let badNextMints = 0;
+async function hmac(body, key) {
+  const { createHmac } = await import('node:crypto');
+  return createHmac('sha256', key).update(body).digest('base64url');
+}
+async function mintMock(identity, ttl = 60) {
   const now = Math.floor(Date.now() / 1000);
+  if (LIVE) {
+    const { iss: _ignored, ...rest } = identity;
+    const body = b64url({ ...rest, iss: LIVE.iss, iat: now, exp: now + ttl });
+    if (badNextMints > 0) { badNextMints--; return `${body}.${await hmac(body, 'deliberately-wrong-key')}`; }
+    return `${body}.${await hmac(body, LIVE.key)}`;
+  }
   return `${b64url({ ...identity, mock: true, iat: now, exp: now + ttl })}.MOCK-UNSIGNED`;
 }
 function readMock(token) {
@@ -54,6 +76,11 @@ const readBody = (req) => new Promise((r) => { let d = ''; req.on('data', (c) =>
 // ── MOCK host: static + MOCK token endpoints ──
 createServer(async (req, res) => {
   const url = new URL(req.url, HOST_ORIGIN);
+  if (url.pathname === '/__host-control' && req.method === 'POST') { // LIVE mode test hook: next N mints are badly signed
+    const b = JSON.parse((await readBody(req)) || '{}');
+    if (typeof b.badNextMints === 'number') badNextMints = b.badNextMints;
+    return send(res, 200, { live: !!LIVE, badNextMints, mints: state.tokenMints.length });
+  }
   // MOCK stand-ins for each module's authenticated token endpoint. The demo "login" is a mock session value the example
   // host keeps; a real endpoint verifies the module's own JWT/session on the server and reads role/tenant from it.
   const m = url.pathname.match(/^\/mock-token\/(crewing|audit|safety|incident|plain)$/);
@@ -63,7 +90,8 @@ createServer(async (req, res) => {
     if (!session) return send(res, 401, { error: 'not signed in (MOCK)' });
     const [userId, tenant, role] = session.split('|');
     if (role === 'NoAssistant') return send(res, 403, { error: 'role not allowed (MOCK)' });
-    const token = mintMock({ iss: `${m[1]}-mock`, userId, userName: `Mock ${userId}`, role, tenantDomain: tenant });
+    const token = await mintMock({ iss: `${m[1]}-mock`, userId, userName: `Mock ${userId}`, role,
+      tenantDomain: LIVE ? `widget-test-${tenant}` : tenant });
     state.tokenMints.push({ module: m[1], userId, tenant });
     return send(res, 200, { token });
   }
@@ -80,7 +108,8 @@ createServer(async (req, res) => {
   }
   if (url.pathname === '/') { res.writeHead(302, { location: '/plain/' }); return res.end(); }
   send(res, 404, { error: 'not found' });
-}).listen(HOST_PORT, () => console.log(`[mock] hosts + widget ${version} + MOCK token endpoints on ${HOST_ORIGIN}`));
+}).listen(HOST_PORT, () => console.log(`[mock] hosts + widget ${version} + MOCK token endpoints on ${HOST_ORIGIN}`
+  + (LIVE ? ` — LIVE PILOT MODE: tokens signed for issuer ${LIVE.iss} (identity is still MOCK)` : '')));
 
 // ── MOCK assistant (other origin) ──
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS',
