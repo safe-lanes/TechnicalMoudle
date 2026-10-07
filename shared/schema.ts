@@ -1,10 +1,10 @@
+import { officeReviewerRoleRuidsSchema } from "./officeReviewer";
 
 import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { updatedAtColumn, updatedAtColumnTz } from "./schemaHelpers";
-import { officeReviewerRoleRuidsSchema } from "./officeReviewer";
 
 // User roles enum - Ship (vessel-based user), Office (shore-based user), PMS Admin (full system access)
 export const userRoleEnum = pgEnum("user_role", ["Ship", "Office", "PMS Admin", "Sail Admin"]);
@@ -1209,7 +1209,7 @@ export const jobs = pgTable("jobs", {
   briefWorkDescription: text("brief_work_description"),
   jobDescription: text("job_description"), // Detailed job description
   approver: text("approver"), // Rank who approves the job
-  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Optional second-stage reviewer rank (Level 2 Office Review)
+  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Retired legacy column; never use as reviewer configuration or fallback
   officeReviewerRoleRuids: jsonb("office_reviewer_role_ruids").$type<string[]>().default([]),
   department: text("department"),
   
@@ -1244,7 +1244,7 @@ export const jobs = pgTable("jobs", {
   nextDueDateIdx: index("idx_job_next_due").on(table.nextDueDate),
 }));
 
-export const insertJobSchema = createInsertSchema(jobs).extend({
+export const insertJobSchema = createInsertSchema(jobs, {
   officeReviewerRoleRuids: officeReviewerRoleRuidsSchema.optional().default([]),
 }).omit({
   id: true,

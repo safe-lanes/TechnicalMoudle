@@ -51,7 +51,8 @@ describe('PATCH Work Order B2 snapshot validation', () => {
     repo.findJob.mockResolvedValue({
       juuid: 'job-1',
       jobNo: 'JOB-1',
-      level2ReviewerRankId: null,
+      level2ReviewerRankId: 'Office',
+      officeReviewerRoleRuids: [],
       lastDoneRH: 6000,
       nextDueRH: 6500,
       intervalRunningHour: 500,
@@ -203,6 +204,29 @@ describe('PATCH Work Order B2 snapshot validation', () => {
       expect.objectContaining({ nextDueRH: expect.anything() }),
     );
   });
+
+  it.each([null, [], ['role-A'], ['role-A', 'role-B']].map(selection => ({ selection })))(
+    'single approval uses only new reviewer array $selection', async ({ selection }) => {
+      const pending = {
+        id: 'wo-1', wouuid: 'wo-uuid', workOrderNo: 'JOB-1-2026-1',
+        status: 'Pending Approval', maintenanceBasis: 'Calendar',
+        component: 'component-1', componentCode: '651.001', vesselId: 'vessel-1',
+        jobId: 'job-1', dateCompleted: '2026-07-16T12:00:00.000Z',
+        approvalTier: 'standard', missedCycles: 0, consumedSpareParts: [],
+      };
+      repo.findById.mockResolvedValue(pending);
+      repo.findJob.mockResolvedValue({
+        juuid: 'job-1', jobNo: 'JOB-1', level2ReviewerRankId: 'Office',
+        officeReviewerRoleRuids: selection, maintenanceBasis: 'Calendar',
+      });
+      repo.update.mockImplementation(async (_id, updates) => ({ ...pending, ...updates }));
+      const { updateWorkOrder } = await import('../services/workOrderService');
+      const result = await updateWorkOrder('wo-1', {
+        status: 'Completed', approvalAction: 'approved', userId: 'Chief Engineer',
+      });
+      expect(result.workOrder.status).toBe(selection?.length ? 'Pending Office Review' : 'Completed');
+    }
+  );
 
   it('rejects a Pending Approval work order without replacing the submitted performer', async () => {
     const pendingWO = {

@@ -1,6 +1,7 @@
+import { validateReviewerSelection } from './officeReviewerValidation';
+import { officeReviewerRoleRuidsSchema } from '@shared/officeReviewer';
 import * as repo from '../repositories/jobRepository';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../shared/errors';
-import { officeReviewerRoleRuidsSchema } from '../../../../shared/officeReviewer';
 
 interface UserInfo {
   username: string;
@@ -99,6 +100,10 @@ export async function createJob(body: any) {
 
   const jobCreateSchema = insertJobSchema.extend({ juuid: z.string().optional() });
   const createInput = { ...body };
+  delete createInput.level2ReviewerRankId;
+  createInput.officeReviewerRoleRuids = await validateReviewerSelection(
+    Object.prototype.hasOwnProperty.call(createInput, 'officeReviewerRoleRuids') ? createInput.officeReviewerRoleRuids : []
+  );
   if (!Object.prototype.hasOwnProperty.call(createInput, 'lastDoneDate')) {
     if (Object.prototype.hasOwnProperty.call(createInput, 'lastCompletedDate')) {
       createInput.lastDoneDate = createInput.lastCompletedDate;
@@ -108,7 +113,6 @@ export async function createJob(body: any) {
   }
   delete createInput.lastCompletedDate;
   delete createInput.lastCompletedOn;
-  delete createInput.level2ReviewerRankId;
   let jobData = jobCreateSchema.parse(createInput);
 
   if (jobData.lastDoneDate) {
@@ -336,6 +340,12 @@ export async function updateJob(id: string, body: any) {
   const existingJob = await repo.findById(id);
   if (!existingJob) {
     throw new NotFoundError('Job not found');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updateData, 'officeReviewerRoleRuids')) {
+    updateData.officeReviewerRoleRuids = await validateReviewerSelection(
+      updateData.officeReviewerRoleRuids, existingJob.officeReviewerRoleRuids
+    );
   }
 
   // Validate jobNo if it is being changed: blank values are not allowed

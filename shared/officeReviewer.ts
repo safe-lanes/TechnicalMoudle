@@ -12,6 +12,15 @@ export function normalizeOfficeReviewerRoles(value: unknown): string[] {
     : [];
 }
 
+/** Strict reader for the new typed column; only SQL NULL/absence means no selection. */
+export function normalizeOfficeReviewerRoleRuids(value: unknown): string[] {
+  return value == null ? [] : officeReviewerRoleRuidsSchema.parse(value).slice().sort();
+}
+
+export function sameOfficeReviewerRoles(a: unknown, b: unknown): boolean {
+  return JSON.stringify(normalizeOfficeReviewerRoleRuids(a)) === JSON.stringify(normalizeOfficeReviewerRoleRuids(b));
+}
+
 export function officeReviewerRolesEqual(a: unknown, b: unknown): boolean {
   const left = normalizeOfficeReviewerRoles(a);
   const right = normalizeOfficeReviewerRoles(b);
@@ -26,11 +35,15 @@ export function requiresOfficeReview(value: unknown): boolean {
 export function validateOfficeReviewerRoles(
   value: unknown,
   existing: unknown,
-  activeRuids: Iterable<string>,
+  activeRoles: Iterable<string | { ruid: string; isActive: boolean | null; isDeleted?: boolean | null }>,
 ): string[] {
   const ids = officeReviewerRoleRuidsSchema.parse(value);
   const retained = new Set(normalizeOfficeReviewerRoles(existing));
-  const active = new Set(activeRuids);
+  const active = new Set<string>();
+  for (const role of Array.from(activeRoles)) {
+    if (typeof role === 'string') active.add(role);
+    else if (role.isActive && !role.isDeleted) active.add(role.ruid);
+  }
   for (const id of ids) {
     if (!retained.has(id) && !active.has(id)) {
       throw new Error(`Office Reviewer role "${id}" is not active or does not exist`);

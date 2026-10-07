@@ -2640,8 +2640,6 @@ export async function performImport(
       
       const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
       
-      const reviewerRankRaw = row['Reviewer Rank'] || null;
-      const level2ReviewerRankId = reviewerRankRaw ? String(reviewerRankRaw).trim() || null : null;
 
       const fleetJobData = {
         jobCode,
@@ -2655,7 +2653,6 @@ export async function performImport(
         taskType,
         assignedTo,
         approver,
-        level2ReviewerRankId,
         jobPriority,
         classRelated,
         briefWorkDescription,

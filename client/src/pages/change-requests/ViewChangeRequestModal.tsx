@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { ChangeRequest } from "@shared/schema";
+import { normalizeOfficeReviewerRoleRuids, officeReviewerRoleLabel, sameOfficeReviewerRoles, useOfficeReviewerRoles } from "@/components/OfficeReviewerRoleSelect";
 
 interface ViewChangeRequestModalProps {
   open: boolean;
@@ -71,6 +72,9 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
     },
     enabled: open && !!requestId
   });
+
+  const rolesQuery = useOfficeReviewerRoles();
+  const roles = rolesQuery.data ?? [];
 
   // Fetch current database values for the target entity
   const { data: targetEntityData } = useQuery({
@@ -147,8 +151,8 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
       changeRequest.proposedChangesJson) : [];
 
   // Helper to get current database value for a field
-  const getCurrentValue = (fieldName: string): string => {
-    if (!targetEntityData?.entity) return '-';
+  const getCurrentValue = (fieldName: string): unknown => {
+    if (!targetEntityData?.entity) return undefined;
     
     // Handle legacy nested paths like "componentInfo.serialNo" -> "serialNo"
     let normalizedField = fieldName;
@@ -170,9 +174,12 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
     const actualField = mappings[normalizedField] || normalizedField;
     
     const value = targetEntityData.entity[actualField];
-    if (value === null || value === undefined) return '-';
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    return String(value);
+    return value;
+  };
+
+  const formatReviewerRoles = (value: unknown): string => {
+    const ruids = normalizeOfficeReviewerRoleRuids(value);
+    return ruids.length ? ruids.map((ruid) => officeReviewerRoleLabel(ruid, roles)).join(", ") : "— None —";
   };
 
   return (
@@ -315,8 +322,21 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
                   <CardContent>
                     <div className="space-y-3">
                       {proposedChanges.map((change: any, index: number) => {
-                        const currentDbValue = getCurrentValue(change.field);
-                        const originalValue = change.oldValue || '-';
+                        const isOfficeReviewerField = change.field === "officeReviewerRoleRuids";
+                        const currentRawValue = getCurrentValue(change.field);
+                        const currentDbValue = isOfficeReviewerField
+                          ? (currentRawValue === undefined ? "—" : formatReviewerRoles(currentRawValue))
+                          : currentRawValue === null || currentRawValue === undefined
+                            ? "-"
+                            : typeof currentRawValue === "boolean"
+                              ? (currentRawValue ? "Yes" : "No")
+                              : String(currentRawValue);
+                        const originalValue = isOfficeReviewerField
+                          ? formatReviewerRoles(change.oldValue)
+                          : String(change.oldValue ?? '-');
+                        const proposedValue = isOfficeReviewerField
+                          ? formatReviewerRoles(change.newValue)
+                          : String(change.newValue ?? '-');
                         
                         // Normalize for comparison (handle boolean variants and type differences)
                         const normalizeForCompare = (val: string): string => {
@@ -328,7 +348,9 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
                         
                         const currentNormalized = normalizeForCompare(currentDbValue);
                         const originalNormalized = normalizeForCompare(originalValue);
-                        const hasChanged = currentDbValue !== '-' && currentNormalized !== originalNormalized;
+                        const hasChanged = isOfficeReviewerField
+                          ? currentRawValue !== undefined && !sameOfficeReviewerRoles(currentRawValue, change.oldValue)
+                          : currentDbValue !== '-' && currentNormalized !== originalNormalized;
                         
                         return (
                         <div key={index} className="border rounded-lg p-3 bg-gray-50" data-testid={`change-item-${index}`}>
@@ -336,7 +358,7 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
                             <div className="col-span-3 grid grid-cols-2 gap-4">
                               <div>
                                 <Label className="text-xs text-gray-600">Field</Label>
-                                <p className="font-medium">{change.field}</p>
+                                <p className="font-medium">{isOfficeReviewerField ? "Office Reviewer" : change.field}</p>
                               </div>
                               <div>
                                 <Label className="text-xs text-gray-600">Justification</Label>
@@ -364,7 +386,7 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
                             </div>
                             <div>
                               <Label className="text-xs text-gray-600">Proposed Value</Label>
-                              <p className="text-green-600 font-medium" data-testid={`proposed-value-${index}`}>{change.newValue}</p>
+                              <p className="text-green-600 font-medium" data-testid={`proposed-value-${index}`}>{proposedValue}</p>
                             </div>
                           </div>
                         </div>

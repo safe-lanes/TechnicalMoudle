@@ -141,7 +141,7 @@ describe('severe review: actual completion services with isolated persistence', 
     expect(history.find(row => row.status === 'Approved')).toMatchObject({
       componentId: component.cuuid, jobId: job.juuid, jobCode: 'JOB-1', workOrderId: wo.wouuid,
     });
-    const skipped = history.filter(row => row.isSkipped);
+      const skipped = history.filter(row => row.isSkipped);
     expect(skipped.length).toBeGreaterThan(0);
     expect(skipped.every(row => row.jobCode === undefined)).toBe(true);
     expect(skipped.every(row => row.workOrderNo === 'SKIPPED-job-canonical')).toBe(true);

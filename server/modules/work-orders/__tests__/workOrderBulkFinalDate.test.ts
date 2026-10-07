@@ -54,7 +54,7 @@ const baseWorkOrder = {
 describe('final approval date projection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    repo.findJob.mockResolvedValue({ juuid: 'job-1', level2ReviewerRankId: null });
+    repo.findJob.mockResolvedValue({ juuid: 'job-1', level2ReviewerRankId: 'Office', officeReviewerRoleRuids: [] });
     repo.update.mockImplementation(async (_id, updates) => ({ ...baseWorkOrder, ...updates }));
     repo.createAuditLog.mockResolvedValue(undefined);
     finalizeWorkOrderCompletion.mockResolvedValue(undefined);
@@ -73,6 +73,20 @@ describe('final approval date projection', () => {
     );
     expect(finalizeWorkOrderCompletion).toHaveBeenCalledWith('wo-1');
   });
+
+  it.each([null, [], ['role-A'], ['role-A', 'role-B']].map(selection => ({ selection })))(
+    'bulk approval uses new array $selection only, never legacy Office', async ({ selection }) => {
+      repo.findJob.mockResolvedValue({ juuid: 'job-1', level2ReviewerRankId: 'Office', officeReviewerRoleRuids: selection });
+      repo.findById.mockResolvedValueOnce({ ...baseWorkOrder, status: 'Pending Approval' });
+      const { bulkApprove } = await import('../services/workOrderBulkService');
+      const result = await bulkApprove(['wo-1'], 'Chief Engineer');
+      expect(result.results.failed).toEqual([]);
+      expect(repo.update).toHaveBeenCalledWith('wo-1', expect.objectContaining({
+        status: selection?.length ? 'Pending Office Review' : 'Completed',
+      }));
+      expect(finalizeWorkOrderCompletion.mock.calls.length).toBe(selection?.length ? 0 : 1);
+    }
+  );
 
   it('reviewer approval preserves dateCompleted before running Job completion projection', async () => {
     repo.findById.mockResolvedValueOnce({ ...baseWorkOrder, status: 'Pending Office Review' });

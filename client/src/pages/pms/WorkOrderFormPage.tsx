@@ -81,8 +81,7 @@ import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection";
 import { WorkOrderDateInput } from "@/components/pms/WorkOrderDateInput";
 import { getLowerRunningHoursWarning, RunningHoursUpdateError } from "./runningHoursErrorFeedback";
-import { OfficeReviewerRoleMultiSelect, formatOfficeReviewerRoles } from "@/components/pms/OfficeReviewerRoleMultiSelect";
-import { normalizeOfficeReviewerRoles, officeReviewerRolesEqual } from "@shared/officeReviewer";
+import { OfficeReviewerRoleSelect, normalizeOfficeReviewerRoleRuids, sameOfficeReviewerRoles } from "@/components/OfficeReviewerRoleSelect";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -233,17 +232,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     queryKey: [`/technical/api/work-orders/${workOrderId}/context`],
     enabled: !!workOrderId && resolvedMode !== 'template'
   });
-  const { data: officeReviewerRoles } = useQuery<Array<{ ruid: string; assignedRole: string; roletype: string; sortOrder: number | null }>>({
-    queryKey: ['/technical/api/admin/roles'],
-  });
 
   // Combine contexts: use job context for template mode, work order context otherwise
   const workOrderContext = resolvedMode === 'template' ? jobContext : woContext;
   const isContextLoading = resolvedMode === 'template' ? isJobContextLoading : isWoContextLoading;
 
-  const reviewerRolesForContext = normalizeOfficeReviewerRoles((workOrderContext as any)?.job?.officeReviewerRoleRuids);
+  const reviewerStatus = (workOrderContext as any)?.workOrder?.status;
   const hasReviewerTab = resolvedMode !== 'template' && (
-    reviewerRolesForContext.length > 0 || (workOrderContext as any)?.workOrder?.status === 'Pending Office Review'
+    normalizeOfficeReviewerRoleRuids((workOrderContext as any)?.job?.officeReviewerRoleRuids).length > 0 ||
+    reviewerStatus === 'Pending Office Review'
   );
   const navStepsWithReviewer = hasReviewerTab
     ? [...navSteps, { id: 'part-c', label: 'C', title: 'Reviewer' }]
@@ -1153,8 +1150,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const useRhWorkOrderSnapshot =
           useWorkOrderSnapshot
           && context.templateData.maintenanceBasis === 'Running Hours';
+        const templateDataFromContext = Object.fromEntries(
+          Object.entries(context.templateData).filter(([key]) => key !== "level2ReviewerRankId"),
+        );
         const normalizedTemplateData = {
-          ...context.templateData,
+          ...templateDataFromContext,
+          maintenanceBasis: context.templateData.maintenanceBasis,
           // Map backend field names to frontend field names
           woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
           woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
@@ -1178,10 +1179,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           criticality: context.templateData.criticality || '',
           isActive: context.templateData.isActive || 'Yes',
           briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || '',
-          officeReviewerRoleRuids: normalizeOfficeReviewerRoles(
+          officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(
             Object.prototype.hasOwnProperty.call(context.job || {}, 'officeReviewerRoleRuids')
               ? context.job.officeReviewerRoleRuids
-              : context.templateData.officeReviewerRoleRuids
+              : context.templateData.officeReviewerRoleRuids,
           ),
           nextDueDate: context.templateData.nextDueDate || '',
           requiredSpareParts: context.templateData.requiredSpareParts || [],
@@ -1429,12 +1430,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     });
   };
 
-  const handleReviewerChange = (value: string[]) => {
+  const handleOfficeReviewerChange = (ruids: string[]) => {
     hasUserTouchedForm.current = true;
     setTemplateData(prev => {
-      const normalized = normalizeOfficeReviewerRoles(value);
-      if (isModifyMode && trackFieldChange && !officeReviewerRolesEqual(normalized, prev.officeReviewerRoleRuids)) {
-        trackFieldChange('officeReviewerRoleRuids', normalized, prev.officeReviewerRoleRuids);
+      const normalized = normalizeOfficeReviewerRoleRuids(ruids);
+      if (isModifyMode && trackFieldChange) {
+        if (!sameOfficeReviewerRoles(normalized, prev.officeReviewerRoleRuids)) {
+          trackFieldChange('officeReviewerRoleRuids', normalized, prev.officeReviewerRoleRuids);
+        }
       }
       return { ...prev, officeReviewerRoleRuids: normalized };
     });
@@ -3280,7 +3283,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           : templateData.maintenanceBasis === 'Running Hours'
             ? parseInt(normalizedFrequency, 10)
             : undefined,
-        officeReviewerRoleRuids: normalizeOfficeReviewerRoles(templateData.officeReviewerRoleRuids),
+        officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids),
         lastDoneRH: (templateData as any).lastDoneRH ? String((templateData as any).lastDoneRH).trim() : null,
         lastDoneDate: mapLastCompletedOnToLastDoneDate((templateData as any).lastCompletedOn),
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
@@ -4766,15 +4769,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 {!isUnplannedCreate && (
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.L2R">Office Reviewer</Label>
-                  <OfficeReviewerRoleMultiSelect
-                    id="work-order-office-reviewer"
+                <OfficeReviewerRoleSelect
+                    label="Office Reviewer"
                     value={templateData.officeReviewerRoleRuids}
-                    onChange={handleReviewerChange}
+                    onChange={handleOfficeReviewerChange}
                     disabled={isPartAReadOnly}
-                  />
-                </div>
+                    labelMarker="WOF.A1.L2R"
+                    testId="work-order-office-reviewer-select"
+                />
                 )}
 
                 {!isUnplannedCreate && (
@@ -7455,10 +7457,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 variant="inline"
               >
                 <div className="space-y-4">
-                  {!!normalizeOfficeReviewerRoles((workOrderContext as any)?.job?.officeReviewerRoleRuids).length && (
+                  {normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids).length > 0 && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800" data-testid="text-reviewer-rank-info">
-                      <span className="font-medium">Office Reviewer roles:</span>
-                      <span>{formatOfficeReviewerRoles((workOrderContext as any)?.job?.officeReviewerRoleRuids, officeReviewerRoles)}</span>
+                      <span className="font-medium">Office Reviewer roles are configured.</span>
                     </div>
                   )}
                   <div className="space-y-2">

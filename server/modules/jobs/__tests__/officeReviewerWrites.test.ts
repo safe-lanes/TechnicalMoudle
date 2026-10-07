@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../repositories/jobRepository', () => ({
   findById: vi.fn(), findComponent: vi.fn(), update: vi.fn(),
 }));
+vi.mock('../../../storage', () => ({
+  storage: { getActiveRoles: async () => ['A', 'B', 'C'].map(ruid => ({ ruid, isActive: true, isDeleted: false })) },
+}));
 import * as repo from '../repositories/jobRepository';
 import { updateJob } from '../services/jobService';
 
