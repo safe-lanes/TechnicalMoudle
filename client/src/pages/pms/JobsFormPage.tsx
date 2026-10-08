@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2, Loader2, FileSpreadsheet, ChevronDown, Clock } from "lucide-react";
-import { normalizeDateToDDMMMYYYY, formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
+import { formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
+import { formatJobFormDate } from "@/lib/jobFormDatePresentation";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { Marker } from "@/components/Marker";
@@ -869,43 +870,6 @@ const JobsFormPage: React.FC = () => {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-';
-    try {
-      let normalizedDate = dateStr;
-      
-      // Handle non-standard formats like "2025-11-28T1200" (missing colon in time)
-      if (/^\d{4}-\d{2}-\d{2}T\d{4}$/.test(dateStr)) {
-        normalizedDate = dateStr.replace(/T(\d{2})(\d{2})$/, 'T$1:$2:00');
-      }
-      
-      // Handle DD-MMM-YYYY format (e.g., "28-Nov-2025")
-      const ddMmmYyyyMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-      if (ddMmmYyyyMatch) {
-        const [, day, month, year] = ddMmmYyyyMatch;
-        const monthMap: Record<string, string> = {
-          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
-          'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-        };
-        const monthNum = monthMap[month];
-        if (monthNum) {
-          normalizedDate = `${year}-${monthNum}-${day.padStart(2, '0')}`;
-        }
-      }
-      
-      const date = new Date(normalizedDate);
-      if (isNaN(date.getTime())) return dateStr;
-      
-      return date.toLocaleDateString('en-GB', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1400,14 +1364,14 @@ const JobsFormPage: React.FC = () => {
                     />
                   ) : templateData.maintenanceBasis === 'Dual Frequency' ? (
                     <>
-                      <ReadOnlyField label="Next Due Date (Calendar)" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
+                      <ReadOnlyField label="Next Due Date (Calendar)" value={formatJobFormDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
                       <ReadOnlyField
                         label="Next Due RH"
                         value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
                       />
                     </>
                   ) : (
-                    <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
+                    <ReadOnlyField label="Next Due Date" value={formatJobFormDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
                   )}
                   {(templateData.maintenanceBasis === 'Running Hours' || templateData.maintenanceBasis === 'Dual Frequency') && (() => {
                     const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
@@ -1435,7 +1399,7 @@ const JobsFormPage: React.FC = () => {
                         </Label>
                         <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
                           {lastDate ? (
-                            <>{normalizeDateToDDMMMYYYY(lastDate)}{(() => { const r = formatRelativeTime(lastDate); return r ? ` (${r})` : ''; })()}</>
+                            <>{formatJobFormDate(lastDate)}{(() => { const r = formatRelativeTime(lastDate); return r ? ` (${r})` : ''; })()}</>
                           ) : (
                             <span className="italic text-gray-400">First maintenance cycle</span>
                           )}
@@ -1687,7 +1651,7 @@ const JobsFormPage: React.FC = () => {
                   <>
                     {/* Filter bar */}
                     <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
-                      <PeriodPicker value={historyPeriod} onChange={handleHistoryPeriodChange} className="min-w-[160px]" />
+                      <PeriodPicker value={historyPeriod} onChange={handleHistoryPeriodChange} className="min-w-[160px]" dateDisplayFormat="DD-MM-YYYY" />
                       <input type="hidden" value={historyComponentFilter} data-testid="select-history-component" />
                       <input type="hidden" value={historyDateFrom} data-testid="input-history-date-from" />
                       <input type="hidden" value={historyDateTo} data-testid="input-history-date-to" />
@@ -1739,7 +1703,7 @@ const JobsFormPage: React.FC = () => {
                                   className={`border-b border-gray-200 cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                                   data-testid={`row-history-${index}`}
                                 >
-                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
+                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatJobFormDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
                                   <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.isSkipped ? '—' : (record.woNo || '-')}</td>
                                   <td className="p-2 max-w-[180px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.isSkipped ? 'Cycle not performed' : (record.description || '-')}</td>
                                   <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.isSkipped ? '—' : (record.performedBy || '-')}</td>
@@ -1785,7 +1749,7 @@ const JobsFormPage: React.FC = () => {
                                           <>
                                             <div>
                                               <span className="font-medium text-gray-600">Skipped Cycle Date:</span>{' '}
-                                              <span className="text-gray-800">{formatDate(record.skippedCycleDate) || '—'}</span>
+                                              <span className="text-gray-800">{formatJobFormDate(record.skippedCycleDate) || '—'}</span>
                                             </div>
                                             <div>
                                               <span className="font-medium text-gray-600">Source Work Order:</span>{' '}
@@ -1800,7 +1764,7 @@ const JobsFormPage: React.FC = () => {
                                           <>
                                             <div>
                                               <span className="font-medium text-gray-600">Completion Date:</span>{' '}
-                                              <span className="text-gray-800">{record.completionDate || record.workDate || '—'}</span>
+                                              <span className="text-gray-800">{formatJobFormDate(record.completionDate || record.workDate, '—')}</span>
                                             </div>
                                             <div>
                                               <span className="font-medium text-gray-600">Running Hours:</span>{' '}
