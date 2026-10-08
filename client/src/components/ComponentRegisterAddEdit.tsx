@@ -5,6 +5,8 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { Textarea } from "@/components/ui/textarea";
 import StampSelect from "@/components/StampSelect";
 import {
@@ -1509,20 +1511,18 @@ export default function ComponentRegisterAddEdit({
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Installation Date</label>
-                    <Input
-                      type="date"
+                    <ComponentDateInput
                       value={componentData.installationDate}
-                      onChange={(e) => handleFieldChange('installationDate', e.target.value)}
+                      onChange={(value) => handleFieldChange('installationDate', value)}
                       className="h-8 text-sm"
                       data-testid="input-installation-date"
                     />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Commissioned Date</label>
-                    <Input
-                      type="date"
+                    <ComponentDateInput
                       value={componentData.commissionedDate}
-                      onChange={(e) => handleFieldChange('commissionedDate', e.target.value)}
+                      onChange={(value) => handleFieldChange('commissionedDate', value)}
                       className="h-8 text-sm"
                       data-testid="input-commissioned-date"
                     />
@@ -1769,10 +1769,9 @@ export default function ComponentRegisterAddEdit({
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="date"
+                          <ComponentDateInput
                             value={componentData.lastUpdated}
-                            onChange={(e) => handleFieldChange('lastUpdated', e.target.value)}
+                            onChange={(value) => handleFieldChange('lastUpdated', value)}
                             className="h-8 text-sm"
                             data-testid="input-last-updated"
                           />
@@ -1858,7 +1857,7 @@ export default function ComponentRegisterAddEdit({
                               </td>
                               <td className={`px-3 py-2 ${textClass}`}>{wo.jobTitle}</td>
                               <td className={`px-3 py-2 ${textClass}`}>{wo.assignedTo}</td>
-                              <td className={`px-3 py-2 ${textClass}`}>{wo.dueDate}</td>
+                              <td className={`px-3 py-2 ${textClass}`}>{formatComponentDate(wo.dueDate, "")}</td>
                               <td className="px-3 py-2">
                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(wo.status)}`}>
                                   {wo.status}
@@ -1927,7 +1926,7 @@ export default function ComponentRegisterAddEdit({
                           <td className="px-3 py-2 text-gray-700">{item.workOrderNo || ""}</td>
                           <td className="px-3 py-2 text-gray-700">{item.performedBy || ""}</td>
                           <td className="px-3 py-2 text-gray-700">{item.runningHoursAtCompletion || ""}</td>
-                          <td className="px-3 py-2 text-gray-700">{item.dateCompleted || ""}</td>
+                          <td className="px-3 py-2 text-gray-700">{formatComponentDate(item.dateCompleted, "")}</td>
                           <td className="px-3 py-2">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(item.status)}`}>
                               {item.status}
@@ -2071,20 +2070,18 @@ export default function ComponentRegisterAddEdit({
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Last Class Survey</label>
-                      <Input
-                        type="date"
+                      <ComponentDateInput
                         value={classRegData.lastClassSurvey}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, lastClassSurvey: e.target.value }))}
+                        onChange={(value) => setClassRegData(prev => ({ ...prev, lastClassSurvey: value }))}
                         className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-last-class-survey"
                       />
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Next Class Survey</label>
-                      <Input
-                        type="date"
+                      <ComponentDateInput
                         value={classRegData.nextClassSurvey}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, nextClassSurvey: e.target.value }))}
+                        onChange={(value) => setClassRegData(prev => ({ ...prev, nextClassSurvey: value }))}
                         className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-next-class-survey"
                       />

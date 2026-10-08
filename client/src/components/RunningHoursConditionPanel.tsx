@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Save, RefreshCw, Check, ChevronsUpDown, History, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { formatProfessionalDate } from "@/lib/dateUtils";
+import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { componentErrorDescription, componentResponseError } from "@/lib/componentErrorFeedback";
 import { ComponentLoadErrors } from "@/components/ComponentLoadErrors";
 
@@ -224,7 +224,7 @@ export default function RunningHoursConditionPanel({
   const getLastUpdatedDisplay = (): string => {
     if (!rhConfig?.rhLastUpdated) return "—";
     try {
-      return formatProfessionalDate(rhConfig.rhLastUpdated);
+      return formatComponentDate(rhConfig.rhLastUpdated);
     } catch {
       return rhConfig.rhLastUpdated;
     }
@@ -416,8 +416,8 @@ export default function RunningHoursConditionPanel({
           <span className="text-xs text-amber-800">
             <span className="font-medium">Last meter reset: </span>
             {latestReset.enteredAtUTC
-              ? formatProfessionalDate(latestReset.enteredAtUTC)
-              : latestReset.dateUpdatedLocal}
+              ? formatComponentDate(latestReset.enteredAtUTC)
+              : formatComponentDate(latestReset.dateUpdatedLocal, "")}
             {latestReset.oldMeterFinal
               ? ` (previous reading: ${parseFloat(latestReset.oldMeterFinal).toLocaleString()} hrs)`
               : ""}
@@ -452,8 +452,8 @@ export default function RunningHoursConditionPanel({
                 <tr key={event.id} className={idx % 2 === 0 ? "bg-white" : "bg-amber-50"} data-testid={`replacement-event-${event.id}`}>
                   <td className="p-2 border-r border-amber-100 whitespace-nowrap">
                     {event.enteredAtUTC
-                      ? formatProfessionalDate(event.enteredAtUTC)
-                      : event.dateUpdatedLocal}
+                      ? formatComponentDate(event.enteredAtUTC)
+                      : formatComponentDate(event.dateUpdatedLocal, "")}
                   </td>
                   <td className="p-2 border-r border-amber-100">
                     {event.renewalActionType || "Reset"}

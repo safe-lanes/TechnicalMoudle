@@ -16,13 +16,15 @@ interface ReviewChangesDrawerProps {
   onClose: () => void;
   targetType: string;
   targetId: string;
+  formatValue?: (path: string, value: unknown) => string;
 }
 
 export const ReviewChangesDrawer: React.FC<ReviewChangesDrawerProps> = ({
   isOpen,
   onClose,
   targetType,
-  targetId
+  targetId,
+  formatValue
 }) => {
   const { getDiffs, changeRequestTitle, changeRequestCategory, originalSnapshot, reset } = useChangeMode();
   const [reason, setReason] = useState("");
@@ -141,11 +143,11 @@ export const ReviewChangesDrawer: React.FC<ReviewChangesDrawerProps> = ({
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
                           <span className="text-xs text-gray-500">Was:</span>
-                          <div className="text-red-600">{String(diff.oldVal) || '-'}</div>
+                          <div className="text-red-600">{formatValue ? formatValue(diff.path, diff.oldVal) : String(diff.oldVal) || '-'}</div>
                         </div>
                         <div>
                           <span className="text-xs text-gray-500">New:</span>
-                          <div className="text-green-600">{String(diff.newVal) || '-'}</div>
+                          <div className="text-green-600">{formatValue ? formatValue(diff.path, diff.newVal) : String(diff.newVal) || '-'}</div>
                         </div>
                       </div>
                     </div>

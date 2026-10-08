@@ -35,7 +35,8 @@ import { useMasterListOptions } from "@/hooks/useDepartments";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
-import { formatProfessionalDate } from "@/lib/dateUtils";
+import { formatComponentDate } from "@/lib/componentDatePresentation";
+import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
 import { buildDraftJobPayload } from "@/lib/jobFormPayload";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
 import { componentErrorDescription, componentResponseError } from "@/lib/componentErrorFeedback";
@@ -218,8 +219,8 @@ const JobsSectionC: React.FC<JobsSectionCProps> = ({
                         <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.jobTitle}</td>
                         <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.maintenanceType}</td>
                         <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{job.frequencyValue} {job.frequencyUnit}</td>
-                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
-                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatProfessionalDate(job.nextDueDate) || '-'}</td>
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatComponentDate(job.lastDoneDate) || '-'}</td>
+                        <td className={`py-3 px-3 ${isInactive ? "text-gray-400" : "text-gray-900"}`}>{formatComponentDate(job.nextDueDate) || '-'}</td>
                         <td className="py-3 px-1">
                           {!isInactive && (
                             <button
@@ -1201,10 +1202,9 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Installation Date</label>
-                              <input
-                                type="date"
+                              <ComponentDateInput
                                 value={componentData.installationDate}
-                                onChange={(e) => handleFieldChange('installationDate', e.target.value)}
+                                onChange={(value) => handleFieldChange('installationDate', value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="input-installation-date"
                               />
@@ -1249,10 +1249,9 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           <div className="grid grid-cols-4 gap-4">
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Commissioned Date</label>
-                              <input
-                                type="date"
+                              <ComponentDateInput
                                 value={componentData.commissionedDate}
-                                onChange={(e) => handleFieldChange('commissionedDate', e.target.value)}
+                                onChange={(value) => handleFieldChange('commissionedDate', value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
                                 data-testid="input-commissioned-date"
                               />
@@ -1563,7 +1562,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                         <td className="py-3 px-3 text-gray-900 font-medium">{record.workOrderNo}</td>
                                         <td className="py-3 px-3 text-gray-900">{record.jobTitle}</td>
                                         <td className="py-3 px-3 text-gray-900">{record.maintenanceType}</td>
-                                        <td className="py-3 px-3 text-gray-900">{record.dateCompleted}</td>
+                                        <td className="py-3 px-3 text-gray-900">{formatComponentDate(record.dateCompleted, "")}</td>
                                         <td className="py-3 px-3 text-gray-900">{record.runningHoursAtCompletion || '-'}</td>
                                         <td className="py-3 px-3 text-gray-900">{record.performedBy}</td>
                                         <td className="py-3 px-3 text-gray-900">{record.approvedBy || '-'}</td>
@@ -1821,8 +1820,8 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                         <td className="py-3 px-3 text-gray-900">{item.classificationSociety}</td>
                                         <td className="py-3 px-3 text-gray-900">{item.surveyType}</td>
                                         <td className="py-3 px-3 text-gray-900">{item.certificateNo}</td>
-                                        <td className="py-3 px-3 text-gray-900">{item.lastSurveyDate}</td>
-                                        <td className="py-3 px-3 text-gray-900">{item.nextDueDate}</td>
+                                        <td className="py-3 px-3 text-gray-900">{formatComponentDate(item.lastSurveyDate, "")}</td>
+                                        <td className="py-3 px-3 text-gray-900">{formatComponentDate(item.nextDueDate, "")}</td>
                                         <td className="py-3 px-3">
                                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                             item.status === "Valid" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
@@ -1897,7 +1896,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                         <td className="py-3 px-3 text-gray-900 font-medium">{req.requisitionNo}</td>
                                         <td className="py-3 px-3 text-gray-900">{req.itemOrService}</td>
                                         <td className="py-3 px-3 text-gray-900">{req.quantity} {req.uom}</td>
-                                        <td className="py-3 px-3 text-gray-900">{req.raisedOn}</td>
+                                        <td className="py-3 px-3 text-gray-900">{formatComponentDate(req.raisedOn, "")}</td>
                                         <td className="py-3 px-3">
                                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                             req.priority === "Urgent" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"

@@ -3,3 +3,4 @@
 - [Running Hours monotonicity](running-hours-monotonicity.md) — normal RH updates never decrease live counters; only explicit approved reset/replacement workflows may do so.
 - [Component UAT writing standard](component-uat-writing-standard.md) — short, direct numbered actions for domain users, with examples separate from steps.
 - [Component date presentation](component-date-presentation.md) — DD-MM-YYYY for Component UI dates only; preserve backend data and API representations.
+- [Frontend SSR test transforms](frontend-ssr-test-transforms.md) — server-oriented tests may leave JSX untransformed; distinguish this from an application syntax error.
