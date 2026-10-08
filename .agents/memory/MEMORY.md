@@ -6,3 +6,4 @@
 - [Job Form date presentation](job-form-date-presentation.md) — DD-MM-YYYY for Job Form date displays and range filters only; preserve saved data and calculations.
 - [Work Order Planner date presentation](work-order-planner-date-presentation.md) — DD-MM-YYYY for Planner UI dates only; preserve saved dates and planning behavior.
 - [Frontend SSR test transforms](frontend-ssr-test-transforms.md) — server-oriented tests may leave JSX untransformed; distinguish this from an application syntax error.
+- [CLI runtime stalls](cli-runtime-stalls.md) — compare shell and workflow Node executables when checks stall before reporting results.

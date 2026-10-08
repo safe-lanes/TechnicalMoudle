@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
+import { PlannerDateInput } from "@/components/pms/PlannerDateInput";
+import { formatPlannerDueInfo } from "@/lib/plannerDatePresentation";
 
 interface PlannerItem {
   jobId: string;
@@ -302,7 +304,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
   });
 
   const handlePlannedDateChange = (item: PlannerItem, value: string) => {
-    savePlannedDateMutation.mutate({
+    return savePlannedDateMutation.mutateAsync({
       jobId: item.jobId,
       componentId: item.componentId,
       plannedDate: value || null,
@@ -562,6 +564,8 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       width: 120,
       flex: 0,
       cellStyle: { fontWeight: 500 },
+      valueFormatter: (params: any) => formatPlannerDueInfo(params.data?.jobType, params.value),
+      useValueFormatterForExport: false,
     },
     {
       headerName: 'Status',
@@ -589,21 +593,23 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
     {
       headerName: 'Planned Date',
       field: 'plannedDate',
-      minWidth: 180,
+      minWidth: 200,
       flex: 1,
+      valueFormatter: (params: any) => formatPlannerDueInfo("CALENDAR", params.value),
+      useValueFormatterForExport: false,
       cellRenderer: (params: any) => {
         const item = params.data;
         if (!item) return null;
         const isPlanned = !!item.plannedDate;
         return (
           <div className="flex items-center gap-1.5">
-            <input
-              type="date"
+            <PlannerDateInput
               value={item.plannedDate || ""}
-              onChange={(e) => handlePlannedDateChange(item, e.target.value)}
+              onChange={(value) => handlePlannedDateChange(item, value)}
               disabled={!item.componentId}
               className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 flex-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={(e) => e.stopPropagation()}
+              containerClassName="flex-1 min-w-0"
+              aria-label={`Planned date for ${item.jobTitle}`}
               data-testid={`input-planned-date-${item._globalIdx}`}
             />
             {isPlanned && (
@@ -769,11 +775,13 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
             {selectedKeys.size} row{selectedKeys.size !== 1 ? "s" : ""} selected
           </span>
           <div className="flex items-center gap-2 ml-2">
-            <input
-              type="date"
+            <PlannerDateInput
               value={bulkDate}
-              onChange={(e) => setBulkDate(e.target.value)}
+              onChange={setBulkDate}
+              commitOnChange
               className="text-sm border border-blue-300 dark:border-blue-600 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              containerClassName="w-[155px]"
+              aria-label="Bulk planned date"
               data-testid="input-bulk-date"
             />
             <Button
