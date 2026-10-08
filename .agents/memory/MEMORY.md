@@ -2,3 +2,4 @@
 - [Radix ScrollArea intrinsic width](radix-scrollarea-intrinsic-width.md) — long unbroken content can expand narrow modal lists despite truncation; constrain the viewport and row explicitly.
 - [Running Hours monotonicity](running-hours-monotonicity.md) — normal RH updates never decrease live counters; only explicit approved reset/replacement workflows may do so.
 - [Component UAT writing standard](component-uat-writing-standard.md) — short, direct numbered actions for domain users, with examples separate from steps.
+- [Component date presentation](component-date-presentation.md) — DD-MM-YYYY for Component UI dates only; preserve backend data and API representations.
