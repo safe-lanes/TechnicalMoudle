@@ -7,3 +7,4 @@
 - [Work Order Planner date presentation](work-order-planner-date-presentation.md) — DD-MM-YYYY for Planner UI dates only; preserve saved dates and planning behavior.
 - [Frontend SSR test transforms](frontend-ssr-test-transforms.md) — server-oriented tests may leave JSX untransformed; distinguish this from an application syntax error.
 - [CLI runtime stalls](cli-runtime-stalls.md) — compare shell and workflow Node executables when checks stall before reporting results.
+- [PMS documentation audience](pms-documentation-audience.md) — Claude has no codebase access; shared documentation must explain behaviour without source lookup.
