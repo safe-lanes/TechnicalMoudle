@@ -6045,6 +6045,14 @@ export class PostgresStorage {
   // null-vessel trap). Every approval-step log below must stamp the PARENT's
   // vessel_id, resolved via these best-effort lookups.
 
+  /** The change request's UUID for a local id — stamped on comments/attachments so sync can find the right parent. */
+  private async crUuid(changeRequestId: number): Promise<string | null> {
+    const db = await getDb();
+    const r = await db.select({ u: changeRequest.cruuid }).from(changeRequest)
+      .where(eq(changeRequest.id, changeRequestId)).limit(1);
+    return r[0]?.u ?? null;
+  }
+
   private async crVesselId(changeRequestId: number): Promise<string | null> {
     try {
       const db = await getDb();
@@ -6989,7 +6997,8 @@ export class PostgresStorage {
 
   async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
     const db = await getDb();
-    const result = await db.insert(changeRequestAttachment).values(attachment).returning();
+    const changeRequestUuid = attachment.changeRequestUuid ?? await this.crUuid(attachment.changeRequestId);
+    const result = await db.insert(changeRequestAttachment).values({ ...attachment, changeRequestUuid }).returning();
     const created = result[0];
     // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
     try {
@@ -7014,7 +7023,8 @@ export class PostgresStorage {
 
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
     const db = await getDb();
-    const result = await db.insert(changeRequestComment).values(comment).returning();
+    const changeRequestUuid = comment.changeRequestUuid ?? await this.crUuid(comment.changeRequestId);
+    const result = await db.insert(changeRequestComment).values({ ...comment, changeRequestUuid }).returning();
     // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
     try {
       const vId = await this.crVesselId(result[0].changeRequestId);

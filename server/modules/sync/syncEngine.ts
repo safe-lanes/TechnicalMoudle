@@ -417,8 +417,10 @@ export class SyncEngine {
       }
 
       // Step 6: Store apply errors in batch record (if any)
-      const errorMessage = pullErrors.length > 0
-        ? pullErrors.join('\n')
+      // Both directions: rows this ship could not apply (pull) and rows the office could not apply (push).
+      const allSyncErrors = [...pullErrors, ...pushResult.shoreApplyErrors.map((m) => `Office could not apply: ${m}`)];
+      const errorMessage = allSyncErrors.length > 0
+        ? allSyncErrors.join('\n')
         : null;
       if (errorMessage && batchUuid) {
         try {
@@ -638,7 +640,7 @@ export class SyncEngine {
     batchUuid: string,
     vesselId: string,
     lastCheckpoint: Date | null
-  ): Promise<{ totalPushed: number; pushedLogUuids: string[] }> {
+  ): Promise<{ totalPushed: number; pushedLogUuids: string[]; shoreApplyErrors: string[] }> {
     let totalPushed = 0;
 
     // A. Gather SHIP_ONLY rows changed since checkpoint (only from ship instances)
@@ -687,6 +689,7 @@ export class SyncEngine {
     // below. Only logs whose row actually applied get marked synced; dropped rows stay
     // is_synced=false and retry next cycle. `pushedLogUuids` is computed AFTER the loop.
     const droppedRowUuids = new Set<string>();
+    const shoreApplyErrors: string[] = []; // text of rows the office could not apply (newer shores only)
     // Migration 147: rows the shore explicitly CONFIRMED applied, and whether it spoke at all.
     const confirmedRowUuids = new Set<string>();
     let sawPositiveConfirm = false;
@@ -791,6 +794,10 @@ export class SyncEngine {
         // Fix 3: collect rows the shore could not apply (backward-compat: old shore omits the
         // field → undefined → nothing collected → ship marks all synced = current behaviour).
         (result.droppedRowUuids || []).forEach((r: string) => droppedRowUuids.add(r));
+        // Optional field (13-Oct-2026): an older shore omits it → nothing collected.
+        (Array.isArray(result.applyErrors) ? result.applyErrors : []).forEach((m: unknown) => {
+          if (typeof m === 'string') shoreApplyErrors.push(m);
+        });
           // Migration 147 — POSITIVE CONFIRM, selected on FIELD PRESENCE not value.
           // Writing this as `result.appliedRowUuids || []` would be a data-stall bug: an older
           // shore omits the key, the empty array would read as "nothing applied", and the ship
@@ -853,7 +860,7 @@ export class SyncEngine {
       .filter(l => confirmedThisCycle(l.rowUuid ?? (l as any).row_uuid))
       .map(l => l.logUuid ?? (l as any).log_uuid);
 
-    return { totalPushed, pushedLogUuids };
+    return { totalPushed, pushedLogUuids, shoreApplyErrors };
   }
 
   // ═══════════════════════════════════════════════════════════════

@@ -965,6 +965,8 @@ export const changeRequestAttachment = pgTable("change_request_attachment", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   crauuid: text("crauuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   changeRequestId: integer("change_request_id").notNull(),
+  // The change request's UUID (same on shore and ships) — sync resolves the LOCAL change_request_id from it (mig 181).
+  changeRequestUuid: text("change_request_uuid"),
   filename: text("filename").notNull(),
   url: text("url").notNull(),
   uploadedByUserId: text("uploaded_by_user_id").notNull(),
@@ -992,6 +994,8 @@ export const changeRequestComment = pgTable("change_request_comment", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   crcuuid: text("crcuuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   changeRequestId: integer("change_request_id").notNull(),
+  // The change request's UUID (same on shore and ships) — sync resolves the LOCAL change_request_id from it (mig 181).
+  changeRequestUuid: text("change_request_uuid"),
   userId: text("user_id").notNull(),
   message: text("message").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

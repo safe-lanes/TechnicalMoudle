@@ -57,7 +57,18 @@ describe('resolveParentLinks — change_request_approval', () => {
     const row = { id: 1 };
     expect(await resolveParentLinks(p, 'defects', row)).toBeNull();
     expect(p.calls).toHaveLength(0);
-    expect(Object.keys(PARENT_UUID_LINKS)).toEqual(['change_request_approval']);
+    expect(Object.keys(PARENT_UUID_LINKS).sort()).toEqual(['change_request_approval', 'change_request_attachment', 'change_request_comment']);
+  });
+
+  it('comments/attachments: resolved by UUID when present; rows from before mig 181 (no UUID) keep their number', async () => {
+    const withUuid: Record<string, any> = { change_request_id: 952, change_request_uuid: 'f724' };
+    expect(await resolveParentLinks(pool({ f724: 1453 }), 'change_request_comment', withUuid)).toBeNull();
+    expect(withUuid.change_request_id).toBe(1453);
+    const legacy: Record<string, any> = { change_request_id: 952 };
+    expect(await resolveParentLinks(pool({}), 'change_request_attachment', legacy)).toBeNull();
+    expect(legacy.change_request_id).toBe(952);
+    const notArrived: Record<string, any> = { change_request_id: 952, change_request_uuid: 'later' };
+    expect(await resolveParentLinks(pool({}), 'change_request_comment', notArrived)).toMatch(/has not arrived/);
   });
 
   it('defects are never merged on a number clash', () => {

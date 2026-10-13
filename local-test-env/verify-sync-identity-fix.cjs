@@ -97,6 +97,21 @@ async function sync() {
       `ship CR id ${shipLocalOfficeCr} (office id ${officeCr.id}), step points at ${t2Ship[0]?.[1]}`);
     check('T1/T2 sync finished without approval errors', !/change_request_approval/.test(errs), errs || 'no errors');
 
+    // T7 — comments/attachments land on the RIGHT change request on the other side (mig 181)
+    const shipCrIdOnShip = ship(`SELECT id FROM change_request WHERE cruuid=${sq(shipCr.cruuid)};`)[0]?.[0];
+    await api('ship', 'POST', `/change-requests/${shipCrIdOnShip}/comments`, { userId: 'identity-fix-probe', message: `SHIP comment — ${TAG}` });
+    await api('ship', 'POST', `/change-requests/${shipCrIdOnShip}/attachments`, { filename: `ship-${Date.now()}.pdf`, url: 'https://example.com/identity-fix-probe.pdf', uploadedByUserId: 'identity-fix-probe' });
+    await api('shore', 'POST', `/change-requests/${officeCr.id}/comments`, { userId: 'identity-fix-probe', message: `OFFICE comment — ${TAG}` });
+    await sync();
+    const childQ = (kind, cruuid) => kind === 'comment'
+      ? `SELECT count(*) FROM change_request_comment c JOIN change_request cr ON cr.id = c.change_request_id WHERE c.message LIKE '%${TAG}%' AND cr.cruuid = '${cruuid}'`
+      : `SELECT count(*) FROM change_request_attachment a JOIN change_request cr ON cr.id = a.change_request_id WHERE a.url = 'https://example.com/identity-fix-probe.pdf' AND cr.cruuid = '${cruuid}'`;
+    const shoreShipComment = Number((await shore(childQ('comment', shipCr.cruuid)))[0].count);
+    const shoreShipAttach = Number((await shore(childQ('attachment', shipCr.cruuid)))[0].count);
+    const shipOfficeComment = Number(ship(childQ('comment', officeCr.cruuid) + ';')[0][0]);
+    check('T7 ship comment + attachment are on the same change request in the office', shoreShipComment === 1 && shoreShipAttach >= 1, `comment ${shoreShipComment}, attachment ${shoreShipAttach}`);
+    check('T7 office comment is on the same change request on the ship', shipOfficeComment === 1, `comment ${shipOfficeComment}`);
+
     // T3
     const appr = await api('shore', 'PUT', `/change-requests/${officeCr.id}/approve`, { comment: TAG, reviewerId: 'identity-fix-probe', role: 'Sail Admin' });
     await sync();
@@ -146,7 +161,8 @@ async function sync() {
     const logText = fs.existsSync(shoreLog) ? fs.readFileSync(shoreLog, 'utf8') : '';
     check('T5 clash reported on shore (log "NUMBER CLASH" for this defect)', logText.includes('NUMBER CLASH') && logText.includes(clashing.duuid),
       fs.existsSync(shoreLog) ? shoreLog : `shore log not found: ${shoreLog}`);
-    void s5;
+    check('T5 clash also shown on the ship\'s sync result ("Office could not apply")', /Office could not apply/.test(String(s5.error || '')) && String(s5.error || '').includes(clashing.duuid),
+      String(s5.error || '(no error text)').slice(0, 140));
   } finally {
     for (const r of prevShore) await shore(`UPDATE approval_workflow_config SET level1_enabled=$1 WHERE function_id='pms-components-cr' AND variable_name=$2`, [r.level1_enabled, r.variable_name]);
     for (const [name, on] of prevShip) ship(`UPDATE approval_workflow_config SET level1_enabled=${on === 't'} WHERE function_id='pms-components-cr' AND variable_name=${sq(name)};`);

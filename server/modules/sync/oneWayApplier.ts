@@ -803,10 +803,20 @@ export interface FieldLogEntry {
 // it either names no row (FK violation → the old NULL-FK retry then hit NOT NULL, retrying
 // forever) or silently names a DIFFERENT parent. The child also carries the parent's UUID,
 // which is the same everywhere — resolve the local id from it BEFORE writing the row.
-interface ParentUuidLink { fkCol: string; uuidCol: string; parentTable: string; parentUuidCol: string }
+interface ParentUuidLink {
+  fkCol: string; uuidCol: string; parentTable: string; parentUuidCol: string;
+  /** Rows written before the UUID column existed (mig 181) carry none: keep today's behaviour for them. */
+  optional?: boolean;
+}
 export const PARENT_UUID_LINKS: Record<string, ParentUuidLink[]> = {
   change_request_approval: [
     { fkCol: 'change_request_id', uuidCol: 'change_request_uuid', parentTable: 'change_request', parentUuidCol: 'cruuid' },
+  ],
+  change_request_comment: [
+    { fkCol: 'change_request_id', uuidCol: 'change_request_uuid', parentTable: 'change_request', parentUuidCol: 'cruuid', optional: true },
+  ],
+  change_request_attachment: [
+    { fkCol: 'change_request_id', uuidCol: 'change_request_uuid', parentTable: 'change_request', parentUuidCol: 'cruuid', optional: true },
   ],
 };
 
@@ -823,7 +833,10 @@ export async function resolveParentLinks(
 ): Promise<string | null> {
   for (const link of PARENT_UUID_LINKS[tableName] || []) {
     const parentUuid = row[link.uuidCol] ?? row[toCamelCase(link.uuidCol)];
-    if (!parentUuid) return `no ${link.uuidCol} — cannot tell which ${link.parentTable} it belongs to`;
+    if (!parentUuid) {
+      if (link.optional) continue; // pre-migration row / old sender: unchanged behaviour
+      return `no ${link.uuidCol} — cannot tell which ${link.parentTable} it belongs to`;
+    }
     const r = await pool.query(`SELECT id FROM "${link.parentTable}" WHERE "${link.parentUuidCol}" = $1 LIMIT 1`, [parentUuid]);
     if (r.rows.length === 0) return `${link.parentTable} ${parentUuid} has not arrived on this instance yet`;
     row[link.fkCol] = r.rows[0].id;
