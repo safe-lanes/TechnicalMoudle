@@ -4154,7 +4154,6 @@ export const admRoleMenuAccess = pgTable("adm_role_menu_access", {
 ]);
 
 export const insertAdmRoleMenuAccessSchema = createInsertSchema(admRoleMenuAccess).omit({
-  id: true,
   createdAt: true,
   updatedAt: true,
 });

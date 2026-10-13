@@ -1,5 +1,21 @@
 # PMS Test Suite Documentation
 
+## Focused dormant-integration regression checks
+
+The batch, image, chat-storage and Access Control validator checks run without
+live AI requests or database writes using the existing Vitest configuration:
+
+```bash
+npx vitest run \
+  server/replit_integrations/batch/__tests__/utils.test.ts \
+  server/replit_integrations/image/__tests__/image.test.ts \
+  server/replit_integrations/chat/__tests__/storage.test.ts \
+  server/__tests__/lowImpactIntegrationContracts.test.ts
+```
+
+See [`docs/low-impact-typescript-verification.md`](../docs/low-impact-typescript-verification.md)
+for compiler comparison results, remaining diagnostics and preserved behavior contracts.
+
 ## Overview
 Comprehensive end-to-end test suite for the Maritime Planned Maintenance System (PMS) web application. The suite includes 215+ test cases covering all modules, database verification, and cross-cutting concerns.
 
