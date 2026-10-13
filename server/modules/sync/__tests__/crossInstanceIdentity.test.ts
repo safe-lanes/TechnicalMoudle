@@ -103,3 +103,42 @@ describe('defect number series — ship and office never overlap', () => {
     expect(highestInSeries(['D048-26-12345', 'D048-26-O0002'], ship)).toBe(12345);
   });
 });
+
+describe('component_documents — UUID identity across versions (mig 182)', () => {
+  it('md5Uuid matches the Postgres md5()::uuid layout (8-4-4-4-12, lower case)', async () => {
+    const { md5Uuid } = await import('../oneWayApplier');
+    // Values checked against Postgres md5($1)::uuid::text on the pilot (13-Oct-2026).
+    expect(md5Uuid('component_documents:1:601.016/manual.pdf')).toBe('beb5284b-d846-d932-af6c-c691dda065b3');
+    expect(md5Uuid('component_documents:42:WKFV/Ä-über drawing (rev 2).PDF')).toBe('0b80ffd0-ed47-bffa-f2e0-fe1f9a1ccbb9');
+  });
+
+  it('an old sender\'s creating change derives the migration\'s UUID from file + component (NOT its integer id)', async () => {
+    const { LEGACY_ID_KEYED, md5Uuid } = await import('../oneWayApplier');
+    const logs = [
+      { tableName: 'component_documents', rowUuid: '7', fieldName: 'fileKey', oldValue: null, newValue: '601.016/1_x.pdf', changedAt: '2026-10-13T10:00:00Z' },
+      { tableName: 'component_documents', rowUuid: '7', fieldName: 'componentId', oldValue: null, newValue: 'c-uuid-1', changedAt: '2026-10-13T10:00:00Z' },
+    ] as any[];
+    const u = LEGACY_ID_KEYED.component_documents.derive('7', logs);
+    expect(u).toBe(md5Uuid('component_documents:601.016/1_x.pdf:c-uuid-1:1'));
+    // the same document under a DIFFERENT local id on the other side derives the same UUID
+    expect(LEGACY_ID_KEYED.component_documents.derive('99', logs.map((l) => ({ ...l, rowUuid: '99' })))).toBe(u);
+  });
+
+  it('an old sender\'s edit without the file cannot be derived → waits', async () => {
+    const { LEGACY_ID_KEYED } = await import('../oneWayApplier');
+    const logs = [{ tableName: 'component_documents', rowUuid: '7', fieldName: 'notes', oldValue: 'a', newValue: 'b', changedAt: '2026-10-13T10:00:00Z' }] as any[];
+    expect(LEGACY_ID_KEYED.component_documents.derive('7', logs)).toBeNull();
+  });
+
+  it('old ships are not sent UUID-keyed document changes; updated ships are', async () => {
+    const { holdBackForOldShip, CAP_COMPONENT_DOCUMENTS_UUID } = await import('../service');
+    const logs = [
+      { tableName: 'component_documents', rowUuid: '9d5b14d1-5261-45af-9134-bf845c07410f' },
+      { tableName: 'component_documents', rowUuid: '12' }, // legacy key — safe for an old ship
+      { tableName: 'defects', rowUuid: 'a1' },
+    ];
+    expect(holdBackForOldShip(logs, undefined)).toEqual({ logs: [logs[1], logs[2]], heldBack: 1 });
+    expect(holdBackForOldShip(logs, ['something-else']).heldBack).toBe(1);
+    expect(holdBackForOldShip(logs, [CAP_COMPONENT_DOCUMENTS_UUID])).toEqual({ logs, heldBack: 0 });
+  });
+});

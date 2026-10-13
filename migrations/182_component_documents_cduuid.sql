@@ -4,19 +4,28 @@
 -- (shared/syncConfig.ts).
 --
 -- Mixed versions are expected (shore is updated first, ships pull the code at night), so the UUID of an EXISTING
--- document is computed, not random: md5('component_documents:' || id || ':' || file_key). A document copied to the
--- ship at provisioning has the same id and file_key on both sides → the same UUID, with no coordination. Two
--- different documents that collided on id have different file_keys → different UUIDs. The receiving side derives
--- the same value for an old (id-keyed) sender's new document (oneWayApplier LEGACY_ID_KEYED). New documents get a
--- random UUID.
+-- document is computed, not random, from what is the SAME on shore and ship for the same document: its stored file
+-- (file_key, unique per upload — it carries the upload timestamp) and its component (component_id = components.cuuid):
+--   md5('component_documents:' || file_key || ':' || component_id || ':' || n)
+-- where n = 1, 2, … only separates the rare case of one file attached twice to the same component (by upload time).
+-- NOT the integer id: a document that synced under the old code has DIFFERENT ids on the two sides (proven on the
+-- pilot: shore 4, ship 1). The receiving side derives the same value for an old (id-keyed) sender's new document
+-- (oneWayApplier LEGACY_ID_KEYED, n = 1). New documents get a random UUID.
 --
 -- Additive and idempotent.
 
 ALTER TABLE component_documents ADD COLUMN IF NOT EXISTS cduuid TEXT;
 
-UPDATE component_documents
-SET cduuid = md5('component_documents:' || id::text || ':' || coalesce(file_key, ''))::uuid::text
-WHERE cduuid IS NULL;
+WITH ranked AS (
+  SELECT id, file_key, component_id,
+         row_number() OVER (PARTITION BY file_key, component_id ORDER BY uploaded_at, id) AS n
+  FROM component_documents
+  WHERE cduuid IS NULL
+)
+UPDATE component_documents d
+SET cduuid = md5('component_documents:' || r.file_key || ':' || r.component_id || ':' || r.n::text)::uuid::text
+FROM ranked r
+WHERE d.id = r.id;
 
 ALTER TABLE component_documents ALTER COLUMN cduuid SET DEFAULT gen_random_uuid()::text;
 

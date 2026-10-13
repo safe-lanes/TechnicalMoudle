@@ -870,9 +870,12 @@ function latestLogValue(logs: FieldLogEntry[], column: string): string | null {
  */
 export const LEGACY_ID_KEYED: Record<string, { derive: (senderId: string, logs: FieldLogEntry[]) => string | null }> = {
   component_documents: {
-    derive: (senderId, logs) => {
+    // = migration 182 backfill (n = 1): stored file + component — the same on both sides for the same document. NOT the
+    // sender's integer id: a document that synced under the old code has different ids on shore and ship.
+    derive: (_senderId, logs) => {
       const fileKey = latestLogValue(logs, 'file_key');
-      return fileKey ? md5Uuid(`component_documents:${senderId}:${fileKey}`) : null; // = migration 182 backfill
+      const componentId = latestLogValue(logs, 'component_id');
+      return fileKey && componentId ? md5Uuid(`component_documents:${fileKey}:${componentId}:1`) : null;
     },
   },
 };
