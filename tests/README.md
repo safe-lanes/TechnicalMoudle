@@ -1,5 +1,17 @@
 # PMS Test Suite Documentation
 
+## Focused AuthContext metadata regression checks
+
+```bash
+npx vitest run server/__tests__/authContextMetadata.test.ts
+```
+
+These offline tests execute the actual provider source with deterministic hook
+fakes, real encrypted-storage handling, and mocked identity/query/API side
+effects. They do not make login requests, write to a database, or synchronize.
+See [`docs/auth-context-metadata-verification.md`](../docs/auth-context-metadata-verification.md)
+for the bounded change and compiler comparison.
+
 ## Focused dormant-integration regression checks
 
 The batch, image, chat-storage and Access Control validator checks run without
