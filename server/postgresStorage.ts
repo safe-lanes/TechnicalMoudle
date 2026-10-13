@@ -2148,7 +2148,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(componentDocuments).values(doc).returning();
     // Sync field logging — INSERT
-    try { await logFieldChanges('component_documents', String(result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc create:', e); }
+    try { await logFieldChanges('component_documents', String(result[0].cduuid ?? result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc create:', e); }
     return result[0];
   }
 
@@ -2165,7 +2165,7 @@ export class PostgresStorage {
     }
     // Sync field logging — UPDATE
     if (existingDoc[0]) {
-      try { await logFieldChanges('component_documents', String(id), (existingDoc[0] as any).vesselCode || null, existingDoc[0], result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc update:', e); }
+      try { await logFieldChanges('component_documents', String(existingDoc[0].cduuid ?? id), (existingDoc[0] as any).vesselCode || null, existingDoc[0], result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc update:', e); }
     }
     return result[0];
   }

@@ -8,6 +8,7 @@
  * Uses raw SQL for dynamic table names since Drizzle ORM requires static table refs.
  */
 
+import { createHash } from 'crypto';
 import { getPool } from '../../db';
 import { getTableSyncConfig, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
@@ -845,6 +846,37 @@ export async function resolveParentLinks(
   return null;
 }
 
+/** md5(text) as a UUID string — byte-identical to Postgres `md5(text)::uuid::text` (used by migration 182). */
+export function md5Uuid(text: string): string {
+  const h = createHash('md5').update(text, 'utf8').digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function latestLogValue(logs: FieldLogEntry[], column: string): string | null {
+  let best: { t: number; v: string } | null = null;
+  for (const l of logs) {
+    if (fieldNameToColumn(l.fieldName) !== column || l.newValue == null) continue;
+    const t = new Date(String(l.changedAt)).getTime() || 0;
+    if (!best || t >= best.t) best = { t, v: String(l.newValue) };
+  }
+  return best ? best.v : null;
+}
+
+/**
+ * Tables whose sync identity moved from the per-instance integer id to a UUID (13-Oct-2026). Ships update at night,
+ * so for a while an OLD sender still keys its changes by its local integer id. Such a group is translated to the UUID
+ * the migration computes for that row (same formula on both sides — no coordination needed) when it carries the
+ * creating fields; anything else WAITS (kept pending) until the sender updates, which re-keys its pending changes.
+ */
+export const LEGACY_ID_KEYED: Record<string, { derive: (senderId: string, logs: FieldLogEntry[]) => string | null }> = {
+  component_documents: {
+    derive: (senderId, logs) => {
+      const fileKey = latestLogValue(logs, 'file_key');
+      return fileKey ? md5Uuid(`component_documents:${senderId}:${fileKey}`) : null; // = migration 182 backfill
+    },
+  },
+};
+
 /**
  * Tables whose unique keys (other than the sync identity) are business numbers given out
  * independently on each side. A unique-key collision there means two DIFFERENT records — the
@@ -891,9 +923,42 @@ export async function applyFieldLogInserts(
   // insert), after which the pending fragments apply as normal updates.
   const needsFullRows: Array<{ tableName: string; rowUuid: string }> = [];
 
+  // 0. Old senders of tables whose identity moved to a UUID (LEGACY_ID_KEYED): translate their integer-id-keyed
+  //    groups to the UUID, or keep them pending. Copies only — the caller acks by the ORIGINAL keys, so every key
+  //    reported back (failed / self-heal) is mapped to the original below.
+  const originalKeyOf = new Map<string, string>(); // `${table}::${uuid}` → sender's integer id
+  let workingLogs: FieldLogEntry[] = fieldLogs;
+  if (fieldLogs.some((l) => LEGACY_ID_KEYED[l.tableName] && /^\d+$/.test(String(l.rowUuid)))) {
+    const legacyGroups = new Map<string, FieldLogEntry[]>();
+    workingLogs = [];
+    for (const log of fieldLogs) {
+      if (LEGACY_ID_KEYED[log.tableName] && /^\d+$/.test(String(log.rowUuid))) {
+        const k = `${log.tableName}::${log.rowUuid}`;
+        if (!legacyGroups.has(k)) legacyGroups.set(k, []);
+        legacyGroups.get(k)!.push(log);
+      } else {
+        workingLogs.push(log);
+      }
+    }
+    for (const logs of Array.from(legacyGroups.values())) {
+      const { tableName, rowUuid: senderId } = logs[0];
+      const uuid = LEGACY_ID_KEYED[tableName].derive(String(senderId), logs);
+      if (!uuid) {
+        const msg = `${tableName}.${senderId}: changed on an instance still running the previous version — applies after its next update; kept pending`;
+        errors.push(msg);
+        failedRowUuids.push(String(senderId));
+        syncDiag(`FIELD-LOG-INSERT LEGACY-WAIT: ${msg}`);
+        continue;
+      }
+      originalKeyOf.set(`${tableName}::${uuid}`, String(senderId));
+      syncDiag(`FIELD-LOG-INSERT LEGACY-KEY: ${tableName} sender id ${senderId} → ${uuid}`);
+      for (const l of logs) workingLogs.push({ ...l, rowUuid: uuid });
+    }
+  }
+
   // 1. Group by (tableName, rowUuid)
   const groups = new Map<string, FieldLogEntry[]>();
-  for (const log of fieldLogs) {
+  for (const log of workingLogs) {
     const key = `${log.tableName}::${log.rowUuid}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(log);
@@ -1515,6 +1580,20 @@ export async function applyFieldLogInserts(
   const portableUpdateLogs = updateLogs.filter((l) => !isNonPortableParentLinkLog(l));
   if (portableUpdateLogs.length !== updateLogs.length) {
     syncDiag(`FIELD-LOG-INSERT: ${updateLogs.length - portableUpdateLogs.length} parent-id field update(s) ignored (local id differs per instance; parent resolved by UUID)`);
+  }
+
+  // Report translated legacy groups under the sender's ORIGINAL key (it acks / serves full rows by that key).
+  if (originalKeyOf.size > 0) {
+    const tablesOf = new Map<string, string>(); // uuid → table (uuids are unique across tables in practice)
+    for (const k of Array.from(originalKeyOf.keys())) { const [t, u] = k.split('::'); tablesOf.set(u, t); }
+    for (let i = 0; i < failedRowUuids.length; i++) {
+      const t = tablesOf.get(failedRowUuids[i]);
+      if (t) failedRowUuids[i] = originalKeyOf.get(`${t}::${failedRowUuids[i]}`)!;
+    }
+    for (const n of needsFullRows) {
+      const orig = originalKeyOf.get(`${n.tableName}::${n.rowUuid}`);
+      if (orig) n.rowUuid = orig;
+    }
   }
 
   syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${portableUpdateLogs.length}, errors=${errors.length}, selfHealRequests=${needsFullRows.length}`);

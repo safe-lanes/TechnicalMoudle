@@ -934,6 +934,8 @@ export class SyncEngine {
       vesselId,
       instanceId: this.instanceId,
       lastCheckpoint: floor ? floor.toISOString() : null,
+      // 13-Oct-2026: this ship matches component_documents on cduuid (mig 182) — the shore may send UUID-keyed changes.
+      capabilities: ['component_documents_uuid'],
       ...(havePerTable
         ? {
             tableCheckpoints: Object.fromEntries(
@@ -1453,7 +1455,9 @@ export class SyncEngine {
           body.batchUuid,
           body.vesselId,
           body.instanceId,
-          body.lastCheckpoint ? new Date(body.lastCheckpoint) : null
+          body.lastCheckpoint ? new Date(body.lastCheckpoint) : null,
+          undefined,
+          body.capabilities
         );
       case '/sync/complete':
         // 4th arg (appliedRowUuids) intentionally NOT passed in local mode — preserves the

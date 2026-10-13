@@ -2160,6 +2160,8 @@ export type RetentionSetting = typeof retentionSettings.$inferSelect;
 // Component Documents Table - Drawings, manuals, and technical documents
 export const componentDocuments = pgTable("component_documents", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  // Sync identity (mig 182). The integer id is per instance; sync matches documents on cduuid.
+  cduuid: text("cduuid").default(sql`gen_random_uuid()::text`),
   componentId: text("component_id").notNull().references(() => components.cuuid),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),

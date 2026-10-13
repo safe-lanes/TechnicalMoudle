@@ -1026,6 +1026,18 @@ export async function fetchFullRowsForHeal(
 // 3. PULL (Ship requests Shore's changes)
 // ═══════════════════════════════════════════════════════════════
 
+/** Capability a ship sends once it matches component_documents on cduuid (mig 182). */
+export const CAP_COMPONENT_DOCUMENTS_UUID = 'component_documents_uuid';
+
+/** For a ship WITHOUT the capability, drop UUID-keyed component_documents changes (they stay pending). */
+export function holdBackForOldShip<T extends { tableName: string; rowUuid: string }>(
+  logs: T[], capabilities: string[] | undefined
+): { logs: T[]; heldBack: number } {
+  if (Array.isArray(capabilities) && capabilities.includes(CAP_COMPONENT_DOCUMENTS_UUID)) return { logs, heldBack: 0 };
+  const kept = logs.filter((l) => !(l.tableName === 'component_documents' && !/^\d+$/.test(String(l.rowUuid))));
+  return { logs: kept, heldBack: logs.length - kept.length };
+}
+
 export async function preparePullData(
   batchUuid: string,
   vesselId: string,
@@ -1034,7 +1046,11 @@ export async function preparePullData(
   /** Migration 148 — per-table one-way watermarks from the ship. ABSENT (old ship) means
    *  fall back to the single `lastCheckpoint` for every table, i.e. today's behaviour
    *  exactly. Presence of the key is the capability signal; no version handshake. */
-  tableCheckpoints?: Record<string, Date>
+  tableCheckpoints?: Record<string, Date>,
+  /** 13-Oct-2026: what the pulling ship understands. ABSENT (old ship) → UUID-keyed changes of tables whose identity
+   *  moved to a UUID (component_documents) are HELD BACK — left pending and re-offered after the ship updates — since
+   *  an old ship matches them by its integer id and would fail on a UUID value. */
+  capabilities?: string[]
 ) {
   // Validate batch
   const batch = await repo.getBatch(batchUuid);
@@ -1073,7 +1089,14 @@ export async function preparePullData(
     shipInstanceId,
     vesselCode
   );
-  const shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
+  let shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
+  {
+    const held = holdBackForOldShip(shoreFieldLogs, capabilities);
+    if (held.heldBack > 0) {
+      syncDiag(`PREPARE-PULL HOLD-BACK: ${held.heldBack} UUID-keyed change(s) (component_documents) kept pending — ship ${shipInstanceId} has not updated yet`);
+    }
+    shoreFieldLogs = held.logs;
+  }
   syncDiag(`PREPARE-PULL FIELD LOGS: ${shoreFieldLogs.length} shore logs for vessel=${vesselId} (excluded instance=${shipInstanceId})`);
   if (shoreFieldLogs.length > 0) {
     // Per-table breakdown for diagnostics
@@ -1310,6 +1333,9 @@ export async function completeSyncSession(
   if (Array.isArray(appliedRowUuids)) {
     const acked = new Set(appliedRowUuids);
     logsToMark = shoreLogs.filter(l => acked.has(l.rowUuid));
+  } else {
+    // Legacy ship (marks the whole window): never mark changes that were held back from it (13-Oct-2026).
+    logsToMark = holdBackForOldShip(shoreLogs, undefined).logs;
   }
   syncDiag(`COMPLETE-SESSION: ${shoreLogs.length} shore logs in window; marking ${logsToMark.length} synced (ack=${Array.isArray(appliedRowUuids) ? appliedRowUuids.length : 'legacy-all'})`);
   if (logsToMark.length > 0) {
