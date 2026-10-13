@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { getDb } from './db';
 import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
+import { defectSeriesPrefix, formatDefectNumber, highestInSeries, type DefectSide } from './utils/defectNumberSeries';
 import {
   users,
   fleets,
@@ -5071,50 +5072,50 @@ export class PostgresStorage {
       }
     }
     
-    // Get or create defect sequence for this vessel/year
-    const existingSeq = await db.select()
-      .from(defectSequences)
-      .where(and(
-        eq(defectSequences.vesselId, vesselId),
-        eq(defectSequences.year, currentYear)
-      ));
-    
-    let nextSeq: number;
-    if (existingSeq.length === 0) {
-      // Create new sequence for this vessel/year starting at 1
-      const seqResult = await db.insert(defectSequences).values({
-        vesselId,
-        year: currentYear,
-        lastSequence: 1,
-      }).returning();
-      nextSeq = 1;
-      // Sync field logging — INSERT
-      try { await logFieldChanges('defect_sequences', String(seqResult[0].id), vesselId, null, seqResult[0], 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences create:', e); }
-    } else {
-      // Increment existing sequence
-      nextSeq = existingSeq[0].lastSequence + 1;
-      const oldSeq = { ...existingSeq[0] };
-      await db.update(defectSequences)
-        .set({ lastSequence: nextSeq })
-        .where(and(
-          eq(defectSequences.vesselId, vesselId),
-          eq(defectSequences.year, currentYear)
-        ));
-      // Sync field logging — UPDATE
-      try { await logFieldChanges('defect_sequences', String(existingSeq[0].id), vesselId, oldSeq, { ...oldSeq, lastSequence: nextSeq }, 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences update:', e); }
+    // Defect numbers per side (server/utils/defectNumberSeries.ts, 13-Oct-2026): the ship numbers its own series
+    // (D048-26-0004 — unchanged format) and the office its own (D048-26-O0001), so the two can never give out the
+    // same number while offline from each other (the Testvessel / pilot defect loss). The next number is the highest
+    // already used in THIS side's series + 1 — defects sync, so this stays right after a re-provision.
+    const { getInstanceRole } = await import('./modules/sync/syncRole');
+    const side: DefectSide = (await getInstanceRole()) === 'ship' ? 'ship' : 'shore';
+    const prefix = defectSeriesPrefix(vesselSeq, yearShort, side);
+    const usedIds = await db.execute(sql`SELECT id FROM defects WHERE vessel_id = ${vesselId} AND id LIKE ${prefix + '%'}`);
+    let nextSeq = highestInSeries((usedIds.rows as any[]).map((r) => String(r.id)), prefix) + 1;
+
+    // Ship only: the per-vessel/year counter stays as a floor (e.g. numbers already printed on board). It is local
+    // bookkeeping now — no field log: the office never numbers in the ship series, and syncing this row by its
+    // per-instance integer id was the "defect_sequences.<id> … missing NOT-NULL [year]" error.
+    const existingSeq = side === 'ship'
+      ? await db.select().from(defectSequences)
+          .where(and(eq(defectSequences.vesselId, vesselId), eq(defectSequences.year, currentYear)))
+      : [];
+    if (existingSeq.length > 0) nextSeq = Math.max(nextSeq, existingSeq[0].lastSequence + 1);
+
+    // Two people raising a defect at the same moment can pick the same number: on a duplicate number, take the next.
+    let result: Defect[] = [];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        result = await db.insert(defects).values({
+          ...defect,
+          id: formatDefectNumber(prefix, nextSeq),
+          duuid: randomUUID(),
+        }).returning();
+        break;
+      } catch (e: any) {
+        const dupNumber = e?.code === '23505' && String(e?.constraint || '').startsWith('defects_pkey');
+        if (!dupNumber || attempt >= 9) throw e;
+        nextSeq++;
+      }
     }
-    
-    // Format: D{VesselCode 3 digits}-{Year 2 digits}-{Seq 4 digits}
-    const vesselCode = String(vesselSeq).padStart(3, '0');
-    const yearCode = String(yearShort).padStart(2, '0');
-    const seqCode = String(nextSeq).padStart(4, '0');
-    const id = `D${vesselCode}-${yearCode}-${seqCode}`;
-    
-    const result = await db.insert(defects).values({
-      ...defect,
-      id,
-      duuid: randomUUID(),
-    }).returning();
+
+    if (side === 'ship') {
+      if (existingSeq.length === 0) {
+        await db.insert(defectSequences).values({ vesselId, year: currentYear, lastSequence: nextSeq });
+      } else if (nextSeq > existingSeq[0].lastSequence) {
+        await db.update(defectSequences).set({ lastSequence: nextSeq })
+          .where(and(eq(defectSequences.vesselId, vesselId), eq(defectSequences.year, currentYear)));
+      }
+    }
 
     // Sync field logging — INSERT
     try { await logFieldChanges('defects', result[0].duuid, defect.vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect create:', e); }

@@ -795,6 +795,58 @@ export interface FieldLogEntry {
  * - updateLogs: field logs that need UPDATE (not part of an INSERT group)
  * - errors: any errors during INSERT
  */
+// ═══════════════════════════════════════════════════════════════
+// CROSS-INSTANCE PARENT LINKS (13-Oct-2026, Testvessel)
+// ═══════════════════════════════════════════════════════════════
+// Some child tables link to their parent by the parent's LOCAL integer id. That number is
+// assigned separately on shore and on each ship, so the SENDER's value is meaningless here:
+// it either names no row (FK violation → the old NULL-FK retry then hit NOT NULL, retrying
+// forever) or silently names a DIFFERENT parent. The child also carries the parent's UUID,
+// which is the same everywhere — resolve the local id from it BEFORE writing the row.
+interface ParentUuidLink { fkCol: string; uuidCol: string; parentTable: string; parentUuidCol: string }
+export const PARENT_UUID_LINKS: Record<string, ParentUuidLink[]> = {
+  change_request_approval: [
+    { fkCol: 'change_request_id', uuidCol: 'change_request_uuid', parentTable: 'change_request', parentUuidCol: 'cruuid' },
+  ],
+};
+
+/**
+ * Point every UUID-carried parent link of `row` at THIS instance's parent row (mutates `row`).
+ * Returns null when all links resolved (or the table has none), otherwise the reason the row must
+ * wait: the parent has not arrived yet, or the row does not name its parent. The caller keeps such
+ * a row PENDING — it is never written with the sender's id and never written with the link blanked.
+ */
+export async function resolveParentLinks(
+  pool: { query: (text: string, values?: any[]) => Promise<any> },
+  tableName: string,
+  row: Record<string, any>
+): Promise<string | null> {
+  for (const link of PARENT_UUID_LINKS[tableName] || []) {
+    const parentUuid = row[link.uuidCol] ?? row[toCamelCase(link.uuidCol)];
+    if (!parentUuid) return `no ${link.uuidCol} — cannot tell which ${link.parentTable} it belongs to`;
+    const r = await pool.query(`SELECT id FROM "${link.parentTable}" WHERE "${link.parentUuidCol}" = $1 LIMIT 1`, [parentUuid]);
+    if (r.rows.length === 0) return `${link.parentTable} ${parentUuid} has not arrived on this instance yet`;
+    row[link.fkCol] = r.rows[0].id;
+    if (toCamelCase(link.fkCol) in row) row[toCamelCase(link.fkCol)] = r.rows[0].id;
+  }
+  return null;
+}
+
+/**
+ * Tables whose unique keys (other than the sync identity) are business numbers given out
+ * independently on each side. A unique-key collision there means two DIFFERENT records — the
+ * "same logical row, adopt its identity" conflict fallback must never merge them.
+ */
+export const NEVER_MERGE_ON_CONFLICT = new Set<string>(['defects']);
+
+/** True for a field log that would write the SENDER's local parent id into an existing row. */
+function isNonPortableParentLinkLog(log: FieldLogEntry): boolean {
+  const links = PARENT_UUID_LINKS[log.tableName];
+  if (!links) return false;
+  const col = fieldNameToColumn(log.fieldName);
+  return links.some((l) => l.fkCol === col);
+}
+
 export async function applyFieldLogInserts(
   fieldLogs: FieldLogEntry[],
   /** Optional pg client to reuse (for transactional SET LOCAL sync.bypass_trigger) */
@@ -1008,6 +1060,22 @@ export async function applyFieldLogInserts(
       if (!rowData['created_at']) rowData['created_at'] = new Date();
       if (!rowData['updated_at']) rowData['updated_at'] = new Date();
 
+      // Parent links by UUID (change_request_approval → change_request): replace the sender's local
+      // integer parent id with THIS instance's id BEFORE the INSERT. Parent not here yet → keep the
+      // row pending (retried next cycle) instead of failing, blanking the link or attaching it to a
+      // different parent that happens to have the same number.
+      const waitReason = await resolveParentLinks(pool, tableName, rowData);
+      if (waitReason) {
+        const msg = `${tableName}.${rowUuid}: waiting for parent — ${waitReason}; kept pending`;
+        errors.push(msg);
+        failedRowUuids.push(rowUuid);
+        syncDiag(`FIELD-LOG-INSERT PARENT-WAIT: ${msg}`);
+        if (externalClient) {
+          try { await pool.query(`RELEASE SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+        }
+        continue;
+      }
+
       // Defense-in-depth (pairs with full-row-creation logging): work_orders.id is a LOCAL text PK
       // with no DB default, and it is intentionally NOT carried across instances (every child table
       // FKs to wouuid, never to id). If an incoming INSERT lacks `id`, assign a fresh local id keyed
@@ -1166,30 +1234,7 @@ export async function applyFieldLogInserts(
         }
       }
 
-      // ── Post-INSERT: Cross-instance integer FK resolution for change_request_uuid → change_request_id ──
-      // change_request.id is a per-instance identity (cruuid is the sync key), so the sender's
-      // integer change_request_id is meaningless here — worse, it can silently MATCH a different
-      // local change_request (wrong-parent attach, no error). Resolve the authoritative parent via
-      // change_request_uuid and overwrite the integer FK (same pattern as the location_uuid remap).
-      if (tableName === 'change_request_approval' && rowData['change_request_uuid']) {
-        try {
-          const crLookup = await pool.query(
-            `SELECT id FROM change_request WHERE cruuid = $1 LIMIT 1`,
-            [rowData['change_request_uuid']]
-          );
-          if (crLookup.rows.length > 0) {
-            await pool.query(
-              `UPDATE "${tableName}" SET "change_request_id" = $1 WHERE "${identityCol}" = $2`,
-              [crLookup.rows[0].id, rowUuid]
-            );
-            syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} change_request_uuid=${rowData['change_request_uuid']} → local change_request_id=${crLookup.rows[0].id}`);
-          } else {
-            syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} change_request_uuid=${rowData['change_request_uuid']} — change_request not yet synced`);
-          }
-        } catch (fkErr: any) {
-          syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
-        }
-      }
+      // (change_request_approval's parent link is resolved by UUID BEFORE the INSERT — resolveParentLinks.)
 
       // Release savepoint on success — keeps transaction clean
       if (externalClient) {
@@ -1275,7 +1320,17 @@ export async function applyFieldLogInserts(
             }
           }
 
-          if (existingIdentity) {
+          if (existingIdentity && existingIdentity !== rowUuid && NEVER_MERGE_ON_CONFLICT.has(tableName)) {
+            // Two DIFFERENT records collided on a natural key (defects: the same defect number given
+            // out on shore and on the ship). Merging would overwrite one with the other and take
+            // over its identity — the defect loss proven on the pilot (8-Oct-2026). Keep both: the
+            // local row is untouched and the incoming one stays pending, reported until resolved.
+            const msg = `${tableName}.${rowUuid}: ${err.detail || 'unique key already used'} by a DIFFERENT record (${identityCol} ${existingIdentity}) — not merged, nothing overwritten; incoming record kept pending`;
+            console.error(`[FieldLogInsert] ⚠️ NUMBER CLASH: ${msg}`);
+            syncDiag(`FIELD-LOG-INSERT NUMBER-CLASH: ${msg}`);
+            errors.push(msg);
+            failedRowUuids.push(rowUuid);
+          } else if (existingIdentity) {
             // Apply field-level updates to the existing row
             let fieldsApplied = 0;
             for (const log of logs) {
@@ -1372,7 +1427,15 @@ export async function applyFieldLogInserts(
           if (detailMatch) fkColumn = detailMatch[1];
         }
 
-        if (fkColumn && rowData[fkColumn] !== undefined) {
+        if (!meta) { try { meta = await getColumnMeta(pool, tableName); } catch { /* fall through with null meta */ } }
+        if (fkColumn && meta && meta.requiredCols.has(fkColumn)) {
+          // A NOT NULL link can never be blanked (the retry could only fail with a NOT NULL error —
+          // the Testvessel loop). Keep the row pending: its parent may still arrive.
+          const msg = `${tableName}.${rowUuid}: ${fkColumn} points at a row that does not exist here and cannot be left empty; kept pending (${constraintName})`;
+          syncDiag(`FIELD-LOG-INSERT FK-WAIT: ${msg}`);
+          errors.push(msg);
+          failedRowUuids.push(rowUuid);
+        } else if (fkColumn && rowData[fkColumn] !== undefined) {
           syncDiag(`FK-NULL RETRY: ${tableName} row=${rowUuid} — setting ${fkColumn}=NULL and retrying INSERT`);
           try {
             // Rollback to savepoint, null out the FK column, and retry
@@ -1433,8 +1496,16 @@ export async function applyFieldLogInserts(
     }
   }
 
-  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${updateLogs.length}, errors=${errors.length}, selfHealRequests=${needsFullRows.length}`);
-  return { insertedRows, updateLogs, errors, failedRowUuids, needsFullRows };
+  // An UPDATE to an existing row must never copy the SENDER's local parent id over the receiver's
+  // (the parent never changes; only its number differs per instance). Drop those field logs from
+  // the update pass — they count as applied, so they are not retried.
+  const portableUpdateLogs = updateLogs.filter((l) => !isNonPortableParentLinkLog(l));
+  if (portableUpdateLogs.length !== updateLogs.length) {
+    syncDiag(`FIELD-LOG-INSERT: ${updateLogs.length - portableUpdateLogs.length} parent-id field update(s) ignored (local id differs per instance; parent resolved by UUID)`);
+  }
+
+  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${portableUpdateLogs.length}, errors=${errors.length}, selfHealRequests=${needsFullRows.length}`);
+  return { insertedRows, updateLogs: portableUpdateLogs, errors, failedRowUuids, needsFullRows };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1494,6 +1565,16 @@ export async function applyFullRowsIfAbsent(
             continue;
           }
           row = { ...row, date_completed: executionDate };
+        }
+      }
+      // Parent links by UUID — never the sender's local integer parent id (see resolveParentLinks).
+      if (PARENT_UUID_LINKS[tableName]) {
+        row = { ...row };
+        const waitReason = await resolveParentLinks(pool, tableName, row);
+        if (waitReason) {
+          out.errors.push(`${tableName}.${identity}: waiting for parent — ${waitReason}`);
+          syncDiag(`SELF-HEAL PARENT-WAIT: ${tableName}.${identity} — ${waitReason}`);
+          continue;
         }
       }
       // Build the INSERT column-name-mapped (order-safe); skip serial/identity integer PKs so
