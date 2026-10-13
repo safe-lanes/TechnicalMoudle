@@ -577,6 +577,7 @@ export class SyncEngine {
     let cyclesRun = 0;
     let prevRemaining = Number.POSITIVE_INFINITY;
     let aggPushed = 0, aggPulled = 0, aggConflicts = 0, aggAuto = 0, aggFiles = 0;
+    const aggErrors = new Set<string>();
     let last!: SyncResult;
 
     try {
@@ -588,6 +589,9 @@ export class SyncEngine {
         aggConflicts += last.conflictsFound;
         aggAuto += last.conflictsAutoResolved;
         aggFiles += last.filesQueued;
+        // Keep every cycle's errors: a row that failed in cycle 1 and is backed off in cycle 2 would otherwise
+        // vanish from the result the user sees (only the LAST cycle was returned).
+        for (const line of String(last.error || '').split('\n')) if (line.trim()) aggErrors.add(line);
 
         if (!last.success) break; // FAILURE → stop (counts unknown)
 
@@ -628,6 +632,7 @@ export class SyncEngine {
       conflictsFound: aggConflicts,
       conflictsAutoResolved: aggAuto,
       filesQueued: aggFiles,
+      error: aggErrors.size > 0 ? Array.from(aggErrors).join('\n') : last.error,
       cyclesRun,
     };
   }
