@@ -12,6 +12,7 @@ Audience: Nilesh (deploy), support. Written 14-Oct-2026.
 | **Defect numbers** | Office and ship numbered defects from the same series. Two defects raised between syncs could get the same number, and one overwrote the other. | Ship defects keep their format (`D048-26-0004`). Office defects get their own series: **`D048-26-O0001`**. Existing defects keep their numbers. If two different defects ever share a number (old data), both are kept and nothing is overwritten. |
 | **Defect counter** | Synced by row number, and failed on Testvessel ("defect_sequences … missing [year]"). | No longer synced. Each side numbers its own series from the defects themselves. |
 | **Component documents** | An office upload and a ship upload between syncs both got number 1, and each side silently kept only its own. | Each document gets a permanent ID (database change 182). Both documents reach both sides. |
+| **Setting up a new ship (provisioning)** | Maintenance history, component documents (and requisitions, running-hours log, class/regulatory items) were left out of the setup package — 0 rows — and the setup check still said "verified". A ship set up later also never received the document files. | These tables are included. The setup also re-offers the vessel's document and attachment files to the new ship. |
 | **Sync Now result on the ship** | Errors on the office side reached the ship only as a count. Sync Now showed only the last round's errors. | The ship shows "Office could not apply: …" lines, collected from all rounds. |
 
 ## Rollout order
@@ -45,5 +46,7 @@ Going back to the previous version after this release has one known effect. The 
 
 ## Not in this release (known, separate)
 
-- Component requisitions and surveys probably have the same row-number issue as documents. Found in the code; not yet tested.
+- Old ship edits of shared component documents may have landed on the wrong document in the office (or the reverse) before this release. Check per vessel with docs/output/component-documents-wrong-edit-check.sql; repair only what it finds.
+
+- Component requisitions: same row-number weakness, but no screen creates requisitions today, so nothing to fix now (ask Jeevan if they will be used). Surveys S1–S5 are built-in sample rows with no vessel and never sync — no issue.
 - Six office-to-ship tables scoped by vessel code (fleet mappings, master data, component class/regulatory) are skipped during normal sync. Not changed here; it needs a decision first.
