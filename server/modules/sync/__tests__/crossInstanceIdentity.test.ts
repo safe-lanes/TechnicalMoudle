@@ -142,3 +142,14 @@ describe('component_documents — UUID identity across versions (mig 182)', () =
     expect(holdBackForOldShip(logs, [CAP_COMPONENT_DOCUMENTS_UUID])).toEqual({ logs, heldBack: 0 });
   });
 });
+
+describe('provisioning — vessel_code-scoped tables (14-Oct-2026)', () => {
+  it('matches vessel_code by the vessel UUID (what the app writes) and by vessels.id', async () => {
+    const { vesselScopeValues } = await import('../provisioningService');
+    expect(vesselScopeValues('vessel_code', '743ef9d1-841a-11ed-aa7c-7003bca91a86', 'WKFV'))
+      .toEqual(['743ef9d1-841a-11ed-aa7c-7003bca91a86', 'WKFV']);
+    expect(vesselScopeValues('vessel_id', '743ef9d1', 'WKFV')).toEqual(['743ef9d1']); // vessel_id scope unchanged
+    expect(vesselScopeValues('vessel_code', 'same', 'same')).toEqual(['same']);
+    expect(vesselScopeValues('vessel_code', null, '')).toEqual([]);
+  });
+});
