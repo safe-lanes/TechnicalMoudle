@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { useLocation } from "wouter";
 import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2, Check, ChevronsUpDown, X, ChevronUp } from "lucide-react";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -283,6 +284,7 @@ export default function ComponentRegisterAddEdit({
 
   const { data: maintenanceHistory = [], error: historyError } = useQuery<any[]>({
     queryKey: ['/technical/api/component-maintenance-history', activeComponentId],
+    select: rows => rows.filter(isVisibleMaintenanceHistory),
     queryFn: async () => {
       if (!activeComponentId) return [];
       const response = await fetch(`/technical/api/component-maintenance-history/${activeComponentId}`, {

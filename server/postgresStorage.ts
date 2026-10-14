@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { persistMaintenanceHistory, visibleMaintenanceHistory } from './modules/work-orders/utils/maintenanceHistoryPersistence';
 import {
   type ApprovalFieldOverride,
   approvalValuesEqual,
@@ -2227,17 +2228,18 @@ export class PostgresStorage {
     const db = await getDb();
     if (vesselCode) {
       return await db.select().from(componentMaintenanceHistory)
-        .where(eq(componentMaintenanceHistory.vesselCode, vesselCode))
+        .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.vesselCode, vesselCode)))
         .orderBy(desc(componentMaintenanceHistory.createdAt));
     }
     return await db.select().from(componentMaintenanceHistory)
+      .where(visibleMaintenanceHistory)
       .orderBy(desc(componentMaintenanceHistory.createdAt));
   }
 
   async getComponentMaintenanceHistory(componentId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.componentId, componentId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.componentId, componentId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
@@ -2245,6 +2247,7 @@ export class PostgresStorage {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
       .where(and(
+        visibleMaintenanceHistory,
         eq(componentMaintenanceHistory.componentCode, componentCode),
         eq(componentMaintenanceHistory.vesselCode, vesselCode)
       ))
@@ -2254,35 +2257,35 @@ export class PostgresStorage {
   async getMaintenanceHistoryByJobId(jobId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.jobId, jobId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.jobId, jobId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
   async getMaintenanceHistoryByJobCode(jobCode: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.jobCode, jobCode))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.jobCode, jobCode)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
   async getComponentMaintenanceHistoryItem(id: number): Promise<ComponentMaintenanceHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.id, id));
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.id, id)));
     return result[0];
   }
 
   async getMaintenanceHistoryByWorkOrderId(workOrderId: string): Promise<ComponentMaintenanceHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.workOrderId, workOrderId));
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.workOrderId, workOrderId)));
     return result[0];
   }
 
   async getMaintenanceHistoryByVessel(vesselId: string): Promise<any[]> {
     const db = await getDb();
     const history = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.vesselCode, vesselId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.vesselCode, vesselId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     if (history.length === 0) return [];
 
@@ -2312,11 +2315,7 @@ export class PostgresStorage {
 
   // INSERT ONLY - No update or delete methods per immutability requirement
   async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
-    const db = await getDb();
-    const result = await db.insert(componentMaintenanceHistory).values(history).returning();
-    // Sync field logging — INSERT
-    try { await logFieldChanges('component_maintenance_history', result[0].cmhuuid, (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] cmh create:', e); }
-    return result[0];
+    return persistMaintenanceHistory(history);
   }
 
   // ============= MODULE 3: COMPONENT REQUISITIONS =============
@@ -9624,6 +9623,7 @@ export class PostgresStorage {
     // First try to match by jobId directly
     let results = await db.select().from(componentMaintenanceHistory)
       .where(and(
+        visibleMaintenanceHistory,
         eq(componentMaintenanceHistory.jobId, jobId),
         eq(componentMaintenanceHistory.componentCode, componentCode)
       ))
@@ -9644,7 +9644,9 @@ export class PostgresStorage {
     
     // Get all maintenance history for this component, then filter by jobNo match
     const allRecords = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.componentCode, componentCode))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.componentCode, componentCode),
+        or(eq(componentMaintenanceHistory.vesselCode, job[0].vesselId ?? ''),
+          eq(componentMaintenanceHistory.vesselCode, vesselCode ?? ''))))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     
     // Legacy and vessel-prefixed work order numbers both resolve to the

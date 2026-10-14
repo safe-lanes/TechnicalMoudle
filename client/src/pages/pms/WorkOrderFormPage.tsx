@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators, formatWorkOrderDateDDMMYYYY, workOrderOverdueCompletionMessage } from "@shared/dateUtils";
 import {
   AlertDialog,
@@ -733,7 +734,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const buildWorkHistoryForExport = () => {
-    const raw = templateData.workHistory || [];
+    const raw = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
     return raw
       .filter((h: any) => {
         const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
@@ -5261,7 +5262,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={handleExportWorkHistoryExcel}
-                  disabled={isExportingHistoryExcel || (templateData.workHistory || []).length === 0}
+                  disabled={isExportingHistoryExcel || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                   data-testid="button-export-history-excel"
                   className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-40"
                 >
@@ -5273,7 +5274,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={handleExportWorkHistoryPDF}
-                  disabled={isExportingHistoryPDF || (templateData.workHistory || []).length === 0}
+                  disabled={isExportingHistoryPDF || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                   data-testid="button-export-history-pdf"
                   className="h-7 text-xs border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-40"
                 >
@@ -5285,7 +5286,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             }
           >
             {(() => {
-              const rawHistory = templateData.workHistory || [];
+              const rawHistory = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
               type SpareUsedItem = { partName?: string; partCode?: string; quantity?: number | null };
               const allHistory = rawHistory.map((history: any) => {
                 if (history.isSkipped) {

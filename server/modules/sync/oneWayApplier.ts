@@ -1471,6 +1471,15 @@ export async function applyFieldLogInserts(
           console.error(`[FieldLogInsert] Conflict fallback error for ${tableName}.${rowUuid}:`, fallbackErr.message);
         }
       } else if (err.code === '23503') {
+        if (tableName === 'component_maintenance_history') {
+          // Immutable history cannot be repaired later by UPDATE. Keep its complete
+          // original FK payload pending instead of inserting a permanently unlinked row.
+          const message = `${tableName}.${rowUuid}: parent not yet available; immutable history kept pending`;
+          errors.push(message);
+          failedRowUuids.push(rowUuid);
+          syncDiag(`FIELD-LOG-INSERT HISTORY-PARENT-DEFER: ${message}`);
+          continue;
+        }
         // 23503 = foreign_key_violation — the row references a FK target that doesn't
         // exist on this instance. Common case: defect created on ship references a
         // component_id that was soft-deleted or not yet synced to shore.

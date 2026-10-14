@@ -1,4 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
+import { isVisibleMaintenanceHistory } from '@shared/workOrders/maintenanceHistoryVisibility';
 import { NotFoundError } from '../../shared/errors';
 import { ensureArray, ensureJsonObject } from '../../shared/jsonHelpers';
 import { resolveWorkOrderPartADates } from '../utils/workOrderPartADates';
@@ -155,7 +156,7 @@ export async function getWorkOrderContext(workOrderId: string) {
   if (workOrder.wouuid && workOrder.status === 'Completed') {
     try {
       const ownHistory = await repo.findMaintenanceHistoryByWorkOrderId(workOrder.wouuid);
-      if (ownHistory && !existingWoIds.has(workOrder.wouuid)) {
+      if (ownHistory && isVisibleMaintenanceHistory(ownHistory) && !existingWoIds.has(workOrder.wouuid)) {
         existingWoIds.add(workOrder.wouuid);
         workHistory.push({
           woNo: ownHistory.workOrderNo || workOrder.workOrderNo || '-',
@@ -186,7 +187,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     try {
       const maintenanceHistoryRecords = await repo.findMaintenanceHistoryByJobId(job.juuid);
 
-      for (const h of maintenanceHistoryRecords) {
+      for (const h of maintenanceHistoryRecords.filter(isVisibleMaintenanceHistory)) {
         if (h.isSkipped) {
           workHistory.push({
             woNo: '-',

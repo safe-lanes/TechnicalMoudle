@@ -1,6 +1,7 @@
 import { validateReviewerSelection } from './officeReviewerValidation';
 import { officeReviewerRoleRuidsSchema } from '@shared/officeReviewer';
 import * as repo from '../repositories/jobRepository';
+import { isVisibleMaintenanceHistory } from '@shared/workOrders/maintenanceHistoryVisibility';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../shared/errors';
 
 interface UserInfo {
@@ -543,10 +544,11 @@ export async function getJobMaintenanceHistory(jobId: string, user: UserInfo) {
   }
 
   let history = await repo.findMaintenanceHistoryByJobId(jobId);
+  history = history.filter(isVisibleMaintenanceHistory);
   if (history.length === 0 && job.jobNo) {
     history = await repo.findMaintenanceHistoryByJobCode(job.jobNo);
   }
-  return history;
+  return history.filter(isVisibleMaintenanceHistory);
 }
 
 // ── Generate Work Order ──
