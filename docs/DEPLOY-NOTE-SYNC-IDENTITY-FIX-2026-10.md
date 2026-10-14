@@ -46,7 +46,6 @@ Going back to the previous version after this release has one known effect. The 
 
 ## Not in this release (known, separate)
 
-- Old ship edits of shared component documents may have landed on the wrong document in the office (or the reverse) before this release. Check per vessel with docs/output/component-documents-wrong-edit-check.sql; repair only what it finds.
-
+- Old ship edits of shared component documents may have landed on the wrong document in the office (or the reverse) before this release. Check per vessel with docs/component-documents-wrong-edit-check.sql; repair only what it finds.
 - Component requisitions: same row-number weakness, but no screen creates requisitions today, so nothing to fix now (ask Jeevan if they will be used). Surveys S1–S5 are built-in sample rows with no vessel and never sync — no issue.
 - Six office-to-ship tables scoped by vessel code (fleet mappings, master data, component class/regulatory) are skipped during normal sync. Not changed here; it needs a decision first.
