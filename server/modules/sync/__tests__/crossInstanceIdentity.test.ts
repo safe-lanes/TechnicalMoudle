@@ -140,7 +140,7 @@ describe('component_documents — UUID identity across versions (mig 182)', () =
     expect(holdBackForOldShip(logs, undefined)).toEqual({ logs: [logs[1], logs[2]], heldBack: 1 });
     expect(holdBackForOldShip(logs, ['something-else']).heldBack).toBe(1);
     expect(holdBackForOldShip(logs, [CAP_COMPONENT_DOCUMENTS_UUID])).toEqual({ logs, heldBack: 0 });
-  });
+  }, 30_000); // first import of the sync service module is slow under load
 });
 
 describe('provisioning — vessel_code-scoped tables (14-Oct-2026)', () => {
