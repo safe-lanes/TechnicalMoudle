@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from . import agent, chat, db, kb_routes, llm, retrieval, suggestions
+from . import agent, chat, db, kb_routes, llm, retrieval, suggestions, widget_static
 from .config import settings
 from .identity import peek_issuer, verify_identity
 
@@ -30,6 +30,8 @@ def prompt_record() -> dict[str, str]:
 app = FastAPI(title="SAIL AI Assistant", docs_url=None, redoc_url=None, openapi_url=None)
 # Knowledge management (30-Sep-2026): /kb (owner screen + API) and /feedback (review items from chat users).
 app.include_router(kb_routes.router)
+# Shared chat widget bundle (15-Oct-2026): GET /widget/<version>/<file>, immutable, see app/widget_static.py.
+app.include_router(widget_static.router)
 
 # 24-Sep-2026: module-instance registry hygiene, printed once at import/startup. Instances that reuse a signing key
 # or a secret, or whose signing key equals the shared documentation key, are REJECTED (dropped) by settings().

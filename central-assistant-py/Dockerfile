@@ -9,6 +9,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY app ./app
 COPY alembic.ini ./
 COPY alembic ./alembic
+# Shared chat widget versions (copied in by scripts/sync_widget_bundle.py; served at /widget/<version>/)
+COPY widget ./widget
 RUN useradd -r -u 10001 assistant && chown -R assistant /app
 USER assistant
 ENV PATH="/opt/venv/bin:$PATH" PORT=8000
