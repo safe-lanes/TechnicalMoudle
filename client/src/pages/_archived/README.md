@@ -1,7 +1,10 @@
 # Archived Files
 
 This folder contains unused/dead code files that were identified and archived on 05-Jan-2026.
-These files are kept for reference in case functionality needs to be restored.
+The remaining files are kept for reference in case functionality needs to be restored.
+The unused `defects/DefectForm.tsx` and `defects/DefectFormSimple.tsx` reference
+copies have been retired; use Git history to recover them if needed. Previous
+compiler investigation reports remain historical evidence, not a current inventory.
 
 ## Archived Files
 
@@ -9,8 +12,6 @@ These files are kept for reference in case functionality needs to be restored.
 - **WorkOrderUpload.tsx** - Bulk work order upload UI (incomplete - no backend API exists)
 
 ### defects/
-- **DefectForm.tsx** - Old defect form (replaced by DefectFormWizard)
-- **DefectFormSimple.tsx** - Simplified defect form (never integrated)
 - **DefectsRecurring.tsx** - Duplicate of RecurringDefects.tsx in parent folder
 
 ### modify-pms/
