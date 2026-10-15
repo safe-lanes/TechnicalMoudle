@@ -18,27 +18,86 @@ minted by one instance can never obtain another instance's data.
 
 ## 1. Stage 1 — documentation answers
 
-### 1.1 The widget (client)
+### 1.1 The widget (client): one shared bundle for every module (rewritten 15-Oct-2026)
 
-Copy from Technical and rename nothing but the module id:
+Modules no longer copy Technical's chat components. Every host (Angular, React, plain HTML) loads the **same
+built file**, `sail-assistant-widget.<version>.js`, and calls `SailAssistant.init(…)`. React is bundled
+privately inside it, so the host installs nothing. The widget renders in its own shadow root, so the host's
+styles can't leak in. Source and build: `packages/sail-assistant-widget/` (`npm run build` →
+`dist/<version>/` + `SHA384SUMS`).
 
-| File | Purpose |
-|---|---|
-| `client/src/components/chat/ChatButton.tsx`, `ChatPanel.tsx`, `ChatMessage.tsx`, `SuggestedPrompts.tsx` | The floating button, panel, Markdown rendering (tables need `remark-gfm`), starter questions |
-| `client/src/hooks/useChat.ts` | Conversation state; sends `context.module`, the selected vessel and the history; clears on vessel change |
-| `client/src/assistant-widget/assistantClient.ts` | Mints the token from the module (`GET …/assistant/token`) and calls the assistant; the assistant URL defaults to `https://assistant.sl-sail.com` |
+**Step 1: load the pinned bundle** in the module's `index.html`. Put the version in the file name, never "latest":
 
-Changes for another module:
+```html
+<script src="<WIDGET_HOST>/widget/1.0.0/sail-assistant-widget.1.0.0.js"
+        integrity="sha384-<from dist/1.0.0/integrity.json>" crossorigin="anonymous"></script>
+```
 
-- In `useChat.ts`, set `context.module` to the module id known to the assistant: `crewing`, `audit`,
-  `safety` or `incident` (the ids in the assistant's `MODULE_LABELS`). Everything the assistant retrieves
-  is scoped by this id.
-- `vesselId` / `vesselName` in the context are optional: send them if the module has a vessel selection,
-  otherwise omit them.
-- Gate the button the way the module gates admin features. Technical shows it to the Sail Admin view mode
-  and hides it on ship instances (`useSyncInstanceInfo`). If the module has no ship instances, drop that part.
-- Starter prompts: write four to eight questions the module's manual can answer; verify each one against
-  the assistant before shipping (Technical did: every prompt answered with a Source line).
+`<WIDGET_HOST>` is **not decided yet** (see "Open decisions" below). If the script is missing (offline or
+ship build), the host simply doesn't start the widget. That must not show an error.
+
+**Step 2: start it once after login**, with the module id and a token provider:
+
+```js
+const widget = SailAssistant.init({
+  assistantUrl: 'https://assistant.sl-sail.com',
+  module: 'crewing',                    // configured id, never derived from the URL
+  title: 'Crewing Assistant',
+  getToken: async ({ forceRefresh, signal }) => {
+    // the module's OWN authenticated endpoint (section 1.2); the server verifies the login
+    const r = await fetch('/crewing/api/assistant/token', { signal, cache: 'no-store' /* + the module's auth */ });
+    if (!r.ok) throw new Error('token ' + r.status);
+    return (await r.json()).token;
+  },
+  context: { userKey: user.id, tenantKey: tenant, vesselId: null, vesselName: null },
+  offset: 20,                           // keep clear of the host's own floating buttons
+});
+```
+
+**Step 3: keep the context current, and stop on logout.**
+- Call `widget.updateContext({ vesselId, vesselName, currentPage })`. A change of module, vessel, user or
+  tenant starts a new conversation.
+- On logout, call `widget.updateContext({ userKey: null })` (hides the widget and clears the history) or `widget.destroy()`.
+
+Host code ready to copy (tested):
+
+| Host stack | File to copy | Notes |
+|---|---|---|
+| Angular (like Audit; tested on Angular 19.2) | `packages/sail-assistant-widget/examples/audit-angular/src/app/sail-assistant.service.ts` | Runs the widget outside Angular's zone, so it never triggers the host's change detection |
+| React (like Crewing; tested on React 18.3 + wouter + Tailwind) | `packages/sail-assistant-widget/examples/crewing-react/src/useSailAssistant.ts` | Hook: mount once, update on route, vessel or login change |
+| Plain HTML / anything else | `packages/sail-assistant-widget/examples/plain-html/index.html` | Script tag + `init` |
+
+The widget already handles these, so the host doesn't:
+- starter questions from the assistant's `GET /suggestions` (only questions the module's own manuals answer);
+- Markdown tables, citations and follow-up history;
+- when the assistant rejects a token: one forced token refresh and one retry, then a "sign in again" message.
+
+**Tested 15-Oct-2026.** This used the pilot assistant with a MOCK identity; no real module login is involved yet.
+- Live test (`test/e2e/live.spec.ts`), 4/4 passed:
+  - in all three host stacks: real starter questions, real answers that cite the module's own manuals, and a working follow-up;
+  - a rejected first token recovers with exactly one refresh.
+- The same live test fails from an origin the assistant doesn't allow, as it should.
+- Mock suite 27/27; unit tests 25/25.
+- Every starter question was asked on the pilot, and 21/21 were answered (`central-assistant-py/scripts/verify_suggestions.py`).
+
+**Versions, upgrade and rollback**
+- Each release is a new folder `widget/<x.y.z>/`, and old folders stay.
+- A module upgrades by changing the version and integrity in its own `index.html`, and rolls back the same
+  way. No assistant change is needed for either.
+- The widget talks to the assistant only through `POST /chat` and `GET /suggestions` (`docs/ASSISTANT-API.md`).
+  The assistant keeps both backward compatible.
+
+**Open decisions (Ghazi):**
+1. Where the bundle is served from (`<WIDGET_HOST>`): the assistant host
+   (`https://assistant.sl-sail.com/widget/…`; the assistant doesn't serve it today), or a copy in each module's
+   own static files.
+2. For each module and environment: add its origin to the assistant's allowed origins (CORS), and register it (1.3).
+
+Each module still has to build the token endpoint described in 1.2; it isn't part of the widget. Neither
+Crewing nor Audit has one today. Crewing's login token carries no role, so its endpoint has to look the role
+up on the server.
+
+Technical keeps its existing in-app chat for now. Moving it to the shared widget is optional.
 
 ### 1.2 The token mint (server) — the only endpoint stage 1 needs
 
