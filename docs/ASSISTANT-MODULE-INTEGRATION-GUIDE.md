@@ -29,12 +29,14 @@ styles can't leak in. Source and build: `packages/sail-assistant-widget/` (`npm 
 **Step 1: load the pinned bundle** in the module's `index.html`. Put the version in the file name, never "latest":
 
 ```html
-<script src="<WIDGET_HOST>/widget/1.0.0/sail-assistant-widget.1.0.0.js"
+<script src="https://assistant.sl-sail.com/widget/1.0.0/sail-assistant-widget.1.0.0.js"
         integrity="sha384-<from dist/1.0.0/integrity.json>" crossorigin="anonymous"></script>
 ```
 
-`<WIDGET_HOST>` is **not decided yet** (see "Open decisions" below). If the script is missing (offline or
-ship build), the host simply doesn't start the widget. That must not show an error.
+The assistant serves the bundle itself (decided 15-Oct-2026, option A): `GET /widget/<version>/<file>`. It
+serves only the files listed in that version's `integrity.json`, byte-exact, cached for a year, and readable
+from any site. **It goes live with the next assistant release**; until then it is only on the pilot test assistant.
+If the script is missing (offline or ship build), the host simply doesn't start the widget. That must not show an error.
 
 **Step 2: start it once after login**, with the module id and a token provider:
 
@@ -87,11 +89,12 @@ The widget already handles these, so the host doesn't:
 - The widget talks to the assistant only through `POST /chat` and `GET /suggestions` (`docs/ASSISTANT-API.md`).
   The assistant keeps both backward compatible.
 
-**Open decisions (Ghazi):**
-1. Where the bundle is served from (`<WIDGET_HOST>`): the assistant host
-   (`https://assistant.sl-sail.com/widget/…`; the assistant doesn't serve it today), or a copy in each module's
-   own static files.
-2. For each module and environment: add its origin to the assistant's allowed origins (CORS), and register it (1.3).
+**Publishing a new widget version:** build it (`npm run build` in the package), copy it into the assistant with
+`python central-assistant-py/scripts/sync_widget_bundle.py <version>` (checks the hashes and never changes an
+existing version), then release the assistant.
+
+**For each module and environment (Ghazi/support):** add its origin to the assistant's allowed origins (CORS), and
+register it (1.3).
 
 Each module still has to build the token endpoint described in 1.2; it isn't part of the widget. Neither
 Crewing nor Audit has one today. Crewing's login token carries no role, so its endpoint has to look the role

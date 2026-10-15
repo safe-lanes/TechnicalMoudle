@@ -106,6 +106,10 @@ createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
     return res.end(readFileSync(file));
   }
+  if (url.pathname === '/bare/') { // empty host page (no bundle) — live test loads the bundle from the assistant itself
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    return res.end('<!doctype html><html><head><meta charset="utf-8"><title>Bare host</title></head><body></body></html>');
+  }
   if (url.pathname === '/') { res.writeHead(302, { location: '/plain/' }); return res.end(); }
   send(res, 404, { error: 'not found' });
 }).listen(HOST_PORT, () => console.log(`[mock] hosts + widget ${version} + MOCK token endpoints on ${HOST_ORIGIN}`

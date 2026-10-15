@@ -67,3 +67,35 @@ test('rejected token: exactly one forced refresh, then the real suggestions and 
   await expect(msg.locator('.sa-cite').first()).toBeVisible({ timeout: 120_000 });
   await expect(msg.locator('.sa-err')).toHaveCount(0);
 });
+
+// 15-Oct-2026 (option A): the bundle is served BY THE ASSISTANT at /widget/<version>/. A bare page that loads it from
+// there with Subresource Integrity must start the widget and get a real answer; a wrong integrity hash must block it.
+test('bundle served by the assistant: loads with integrity, answers; wrong hash is blocked', async ({ page }) => {
+  const { readFileSync } = await import('node:fs');
+  const integrity = JSON.parse(readFileSync(new URL('../../dist/1.0.0/integrity.json', import.meta.url), 'utf8')).files['sail-assistant-widget.1.0.0.js'];
+  const src = `${LIVE}/widget/1.0.0/sail-assistant-widget.1.0.0.js`;
+  await page.goto('/bare/'); // a real served page (a test-runner page has no address, which Chrome's local-network check blocks)
+  const load = (hash: string) => page.evaluate(([s, h]) => new Promise<string>((resolve) => {
+    const el = document.createElement('script');
+    el.src = s; el.integrity = h; el.crossOrigin = 'anonymous';
+    el.onload = () => resolve('loaded'); el.onerror = () => resolve('blocked');
+    document.head.appendChild(el);
+  }), [src, hash]);
+  expect(await load('sha384-' + 'A'.repeat(64))).toBe('blocked');
+  expect(await page.evaluate(() => typeof (window as unknown as { SailAssistant?: unknown }).SailAssistant)).toBe('undefined');
+  expect(await load(integrity)).toBe('loaded');
+  await page.evaluate((assistantUrl) => {
+    (window as unknown as { SailAssistant: { init(c: unknown): unknown } }).SailAssistant.init({
+      assistantUrl, module: 'crewing', title: 'Bare host',
+      getToken: async ({ signal }: { signal: AbortSignal }) => {
+        const r = await fetch('/mock-token/plain', { headers: { Authorization: 'Bearer mock-session:101|acme|Sail Admin' }, signal, cache: 'no-store' });
+        return (await r.json()).token;
+      },
+      context: { userKey: '101', tenantKey: 'acme' },
+    });
+  }, LIVE!);
+  await launcher(page).click();
+  await expect(page.locator('[data-sail-assistant] .sa-chip').first()).toBeVisible({ timeout: 30_000 });
+  await ask(page, 'How do I create a new crew record?');
+  await expect(botMessages(page).first().locator('.sa-cite').first()).toBeVisible({ timeout: 120_000 });
+});
