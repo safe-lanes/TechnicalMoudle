@@ -2,7 +2,15 @@
 // NOT prove any module's real login or the real assistant (see live.spec.ts for the pilot run).
 import { expect, test, type Page } from '@playwright/test';
 
-const ASSIST = 'http://localhost:4802';
+// ASSIST_PORT overrides 4802 (Windows can reserve 4754-4853). The example hosts still default to :4802, so their calls
+// are re-pointed to ASSIST_PORT in the browser — the request still crosses origins, so CORS is still exercised.
+const ASSIST_PORT = process.env.ASSIST_PORT;
+const ASSIST = `http://localhost:${ASSIST_PORT || 4802}`;
+if (ASSIST_PORT && ASSIST_PORT !== '4802') {
+  test.beforeEach(async ({ page }) => {
+    await page.route('http://localhost:4802/**', (r) => r.continue({ url: r.request().url().replace('localhost:4802', `localhost:${ASSIST_PORT}`) }));
+  });
+}
 const HOSTS = [
   { name: 'plain-html', url: '/plain/', module: 'crewing', firstSuggestion: 'How do I create a new crew record?' },
   { name: 'crewing-react', url: '/crewing/crew-list', module: 'crewing', firstSuggestion: 'How do I create a new crew record?' },
