@@ -61,6 +61,7 @@ import { invalidateAfterBulkImport } from "@/lib/cacheInvalidation";
 import ImportProgressOverlay, { useImportStream, type ImportProgressData, type ImportCompleteData } from "@/components/admin/ImportProgressOverlay";
 import { LucideIcon } from "lucide-react";
 import ImportSummaryModal, { ImportSummaryRow } from "./ImportSummaryModal";
+import { isGlobalBulkImportType } from "@shared/bulkImportHistoryScope";
 
 interface FieldMapping {
   field: string;
@@ -216,16 +217,24 @@ export default function UniformBulkUpload({
   const { toast } = useToast();
   const { consumeStream } = useImportStream();
 
-  const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
-    queryKey: ['/technical/api/bulk/history', effectiveType],
-    queryFn: async () => {
-      const response = await fetch(`/technical/api/bulk/history?type=${effectiveType}&limit=50`);
+  const isGlobalHistory = isGlobalBulkImportType(effectiveType);
+  const historyVesselId = isGlobalHistory ? undefined : vesselId?.trim();
+  const canLoadHistory = isGlobalHistory || !!historyVesselId;
+
+  const { data: historyData, isLoading: historyLoading, isError: historyError } = useQuery<{items: ImportHistory[], total: number}>({
+    queryKey: ['/technical/api/bulk/history', effectiveType, historyVesselId ?? null],
+    enabled: canLoadHistory,
+    placeholderData: undefined,
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ type: effectiveType, limit: '50' });
+      if (historyVesselId) params.set('vesselId', historyVesselId);
+      const response = await fetch(`/technical/api/bulk/history?${params}`, { signal });
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     }
   });
 
-  const history = historyData?.items || [];
+  const history = canLoadHistory ? historyData?.items || [] : [];
 
   const handleDownloadTemplate = async () => {
     try {
@@ -1244,7 +1253,15 @@ export default function UniformBulkUpload({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {historyLoading ? (
+              {!canLoadHistory ? (
+                <div className="text-center py-8 text-gray-500">
+                  Select a vessel to view import history.
+                </div>
+              ) : historyError ? (
+                <div role="alert" className="text-center py-8 text-red-600">
+                  Unable to load import history. Please try again.
+                </div>
+              ) : historyLoading ? (
                 <div className="text-center py-8 text-gray-500">Loading history...</div>
               ) : history.length === 0 ? (
                 <div className="text-center py-12">

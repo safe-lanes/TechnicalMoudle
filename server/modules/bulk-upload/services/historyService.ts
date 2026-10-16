@@ -3,8 +3,8 @@ import {
   getImportHistoryById as getFileBasedHistoryById
 } from '../../../services/fileBasedImportHistory';
 
-export async function getImportHistory(type: string | undefined, limit: number, offset: number) {
-  const result = await getImportHistoryList(type, limit, offset);
+export async function getImportHistory(type: string | undefined, limit: number, offset: number, vesselId?: string) {
+  const result = await getImportHistoryList(type, limit, offset, vesselId);
   
   return {
     items: result.items.map((h: any) => ({

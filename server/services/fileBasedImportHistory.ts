@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { promises as fsPromises } from 'fs';
+import { isGlobalBulkImportType } from '../../shared/bulkImportHistoryScope';
 
 const HISTORY_DIR = path.join(process.cwd(), 'uploads', 'bulk-imports', 'history');
 
@@ -61,8 +62,15 @@ export async function saveImportHistory(data: ImportHistoryRecord): Promise<Impo
 export async function getImportHistoryList(
   type?: string,
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  vesselId?: string
 ): Promise<{ items: ImportHistoryRecord[]; total: number }> {
+  const selectedVesselId = vesselId?.trim();
+  // Vessel history must never fall back to listing every vessel when cleared.
+  // Only explicitly global template types may be listed without a vessel.
+  if (!selectedVesselId && !isGlobalBulkImportType(type)) {
+    return { items: [], total: 0 };
+  }
   await ensureHistoryDir();
   
   try {
@@ -76,7 +84,9 @@ export async function getImportHistoryList(
         const content = await fsPromises.readFile(path.join(HISTORY_DIR, file), 'utf8');
         const record = JSON.parse(content) as ImportHistoryRecord;
         
-        if (!type || record.type === type) {
+        const matchesVessel = !selectedVesselId ||
+          (record.vesselId === selectedVesselId && !isGlobalBulkImportType(record.type));
+        if ((!type || record.type === type) && matchesVessel) {
           records.push(record);
         }
       } catch (err) {

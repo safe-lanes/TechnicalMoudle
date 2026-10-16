@@ -1280,12 +1280,17 @@ export async function getImportStatus(req: Request, res: Response) {
 // ── History ──
 export async function getHistoryList(req: Request, res: Response) {
   try {
-    const { type, limit = 20, offset = 0 } = req.query;
+    const { type, vesselId, limit = 20, offset = 0 } = req.query;
+    if ((type !== undefined && typeof type !== 'string') ||
+        (vesselId !== undefined && typeof vesselId !== 'string')) {
+      return res.status(400).json({ error: 'Invalid history filters' });
+    }
     
     const history = await getImportHistory(
       type as string,
       parseInt(limit as string),
-      parseInt(offset as string)
+      parseInt(offset as string),
+      vesselId as string | undefined
     );
 
     res.json(history);
