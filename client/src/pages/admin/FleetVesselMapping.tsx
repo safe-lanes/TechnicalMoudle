@@ -1,3 +1,4 @@
+import { useAdminUrlState, useAdminOptionValidation } from "@/hooks/useAdminUrlState";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
@@ -97,9 +98,9 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const canCreateMasters = canCreate("admin-masters");
   const canEditMasters = canEdit("admin-masters");
   const canDeleteMasters = canDelete("admin-masters");
-  const [activeTab, setActiveTab] = useState<MappingTab>("components");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedVessel, setSelectedVessel] = useState<string>("");
+  const [activeTab, setActiveTab] = useAdminUrlState<MappingTab>("master.mapping.tab", "components", ["components", "jobs", "spares"]);
+  const [searchTerm, setSearchTerm] = useAdminUrlState<string>("master.mapping.search", "");
+  const [selectedVessel, setSelectedVessel] = useAdminUrlState<string>("master.mapping.vessel", "");
   const [selectedFleetItem, setSelectedFleetItem] = useState<string | null>(null);
   const [selectedVesselItems, setSelectedVesselItems] = useState<Set<string>>(new Set());
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
@@ -116,9 +117,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const [selectedVesselJobs, setSelectedVesselJobs] = useState<Set<string>>(new Set());
   const [selectedFleetSpare, setSelectedFleetSpare] = useState<string | null>(null); // composite key: fleetEquipmentCode|partCode
   const [selectedVesselSpares, setSelectedVesselSpares] = useState<Set<string>>(new Set());
-  const [vesselSpareSearch, setVesselSpareSearch] = useState("");
+  const [vesselSpareSearch, setVesselSpareSearch] = useAdminUrlState<string>("master.mapping.spareSearch", "");
 
-  const { data: vessels = [] } = useVessels();
+  const { data: vessels = [], isLoading: vesselsLoading, error: vesselsError } = useVessels();
+  useAdminOptionValidation(selectedVessel, setSelectedVessel, !vesselsLoading && !vesselsError ? vessels.map(v => v.id) : undefined);
 
   const { data: fleetComponentsData = [], isLoading: isLoadingFleet } = useQuery<FleetComponents[]>({
     queryKey: ["/technical/api/fleet-admin/fleet-components"],

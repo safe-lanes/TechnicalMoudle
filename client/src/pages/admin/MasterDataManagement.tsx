@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type MasterData } from "@shared/schema";
@@ -44,7 +45,7 @@ export default function MasterDataManagement({ onBack }: { onBack?: () => void }
   const canCreateMasters = canCreate("admin-masters");
   const canEditMasters = canEdit("admin-masters");
   const canDeleteMasters = canDelete("admin-masters");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.data.search", "");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MasterData | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

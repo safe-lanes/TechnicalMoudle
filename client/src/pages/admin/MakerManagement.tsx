@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type MakerList } from "@shared/schema";
@@ -15,7 +16,7 @@ import { SectionBlock } from "@/components/SectionBlock";
 
 export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.makers.search", "");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [makerToDelete, setMakerToDelete] = useState<MakerList | null>(null);
 

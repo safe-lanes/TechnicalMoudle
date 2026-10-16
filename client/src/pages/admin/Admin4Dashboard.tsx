@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
+import { useEffect } from "react";
 import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, MapPin, ChevronRight, Stamp } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
@@ -18,7 +19,11 @@ import RotationItemMasterList from "./RotationItemMasterList";
 type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations' | 'rotation-items';
 
 export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
-  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  const [currentView, setCurrentView] = useAdminUrlState<ViewType>("master.view", "dashboard", [
+    "dashboard", "makers", "master-lists", "master-data", "master-data-table",
+    "components", "jobs", "spares", "vessel-mapping", "pms-settings", "equipment-tree",
+    "fleet-vessel-manager", "fleet-data", "locations", "rotation-items",
+  ], true);
 
   useEffect(() => {
     onSubViewChange?.(currentView !== 'dashboard');

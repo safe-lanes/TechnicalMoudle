@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BulkDataImport from "../admin/BulkDataImport";
 import Alerts from "../admin/Alerts";
@@ -7,33 +7,28 @@ import Admin4Dashboard from "../admin/Admin4Dashboard";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { cn } from "@/lib/utils";
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 
 export default function PMSAdmin() {
-  const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const { uiRole, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const showBulkDataImp = isSailAdmin || isClientAdmin || isExternal;
   const showMasterData = isSailAdmin;
-  const [activeTab, setActiveTab] = useState(showBulkDataImp ? "bulk-data-imp" : "alerts");
+  const [requestedTab, setActiveTab] = useAdminUrlState<string>(
+    "tab", "", ["", "bulk-data-imp", "alerts", "forms", "admin-4"], true,
+  );
+  const defaultTab = showBulkDataImp ? "bulk-data-imp" : "alerts";
+  const activeTab = isExternal ? "bulk-data-imp"
+    : requestedTab === "admin-4" && !showMasterData ? defaultTab
+    : requestedTab === "bulk-data-imp" && !showBulkDataImp ? defaultTab
+    : requestedTab || defaultTab;
   const [isSubViewActive, setIsSubViewActive] = useState(false);
 
   const handleSubViewChange = useCallback((isSubView: boolean) => {
     setIsSubViewActive(isSubView);
   }, []);
 
-  // Reset to appropriate tab when switching roles (since hidden tabs shouldn't be active)
-  useEffect(() => {
-    if (isExternal) {
-      if (activeTab !== "bulk-data-imp") {
-        setActiveTab("bulk-data-imp");
-      }
-      return;
-    }
-    if (!showBulkDataImp && activeTab === "bulk-data-imp") {
-      setActiveTab("alerts");
-    }
-    if (!showMasterData && activeTab === "admin-4") {
-      setActiveTab(showBulkDataImp ? "bulk-data-imp" : "alerts");
-    }
-  }, [showBulkDataImp, showMasterData, isExternal, activeTab]);
+  // Resolve permissions before rendering; never replace restored state during role hydration.
+  if (!uiRole) return <div role="status">Loading Admin…</div>;
 
   const getPageTitle = () => {
     switch (activeTab) {

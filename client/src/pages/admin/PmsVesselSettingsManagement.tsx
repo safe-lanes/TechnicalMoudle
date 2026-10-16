@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
@@ -95,7 +96,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCompanyGraceDialogOpen, setIsCompanyGraceDialogOpen] = useState(false);
-  const [vesselSearch, setVesselSearch] = useState("");
+  const [vesselSearch, setVesselSearch] = useAdminUrlState<string>("master.settings.search", "");
 
   const [vesselTab, setVesselTab] = useState<'calendar' | 'rh'>('calendar');
 
@@ -120,7 +121,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
     rhFallbackGraceHours: 0 as number | null,
   });
 
-  const [companyStandardTab, setCompanyStandardTab] = useState<'calendar' | 'rh'>('calendar');
+  const [companyStandardTab, setCompanyStandardTab] = useAdminUrlState<'calendar' | 'rh'>("master.settings.tab", "calendar", ["calendar", "rh"]);
 
   const [companyGraceForm, setCompanyGraceForm] = useState({
     graceMethod: 'FIXED_DAYS',

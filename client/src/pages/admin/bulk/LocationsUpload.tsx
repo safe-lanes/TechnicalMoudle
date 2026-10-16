@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,6 +26,7 @@ interface LocationsUploadProps {
 }
 
 export default function LocationsUpload({ vesselId }: LocationsUploadProps) {
+  const [activeTab, setActiveTab] = useAdminUrlState<string>("bulk.locations.tab", "upload", ["upload", "mapping"]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -209,7 +211,7 @@ export default function LocationsUpload({ vesselId }: LocationsUploadProps) {
         </Button>
       </div>
 
-      <Tabs defaultValue="upload" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="upload" data-testid="tab-locations-upload">Upload</TabsTrigger>
           <TabsTrigger value="mapping" data-testid="tab-locations-mapping">Field Mapping Guide</TabsTrigger>

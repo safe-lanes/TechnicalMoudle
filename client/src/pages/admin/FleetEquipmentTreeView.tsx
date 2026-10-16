@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,7 +38,7 @@ interface TreeNode {
 type MasterDataResponse = { items: MasterData[]; total: number };
 
 export default function FleetEquipmentTreeView({ onBack }: { onBack?: () => void }) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.tree.search", "");
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [selectedEquipment, setSelectedEquipment] = useState<MasterData | null>(null);
   

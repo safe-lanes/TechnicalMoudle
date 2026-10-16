@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,16 +30,26 @@ import type { BulkImportHistory as BulkImportHistoryType, BulkImportError } from
 
 interface BulkImportHistoryProps {
   vesselId?: string;
+  onVesselChange?: (vesselId: string) => void;
   moduleType?: string;
 }
 
-export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHistoryProps) {
+export default function BulkImportHistory({ vesselId, onVesselChange, moduleType }: BulkImportHistoryProps) {
   const { data: vessels = [] } = useVessels();
-  const [selectedVessel, setSelectedVessel] = useState<string>(vesselId || 'all');
-  const [selectedModule, setSelectedModule] = useState<string>(moduleType || 'all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [page, setPage] = useState(0);
+  const [storedVessel, setStoredVessel] = useAdminUrlState<string>("bulk.vessel", "");
+  const selectedVessel = (onVesselChange ? vesselId : storedVessel) || "all";
+  const [page, setPage] = useAdminUrlState<number>("bulk.history.page", 0);
+  const setSelectedVessel = (value: string) => {
+    (onVesselChange || setStoredVessel)(value === "all" ? "" : value);
+    setPage(0);
+  };
+  const [selectedModule, setModule] = useAdminUrlState<string>("bulk.history.module", moduleType || "all",
+    ["all", "machinery", "jobs", "spares", "stores", "fleet-component", "fleet-jobs", "fleet-spares", "maker-list", "master-data", "master-list"]);
+  const [selectedStatus, setStatus] = useAdminUrlState<string>("bulk.history.status", "all", ["all", "completed", "partial", "failed", "processing"]);
+  const [searchTerm, setSearch] = useAdminUrlState<string>("bulk.history.search", "");
+  const setSelectedModule = (value: string) => { setModule(value); setPage(0); };
+  const setSelectedStatus = (value: string) => { setStatus(value); setPage(0); };
+  const setSearchTerm = (value: string) => { setSearch(value); setPage(0); };
   const [selectedImport, setSelectedImport] = useState<BulkImportHistoryType | null>(null);
   const pageSize = 20;
 
@@ -117,6 +129,9 @@ export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHi
   };
 
   const totalPages = Math.ceil((historyData?.total || 0) / pageSize);
+  useEffect(() => {
+    if (historyData && page >= Math.max(1, totalPages)) setPage(Math.max(0, totalPages - 1));
+  }, [historyData, page, totalPages, setPage]);
 
   return (
     <div className="space-y-6">

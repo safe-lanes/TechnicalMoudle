@@ -1,3 +1,4 @@
+import { useAdminUrlState, useAdminOptionValidation } from "@/hooks/useAdminUrlState";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -45,9 +46,10 @@ interface Location {
 
 export default function LocationManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
-  const { data: vessels = [] } = useVessels();
-  const [selectedVesselId, setSelectedVesselId] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const { data: vessels = [], isLoading: vesselsLoading, error: vesselsError } = useVessels();
+  const [selectedVesselId, setSelectedVesselId] = useAdminUrlState<string>("master.locations.vessel", "");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.locations.search", "");
+  useAdminOptionValidation(selectedVesselId, setSelectedVesselId, !vesselsLoading && !vesselsError ? vessels.map(v => v.id) : undefined);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteLocation, setDeleteLocation] = useState<Location | null>(null);

@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,8 +35,9 @@ const MOCK_HISTORY: any[] = [];
 
 export default function MasterListsUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importMode, setImportMode] = useState<string>("upsert");
-  const [selectedListType, setSelectedListType] = useState<string>("categories");
+  const [importMode, setImportMode] = useAdminUrlState<string>("bulk.masterLists.mode", "upsert", ["add", "update", "upsert"]);
+  const [selectedListType, setSelectedListType] = useAdminUrlState<string>("bulk.masterLists.type", "categories", MASTER_LIST_TYPES.map(type => type.id));
+  const [activeTab, setActiveTab] = useAdminUrlState<string>("bulk.masterLists.tab", "upload", ["upload", "mapping", "history"]);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
@@ -93,7 +95,7 @@ export default function MasterListsUpload() {
         </Button>
       </div>
 
-      <Tabs defaultValue="upload" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="upload" data-testid="tab-upload">Upload</TabsTrigger>
           <TabsTrigger value="mapping" data-testid="tab-mapping">Field Mapping Guide</TabsTrigger>

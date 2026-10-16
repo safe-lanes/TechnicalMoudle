@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -165,8 +166,8 @@ export default function UniformBulkUpload({
 }: UniformBulkUploadProps) {
   const { isSailAdmin, isExternal } = useUIRole();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
-  const [selectedStoreType, setSelectedStoreType] = useState<string>('');
+  const [importMode, setImportMode] = useAdminUrlState<'add' | 'update' | 'upsert'>(`bulk.${templateType}.mode`, "upsert", ["add", "update", "upsert"]);
+  const [selectedStoreType, setSelectedStoreType] = useAdminUrlState<string>(`bulk.${templateType}.storeType`, "", ["", ...(storeTypes || []).map(type => type.value)]);
   const [internalHistorySubType, setInternalHistorySubType] = useState<string>(selectedHistorySubTypeProp ?? 'work-order');
   const selectedHistorySubType = selectedHistorySubTypeProp ?? internalHistorySubType;
   const setSelectedHistorySubType = (value: string) => {
@@ -201,7 +202,7 @@ export default function UniformBulkUpload({
   const [undoDialogOpen, setUndoDialogOpen] = useState(false);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState(false);
-  const [activeTab, setActiveTab] = useState('upload');
+  const [activeTab, setActiveTab] = useAdminUrlState<string>(`bulk.${templateType}.tab`, "upload", ["upload", ...((isSailAdmin || isExternal) ? ["mapping"] : []), "history"]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');

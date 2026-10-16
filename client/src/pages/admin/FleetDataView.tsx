@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessels } from "@/hooks/useVessels";
@@ -250,7 +251,7 @@ interface ComponentVesselMapping {
 
 export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [, setLocation] = useLocation();
-  const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
+  const [selectedNodeCode, setSelectedNodeCode] = useAdminUrlState<string>("master.fleetData.component", "");
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
   const [selectedMappingIds, setSelectedMappingIds] = useState<Set<number>>(new Set());
@@ -278,7 +279,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [jobVesselSearchQuery, setJobVesselSearchQuery] = useState("");
   const [jobFormData, setJobFormData] = useState<Partial<FleetJob>>({});
   const [newJobFormData, setNewJobFormData] = useState<Partial<FleetJob>>({});
-  const [jobSearchQuery, setJobSearchQuery] = useState("");
+  const [jobSearchQuery, setJobSearchQuery] = useAdminUrlState<string>("master.fleetData.jobs.search", "");
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   
   // Collapsible section state for right panel
@@ -299,14 +300,14 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [selectedSpareVesselIds, setSelectedSpareVesselIds] = useState<Set<string>>(new Set());
   const [spareVesselSearchQuery, setSpareVesselSearchQuery] = useState("");
   const [spareFormData, setSpareFormData] = useState<Partial<FleetSpare>>({});
-  const [spareSearchQuery, setSpareSearchQuery] = useState("");
+  const [spareSearchQuery, setSpareSearchQuery] = useAdminUrlState<string>("master.fleetData.spares.search", "");
   const [selectedSpareIds, setSelectedSpareIds] = useState<Set<string>>(new Set());
   const [makerSearchText, setMakerSearchText] = useState("");
   const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
 
   const [isEditMode, setIsEditMode] = useState(false);
-  const [treeSearchQuery, setTreeSearchQuery] = useState("");
-  const [showAllSpares, setShowAllSpares] = useState(false);
+  const [treeSearchQuery, setTreeSearchQuery] = useAdminUrlState<string>("master.fleetData.search", "");
+  const [showAllSpares, setShowAllSpares] = useAdminUrlState<boolean>("master.fleetData.allSpares", false);
   const [editTreeData, setEditTreeData] = useState<TreeNode[]>([]);
   const [dragSourceCode, setDragSourceCode] = useState<string | null>(null);
   const [dragSourceParent, setDragSourceParent] = useState<string | null | undefined>(null);
@@ -580,6 +581,29 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     if (!mappedComponents.length) return [];
     return buildTree(mappedComponents);
   }, [mappedComponents]);
+
+  const selectedPath = useMemo(() => {
+    function find(nodes: TreeNode[], ancestors: TreeNode[]): TreeNode[] {
+      for (const node of nodes) {
+        const path = [...ancestors, node];
+        if (node.code === selectedNodeCode) return path;
+        const found = find(node.children, path);
+        if (found.length) return found;
+      }
+      return [];
+    }
+    return find(treeData, []);
+  }, [treeData, selectedNodeCode]);
+  const selectedNode = selectedPath[selectedPath.length - 1] || null;
+  const setSelectedNode = (node: TreeNode | null) => setSelectedNodeCode(node?.code || "");
+
+  useEffect(() => {
+    if (selectedPath.length) {
+      setExpandedNodes(prev => new Set([...Array.from(prev), ...selectedPath.slice(0, -1).map(n => n.code)]));
+    } else if (fleetComponentsData && selectedNodeCode) {
+      setSelectedNodeCode("");
+    }
+  }, [selectedPath, fleetComponentsData, selectedNodeCode, setSelectedNodeCode]);
 
   const handleToggle = (code: string) => {
     setExpandedNodes((prev) => {

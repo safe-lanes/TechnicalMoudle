@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type MasterList, type MasterListType, insertMasterListSchema } from "@shared/schema";
@@ -77,8 +78,8 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
   const canManageTypes = hasRole("Sail Admin");
 
   // ── Section + selected list type ──
-  const [activeSection, setActiveSection] = useState<Section>("Components");
-  const [selectedListType, setSelectedListType] = useState<string>("");
+  const [activeSection, setActiveSection] = useAdminUrlState<Section>("master.lists.section", "Components", SECTIONS);
+  const [selectedListType, setSelectedListType] = useAdminUrlState<string>("master.lists.type", "");
 
   // ── Item dialogs ──
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -127,6 +128,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
 
   // Auto-select first available type when section or types change.
   useEffect(() => {
+    if (!allTypes) return;
     if (typesForCurrentSection.length === 0) {
       setSelectedListType("");
       return;
@@ -136,7 +138,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
       setSelectedListType(typesForCurrentSection[0].listTypeKey);
     }
     setSelectedRowItem(null);
-  }, [activeSection, typesForCurrentSection]);
+  }, [activeSection, typesForCurrentSection, allTypes, selectedListType]);
 
   // ── Fetch master list items for the selected type ──
   const { data: masterLists, isLoading, error } = useQuery<MasterList[]>({

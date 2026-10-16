@@ -1,3 +1,4 @@
+import { useAdminUrlState, useAdminOptionValidation } from "@/hooks/useAdminUrlState";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type FleetSpares, type FleetComponents, type Maker } from "@shared/schema";
@@ -21,8 +22,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const canCreateMasters = canCreate("admin-masters");
   const canEditMasters = canEdit("admin-masters");
   const canDeleteMasters = canDelete("admin-masters");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedEquipment, setSelectedEquipment] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.spares.search", "");
+  const [selectedEquipment, setSelectedEquipment] = useAdminUrlState<string>("master.spares.equipment", "all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [spareToDelete, setSpareToDelete] = useState<FleetSpares | null>(null);
 
@@ -333,6 +334,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   };
 
   const equipmentOptions = components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10) || [];
+  useAdminOptionValidation(selectedEquipment, setSelectedEquipment, components ? equipmentOptions.map(c => c.fleetEquipmentCode!) : undefined, "all");
   const totalSpares = spares?.length || 0;
 
   const renderSpareFormSections = (formData: Partial<FleetSpares>, setFormData: (fn: (prev: Partial<FleetSpares>) => Partial<FleetSpares>) => void) => (

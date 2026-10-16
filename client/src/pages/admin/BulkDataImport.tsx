@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useAdminUrlState, useAdminOptionValidation } from "@/hooks/useAdminUrlState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -252,16 +252,18 @@ export default function BulkDataImport() {
   const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { canCreate, canEdit } = usePermissions();
   const canImport = canCreate("admin-masters") || canEdit("admin-masters");
-  const { data: vessels = [], isLoading: isLoadingVessels } = useVessels();
+  const { data: vessels = [], isLoading: isLoadingVessels, error: vesselsError } = useVessels();
   // Fleet mode is available for Sail Admin and External
-  const [isFleetModeState, setIsFleetModeState] = useState(false);
+  const [isFleetModeState, setIsFleetModeState] = useAdminUrlState<boolean>("bulk.fleet", false);
   const isFleetMode = (isSailAdmin || isExternal) ? isFleetModeState : false;
   const setIsFleetMode = (isSailAdmin || isExternal) ? setIsFleetModeState : () => {};
-  const [selectedVesselTemplate, setSelectedVesselTemplate] = useState<VesselTemplateType>('machinery');
-  const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
-  const [selectedVessel, setSelectedVessel] = useState<string>('');
-  const [viewMode, setViewMode] = useState<ViewMode>('upload');
-  const [selectedHistorySubType, setSelectedHistorySubType] = useState<string>('work-order');
+  const [selectedVesselTemplate, setSelectedVesselTemplate] = useAdminUrlState<VesselTemplateType>("bulk.vesselTemplate", "machinery", ["machinery", "stores", "spares", "jobs", "locations", "rotational-items", "wo-history"]);
+  const [requestedFleetTemplate, setSelectedFleetTemplate] = useAdminUrlState<FleetTemplateType>("bulk.fleetTemplate", "maker-list", ["maker-list", "fleet-component", "fleet-jobs", "fleet-spares", "master-list"]);
+  const selectedFleetTemplate = isExternal ? "maker-list" : requestedFleetTemplate;
+  const [selectedVessel, setSelectedVessel] = useAdminUrlState<string>("bulk.vessel", "");
+  const [viewMode, setViewMode] = useAdminUrlState<ViewMode>("bulk.view", "upload", ["upload", "history"], true);
+  const [selectedHistorySubType, setSelectedHistorySubType] = useAdminUrlState<string>("bulk.historySubtype", "work-order", ["work-order", "spares", "stores"]);
+  useAdminOptionValidation(selectedVessel, setSelectedVessel, !isLoadingVessels && !vesselsError ? vessels.map(v => v.id) : undefined);
 
   const vesselTemplates = [
     { id: 'machinery' as VesselTemplateType, number: 1, name: 'Machinery Components' },
@@ -408,7 +410,7 @@ export default function BulkDataImport() {
         {/* Template Content */}
         <div className="p-6">
           {viewMode === 'history' ? (
-            <BulkImportHistory vesselId={selectedVessel} />
+          <BulkImportHistory vesselId={selectedVessel} onVesselChange={setSelectedVessel} />
           ) : !canImport ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
