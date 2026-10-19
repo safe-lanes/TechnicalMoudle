@@ -146,6 +146,24 @@ rejected at startup and shown on the assistant's `/health` as `instancesRejected
 3. A question the manual does not cover returns the "not covered" answer, not an invention.
 4. Tampered or expired token → 401 from the assistant.
 
+### 1.5 What each module team must supply (checklist, 19-Oct-2026)
+
+The widget itself needs no change for a new module. Each module team (Crewing, Audit & Safety, …) must deliver:
+
+| # | Item | Owner | Crewing | Audit & Safety |
+|---|---|---|---|---|
+| 1 | **Authenticated token endpoint**, e.g. `GET /<module>/api/assistant/token`, behind the module's normal login (section 1.2) | module team | not built | not built |
+| 2 | **Verified identity and role from the server-side session**, never from browser headers or body | module team | ⚠️ the Crewing login token carries **no role**, so the endpoint must look the role up on the server | to confirm from Audit's login flow |
+| 3 | **Role allow-list** (`ASSISTANT_ALLOWED_ROLES`); refuse other roles with 403 | module team | — | — |
+| 4 | **Shore-only:** refuse to mint on a ship instance, if the module has ship installations | module team | to confirm | to confirm |
+| 5 | **Keys in PM2 env only** (`ASSISTANT_INSTANCE_ID`, `ASSISTANT_IDENTITY_SIGNING_KEY`, `ASSISTANT_SERVICE_SECRET`); never in browser code, Git or chat | module team + Nilesh | — | — |
+| 6 | **Instance registration** on the assistant (`ASSISTANT_MODULE_INSTANCES`, e.g. `crewing-dev`, later `crewing-prod`, each with its own keys) **plus the module's origin in `ASSISTANT_CORS_ORIGINS`** | Ghazi / support | — | — |
+| 7 | **Widget glue:** script tag + `SailAssistant.init` with `module: '<id>'` (copy the React hook or Angular service from the examples) | module team | example ready (React) | example ready (Angular) |
+| 8 | **Genuine-login test** on dev: a real user signs in to the module → widget shows that module's starter questions → answer with a citation; a disallowed role gets no widget; sign-out clears it | module team + support | pending | pending |
+| 9 | **Framework version check:** confirm the live frontend version matches the tested example | module team | React 18.3 / Vite 7 confirmed from repo | ⚠️ Angular 19.2.14 read from commit `5ec343ada` (18-May-2026); **confirm with the Audit team** (newer GitLab history was not accessible) |
+
+All widget tests so far use a **MOCK identity** (labelled "MOCK" on the demo pages). Only item 8 proves a real module login.
+
 ## 2. Stage 2 — live data
 
 ### 2.1 What to build (mirror Technical)
