@@ -139,3 +139,22 @@ def test_registry_rejects_reused_signing_keys_and_secrets(monkeypatch):
     # a clean registry has no violations and keeps every instance
     _, s = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=REGISTRY, **BASE_ENV)
     assert s.registry_violations() == [] and set(s.module_instances) == {"technical-dev", "technical-prod"}
+
+
+@pytest.mark.asyncio
+async def test_documentation_only_registration_never_calls_the_module(monkeypatch):
+    """19-Oct-2026 (stage 1): module + signingKey, no url/secret → registered (token verifiable), and the assistant never
+    calls a manifest or execute endpoint. Half a data-API registration (url without secret or the reverse) is dropped."""
+    docs = {"module": "crewing", "env": "dev", "signingKey": "crew-key"}
+    reg = json.dumps({"crewing-dev": docs, "half-url": {"module": "audit", "url": "https://a.example", "signingKey": "k2"},
+                      "half-secret": {"module": "audit", "secret": "s3", "signingKey": "k3"}})
+    agent, s = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=reg, **BASE_ENV)
+    inst = s.module_instances
+    assert set(inst) == {"crewing-dev"} and inst["crewing-dev"]["url"] == "" and inst["crewing-dev"]["secret"] == ""
+    tok = sign_identity({"userId": "u1", "role": "Crew Manager", "tenantDomain": "acme", "iss": "crewing-dev"}, "crew-key")
+    assert verify_identity(tok, inst[peek_issuer(tok)]["signingKey"], 30).ok
+    calls: list[str] = []
+    monkeypatch.setattr(agent.llm, "module_client", lambda: (calls.append("called"), httpx.AsyncClient())[1])
+    assert await agent.manifest_for(inst["crewing-dev"]) is None
+    r = await agent.execute_module_tool(inst["crewing-dev"], "any", {}, tok, "r1")
+    assert r["ok"] is False and calls == []

@@ -184,8 +184,10 @@ class Settings(BaseSettings):
 
     @property
     def module_instances(self) -> dict[str, dict[str, Any]]:
-        """Registered module instances keyed by issuer id; entries missing module/url/secret/signingKey are dropped
-        (a half-registered instance must never be callable)."""
+        """Registered module instances keyed by issuer id. module + signingKey are required. 19-Oct-2026: url + secret are
+        optional TOGETHER — an entry with neither is DOCUMENTATION-ONLY (stage 1: its tokens are verified and get manual
+        answers; the assistant never calls the module). An entry with only one of url/secret is dropped (a half-registered
+        data API must never be callable)."""
         try:
             v = json.loads(self.assistant_module_instances or "{}")
         except json.JSONDecodeError:
@@ -194,9 +196,13 @@ class Settings(BaseSettings):
             return {}
         out: dict[str, dict[str, Any]] = {}
         for iss, e in v.items():
-            if isinstance(e, dict) and all(isinstance(e.get(k), str) and e.get(k) for k in ("module", "url", "secret", "signingKey")):
-                out[str(iss)] = {"iss": str(iss), "module": e["module"].lower(), "env": str(e.get("env") or ""),
-                                 "url": e["url"].rstrip("/"), "secret": e["secret"], "signingKey": e["signingKey"]}
+            if not (isinstance(e, dict) and all(isinstance(e.get(k), str) and e.get(k) for k in ("module", "signingKey"))):
+                continue
+            url, sec = str(e.get("url") or "").strip(), str(e.get("secret") or "").strip()
+            if bool(url) != bool(sec):
+                continue  # half a data API registration — dropped
+            out[str(iss)] = {"iss": str(iss), "module": e["module"].lower(), "env": str(e.get("env") or ""),
+                             "url": url.rstrip("/"), "secret": sec, "signingKey": e["signingKey"]}
         # Credential reuse is rejected (24-Sep-2026, reviewer requirement): a signing key or a service secret shared by
         # two instances, or an instance signing key equal to the shared documentation key, would let one environment's
         # token or secret pass as another's. Every instance involved in a reuse is DROPPED (fail closed); the reasons

@@ -75,8 +75,8 @@ _manifest_cache: dict[str, dict[str, Any]] = {}
 async def manifest_for(instance: dict[str, Any] | None) -> dict[str, Any] | None:
     """Tool manifest of a REGISTERED module instance (24-Sep-2026: keyed by the issuer id, never by module
     alone, so a dev and a production instance of the same module never share a cache entry)."""
-    if not instance:
-        return None
+    if not instance or not instance.get("url"):
+        return None  # 19-Oct-2026: documentation-only registration (no data API) — never call the module
     key = instance["iss"]
     cached = _manifest_cache.get(key)
     if cached and time.monotonic() - cached["at"] < settings().manifest_ttl_ms / 1000.0:
@@ -103,7 +103,7 @@ async def manifest_for(instance: dict[str, Any] | None) -> dict[str, Any] | None
 async def execute_module_tool(instance: dict[str, Any] | None, tool: str, args: dict[str, Any], identity_token: str, request_id: str) -> dict[str, Any]:
     """Call ONE registered instance's /assistant/execute with THAT instance's secret; the user's token is forwarded
     only there (24-Sep-2026). Redirects are never followed and are reported as failures."""
-    if not instance:
+    if not instance or not instance.get("url"):
         return {"ok": False, "error": "no registered data API for this token's issuer"}
     try:
         r = await llm.module_client().post(
