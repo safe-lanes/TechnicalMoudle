@@ -1,6 +1,6 @@
 {
   "name": "@sail/assistant-widget",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Framework-neutral SAIL AI Assistant chat widget (one JS bundle for Angular, React and plain HTML hosts).",
   "type": "module",

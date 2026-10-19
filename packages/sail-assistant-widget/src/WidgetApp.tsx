@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { remarkBrToBreak } from './markdownBreaks';
 import type { Message, WidgetSession } from './widgetSession';
 
 export interface WidgetLabels {
@@ -52,7 +53,7 @@ function Bubble({ m }: { m: Message }) {
         {m.error ? <p>{m.content}</p> : (
           <div className="sa-md">
             <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
+              remarkPlugins={[remarkGfm, remarkBrToBreak]}
               components={{
                 table: ({ node: _n, ...p }) => <div className="sa-table-wrap" tabIndex={0}><table {...p} /></div>,
                 a: ({ node: _n, ...p }) => <a {...p} target="_blank" rel="noopener noreferrer" />,

@@ -266,7 +266,7 @@ test.describe('mount / unmount', () => {
     });
     await expect(page.locator('[data-sail-assistant]')).toHaveCount(1);
     const v = await page.evaluate(() => (window as unknown as { SailAssistant: { VERSION: string } }).SailAssistant.VERSION);
-    expect(v).toBe('1.0.0');
+    expect(v).toBe('1.0.1');
   });
 
   test('invalid config is refused (no http assistant, module id required, token provider required)', async ({ page }) => {

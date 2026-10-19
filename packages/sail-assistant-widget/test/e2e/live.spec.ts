@@ -72,8 +72,8 @@ test('rejected token: exactly one forced refresh, then the real suggestions and 
 // there with Subresource Integrity must start the widget and get a real answer; a wrong integrity hash must block it.
 test('bundle served by the assistant: loads with integrity, answers; wrong hash is blocked', async ({ page }) => {
   const { readFileSync } = await import('node:fs');
-  const integrity = JSON.parse(readFileSync(new URL('../../dist/1.0.0/integrity.json', import.meta.url), 'utf8')).files['sail-assistant-widget.1.0.0.js'];
-  const src = `${LIVE}/widget/1.0.0/sail-assistant-widget.1.0.0.js`;
+  const integrity = JSON.parse(readFileSync(new URL('../../dist/1.0.1/integrity.json', import.meta.url), 'utf8')).files['sail-assistant-widget.1.0.1.js'];
+  const src = `${LIVE}/widget/1.0.1/sail-assistant-widget.1.0.1.js`;
   await page.goto('/bare/'); // a real served page (a test-runner page has no address, which Chrome's local-network check blocks)
   const load = (hash: string) => page.evaluate(([s, h]) => new Promise<string>((resolve) => {
     const el = document.createElement('script');
