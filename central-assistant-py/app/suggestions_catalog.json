@@ -11,8 +11,7 @@
     {"question": "How do I add records to the crew pool?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.3.1.5 HOW TO ADD RECORDS TO CREW POOL"},
     {"question": "How do I approve or reject a rotation plan?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.5.3.3 HOW TO APPROVE OR REJECT A ROTATION PLAN"},
     {"question": "How do I download the IMO crew list?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.4.1.3 HOW TO DOWNLOAD THE IMO CREW LIST / US CREW LIST"},
-    {"question": "How do I record an approval decision on a promotion?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.6.1.4 HOW TO RECORD AN APPROVAL DECISION"},
-    {"question": "How do I create a new post incident test record?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.8.4.3 HOW TO CREATE A NEW POST INCIDENT TEST RECORD"}
+    {"question": "How do I record an approval decision on a promotion?", "file": "Crewing - Crewing User Manual R2_10.06.2026.pdf", "section": "1.6.1.4 HOW TO RECORD AN APPROVAL DECISION"}
   ],
   "audit": [
     {"question": "How do I create a new preparation?", "file": "Audit - Preparation Manual_Office_R1_30.06.2026.pdf", "section": "3.1 HOW TO CREATE NEW PREPARATION"},

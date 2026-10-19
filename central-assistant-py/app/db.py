@@ -116,11 +116,16 @@ async def pair_enabled(tenant_domain: str, module: str) -> bool:
 
 async def manual_sections(module: str) -> set[tuple[str, str]]:
     """(file, section title) of every published MANUAL passage of one module in the served index set — company-wide
-    manuals only (no tenant copy, no knowledge entry, no draft). The source check behind the starter questions."""
+    manuals only (no tenant copy, no knowledge entry, no draft). The source check behind the starter questions.
+    19-Oct-2026: a section counts only while NONE of its passages is superseded by a published knowledge entry — of any
+    company or environment (fail closed: a starter question never points at a replaced passage). Retiring the entry
+    deletes its supersedes, so the question comes back."""
     async with engine().connect() as c:
         rows = await c.execute(text(
-            "SELECT DISTINCT file, section_title FROM assistant_chunks WHERE index_set=:s AND lower(module)=:m "
-            "AND kb_state IS NULL AND tenant_domain IS NULL"), {"s": settings().assistant_index_set, "m": module})
+            "SELECT file, section_title FROM assistant_chunks c WHERE c.index_set=:s AND lower(c.module)=:m "
+            "AND c.kb_state IS NULL AND c.tenant_domain IS NULL GROUP BY file, section_title "
+            "HAVING bool_and(NOT EXISTS (SELECT 1 FROM kb_supersedes x WHERE x.index_set = c.index_set AND x.chunk_id = c.id))"),
+            {"s": settings().assistant_index_set, "m": module})
         return {(str(r[0]), str(r[1] or "")) for r in rows}
 
 
