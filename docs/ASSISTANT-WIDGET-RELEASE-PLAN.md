@@ -70,3 +70,19 @@ Tests: pytest 95/95 on the branch (adds the documentation-only registration test
 
 - Registering Crewing or Audit instances and adding their origins to CORS. That happens per module when it connects (see the integration guide, section 1.5).
 - Any change to Technical's in-app chat.
+
+## 7. Release log — 19-Oct-2026
+
+| Item | Value |
+|---|---|
+| Pushed | `origin/feature/assistant-widget` = `64e7f49d5` (no merge into any other branch) |
+| Live image | `sail-assistant-py:v9-64e7f49d5` (image id `2ea790124828`, the same build that was pilot-tested as `widget-6a3a5c4ba`), container `sail-assistant-py-v9`, `127.0.0.1:8052`, env `v8-release.env` |
+| Switch | nginx `assistant.conf:21` + `safelanes.conf:375` `8051 → 8052`; `nginx -t` OK; reloaded **07:03:42 UTC** |
+| Backups | `/etc/nginx/conf.d/assistant.conf.bak-v9-20261019T070341Z`, `safelanes.conf.bak-v9-20261019T070341Z` |
+| Rollback | v8 `sail-assistant-py-v8` still running on `127.0.0.1:8051`: copy both backups back (or sed `8052 → 8051`), `nginx -t`, reload. No database step. |
+
+**Pre-switch (v9 direct, :8052):** C1 health identical to v8 · C2 widget file (SRI, immutable, CORS, `integrity.json` 404) · C3 4 Technical / `hr` [] / no identity 401 · C4 documentation answer · Technical live data: Vessel 3, `rsms05102026`, `technical-dev` → 160 overdue = direct execute on `dev.sl-sail.com` 160 · C6 `/kb` byte-identical.
+
+**Post-switch (public `https://assistant.sl-sail.com`):** C1 identical · C2 identical (SRI matches `integrity.json`) · C3 identical · C4 documentation answer · Technical live data: 160 = source 160 (9.6 s) · served by v9 (v8 got 0 requests) · `viqmap.sl-sail.com/assistant/` also → v9 · no v9 errors.
+
+**Not verified by support:** C5, the existing Technical chat button with a genuine SAILERP login. No real user had used the chatbot since the switch, and support cannot sign in as a user. One question from the Technical dev (and prod) site is needed. The checks used a test identity (`release-check-v9`) and left 6 test conversations in the live log.
