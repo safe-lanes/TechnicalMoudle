@@ -86,3 +86,24 @@ Tests: pytest 95/95 on the branch (adds the documentation-only registration test
 **Post-switch (public `https://assistant.sl-sail.com`):** C1 identical · C2 identical (SRI matches `integrity.json`) · C3 identical · C4 documentation answer · Technical live data: 160 = source 160 (9.6 s) · served by v9 (v8 got 0 requests) · `viqmap.sl-sail.com/assistant/` also → v9 · no v9 errors.
 
 **Not verified by support:** C5, the existing Technical chat button with a genuine SAILERP login. No real user had used the chatbot since the switch, and support cannot sign in as a user. One question from the Technical dev (and prod) site is needed. The checks used a test identity (`release-check-v9`) and left 6 test conversations in the live log.
+
+## 8. Next release (prepared, NOT applied): widget 1.0.1 — v10
+
+**Why:** widget 1.0.1 shows `<br>` in table cells as a line break; no other HTML is rendered. The Crewing stage 1 integration pins 1.0.1, so **this release must go live and be verified before Crewing is enabled.**
+
+| Item | Value |
+|---|---|
+| Commit | `feature/assistant-widget` `b2ae111e0` (local; push needs approval) |
+| Change vs live `64e7f49d5` | **only** `central-assistant-py/widget/1.0.1/` (4 files). No code change, no migration, no env change. `widget/1.0.0/` byte-identical. |
+| Image (prepared, not running) | `sail-assistant-py:v10-b2ae111e0`, id `1543f15d6bbc`, the same image that was pilot-tested as `widget-b2ae111e0` |
+| 1.0.0 SRI (must stay) | `sha384-Dz8YnW533ZDxdij+nA0olCnp3VYRdi7kPkEpOxhXKilHPneJPVMiQWFwsaVJErWP`: live today = pilot = this value |
+| 1.0.1 SRI (new) | `sha384-e2Q1Mm3OiovWmjX/D8EIXFTxKaNbunU2Y2jH0JuaITO2DdarwsW3BxJQrHte4ZMU`: pilot = this value; live today 404 |
+
+**Steps (same method as v9):**
+1. Push `feature/assistant-widget` and fast-forward `feature/chatbot-enterprise`.
+2. Run `sail-assistant-py-v10` on `127.0.0.1:8053` with `v8-release.env`.
+3. On `:8053`, check C1 (health identical to v9) and C2 for **both** versions (SRI as above, immutable, CORS). Run one Technical documentation question and one Technical live-data question.
+4. Back up both nginx files (`.bak-v10-<ts>`) and switch `8052 → 8053`; `nginx -t`; reload.
+5. **Public hash check** through `https://assistant.sl-sail.com/widget/1.0.0/…` and `/widget/1.0.1/…`. Both SRI values must match the table above. Then repeat C1, one Technical live-data question and the Technical chat button.
+
+**Rollback:** nginx back to `127.0.0.1:8052` (v9 kept running). No database step. 1.0.0 consumers are unaffected either way.
