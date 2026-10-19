@@ -7,8 +7,8 @@ step below points at the Technical file to copy or mirror. Contract details: `do
 
 | Stage | What the user gets | Work on the module | Work on the assistant (Ghazi/support) |
 |---|---|---|---|
-| **1. Documentation answers** | "How do I …" answers from the module's own manuals, with sources | Chat widget + one token endpoint + 3 PM2 values | Register the instance (id, key, secret). The manuals of Audit, Crewing, Safety and Incident are already indexed (`kb-xref-e`). |
-| **2. Live data** | Questions about the module's records (counts, lists, status) | A manifest of tools + an execute endpoint + access rules | Add the module URL to the same registration |
+| **1. Documentation answers** | "How do I …" answers from the module's own manuals, with sources | Chat widget + one token endpoint + PM2 values `ASSISTANT_INSTANCE_ID`, `ASSISTANT_IDENTITY_SIGNING_KEY`, `ASSISTANT_ALLOWED_ROLES` (no service secret) | Register the instance (id + signing key only; no URL, no secret). The manuals of Audit, Crewing, Safety and Incident are already indexed (`kb-xref-e`). |
+| **2. Live data** | Questions about the module's records (counts, lists, status) | A manifest of tools + an execute endpoint + access rules + `ASSISTANT_SERVICE_SECRET` | Add the module URL **and** the service secret, together, to the same registration |
 
 Stage 1 is one to two days per module. Stage 2 depends on how many tools the module wants.
 
@@ -80,7 +80,7 @@ The widget already handles these, so the host doesn't:
   - a rejected first token recovers with exactly one refresh.
 - The same live test fails from an origin the assistant doesn't allow, as it should.
 - Mock suite 27/27; unit tests 25/25.
-- Every starter question was asked on the pilot, and 21/21 were answered (`central-assistant-py/scripts/verify_suggestions.py`).
+- *Historical (15-Oct-2026):* every starter question then in the catalogue was asked on the pilot, and 21/21 were answered (`central-assistant-py/scripts/verify_suggestions.py`). On 19-Oct one weak Crewing question was removed; the **current catalogue has 20 questions**, all part of that run.
 
 **Versions, upgrade and rollback**
 - Each release is a new folder `widget/<x.y.z>/`, and old folders stay.
