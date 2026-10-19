@@ -107,10 +107,17 @@ Technical keeps its existing in-app chat for now. Moving it to the shared widget
 Copy `server/modules/assistant-api/identityToken.ts` (signing, unchanged) and the `handleMintToken` part of
 `server/modules/assistant-api/controller.ts` plus its route (`routes.ts`). Rules the mint must keep:
 
-1. **User identity comes from the verified login only.** Technical reads user id, role and user type from
-   the SAILERP JWT claims (`id`, `role`, `userType`) that the tenant middleware verified — never from
-   browser headers. Do the same with whatever your module's verified session provides. If the module cannot
-   verify the login, do not mint.
+1. **User identity comes from the verified login only; the role from a trusted server-side source.**
+   - User id, tenant and user type come from the login token the module's server has **verified** (signature +
+     expiry). Never from browser headers, query or body.
+   - **The role:** the genuine SAILERP login token carries `id` and `userType` but **no `role`** (proven on Technical
+     dev, 25-Sep-2026). Technical therefore looks the role up **on the server** in the tenant's synced SAILERP
+     master data (`master_users`) by the verified user id (`controller.ts` `handleMintToken`, option B). A user with
+     no role there cannot mint. Use the module's own trusted server-side role source in the same way: Crewing's login
+     token has no role either.
+   - **No browser fallback.** Technical has a legacy opt-in `ASSISTANT_ROLE_FALLBACK=profile` that accepts the role
+     forwarded by the browser. New modules must **not** implement or enable such a fallback.
+   - If the module cannot verify the login or resolve the role on the server, do not mint (403).
 2. **Tenant comes from the verified domain** (`tenantDomain`, `tuid`). In multi-tenant mode this is what the
    assistant uses to keep tenants apart.
 3. **`iss` = `ASSISTANT_INSTANCE_ID`** of this module instance. Refuse to mint if it is not configured.
@@ -131,11 +138,20 @@ Module PM2 env (per environment, values never in chat, ticket or Git):
 |---|---|
 | `ASSISTANT_INSTANCE_ID` | `crewing-dev` (dev), `crewing-prod` (production) |
 | `ASSISTANT_IDENTITY_SIGNING_KEY` | 64-hex, unique to this instance |
-| `ASSISTANT_SERVICE_SECRET` | 64-hex, unique to this instance (used in stage 2; set it now) |
+| `ASSISTANT_SERVICE_SECRET` | stage 2 only (live data). Not needed for documentation answers |
 | `ASSISTANT_ALLOWED_ROLES` | `Sail Admin` or the roles the module wants |
 
-Assistant side (Ghazi/support): one registration entry per instance in `ASSISTANT_MODULE_INSTANCES` —
-`{"crewing-dev":{"module":"crewing","env":"dev","url":"https://<host>/crewing/api","secret":"…","signingKey":"…"}}`.
+Assistant side (Ghazi/support): one registration entry per instance in `ASSISTANT_MODULE_INSTANCES`.
+
+**Stage 1 (documentation only): no `url`, no `secret`.**
+`{"crewing-dev":{"module":"crewing","env":"dev","signingKey":"…"}}`
+The assistant verifies the module's tokens and answers from the manuals. It **never calls the module**: no manifest
+or execute request is made. Proven on the pilot 19-Oct-2026 (`crewing-pilot`, `audit-pilot`): starter questions and
+cited answers came back, and 0 module calls were logged. The previous code dropped such an entry (401), and that
+control was reproduced.
+
+**Stage 2 (live data): add `url` and `secret` together** (section 2.2). An entry with only one of the two is
+dropped. Also add the module's browser origin to `ASSISTANT_CORS_ORIGINS`.
 A key or secret reused from another instance, or equal to the assistant's shared documentation key, is
 rejected at startup and shown on the assistant's `/health` as `instancesRejected`.
 
@@ -145,6 +161,10 @@ rejected at startup and shown on the assistant's `/health` as `instancesRejected
 2. A "How do I …" question from the module's manual answers with a `Source:` line naming the manual.
 3. A question the manual does not cover returns the "not covered" answer, not an invention.
 4. Tampered or expired token → 401 from the assistant.
+5. **Starter questions before the first chat:** a newly connected company/module pair gets its module's permitted
+   starter questions on its first `GET /suggestions`, before any question is sent; this request registers nothing.
+   A pair an administrator switched off gets none, and its chat is refused (`gate: disabled`); the same company's
+   other modules are unaffected. Proven on the pilot 19-Oct-2026.
 
 ### 1.5 What each module team must supply (checklist, 19-Oct-2026)
 
@@ -153,11 +173,11 @@ The widget itself needs no change for a new module. Each module team (Crewing, A
 | # | Item | Owner | Crewing | Audit & Safety |
 |---|---|---|---|---|
 | 1 | **Authenticated token endpoint**, e.g. `GET /<module>/api/assistant/token`, behind the module's normal login (section 1.2) | module team | not built | not built |
-| 2 | **Verified identity and role from the server-side session**, never from browser headers or body | module team | ⚠️ the Crewing login token carries **no role**, so the endpoint must look the role up on the server | to confirm from Audit's login flow |
+| 2 | **Verified identity, plus the role from a trusted server-side lookup** (section 1.2); never browser headers/body, no profile fallback | module team | ⚠️ the Crewing login token carries **no role**, so the endpoint must look the role up on the server | to confirm from Audit's login flow |
 | 3 | **Role allow-list** (`ASSISTANT_ALLOWED_ROLES`); refuse other roles with 403 | module team | — | — |
 | 4 | **Shore-only:** refuse to mint on a ship instance, if the module has ship installations | module team | to confirm | to confirm |
 | 5 | **Keys in PM2 env only** (`ASSISTANT_INSTANCE_ID`, `ASSISTANT_IDENTITY_SIGNING_KEY`, `ASSISTANT_SERVICE_SECRET`); never in browser code, Git or chat | module team + Nilesh | — | — |
-| 6 | **Instance registration** on the assistant (`ASSISTANT_MODULE_INSTANCES`, e.g. `crewing-dev`, later `crewing-prod`, each with its own keys) **plus the module's origin in `ASSISTANT_CORS_ORIGINS`** | Ghazi / support | — | — |
+| 6 | **Instance registration** on the assistant (`ASSISTANT_MODULE_INSTANCES`, e.g. `crewing-dev`, later `crewing-prod`, each with its own signing key; **stage 1 = no `url`/`secret`**, section 1.3) **plus the module's origin in `ASSISTANT_CORS_ORIGINS`** | Ghazi / support | — | — |
 | 7 | **Widget glue:** script tag + `SailAssistant.init` with `module: '<id>'` (copy the React hook or Angular service from the examples) | module team | example ready (React) | example ready (Angular) |
 | 8 | **Genuine-login test** on dev: a real user signs in to the module → widget shows that module's starter questions → answer with a citation; a disallowed role gets no widget; sign-out clears it | module team + support | pending | pending |
 | 9 | **Framework version check:** confirm the live frontend version matches the tested example | module team | React 18.3 / Vite 7 confirmed from repo | ⚠️ Angular 19.2.14 read from commit `5ec343ada` (18-May-2026); **confirm with the Audit team** (newer GitLab history was not accessible) |
@@ -188,8 +208,10 @@ Rules that apply to every module:
 
 ### 2.2 Configuration for stage 2
 
-Only the registration's `url` on the assistant needs to be set (Ghazi/support). The module already has the
-secret from stage 1.
+Add **both** `url` (the module's API base, e.g. `https://<host>/crewing/api`) and `secret` to the instance's
+registration (Ghazi/support), and set the same value as `ASSISTANT_SERVICE_SECRET` in the module's PM2 env:
+`{"crewing-dev":{"module":"crewing","env":"dev","url":"https://<host>/crewing/api","secret":"…","signingKey":"…"}}`.
+Only add them once the manifest and execute endpoints exist; until then keep the stage 1 entry.
 
 ### 2.3 Stage 2 acceptance (copy Technical's harnesses)
 

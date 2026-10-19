@@ -26,10 +26,19 @@ All additive. **No database migration, no new env variable, no change to `/chat`
 | `app/suggestions.py` + `app/suggestions_catalog.json` | starter questions: catalog of 20 questions (technical 4, crewing 5, audit 4, safety 4, incident 3), each tied to a manual file + section |
 | `app/db.py` | two **read-only** helpers: `pair_enabled` (never registers a pair) and `manual_sections` (published manual sections, minus any superseded by published knowledge) |
 | `app/widget_static.py` | `GET /widget/<version>/<file>`: only files listed in `integrity.json` with matching hash; immutable cache; public CORS |
+| `app/config.py` | registration: `module` + `signingKey` required; `url` + `secret` optional **together**. An entry with neither is documentation-only (stage 1); an entry with one of the two is dropped. Existing Technical entries (all four fields) parse exactly as before. |
+| `app/agent.py` | `manifest_for` / `execute_module_tool` make **no HTTP call** for an instance without `url` |
 | `Dockerfile` | `COPY widget ./widget` |
 | `widget/1.0.0/` | the bundle (`.js`, `.mjs`, `integrity.json`, `SHA384SUMS`) |
 
-Tests: pytest 94/94 on the branch.
+Tests: pytest 95/95 on the branch (adds the documentation-only registration test).
+
+**Pilot results, 19-Oct-2026** (widget test container, image `widget-6a3a5c4ba`, documentation-only entries `crewing-pilot` / `audit-pilot`):
+- **Control:** the previous image dropped those entries, so their tokens got 401 `unknown-issuer`.
+- **New image:** a brand-new Crewing tenant got 5 Crewing starter questions on its first call, before any chat, and that call registered nothing. Audit got its 4 questions.
+- **Answers:** the Crewing and Audit questions answered with only own-module citations (10.3 s and 4.6 s).
+- **No module calls:** 0 manifest or execute calls were logged.
+- **Disabled pair:** a pair switched off by an administrator got `[]` starter questions and its chat was refused (`gate: disabled`). The same tenant's other module still worked. The test row was removed afterwards.
 
 ## 3. Release steps (proposed)
 
@@ -47,6 +56,7 @@ Tests: pytest 94/94 on the branch.
 | C2 | `GET /widget/1.0.0/sail-assistant-widget.1.0.0.js` | 200; sha384 = `integrity.json`; `cache-control: immutable`; `access-control-allow-origin: *`; `/widget/1.0.0/integrity.json` → 404 |
 | C3 | `GET /suggestions?module=technical` with a `technical-dev` identity | ≤ 6 Technical questions; `module=hr` → `[]`; no identity → 401 |
 | C4 | One documentation question via `POST /chat` (technical-dev identity) | answer with a Technical citation, as on v8 |
+| C4b | `/health` `instances` | still `technical-dev`, `technical-prod`, `technical-demo`; `instancesRejected: []` (the existing entries are unaffected by the registration change) |
 | C5 | Technical dev site: the existing chat button | answers as before (integration unchanged) |
 | C6 | `/kb` screen: a trainer account signs in and lists entries | unchanged (no write performed) |
 
