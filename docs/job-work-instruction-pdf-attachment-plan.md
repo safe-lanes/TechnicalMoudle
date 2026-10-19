@@ -1,16 +1,16 @@
 # Job Form Work Instructions — Vessel Job PDF Attachment Plan
 
-**Status:** Proposed plan for review; no implementation has been performed.  
+**Status:** Updated proposed plan for review; no feature implementation or migration has been performed.
 **Scope:** Vessel-scoped PMS Jobs only. Fleet Jobs are explicitly out of scope.
 
 ## 1. Purpose
 
-Make the Job Form's **Work Instructions** dialog useful by providing:
+Make the vessel Job's **Work Instructions** dialog useful by providing:
 
-1. A **PDF Attachments** section for manuals and work-instruction files associated with the selected vessel Job.
+1. A **PDF Attachments** section for manuals and work-instruction files managed on vessel-specific Jobs.
 2. A visible **Feature Coming Soon** section, clearly marked as not yet available and with no active controls.
 
-The attachment must be retrievable later from the same Job, stored privately, and synchronized with both its document metadata and PDF bytes to the applicable vessel installation.
+The vessel Job is the source of truth for its active PDF links. A vessel-level PDF file may be linked to multiple vessel Jobs without creating duplicate file assets. Files must be stored privately and synchronized with their metadata and bytes to the applicable vessel installation. Work Orders show the latest active files from their linked Job, read-only.
 
 ## 2. Current implementation and findings
 
@@ -19,7 +19,8 @@ The attachment must be retrievable later from the same Job, stored privately, an
 - The Job Form route is `/pms/job/:id`.
 - The Work Instructions dialog currently receives only `isOpen` and `onClose`. It does not receive the Job ID or any attachment data/callbacks.
 - The dialog currently renders static example headings and steps. It has no working add, save, upload, list, open, or remove behavior.
-- The shared dialog is also used by Work Order forms. The new feature must be enabled in the **Job Form** without unintentionally changing Work Order behavior.
+- The shared dialog is also used by Work Order forms. Upload/manage controls belong to the **Job Form**; Work Orders receive only the separately confirmed read-only view of the current Job attachments. Existing Work Order-owned document actions must not change.
+- The existing Jobs bulk-import template and service must be extended with a `Job attachments` column. Its filename value refers to a PDF in the selected vessel's controlled private folder; the import must not accept arbitrary filesystem paths from a spreadsheet.
 
 ### Existing data model
 
@@ -40,171 +41,204 @@ The existing Work Order API has document list, upload, download, and delete rout
 
 ### 3.1 Opening Work Instructions
 
-- The dialog must be given the canonical Job identity and vessel context from the Job Form.
-- Load the active PDF attachments for that Job and vessel when the dialog opens.
-- Show a loading state while the attachment list is retrieved.
-- If no files exist, show a clear empty state and, for users allowed to edit, an upload action.
-- If retrieval fails, show a useful error and a retry action; do not silently display an empty list as though the Job has no documents.
+- The dialog receives the canonical Job identity and vessel context from the Job Form.
+- Load the active Job-to-file links for that Job and vessel. The Work Instructions list must not show another Job's links or another vessel's files.
+- Show loading, empty, and recoverable error states. A retrieval failure must not be presented as an empty attachment list.
+- An unsaved Job must be saved first. Disable upload, attach, and import-link actions until the Job has its canonical `juuid`; explain why.
 
-### 3.2 Uploading a PDF
+### 3.2 Uploading and reusing a PDF
 
-- Provide an upload control in the **PDF Attachments** section.
-- Accept PDF files only. Validate the filename extension and MIME type on the server; where practical, also verify the PDF file signature rather than trusting browser-supplied metadata.
-- Enforce a server-side size limit. A 25 MB limit is a possible starting point because the existing Work Order uploader uses that limit, but this must be confirmed for Job manuals before implementation.
-- Generate a unique document ID and stored filename on the server. Do not use an unsanitized client filename as a storage path.
-- Associate the metadata with both the owning Job's `juuid` and its `vessel_id`.
-- If the Job has not yet been saved and does not have a canonical `juuid`, disable the upload and explain that the Job must be saved first. Do not create unlinked files.
-- On successful upload, refresh the visible attachment list and show the stored filename.
-- If metadata creation fails after the file is stored, attempt to remove the orphaned file and report the failure.
+- Office users with Job edit rights can upload a PDF from the vessel Job's Work Instructions dialog.
+- Accept PDF files only. Validate extension, MIME type, and (where practical) the PDF signature on the server. Enforce a server-side size limit; the existing Work Order 25 MB limit is only a reference and is not approved for this feature.
+- A physical file name is unique within a vessel. Do not create a second file asset with a duplicate active name for that vessel.
+- If the vessel file already exists, allow an authorized user to attach that existing file to another Job. Reuse its document ID and bytes; do not upload or store a duplicate copy.
+- Generate an immutable document ID and derive the private storage key on the server. Sanitize the original filename and reject path traversal, path separators, and unsafe names.
+- If metadata or Job-link creation fails after file storage, clean up or quarantine the unreferenced file and report the failure; do not leave an invisible orphan.
+- A simple optional revision/remarks field may document the reason or revision without introducing a full version-control feature.
 
-### 3.3 Opening and downloading
+### 3.3 Jobs Bulk Import
 
-- Provide an authenticated **Open PDF** action; optionally provide a separate download action.
-- Retrieve the file by document ID through the application server after validating access to the Job and vessel.
+- Add a `Job attachments` column to the Jobs import template and field-mapping guide.
+- The value contains one or more PDF filenames, not paths or URLs. The exact multi-filename delimiter/encoding is an open implementation detail and must be documented in the template.
+- Resolve each filename only within the selected vessel's controlled private Job-document folder. Validate the vessel, file existence, PDF content, filename, and size on the server.
+- For an existing vessel file, create a link to that file for the imported Job. Store the physical file only once, even when several Jobs reference it.
+- A missing, ambiguous, invalid, or duplicate-new-file name must produce a row-level import error with a clear reason. Do not silently skip an attachment or commit an invalid partial link.
+- Import must be idempotent: retrying the same row must not create duplicate Job links or file assets.
+
+### 3.4 Opening and downloading
+
+- Office and vessel users may view and open active files when they have access to the vessel Job. Vessel users are read-only.
+- Retrieve a file by document ID through an authenticated application endpoint after validating the user's vessel access, the Job-to-file link, and active state.
 - Return the correct PDF content type and safe inline/download headers. Do not expose a permanent public object URL.
-- Use the server-stored `fileKey` and storage-backend value; the client must not supply a filesystem path or object-store path.
+- The client must never supply a filesystem path or object-store key.
 
-### 3.4 Removing a document
+### 3.5 Removing, restoring, and replacing a Job attachment
 
-- If removal is permitted, expose it only to users who can edit the Job.
-- Confirm before removal and record the deletion in the audit columns. Prefer a soft delete so the record and deletion event can synchronize and remain auditable.
-- Define a later retention/purge process separately if deleted file bytes must eventually be physically removed. Do not silently hard-delete the metadata at the point of user removal.
+- Only office users with Job edit rights may upload, remove, or restore Job-to-file links. Vessel users may only view and open files.
+- Removing a file from a Job soft-deletes that **Job-to-file link only**. If the shared vessel file is linked to other Jobs, it remains active and visible from those Jobs.
+- Provide an authorized restore action for the soft-deleted link. Record the removal and restoration in the audit fields and synchronize both events.
+- Replacement is not an in-place overwrite. Upload or select a distinct file, link it to the Job, and soft-delete the old link for that Job. Do not change links on other Jobs that use the old file. If the old asset has no remaining active links, retain it for restoration/audit according to the approved retention policy.
+- Do not physically delete file bytes as part of removing one Job link. Any later orphan cleanup/purge must be a separate, auditable retention process.
 
-### 3.5 Coming Soon section
+### 3.6 Work Order visibility
+
+- Every Work Order generated from a vessel Job displays that Job's active PDFs as read-only, accessed through the canonical Job link.
+- Existing and open Work Orders always show the latest active PDF links on their Job; do not snapshot the file list at WO creation and do not copy the files into `work_order_documents`.
+- Adding, removing, restoring, or replacing a Job link is reflected on all Work Orders linked to that Job. Changes do not affect Work Orders from other Jobs, even when those Jobs share the same vessel file.
+- This display is a Job-document view only. Existing Work Order upload, edit, and document behavior remains unchanged.
+
+### 3.7 Coming Soon section
 
 - Keep **Feature Coming Soon** visible in the dialog and clearly label it as unavailable.
-- Do not show active upload, save, or other controls in this section until a separate functionality plan is approved.
+- Do not show active controls in this section until separate functionality is approved.
 
 ## 4. Proposed database structure
 
-Add a normalized child table, provisionally named `job_documents`. This is a **new table proposal**, not an existing table.
+Because one vessel file may be linked to multiple Jobs, a single table with a required `job_id` on each file row would duplicate file metadata or bytes. Use a normalized vessel-file asset plus Job-association model. These are **new table proposals**, not existing tables; final names should follow repository conventions.
+
+### 4.1 Vessel Job-document file asset
+
+One row represents one physical PDF file for a vessel, independent of how many Jobs use it.
 
 | Proposed column | Purpose |
 |---|---|
-| `id` | Unique document identifier; generate on the server. |
-| `job_id` | Required foreign key to `jobs.juuid`, identifying the canonical owning Job. |
-| `vessel_id` | Required foreign key to the vessel UUID for this vessel-only feature and its access/sync scope. |
-| `file_name` | Original filename for display and download naming. |
-| `file_key` | Private object-storage or local-storage reference; never a public URL. |
-| `file_type` | Validated content type; for this feature, `application/pdf`. |
-| `file_size` | Stored file size in bytes. |
-| `storage_backend` | Identifies the configured private object or local filesystem backend. |
-| `uploaded_by` | User identity/name shown as the uploader, populated from authenticated request context. |
-| `uploaded_at` | Upload timestamp, populated by the server/database. |
-| `created_by`, `created_at` | Required creation audit identity and timestamp. |
-| `updated_by`, `updated_at` | Required last-update audit identity and timestamp. |
-| `is_deleted` | Soft-delete state used for safe removal and synchronization. |
-| `deleted_by`, `deleted_at` | Identity and timestamp for soft deletion; set only when deleting and cleared if restoration is supported. |
-| `is_sync` | Sync tracking field, following the applicable existing table conventions. |
-| `created_by_uuid`, `updated_by_uuid` | User UUID tracking fields where required by the PMS audit/sync architecture. |
-| `sort_order` | Optional stable ordering when multiple PDFs are listed. |
+| `id` | Unique immutable document ID; generate on the server. |
+| `vessel_id` | Required vessel UUID FK and scope key for lookup, authorization, uniqueness, and sync. |
+| `file_name` | Original/safe display filename, including the `.pdf` extension. |
+| `normalized_file_name` | Server-derived comparison key for enforcing one active file name per vessel; normalization rules remain to be finalized. |
+| `file_key` | Private storage key; never a public URL or client-supplied path. |
+| `content_type` | Server-validated content type; `application/pdf`. |
+| `file_size` | Validated size in bytes. |
+| `storage_backend` | Identifies the configured private storage backend. |
+| `uploaded_by`, `uploaded_at` | Server-derived uploader identity and upload time. |
+| `revision_remarks` | Optional short revision/document-control note; not a full versioning system. |
+| Audit/sync columns | Apply the same finalized audit and sync column set used by `component_class_regulatory_attachments`. |
 
-### Audit requirements
+### 4.2 Job-to-file association
 
-The project requirement for every new table includes, at minimum:
+One row links a vessel Job to a vessel file. This is the record removed/restored when a file is detached from one Job.
 
-- Created By
-- Created At
-- Updated By
-- Updated At
-- Is Deleted
-- Deleted By
-- Deleted At
+| Proposed column | Purpose |
+|---|---|
+| `id` | Unique immutable association ID. |
+| `job_id` | Required FK to canonical `jobs.juuid`. |
+| `document_id` | Required FK to the vessel-file asset. |
+| `vessel_id` | Required sync/scope value; must match both the Job and the file asset. |
+| `is_deleted` | Soft-delete state for this Job link; does not retire a shared asset used by other Jobs. |
+| Audit/sync columns | Apply the same finalized audit and sync column set used by `component_class_regulatory_attachments`. |
 
-Before implementation, inspect the full standard used by existing PMS tables and include any additional standard audit or tracking fields it requires. Follow established column names, types, defaults, utilities, and relationships. Populate user fields from authenticated identity and timestamps from the server/database; do not use hard-coded or arbitrary user IDs. Ensure create, update, soft-delete, and restore operations maintain the fields consistently.
+### Audit and scope requirements
+
+The new table(s) must use the **same finalized audit/sync column set** as `component_class_regulatory_attachments`. The required audit concepts include:
+
+- `created_by`, `created_at`
+- `updated_by`, `updated_at`
+- `is_deleted`, `deleted_by`, `deleted_at`
+- The reference table's actor UUID and sync-tracking fields, including `created_by_uuid`, `updated_by_uuid`, and `is_sync` where required by the finalized standard
+- File-specific `uploaded_by` and `uploaded_at` on the vessel-file asset
+
+Use the exact approved column names, SQL types, nullability, defaults, and update utilities from the finalized PMS standard. The reference attachment table is currently described in a proposal rather than found in the active schema; its proposal excerpt does not list every mandatory audit concept above. Before migration, compare the authoritative finalized column list with the project's mandatory audit-column standard and resolve any discrepancy. Do not omit required columns because a proposal excerpt is incomplete.
+
+Populate actor fields from authenticated identity and timestamps from the server/database. A link removal/restore updates the association's deletion and audit fields. Do not mark an asset deleted while any active Job link references it. An asset with no active links may be soft-deleted and retained for restoration/audit; physical purge requires a separate approved retention policy.
 
 ### Constraints and indexes to consider
 
-- Foreign key from `job_id` to `jobs.juuid`.
-- Foreign key from `vessel_id` to the vessel UUID column.
-- Validate that the Job is vessel-scoped and that `jobs.vessel_id` matches the submitted `vessel_id`; reject Fleet Jobs.
-- Index active documents by `(job_id, vessel_id)` and index `vessel_id` for scoped listing/sync.
-- Consider a unique constraint on `file_key` to prevent two records from claiming the same stored object.
-- All list queries must exclude soft-deleted rows unless an authorized audit view explicitly requests them.
+- Foreign key from the association `job_id` to `jobs.juuid`; foreign keys from both tables to the canonical vessel UUID and from the association to the file asset.
+- Validate that the Job is vessel-scoped and `jobs.vessel_id` matches both the association and asset `vessel_id`; reject Fleet Jobs and cross-vessel links.
+- Enforce one active physical file per normalized filename within a vessel, while allowing that same asset to be linked to many Jobs.
+- Enforce one active association for a given `(job_id, document_id)`; do not impose filename uniqueness on association rows.
+- Index assets by `(vessel_id, normalized_file_name, is_deleted)` and associations by `(job_id, vessel_id, is_deleted)` and by `document_id`.
+- Ensure one storage key maps to one asset record. All ordinary Job and Work Order views exclude soft-deleted associations.
+- Restore must detect a conflicting active association or filename and return a clear error rather than creating duplicates.
 
 ## 5. Proposed private file layout
 
 The exact private object root is environment-configured and is not a literal path in the repository. The current Work Order implementation uses `PRIVATE_OBJECT_DIR` for object storage and `.private/wo-docs` as its local fallback. Do not assume the configured bucket/root value; confirm it through the approved environment configuration process before implementation.
 
-The agreed folder policy is to separate files by vessel and Job, using a stable vessel code or ID rather than relying on a mutable/display-only name:
+The agreed folder policy is a shared private folder per vessel, named with the stable vessel UUID (or an approved immutable vessel code) and **no vessel-name suffix**. Do not create a per-Job folder: a physical file must have one vessel-scoped location so several Jobs can reference it.
 
 ```text
 <PRIVATE_OBJECT_DIR>/
     job-docs/
-        <stable-vessel-code-or-id>_<safe-vessel-name>/
-            <job.juuid>/
-                <unique-document-id>_<safe-filename>.pdf
+        <vessel-uuid-or-immutable-code>/
+            <safe-filename>.pdf
 ```
 
 Example shape only:
 
 ```text
-<PRIVATE_OBJECT_DIR>/job-docs/VSL-042_Alejandro/<job.juuid>/<document-uuid>_pump-overhaul.pdf
+<PRIVATE_OBJECT_DIR>/job-docs/<vessel-uuid>/pump-overhaul.pdf
 ```
 
-`VSL-042_Alejandro` is illustrative, not a confirmed vessel code or actual storage root.
+The vessel identifier and filename are illustrative, not actual values or a confirmed storage root. The document UUID remains in metadata; the physical file is not duplicated or placed in a Job-specific subfolder.
 
 If the local fallback is used, the proposed corresponding layout is:
 
 ```text
 <project-root>/.private/job-docs/
-    <stable-vessel-code-or-id>_<safe-vessel-name>/
-        <job.juuid>/
-            <unique-document-id>_<safe-filename>.pdf
+    <vessel-uuid-or-immutable-code>/
+        <safe-filename>.pdf
 ```
 
-Normalize the vessel folder component and filename to prevent path traversal and invalid filesystem/object names. Persist the storage reference in `file_key`; the directory layout must not become an API input.
+The exact private root is environment-configured and must be confirmed through the approved configuration process. The vessel folder is also the controlled file-drop/lookup area for Jobs Bulk Import. It must be persistent and accessible to the import process; do not rely on an ephemeral per-process directory. Normalize the filename to prevent path traversal and unsafe names. The spreadsheet supplies a filename only; the server derives the folder and `file_key`. If the configured object-storage backend cannot support direct folder drops, provide an approved controlled staging/import mechanism that preserves the same vessel scoping and validation.
 
 ## 6. Proposed API and backend responsibilities
 
-There is currently no Job-document endpoint. Add Job-scoped endpoints following existing route conventions, for example:
+There is currently no Job-document endpoint. Add Job/file-association endpoints following existing route conventions, for example:
 
 | Proposed route | Responsibility |
 |---|---|
-| `GET /technical/api/jobs/:jobId/documents` | Return active attachment metadata after resolving the Job and verifying vessel/user access. |
-| `POST /technical/api/jobs/:jobId/documents` | Accept multipart PDF upload, validate the Job/vessel ownership, store the file, create its metadata record, and queue file sync. |
-| `GET /technical/api/job-documents/:documentId/open` | Authorize through the document’s Job and vessel, then stream the PDF privately for viewing. |
-| `GET /technical/api/job-documents/:documentId/download` | Optional download endpoint with safe filename headers. |
-| `DELETE /technical/api/job-documents/:documentId` | Soft-delete the document and queue the metadata/deletion for sync, subject to edit permission. |
+| `GET /technical/api/jobs/:jobId/documents` | Return the Job's active file links and metadata after resolving the canonical Job and verifying vessel/user access. |
+| `POST /technical/api/jobs/:jobId/documents/upload` | Accept a new PDF, validate it, create/reuse a vessel asset as allowed by filename rules, link it to the Job, and queue metadata plus file sync. |
+| `POST /technical/api/jobs/:jobId/documents/link` | Link an existing active vessel file asset to this Job without duplicating its bytes. |
+| Existing Jobs bulk-import route | Read `Job attachments`, resolve filenames within the selected vessel folder, and create idempotent Job links with row-level errors. |
+| `GET /technical/api/job-document-assets/:documentId/open` | Authorize through the requested Job link and vessel, then stream the PDF privately for viewing. |
+| `GET /technical/api/job-document-assets/:documentId/download` | Optional download endpoint with safe filename headers. |
+| `DELETE /technical/api/job-document-links/:linkId` | Soft-delete only this Job association and queue the link deletion for sync. |
+| `POST /technical/api/job-document-links/:linkId/restore` | Restore a permitted Job association, subject to duplicate and vessel checks. |
 
 These are proposed names; route naming should follow the final API design. Backend responsibilities include:
 
 1. Resolve legacy route IDs to the canonical `jobs.juuid`.
 2. Reject missing, inactive/unauthorized, Fleet-scoped, or mismatched-vessel Jobs as appropriate to the PMS policy.
-3. Verify that the requester's role and vessel assignments permit listing, uploading, opening, or removing the document.
-4. Validate PDF type, size, and safe filename on the server.
-5. Store privately and save only the storage key/reference in the database.
-6. Use a database transaction or explicit cleanup handling so failed metadata writes do not leave orphaned files.
-7. Write audit values from the authenticated user and server clock.
-8. Return metadata only for list requests; stream or return the PDF only from the separately authorized open/download endpoint.
+3. Enforce the role rules: office users with Job edit rights may upload, link, remove, and restore; vessel users may only list and open files.
+4. Enforce that the asset, Job, association, and request vessel all match. Reject duplicate new vessel filenames; permit reuse of one active asset by multiple Jobs.
+5. Validate PDF type, size, normalized filename, and file content on the server. For bulk import, resolve a filename only in the selected vessel folder and never treat spreadsheet content as a path.
+6. Create one private asset row and one Job-link row as needed. Use transactions or cleanup/quarantine handling so failed records do not leave invisible files or broken links.
+7. Apply the same finalized audit/sync fields as the reference attachment standard, with authenticated actor identity and server/database timestamps.
+8. Soft-delete and restore the association, not a shared asset that remains linked elsewhere. Keep a restore/audit trail and make retries idempotent.
+9. Return metadata only from list requests; stream or download the PDF only from a separately authorized endpoint.
+10. Make Job attachment metadata available to Work Orders through the Job relationship, always selecting current active links rather than copying a stale list.
 
 ## 7. Sync requirements
 
 Sync is part of the feature scope, not an optional later enhancement.
 
-Both of the following must reach the vessel:
+Both of the following must reach the applicable vessel:
 
-1. **Document metadata** — including Job UUID, vessel ID, private storage reference/backend, file details, audit data, and deletion state.
-2. **PDF bytes** — the actual file content must be delivered and stored using the vessel-side file-sync mechanism.
+1. **Vessel-file asset metadata** — including document ID, vessel ID, private storage reference/backend, filename, content type/size, revision remarks, audit data, and asset state.
+2. **Job-file association metadata** — including canonical Job UUID, document ID, vessel ID, audit data, and per-Job soft-delete/restore state.
+3. **PDF bytes** — transfer each physical asset once per vessel, even if several Jobs link to it.
 
-Before implementation, map the new table into the application’s sync configuration and file-transfer pipeline. The current file-sync processor explicitly handles `work_order_documents` and `component_documents`; a new `job_documents` table will need equivalent registration and storage-directory/path resolution. Queue files for transfer after upload, make retries safe, and verify the file exists on the vessel before the UI reports it as available there.
+Before implementation, register both proposed tables in the sync configuration and include file assets in the file-transfer pipeline. The current processor handles Work Order and component document files; this feature needs the equivalent vessel-folder mapping for assets and independent synchronization of Job links. Queue file transfer after the asset is safely stored, make retries safe, and verify bytes are present before a vessel UI or Work Order offers the file as available.
 
-The implementation plan must also define:
+Required sync behavior:
 
-- Sync direction and which side is authoritative for Job documents.
-- How uploads made while the vessel is offline are retried.
-- How soft deletions propagate and how the vessel removes or hides deleted PDFs.
-- How a Job or vessel deletion/inactivation affects its document records and stored files.
-- How duplicate/out-of-order sync events are made idempotent.
-- Whether uploaded PDFs are available in Work Orders generated from the Job. This plan does not automatically copy them to `work_order_documents`; that behavior requires an explicit decision.
+- Synchronize a Job-link soft deletion without deleting a shared vessel asset that has other active Job links.
+- Synchronize restoration and ensure that stale/out-of-order events cannot resurrect an intentionally removed link.
+- Transfer file bytes once per vessel asset, then make all synchronized Job links resolve to that local asset.
+- Keep Work Order views read-only and live-linked to the current Job associations. Do not create duplicate Work Order attachment records.
+- Define sync authority/direction, offline upload/import retry behavior, Job/vessel inactivation behavior, asset retention, and duplicate/out-of-order event handling before implementation.
 
 ## 8. Security and operational safeguards
 
 - Keep files private; use authenticated application endpoints rather than public object URLs.
-- Enforce role permissions and vessel access on every list/open/upload/delete operation, not only by hiding UI controls.
-- Validate that the document's Job and vessel match before serving a file.
+- Enforce role permissions and vessel access on every list/open/upload/link/remove/restore/import operation, not only by hiding UI controls.
+- Validate that the Job link, Job, file asset, and vessel match before serving a file.
 - Check both extension and MIME type; use file-signature validation where practical.
-- Generate the path and unique filename on the server. Sanitize every user-provided display filename and never concatenate it unsafely into a path.
+- Derive the vessel folder and storage key on the server. Sanitize every imported/uploaded filename and never concatenate untrusted input into a path.
+- Restrict direct file-drop access to an authorized office-managed storage process. The bulk-import column is a filename lookup, not a filesystem path or arbitrary object key.
+- Protect file assets referenced by multiple Jobs: removing one Job link must not remove bytes or links belonging to other Jobs.
 - Set safe content headers and avoid trusting client-supplied content types.
 - Apply upload limits and return clear validation errors.
 - Avoid logging file contents, private object URLs, or sensitive user information.
@@ -213,41 +247,45 @@ The implementation plan must also define:
 
 ## 9. Expected schema and migration impact
 
-If approved and implemented as proposed, this feature requires a database migration to create the Job-document metadata table and its constraints/indexes. It should not require adding a PDF blob or path field to the `jobs` record; attachments remain separate rows linked by `job_id`.
+If approved and implemented as proposed, this feature is expected to require a database migration for two normalized tables: vessel file assets and Job-to-file associations, plus their foreign keys, audit/sync fields, uniqueness rules, and indexes. It should not require adding a PDF blob or attachment column to `jobs` or `work_orders`; the Job relationship belongs in the association table. Jobs Bulk Import also needs a `Job attachments` template/mapping field and backend import handling.
 
-The feature also requires backend/API work, private file-storage integration, Job Form UI changes, audit handling, sync-table registration, and binary file-transfer support. No such migration, API, storage folder, or sync behavior has been created as part of this plan document.
+The feature also requires Job Form UI changes, private vessel-folder ingestion, office/vessel permission enforcement, audit handling, Work Order read-only display through the Job link, sync-table registration, and binary file-transfer support. This plan update does not create either table, a migration, an API, storage folders, or sync behavior.
 
 ## 10. Decisions to confirm before implementation
 
-1. Maximum PDF size. The existing Work Order uploader's 25 MB cap is a reference, not an approved Job limit.
-2. Maximum number of PDFs per Job and whether duplicate filenames are permitted.
-3. Whether an uploaded file can be replaced or only a new version can be uploaded.
-4. Whether users may remove PDFs; whether removal is soft-delete only in the UI.
-5. Which ranks/roles may upload, view, and remove files for a vessel Job.
-6. Whether an unsaved Job must first be saved before upload. Recommended: yes.
-7. Whether Job instructions should be visible from a generated Work Order, and whether that view should use current files or a point-in-time snapshot.
-8. The exact stable vessel folder identifier to use (vessel code, vessel UUID, or code plus UUID) and its safe display-name suffix.
-9. Which existing standard audit fields/utilities and sync metadata fields are mandatory for the new table.
+1. Maximum PDF size and maximum number of active files per vessel/Job. The existing Work Order uploader's 25 MB cap is only a reference.
+2. Exact encoding/delimiter for multiple filenames in one `Job attachments` cell, including filename escaping.
+3. Filename matching rules (case sensitivity, Unicode normalization, whitespace, extension handling) and how a distinct file with the same name is rejected.
+4. How a filename becomes available again after its asset/link is soft-deleted, and how restore handles a newer active file with the same name.
+5. Whether the configured private storage supports controlled direct file drops, or requires a dedicated persistent staging/import area and promotion step.
+6. Sync authority/direction, offline import retry, file retention, and cleanup behavior for assets with no active Job links.
+7. Confirm the exact immutable folder identifier used at rollout: vessel UUID is preferred; an immutable vessel code is acceptable. No display-name suffix is used.
+8. At implementation time, verify the exact finalized audit/sync columns and utilities against `component_class_regulatory_attachments` and the project-wide mandatory audit standard; apply that set to both new tables.
+
+The following functional decisions are confirmed and are not open questions: vessel Jobs only; save the Job before attaching; office users with Job edit rights may upload/remove/restore and vessel users may view/open only; filename-based import; one active file asset per filename per vessel; reuse an asset across Jobs; no in-place overwrite; soft-delete/restore the Job link only; live read-only latest files on all Work Orders from that Job; vessel UUID or immutable-code folder with no name suffix.
 
 ## 11. Acceptance criteria
 
-- A vessel Job's Work Instructions dialog shows its own PDFs and does not show files belonging to another Job or vessel.
-- Uploading a valid PDF associates it with the correct `jobs.juuid` and `vessel_id`, and the file is placed under the correct vessel/Job private path.
-- Invalid file type, invalid owner/vessel association, unauthorized access, and over-limit uploads are rejected server-side with clear errors.
-- A permitted user can reopen/download the stored PDF through an authorized endpoint after refreshing or revisiting the Job.
-- Soft deletion updates the audit fields and synchronizes the deletion without exposing the file as active.
-- The attachment metadata and PDF bytes arrive at the correct vessel installation and can be opened there.
-- Retry/duplicate sync operations do not create duplicate attachment rows or corrupt files.
-- Fleet Jobs cannot use this endpoint or create Job-document rows under this vessel-only proposal.
-- The **Feature Coming Soon** section remains visible and inactive.
-- The Work Order forms that share `WorkInstructionsDialog` retain their current behavior unless separately approved.
+- A vessel Job's Work Instructions dialog shows only its active linked PDFs; it cannot reveal another vessel's files or another Job's links.
+- Office users with Job edit rights can upload, link an existing vessel PDF, remove a link, and restore a link. Vessel users can only list/open.
+- Unsaved Jobs cannot receive links. A successful upload/import links the correct `jobs.juuid` and vessel.
+- A vessel cannot have two active file assets with the same normalized filename. The same asset can be linked to multiple Jobs without duplicating bytes.
+- Jobs Bulk Import resolves each `Job attachments` filename only in the selected vessel folder, validates it, reports missing/invalid entries by row, and is safe to retry.
+- Removing/replacing a link on one Job does not hide or delete the asset or association on another Job. Authorized restore reactivates the original link unless a documented collision prevents it.
+- Uploaded/imported files are privately stored in the vessel UUID/immutable-code folder with no vessel-name suffix and can be reopened through an authorized endpoint.
+- Every existing/open Work Order linked to a Job displays that Job's current active PDFs read-only. A Job document change is reflected on its Work Orders but does not alter other Jobs' Work Orders.
+- Asset metadata, Job links, audit/deletion state, and the PDF bytes synchronize to the correct vessel. File bytes are transferred once per vessel asset.
+- Retry/duplicate/out-of-order sync operations do not create duplicate assets/links, lose a shared file, or resurrect a removed link.
+- Fleet Jobs cannot use this feature. The **Feature Coming Soon** section remains visible and inactive.
+- Work Order forms may show Job PDFs through a read-only Job link as specified above; existing Work Order-owned document upload, edit, and deletion behavior remains unchanged.
 - Migration verification lists every new table and its audit columns, purpose, and population/update behavior.
 
 ## 12. Scope exclusions
 
 - Fleet Job attachments.
+- Template/library attachment inheritance.
 - Rich-text or editable instruction steps.
 - Public sharing of PDFs.
 - Automatic copying of Job PDFs into Work Order document records.
-- Any change to current Work Order attachment behavior.
+- Changes to existing Work Order-owned document upload, edit, and deletion behavior.
 - Implementation, migration, or deployment in this plan-only deliverable.
