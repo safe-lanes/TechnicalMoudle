@@ -106,4 +106,9 @@ Tests: pytest 95/95 on the branch (adds the documentation-only registration test
 4. Back up both nginx files (`.bak-v10-<ts>`) and switch `8052 → 8053`; `nginx -t`; reload.
 5. **Public hash check** through `https://assistant.sl-sail.com/widget/1.0.0/…` and `/widget/1.0.1/…`. Both SRI values must match the table above. Then repeat C1, one Technical live-data question and the Technical chat button.
 
-**Rollback:** nginx back to `127.0.0.1:8052` (v9 kept running). No database step. 1.0.0 consumers are unaffected either way.
+**Rollback:** nginx back to `127.0.0.1:8052` (v9 kept running). No database step.
+- **1.0.0 consumers** are unaffected either way.
+- **v9 does NOT serve widget 1.0.1**, and **v9 does not have the `crewing-dev` registration** (it was started before it was added).
+- If Crewing is already enabled when rolling back:
+  - on v9, Crewing's 1.0.1 script returns 404, the browser blocks it, and **the Crewing chat button disappears**. This is fail-safe: no error and no partial widget, and the rest of Crewing works normally;
+  - **coordinate with Datta**: either (a) disable the Crewing widget (rebuild Crewing without `VITE_ASSISTANT_URL`), or (b) restore an assistant build that serves 1.0.1 and has the `crewing-dev` registration. v10 is exactly v9 + the 1.0.1 files, so (b) usually means fixing forward on v10.
