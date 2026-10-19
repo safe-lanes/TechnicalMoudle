@@ -8,3 +8,4 @@
 - [Frontend SSR test transforms](frontend-ssr-test-transforms.md) — server-oriented tests may leave JSX untransformed; distinguish this from an application syntax error.
 - [CLI runtime stalls](cli-runtime-stalls.md) — compare shell and workflow Node executables when checks stall before reporting results.
 - [PMS documentation audience](pms-documentation-audience.md) — Claude has no codebase access; shared documentation must explain behaviour without source lookup.
+- [Vessel Job work-instruction PDFs](job-work-instruction-scope.md) — vessel Jobs only, stable vessel-separated paths, and sync both file metadata and PDFs.
