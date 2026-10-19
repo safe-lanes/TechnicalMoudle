@@ -112,3 +112,36 @@ Tests: pytest 95/95 on the branch (adds the documentation-only registration test
 - If Crewing is already enabled when rolling back:
   - on v9, Crewing's 1.0.1 script returns 404, the browser blocks it, and **the Crewing chat button disappears**. This is fail-safe: no error and no partial widget, and the rest of Crewing works normally;
   - **coordinate with Datta**: either (a) disable the Crewing widget (rebuild Crewing without `VITE_ASSISTANT_URL`), or (b) restore an assistant build that serves 1.0.1 and has the `crewing-dev` registration. v10 is exactly v9 + the 1.0.1 files, so (b) usually means fixing forward on v10.
+
+## 9. Release log — v10, 19-Oct-2026
+
+| Item | Value |
+|---|---|
+| Pushed | `feature/assistant-widget` = `feature/chatbot-enterprise` = `9389ce1f5` (normal fast-forward from `dc29bb26c`) |
+| Live image | `sail-assistant-py:v10-b2ae111e0` (id `1543f15d6bbc`; code unchanged since `b2ae111e0`, later commits docs only), container `sail-assistant-py-v10`, `127.0.0.1:8053` |
+| Settings | `~/central-assistant/v10-release.env` = `v8-release.env` + `crewing-dev` (documentation-only: module, env, signingKey; **no url, no secret**). Key kept only on the server in `~/central-assistant/crewing-dev-signing-key.env` (mode 600). v8 and v9 settings untouched. |
+| Switch | nginx `assistant.conf:21` + `safelanes.conf:375` `8052 → 8053`, `nginx -t` OK, reloaded **13:36:35 UTC** |
+| Backups | `/etc/nginx/conf.d/*.bak-v10-20261019T133635Z` |
+| Rollback | nginx back to `127.0.0.1:8052` (v9 still running); see the §8 caveat: v9 has no widget 1.0.1 and no `crewing-dev`. |
+
+**Pre-switch (v10 direct, :8053):**
+- C1 health identical to v9, plus `crewing-dev`; `instancesRejected` [].
+- C2: both versions served with the expected SRI (1.0.0 unchanged); immutable; CORS `*`; `integrity.json` 404.
+- C3: 4 Technical starters, `hr` → [], no identity → 401.
+- C4: Technical documentation answer.
+- **Technical live data:** Vessel 3 (`rsms05102026`, `technical-dev`): chat 160 = direct execute on `dev.sl-sail.com` 160.
+- **crewing-dev:** 5 Crewing starters, answer citing Crewing only, no tool call (documentation-only); wrong key → 401.
+- `/kb` byte-identical.
+
+**Post-switch (public `https://assistant.sl-sail.com`):**
+- Health identical; public SRI 1.0.0 = `sha384-Dz8Y…ErWP` (unchanged) and 1.0.1 = `sha384-e2Q1…4ZMU`; `integrity.json` 404.
+- C3 and C4 identical; Technical live data 160 = 160 (9.5 s).
+- crewing-dev starters and answer OK.
+- `viqmap.sl-sail.com/assistant/` → v10.
+- v9 received **no** requests after the switch; no v10 errors.
+
+**Not verified by support:**
+- The existing Technical chat button with a genuine SAILERP login.
+- Crewing with a genuine login: Crewing is not deployed yet (Datta).
+
+The checks used test identities (`release-check-v9`, `release-check-v10`).
