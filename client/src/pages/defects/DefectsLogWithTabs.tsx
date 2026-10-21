@@ -50,6 +50,14 @@ import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-co
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
+import {
+  downloadDefectLogCsv,
+  downloadDefectLogExcel,
+  filterDefectsForExport,
+  formatDefectDate,
+  makeDefectLogExportRow,
+  stripDefectHtml,
+} from "./defectLogExport";
 
 interface DefectsFilters {
   periodValue?: PeriodValue | null;
@@ -104,10 +112,7 @@ const CategoryCellRenderer = (params: ICellRendererParams) => {
 };
 
 const stripHtmlTags = (html: string | null | undefined): string => {
-  if (!html) return '';
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return div.textContent || div.innerText || '';
+  return stripDefectHtml(html);
 };
 
 const HtmlTextCellRenderer = (params: ICellRendererParams) => {
@@ -154,35 +159,17 @@ const PriorityCellRenderer = (params: ICellRendererParams) => {
 
 const TwoLineDateCellRenderer = (params: ICellRendererParams) => {
   if (!params.value) return null;
-  
-  try {
-    let date: Date;
-    const value = String(params.value);
-    
-    // Handle DD-MM-YYYY format (e.g., "25-08-2025")
-    const ddmmyyyyMatch = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (ddmmyyyyMatch) {
-      const [, day, month, year] = ddmmyyyyMatch;
-      date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    } else {
-      date = new Date(value);
-    }
-    
-    if (isNaN(date.getTime())) return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
-    
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = date.toLocaleString('en-US', { month: 'short' });
-    const year = date.getFullYear();
-    
-    return (
-      <div className="flex flex-col justify-center text-[13px] text-[#4f5863] leading-tight">
-        <span>{day} {month}</span>
-        <span>{year}</span>
-      </div>
-    );
-  } catch {
-    return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
-  }
+  const formatted = formatDefectDate(params.value);
+  if (!formatted) return null;
+  const match = formatted.match(/^(\d{2} [A-Za-z]{3}) (\d{4})$/);
+  if (!match) return <span className="text-[13px] text-[#4f5863]">{formatted}</span>;
+
+  return (
+    <div className="flex flex-col justify-center text-[13px] text-[#4f5863] leading-tight">
+      <span>{match[1]}</span>
+      <span>{match[2]}</span>
+    </div>
+  );
 };
 
 const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCellContext }) => {
@@ -336,14 +323,21 @@ export default function DefectsLogWithTabs() {
   }, []);
 
   const { data: defects = [], isLoading } = useQuery({
-    queryKey: ['defects', 'active', filters],
+    queryKey: [
+      'defects',
+      'active',
+      filters.vesselId,
+      filters.type,
+      filters.fleet,
+      filters.addGroup,
+      filters.dueOverdue,
+    ],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('statusScope', 'active');
       
       if (filters.vesselId) params.append('vesselId', filters.vesselId);
       if (filters.type) params.append('category', filters.type);
-      if (filters.search) params.append('search', filters.search);
       if (filters.fleet) params.append('fleet', filters.fleet);
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
@@ -425,6 +419,37 @@ export default function DefectsLogWithTabs() {
     );
   };
 
+  const getDefectsForExport = (): Defect[] => {
+    const gridFilters = gridApi && !gridApi.isDestroyed() ? gridApi.getFilterModel() : null;
+    return filterDefectsForExport(filteredDefects, gridFilters) as Defect[];
+  };
+
+  const handleExportCsv = () => {
+    try {
+      downloadDefectLogCsv(getDefectsForExport());
+    } catch (error) {
+      console.error("Failed to export Defect Log CSV:", error);
+      toast({
+        title: "Export failed",
+        description: "Could not create the Defect Log CSV file.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      downloadDefectLogExcel(getDefectsForExport());
+    } catch (error) {
+      console.error("Failed to export Defect Log Excel:", error);
+      toast({
+        title: "Export failed",
+        description: "Could not create the Defect Log Excel file.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredDefects = useMemo(() => {
     let result = defects;
     
@@ -449,6 +474,15 @@ export default function DefectsLogWithTabs() {
           filterName === defectVessel || defectVessel.includes(filterName) || filterName.includes(defectVessel)
         );
       });
+    }
+
+    if (filters.search?.trim()) {
+      const search = filters.search.trim().toLocaleLowerCase();
+      result = result.filter((defect: Defect) =>
+        Object.values(makeDefectLogExportRow(defect)).some((value) =>
+          value.toLocaleLowerCase().includes(search)
+        )
+      );
     }
     
     if (filters.periodValue) {
@@ -528,7 +562,7 @@ export default function DefectsLogWithTabs() {
     }
     
     return result;
-  }, [defects, selectedVessel, allVessels, selectedVesselNames, filters.periodValue, filters.dueOverdue]);
+  }, [defects, selectedVessel, allVessels, selectedVesselNames, filters.search, filters.periodValue, filters.dueOverdue]);
 
   const totalDefects = filteredDefects.length;
   const totalPages = Math.max(1, Math.ceil(totalDefects / pageSize));
@@ -980,6 +1014,8 @@ export default function DefectsLogWithTabs() {
                   showExportButtons={true}
                   showFilterButtons={true}
                   showGroupButtons={true}
+                  onExportCsv={handleExportCsv}
+                  onExportExcel={handleExportExcel}
                 />
               </div>
             </div>
