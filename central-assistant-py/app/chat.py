@@ -56,14 +56,20 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
     tenant = str(identity.get("tenantDomain") or "single-tenant")
 
     masking_on = s.masking_enabled and tenant not in s.masking_disabled_tenants
-    masker = Masker() if masking_on else None
+    masker = Masker(name_parts=(ui_module == "crewing")) if masking_on else None
+    raw_history = body.get("conversationHistory")
+    mem_key = (str(identity.get("iss") or ""), tenant, str(identity.get("userId")), body.get("conversationId"))
     if masker:
         if identity.get("userName"):
             masker.register(identity["userName"], "PERSON")
         if ctx.get("vesselName"):
             masker.register(ctx["vesselName"], "VESSEL")
         if s.assistant_mask_conversation_memory:
-            mask_memory.recall(masker, tenant, str(identity.get("userId")), body.get("conversationId"))
+            recalled = mask_memory.recall(masker, *mem_key)
+            if recalled is None and isinstance(raw_history, list) and raw_history:
+                # fail closed: no memory for this exact issuer/company/user/conversation → never replay earlier answers
+                raw_history = mask_memory.withhold_assistant_turns(raw_history)
+                print("[assistant] masking memory miss with history — earlier answers withheld")
     log_masked = masking_on and tenant in s.masked_only_log_tenants
 
     def for_log(t: str | None) -> str | None:
@@ -119,20 +125,24 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
             # the widget's earlier turns ride along as history (masked on the wire like everything else) so
             # follow-ups ('readable format', 'more') refer to the previous answer instead of restarting.
             r = await agent.run_tool_loop(agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker, manifest["tools"],
-                                          history=agent.build_history(body.get("conversationHistory")), instance=live)
+                                          history=agent.build_history(raw_history), instance=live)
             if masker and masker.warnings:
                 print("[assistant] unmask warnings:", masker.warnings)
             if masker and s.assistant_mask_conversation_memory:
-                mask_memory.remember(masker, tenant, str(identity.get("userId")), body.get("conversationId"))
-            log("answer", r.text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used)
-            return 200, {"response": r.text, "gate": "answer", "module": MODULE_LABELS.get(ui_module, ui_module),
-                         "toolsUsed": r.tools_used, "partial": r.partial, "usage": r.usage}
+                mask_memory.remember(masker, *mem_key)
+            log("answer", r.text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used,
+                citations=r.citations if ui_module == "crewing" else None)
+            out = {"response": r.text, "gate": "answer", "module": MODULE_LABELS.get(ui_module, ui_module),
+                   "toolsUsed": r.tools_used, "partial": r.partial, "usage": r.usage}
+            if ui_module == "crewing":
+                out["citations"] = r.citations  # 21-Oct-2026 trial: source chips for manual answers on the tool-loop path
+            return 200, out
 
         # ── Stage 1 docs path ──
         # Step 4 (owner brief 15-Sep-2026): the same one embedding call; routing may consult the question's own words and
         # the originating module (ASSISTANT_ROUTE_INTENT), excerpt selection may fuse a lexical ranking inside the routed
         # module (ASSISTANT_HYBRID). Both default off = served behaviour. Neither touches identity, tenant or vessel checks.
-        history = agent.build_history(body.get("conversationHistory"))
+        history = agent.build_history(raw_history)
         terms = await retrieval.title_terms() if retrieval.context_routing_on() else None
         query = retrieval.expand_for_module(message, ui_module, terms)  # glossary off → the message itself
         emb = await llm.embed(query, masker)
@@ -206,6 +216,8 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
         text, usage = await agent.answer_docs(system, user, masker, history=history)
         if masker and masker.warnings:
             print("[assistant] unmask warnings:", masker.warnings)
+        if masker and s.assistant_mask_conversation_memory:
+            mask_memory.remember(masker, *mem_key)
         log("answer", text, module=routed.module, citations=citations, confidence=routed.confidence, usage=usage, model=s.chat_model)
         return 200, {"response": text, "gate": "answer", "module": label, "citations": citations, "confidence": round(routed.confidence, 4), "usage": usage,
                      "routing": getattr(routed, "reason", "vector routing")}

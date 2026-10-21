@@ -36,7 +36,10 @@ IMO_KEY = re.compile(r"^(imo|imo_?number)$", re.I)
 
 
 class Masker:
-    def __init__(self) -> None:
+    def __init__(self, name_parts: bool = False) -> None:
+        # 21-Oct-2026 Crewing trial: also register the parts (≥4 letters) of a person name learned from a tool result,
+        # so a first or family name typed ON ITS OWN in a later message ("is Petra …") is masked too. Off by default.
+        self._name_parts = name_parts
         self._real_to_token: dict[str, str] = {}   # lowercased real -> token
         self._token_to_real: dict[str, str] = {}   # token -> real (original casing)
         self._counters = {"VESSEL": 0, "PERSON": 0, "IMO": 0, "ID": 0}
@@ -85,7 +88,11 @@ class Masker:
                 k = str(k)
                 if isinstance(v, str):
                     if NAME_KEY_RE.search(k):
-                        self.register(v, "VESSEL" if re.search("vessel", k, re.I) else "PERSON")
+                        kind = "VESSEL" if re.search("vessel", k, re.I) else "PERSON"
+                        self.register(v, kind)
+                        if kind == "PERSON" and self._name_parts:
+                            for part in re.findall(r"[^\W\d_]{4,}", v):
+                                self.register(part, "PERSON")
                     elif BARE_NAME_KEY.match(k) and (has_vessel or has_person):
                         self.register(v, "VESSEL" if has_vessel else "PERSON")
                     elif IMO_KEY.match(k) and re.fullmatch(r"\d{6,8}", v.strip()):

@@ -66,6 +66,7 @@ class Deps:
     instance: dict[str, Any] | None = None   # the token issuer's REGISTERED instance (url/secret) — the only callback target
     partial: bool = False
     tools_used: list[str] = field(default_factory=list)
+    citations: list[dict[str, Any]] = field(default_factory=list)   # manual excerpts returned by search_module_docs
 
 
 # ── module manifests (Data API discovery) ─────────────────────────────────────────
@@ -162,6 +163,11 @@ class ManifestToolset(AbstractToolset[Deps]):
         args = deps.masker.unmask_json(tool_args) if deps.masker else tool_args  # G4
         if name == "search_module_docs":
             result: Any = await search_docs_tool(str(args.get("query") or ""), deps.masker, deps.ui_module)
+            if isinstance(result, dict) and result.get("documented"):
+                for e in result.get("excerpts") or []:   # 21-Oct-2026: structured citations for the widget's source chips
+                    c = {"module": result.get("module"), "manual": e.get("manual"), "section": e.get("section")}
+                    if c not in deps.citations:
+                        deps.citations.append(c)
         else:
             try:
                 out = await asyncio.wait_for(
@@ -282,6 +288,7 @@ class LoopResult:
     tools_used: list[str]
     usage: dict[str, int] | None
     partial: bool
+    citations: list[dict[str, Any]] = field(default_factory=list)
 
 
 # Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
@@ -495,7 +502,7 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     text = masker.unmask_text(result.output) if masker else result.output
     if deps.partial:
         text = f"{text}{PARTIAL_NOTE}"
-    return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial)
+    return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial, citations=deps.citations)
 
 
 async def answer_docs(system: str, user: str, masker: Masker | None, history: list[ModelMessage] | None = None) -> tuple[str, dict[str, int] | None]:

@@ -1,4 +1,5 @@
 """21-Oct-2026 Crewing live-data PILOT TRIAL: module-specific instructions + per-conversation masking memory."""
+import json
 import subprocess
 from pathlib import Path
 
@@ -41,21 +42,56 @@ def test_masker_entries_round_trip():
 
 
 def test_mask_memory_masks_previous_turn_names():
+    mask_memory.clear()
     first = Masker()
     first.learn_from_json({"rows": [{"fullName": "Orrin Haverlock", "vesselName": "MV Beta Ocean", "rank": "Chief Engineer"}]})
-    mask_memory.remember(first, "trial-a.local", "1", "conv-1")
+    key = ("crewing-pilot", "trial-a.local", "1", "conv-1")
+    mask_memory.remember(first, *key)
     history_text = "Orrin Haverlock on MV Beta Ocean holds 3 certificates."
-
-    without = Masker()
-    assert "Orrin Haverlock" in without.mask_text(history_text)           # the leak the memory closes
+    assert "Orrin Haverlock" in Masker().mask_text(history_text)          # the leak the memory closes
 
     follow_up = Masker()
-    assert mask_memory.recall(follow_up, "trial-a.local", "1", "conv-1") == 2
+    assert mask_memory.recall(follow_up, *key) == 2
     masked = follow_up.mask_text(history_text)
     assert "Orrin" not in masked and "Beta Ocean" not in masked
 
-    other_user = Masker()
-    assert mask_memory.recall(other_user, "trial-a.local", "2", "conv-1") == 0   # keyed per user
-    other_tenant = Masker()
-    assert mask_memory.recall(other_tenant, "trial-b.local", "1", "conv-1") == 0  # and per company
-    assert mask_memory.recall(Masker(), "trial-a.local", "1", None) == 0
+
+def test_mask_memory_isolated_by_issuer_company_user_conversation():
+    mask_memory.clear()
+    m = Masker()
+    m.learn_from_json({"rows": [{"fullName": "Orrin Haverlock"}]})
+    mask_memory.remember(m, "crewing-pilot", "trial-a.local", "1", "conv-1")
+    for other in [("crewing-pilotmt", "trial-a.local", "1", "conv-1"),   # issuer
+                  ("crewing-pilot", "trial-b.local", "1", "conv-1"),     # company
+                  ("crewing-pilot", "trial-a.local", "2", "conv-1"),     # user
+                  ("crewing-pilot", "trial-a.local", "1", "conv-2"),     # conversation
+                  ("crewing-pilot", "trial-a.local", "1", None)]:        # no conversation id
+        assert mask_memory.recall(Masker(), *other) is None
+    assert mask_memory.recall(Masker(), "crewing-pilot", "trial-a.local", "1", "conv-1") == 1
+
+
+def test_turn_without_names_is_a_hit_not_a_miss():
+    mask_memory.clear()
+    mask_memory.remember(Masker(), "crewing-pilot", "t", "1", "c")
+    assert mask_memory.recall(Masker(), "crewing-pilot", "t", "1", "c") == 0
+
+
+def test_restart_miss_withholds_earlier_answers():
+    mask_memory.clear()                                                     # = container restart
+    hist = [{"role": "user", "content": "Who is on board MV Beta Ocean?"},
+            {"role": "assistant", "content": "Orrin Haverlock, Petra Wintermarsh …"}]
+    assert mask_memory.recall(Masker(), "crewing-pilot", "t", "1", "c") is None
+    out = mask_memory.withhold_assistant_turns(hist)
+    assert out[0] == hist[0]
+    assert out[1]["content"] == mask_memory.WITHHELD and "Orrin" not in json.dumps(out)
+
+
+def test_name_parts_only_when_enabled():
+    rows = {"rows": [{"fullName": "Petra Wintermarsh", "rank": "Second Engineer"}]}
+    crew = Masker(name_parts=True)
+    crew.learn_from_json(rows)
+    assert "Petra" not in crew.mask_text("Is Petra on board?")
+    assert "Wintermarsh" not in crew.mask_text("and Wintermarsh?")
+    tech = Masker()                                                       # Technical: unchanged behaviour
+    tech.learn_from_json(rows)
+    assert "Petra" in tech.mask_text("Is Petra on board?")
