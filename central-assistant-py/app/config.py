@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     # with that issuer's secret. Tokens without `iss` verify with IDENTITY_SIGNING_KEY and are documentation-only.
     assistant_module_instances: str = "{}"
     assistant_capture_outbound: str = ""              # test seam: file path; captures ACTUAL wire bodies
+    # 21-Oct-2026 (Crewing live-data PILOT TRIAL): remember, per conversation, the names the masker learned from tool
+    # results, so a follow-up turn masks them in the replayed history BEFORE its first model call. Off by default.
+    assistant_mask_conversation_memory: bool = False
     assistant_admin_email: str = "ghazi.anwer@safe-lanes.com"
 
     # rate limit (Stage A port; now Postgres-backed)

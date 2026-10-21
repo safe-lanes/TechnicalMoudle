@@ -15,7 +15,7 @@ import asyncio
 import time
 from typing import Any
 
-from . import agent, db, llm, notify, retrieval
+from . import agent, db, llm, mask_memory, notify, retrieval
 from .config import MODULE_LABELS, settings
 from .masking import Masker
 
@@ -62,6 +62,8 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
             masker.register(identity["userName"], "PERSON")
         if ctx.get("vesselName"):
             masker.register(ctx["vesselName"], "VESSEL")
+        if s.assistant_mask_conversation_memory:
+            mask_memory.recall(masker, tenant, str(identity.get("userId")), body.get("conversationId"))
     log_masked = masking_on and tenant in s.masked_only_log_tenants
 
     def for_log(t: str | None) -> str | None:
@@ -120,6 +122,8 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
                                           history=agent.build_history(body.get("conversationHistory")), instance=live)
             if masker and masker.warnings:
                 print("[assistant] unmask warnings:", masker.warnings)
+            if masker and s.assistant_mask_conversation_memory:
+                mask_memory.remember(masker, tenant, str(identity.get("userId")), body.get("conversationId"))
             log("answer", r.text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used)
             return 200, {"response": r.text, "gate": "answer", "module": MODULE_LABELS.get(ui_module, ui_module),
                          "toolsUsed": r.tools_used, "partial": r.partial, "usage": r.usage}

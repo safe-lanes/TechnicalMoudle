@@ -44,6 +44,10 @@ class Masker:
         self.warnings: list[str] = []
 
     # -- registration -------------------------------------------------------
+    def entries(self) -> list[tuple[str, str]]:
+        """(real value, kind) of every registered identifier, in registration order (for conversation memory)."""
+        return [(real, tok.strip("[]").rsplit("_", 1)[0]) for tok, real in self._token_to_real.items()]
+
     def register(self, value: Any, kind: str) -> str | None:
         v = str(value if value is not None else "").strip()
         if len(v) < 3:
