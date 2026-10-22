@@ -45,10 +45,21 @@ Changes for another module:
 Copy `server/modules/assistant-api/identityToken.ts` (signing, unchanged) and the `handleMintToken` part of
 `server/modules/assistant-api/controller.ts` plus its route (`routes.ts`). Rules the mint must keep:
 
-1. **User identity comes from the verified login only.** Technical reads user id, role and user type from
-   the SAILERP JWT claims (`id`, `role`, `userType`) that the tenant middleware verified — never from
-   browser headers. Do the same with whatever your module's verified session provides. If the module cannot
-   verify the login, do not mint.
+1. **User identity comes from the verified login only.** Technical reads the user id and user type from
+   the SAILERP login token that the tenant middleware verified. If the module cannot verify the login, do
+   not mint.
+   **⚠️ The SAILERP login token carries NO role** (checked on dev with a genuine login, 25-Sep-2026: claims
+   `id`, `userType`, `domain` — no `role`). So the role must come from somewhere else. Technical resolves it
+   in this order (`server/modules/assistant-api/controller.ts`, `masterUserRepository.ts`):
+   1. the token's role claim, if a future SAILERP login ever carries one;
+   2. the synced user master data, `master_users.role` for the verified user id (requires the user to exist
+      there with a role);
+   3. only if `ASSISTANT_ROLE_FALLBACK=profile` is set: the role from the browser's user profile — the same
+      trust level as the module's other screens (used on Technical dev, production and demo).
+   If none gives a role, refuse to mint (403, with the reason in the log). A module whose **own server
+   already knows the user's role** from its session (for example a module running inside SAILERP itself,
+   like Audit) should use that server-side role as step 1 instead — confirm with the module owner rather than
+   assuming.
 2. **Tenant comes from the verified domain** (`tenantDomain`, `tuid`). In multi-tenant mode this is what the
    assistant uses to keep tenants apart.
 3. **`iss` = `ASSISTANT_INSTANCE_ID`** of this module instance. Refuse to mint if it is not configured.
@@ -71,18 +82,34 @@ Module PM2 env (per environment, values never in chat, ticket or Git):
 | `ASSISTANT_IDENTITY_SIGNING_KEY` | 64-hex, unique to this instance |
 | `ASSISTANT_SERVICE_SECRET` | 64-hex, unique to this instance (used in stage 2; set it now) |
 | `ASSISTANT_ALLOWED_ROLES` | `Sail Admin` or the roles the module wants |
+| `ASSISTANT_ROLE_FALLBACK` | `profile` if the role must come from the browser profile (see 1.2 rule 1); leave unset if the module has a server-side role |
 
 Assistant side (Ghazi/support): one registration entry per instance in `ASSISTANT_MODULE_INSTANCES` —
 `{"crewing-dev":{"module":"crewing","env":"dev","url":"https://<host>/crewing/api","secret":"…","signingKey":"…"}}`.
 A key or secret reused from another instance, or equal to the assistant's shared documentation key, is
 rejected at startup and shown on the assistant's `/health` as `instancesRejected`.
 
+**Assistant side, second step — allow the website (easy to miss; it broke Technical production on 28-Sep).**
+The browser talks to the assistant directly, so the assistant only answers websites on its allowed list,
+`ASSISTANT_CORS_ORIGINS` in the assistant's settings file. The list is by **website address, not by module**:
+today it holds `https://dev.sl-sail.com`, `https://sailerp.sl-sail.com` and `https://erp.sl-sail.com` (plus two
+local test addresses). A module served from one of those websites (for example `https://dev.sl-sail.com/crewing/`)
+is already allowed; only a **new** website address has to be added. After any change to the settings file the
+assistant container is recreated (a plain restart does not re-read the file). Step by step, with the commands:
+`docs/DEPLOY-NOTE-ASSISTANT-ENVIRONMENT-CHECKLIST-2026-09-28.md`.
+
 ### 1.4 Stage 1 acceptance
 
 1. Widget appears for an allowed role; token endpoint returns 200 with `iss` set; 403 for other roles.
-2. A "How do I …" question from the module's manual answers with a `Source:` line naming the manual.
-3. A question the manual does not cover returns the "not covered" answer, not an invention.
-4. Tampered or expired token → 401 from the assistant.
+   Also test a user whose role is only in master data (or only in the browser profile) — the path real
+   SAILERP logins take, because the login token has no role.
+2. Browser pre-check from the module's website: `curl -s -o /dev/null -w '%{http_code}' -X OPTIONS
+   -H "Origin: <website address>" -H "Access-Control-Request-Method: POST"
+   -H "Access-Control-Request-Headers: content-type,x-assistant-identity" https://assistant.sl-sail.com/chat`
+   → `200` (an unknown website stays `400`). Server-side checks alone do NOT prove the widget works.
+3. A "How do I …" question from the module's manual answers with a `Source:` line naming the manual.
+4. A question the manual does not cover returns the "not covered" answer, not an invention.
+5. Tampered or expired token → 401 from the assistant.
 
 ## 2. Stage 2 — live data
 
@@ -135,5 +162,6 @@ secret from stage 1.
 3. Decide per module which live-data questions matter; build stage 2 for that list only.
 4. Production instances (`…-prod`) are registered with their own keys, never by copying dev values.
 
-Open point carried from Technical: the genuine-login check (which claim names the SAILERP token carries)
-is done once on dev; the same finding applies to every module.
+Genuine-login finding (dev, 25-Sep-2026), applies to every module on the SAILERP login: the token carries
+`id`, `userType` and `domain` but **no role** — see 1.2 rule 1. Updated 28-Sep-2026 with the allowed-website
+step after the Technical production go-live.

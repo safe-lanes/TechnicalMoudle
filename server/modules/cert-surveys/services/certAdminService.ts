@@ -224,7 +224,7 @@ export async function saveMasterCertificates(body: any) {
     isApplicable: boolean;
   }> = [];
 
-  for (const masterId of companyApplicableIds) {
+  for (const masterId of Array.from(companyApplicableIds)) {
     if (masterId.startsWith('VES-')) continue;
     for (const vessel of allVessels) {
       const key = `${vessel.id}-${masterId}`;
@@ -247,7 +247,7 @@ export async function saveMasterCertificates(body: any) {
   // Cleanup: remove applicability records for non-company-applicable, non-VES certificates
   const staleApplicabilityMasterIds: string[] = [];
   const masterIdsInApplicability = new Set(allApplicabilityRecords.map(r => r.masterId));
-  for (const masterId of masterIdsInApplicability) {
+  for (const masterId of Array.from(masterIdsInApplicability)) {
     if (masterId.startsWith('VES-')) continue;
     if (!companyApplicableIds.has(masterId)) {
       staleApplicabilityMasterIds.push(masterId);

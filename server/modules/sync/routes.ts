@@ -25,7 +25,7 @@ const router = Router();
 router.post('/sync/initiate', syncTenantGuard, asyncHandler(syncController.initiateSyncHandler));
 router.post('/sync/push', syncTenantGuard, asyncHandler(syncController.pushHandler));
 router.post('/sync/pull', syncTenantGuard, asyncHandler(syncController.pullHandler));
-router.post('/sync/resolve-conflict', requirePermission('admin-sync-conflicts', 'edit'), asyncHandler(syncController.resolveConflictHandler));
+router.post('/sync/resolve-conflict', requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(syncController.resolveConflictHandler));
 router.post('/sync/complete', syncTenantGuard, asyncHandler(syncController.completeSyncHandler));
 // Self-heal fetch (pull direction): ship requests complete rows for fragments targeting
 // rows absent on the ship. Server-to-server — same guard, and MUST be in exemptPaths.
@@ -38,12 +38,12 @@ router.get('/sync/conflicts', asyncHandler(syncController.unresolvedConflictsHan
 
 // Conflict Review endpoints (unified view over sync_conflict_log + sync_conflicts)
 // Static paths MUST come before :id to avoid Express matching "count"/"tables" as an :id
-router.get('/sync/conflicts/review/count', asyncHandler(conflictReviewCtrl.countConflictsHandler));
-router.get('/sync/conflicts/review/tables', asyncHandler(conflictReviewCtrl.conflictTablesHandler));
-router.get('/sync/conflicts/review', asyncHandler(conflictReviewCtrl.listConflictsHandler));
-router.get('/sync/conflicts/review/:id', asyncHandler(conflictReviewCtrl.getConflictHandler));
-router.post('/sync/conflicts/review/:id/apply-incoming', requirePermission('admin-sync-conflicts', 'edit'), asyncHandler(conflictReviewCtrl.applyIncomingHandler));
-router.post('/sync/conflicts/review/:id/dismiss', requirePermission('admin-sync-conflicts', 'edit'), asyncHandler(conflictReviewCtrl.dismissHandler));
+router.get('/sync/conflicts/review/count', requirePermission('admin-sync-dashboard', 'view', { enforce: true }), asyncHandler(conflictReviewCtrl.countConflictsHandler));
+router.get('/sync/conflicts/review/tables', requirePermission('admin-sync-conflicts', 'view', { enforce: true }), asyncHandler(conflictReviewCtrl.conflictTablesHandler));
+router.get('/sync/conflicts/review', requirePermission('admin-sync-conflicts', 'view', { enforce: true }), asyncHandler(conflictReviewCtrl.listConflictsHandler));
+router.get('/sync/conflicts/review/:id', requirePermission('admin-sync-conflicts', 'view', { enforce: true }), asyncHandler(conflictReviewCtrl.getConflictHandler));
+router.post('/sync/conflicts/review/:id/apply-incoming', requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(conflictReviewCtrl.applyIncomingHandler));
+router.post('/sync/conflicts/review/:id/dismiss', requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(conflictReviewCtrl.dismissHandler));
 
 // Sync engine trigger (manual or scheduled)
 router.post('/sync/trigger', requirePermission('admin-sync-dashboard', 'edit'), asyncHandler(syncController.triggerSyncHandler));

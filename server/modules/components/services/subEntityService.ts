@@ -1,6 +1,7 @@
 import * as repo from '../repositories/componentRepository';
 import { insertComponentClassRegulatorySchema, insertComponentRequisitionSchema } from '@shared/schema';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../../shared/errors';
+import { assertShipVesselAccess } from './shipVesselAccess';
 
 interface UserInfo {
   username: string;
@@ -11,19 +12,24 @@ interface UserInfo {
 // ── Component Class Regulatory ──
 
 export async function listClassRegulatory(componentId: string, user: UserInfo) {
+  assertShipVesselAccess(user);
   const component = await repo.findById(componentId);
   if (!component) throw new NotFoundError('Component not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (component.vesselCode !== user.vesselId) {
-      throw new ForbiddenError('Cannot access classification data for components from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, component.vesselCode);
 
   return repo.findClassRegulatory(componentId);
 }
 
 export async function createClassRegulatory(body: any, user: UserInfo) {
+  assertShipVesselAccess(user);
+  if (user.role === 'Ship') {
+    const component = await repo.findById(body.componentId);
+    if (!component) throw new NotFoundError('Component not found');
+    assertShipVesselAccess(user, component.vesselCode);
+    if (body.vesselCode !== component.vesselCode || body.componentCode !== component.componentCode) {
+      throw new ForbiddenError('Cannot create classification data for another component or vessel');
+    }
+  }
   const validatedData = insertComponentClassRegulatorySchema.parse({
     ...body,
     createdBy: user.username,
@@ -33,6 +39,17 @@ export async function createClassRegulatory(body: any, user: UserInfo) {
 }
 
 export async function updateClassRegulatory(id: number, body: any, user: UserInfo) {
+  assertShipVesselAccess(user);
+  if (user.role === 'Ship') {
+    const existing = await repo.findClassRegulatoryItem(id);
+    if (!existing) throw new NotFoundError('Classification data not found');
+    assertShipVesselAccess(user, existing.vesselCode);
+    if ((body.vesselCode !== undefined && body.vesselCode !== existing.vesselCode) ||
+        (body.componentId !== undefined && body.componentId !== existing.componentId) ||
+        (body.componentCode !== undefined && body.componentCode !== existing.componentCode)) {
+      throw new ForbiddenError('Cannot move classification data to another component or vessel');
+    }
+  }
   const validatedData = insertComponentClassRegulatorySchema.partial().parse({
     ...body,
     updatedBy: user.username
@@ -47,14 +64,10 @@ export async function deleteClassRegulatory(id: number) {
 // ── Component Requisitions ──
 
 export async function listRequisitions(componentId: string, user: UserInfo) {
+  assertShipVesselAccess(user);
   const component = await repo.findById(componentId);
   if (!component) throw new NotFoundError('Component not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (component.vesselCode !== user.vesselId) {
-      throw new ForbiddenError('Cannot access requisitions for components from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, component.vesselCode);
 
   let requisitions = await repo.findRequisitions(componentId);
 
@@ -94,29 +107,33 @@ export async function listRequisitions(componentId: string, user: UserInfo) {
 }
 
 export async function listAllRequisitions(user: UserInfo, queryVesselCode?: string) {
+  assertShipVesselAccess(user);
   let vesselCode = queryVesselCode;
-  if (user.role === 'Ship' && user.vesselId) {
+  if (user.role === 'Ship') {
     vesselCode = user.vesselId;
   }
   return repo.findAllRequisitions(vesselCode);
 }
 
 export async function getRequisition(id: number, user: UserInfo) {
+  assertShipVesselAccess(user);
   const item = await repo.findRequisitionItem(id);
   if (!item) throw new NotFoundError('Requisition not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (item.vesselCode !== user.vesselId) {
-      throw new ForbiddenError('Cannot access requisitions from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, item.vesselCode);
 
   return item;
 }
 
 export async function createRequisition(body: any, user: UserInfo) {
+  assertShipVesselAccess(user);
   // Ship users can only create requisitions for their assigned vessel
-  if (user.role === 'Ship' && user.vesselId) {
+  if (user.role === 'Ship') {
+    const component = await repo.findById(body.componentId);
+    if (!component) throw new NotFoundError('Component not found');
+    assertShipVesselAccess(user, component.vesselCode);
+    if (body.componentCode !== component.componentCode) {
+      throw new ForbiddenError('Cannot create requisitions for another component');
+    }
     if (body.vesselCode && body.vesselCode !== user.vesselId) {
       throw new ForbiddenError('Cannot create requisitions for other vessels');
     }
@@ -131,14 +148,10 @@ export async function createRequisition(body: any, user: UserInfo) {
 }
 
 export async function updateRequisition(id: number, body: any, user: UserInfo) {
+  assertShipVesselAccess(user);
   const existing = await repo.findRequisitionItem(id);
   if (!existing) throw new NotFoundError('Requisition not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (existing.vesselCode !== user.vesselId) {
-      throw new ForbiddenError('Cannot update requisitions from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, existing.vesselCode);
 
   const validatedData = insertComponentRequisitionSchema.partial().parse(body);
 
@@ -162,21 +175,15 @@ export async function listAllMaintenanceHistory() {
 }
 
 export async function listVesselMaintenanceHistory(vesselId: string, user?: UserInfo) {
-  if (user?.role === 'Ship' && user.vesselId && user.vesselId !== vesselId) {
-    throw new ForbiddenError('Cannot access maintenance history for other vessels');
-  }
+  if (user) assertShipVesselAccess(user, vesselId);
   return repo.findMaintenanceHistoryByVessel(vesselId);
 }
 
 export async function listMaintenanceHistory(componentId: string, user: UserInfo) {
+  assertShipVesselAccess(user);
   const component = await repo.findById(componentId);
   if (!component) throw new NotFoundError('Component not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (component.vesselCode !== user.vesselId) {
-      throw new ForbiddenError('Cannot access maintenance history for components from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, component.vesselCode);
 
   let history = await repo.findMaintenanceHistory(componentId);
 
@@ -189,14 +196,10 @@ export async function listMaintenanceHistory(componentId: string, user: UserInfo
 }
 
 export async function getMaintenanceHistoryItem(id: number, user: UserInfo) {
+  assertShipVesselAccess(user);
   const item = await repo.findMaintenanceHistoryItem(id);
   if (!item) throw new NotFoundError('Maintenance history item not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (item.vesselCode !== user.vesselId) {
-      throw new ForbiddenError('Cannot access maintenance history from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, item.vesselCode);
 
   return item;
 }

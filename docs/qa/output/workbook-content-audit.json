@@ -1,0 +1,30 @@
+{
+  "prepared": "2026-10-05",
+  "workbook": "docs/qa/output/Completed_TypeScript_Fixes_QA_Test_Cases.xlsx",
+  "sheets": [
+    "Read Me",
+    "Fix Coverage",
+    "Diagnostic Map",
+    "Historical Evidence",
+    "Known Gaps",
+    "Cases - Work Orders",
+    "Cases - Components",
+    "Cases - Reports",
+    "Cases - Certificates",
+    "Cases - Forms & Admin",
+    "Cases - Inventory",
+    "Cases - Storage",
+    "Compiler & Build Cases"
+  ],
+  "fixGroups": 59,
+  "moduleCases": 128,
+  "compilerAndBuildCases": 63,
+  "totalCases": 191,
+  "recoveredOriginalDiagnosticLocations": 145,
+  "sourceOnlyInventoryEntries": 9,
+  "duplicatePastedHeadersIgnored": 0,
+  "errors": [],
+  "operationalChecksExecuted": false,
+  "allNewCasesNotRun": true,
+  "blankExecutionResults": true
+}

@@ -34,8 +34,10 @@ import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
+import JobSafetyRequirementsEditor from "@/components/pms/JobSafetyRequirementsEditor";
+import { buildJobSafetyUpdate, type JobSafetyDraft } from "@/lib/jobSafetyRequirements";
 
-const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
+const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "select" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
   <div className="space-y-2">
     <Label className="text-sm text-[#8798ad]" data-testid={labelMarker}>
       {labelMarker && <Marker id={labelMarker} />}
@@ -137,7 +139,7 @@ const JobsFormPage: React.FC = () => {
   const { toast } = useToast();
   const { vesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
-  const { vessels } = useVessels();
+  const { data: vessels } = useVessels();
   
   const { ranks: rankOptions } = useRanks();
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
@@ -213,6 +215,7 @@ const JobsFormPage: React.FC = () => {
   });
 
   const [originalData, setOriginalData] = useState<Record<string, any>>({});
+  const [safetyDraft, setSafetyDraft] = useState<JobSafetyDraft>({});
 
   const [templateData, setTemplateData] = useState({
     woTitle: "",
@@ -392,6 +395,7 @@ const JobsFormPage: React.FC = () => {
 
   const handleEditClick = () => {
     setOriginalData({ ...templateData });
+    setSafetyDraft({});
     setIsEditMode(true);
   };
 
@@ -400,6 +404,7 @@ const JobsFormPage: React.FC = () => {
       ...prev,
       ...originalData
     }));
+    setSafetyDraft({});
     setIsEditMode(false);
   };
 
@@ -497,6 +502,10 @@ const JobsFormPage: React.FC = () => {
       }
       if (templateData.woTemplateCode !== originalData.woTemplateCode) {
         updatePayload.jobNo = templateData.woTemplateCode;
+      }
+      const safetyUpdate = buildJobSafetyUpdate(templateData.safetyRequirements, safetyDraft);
+      if (safetyUpdate) {
+        updatePayload.safetyRequirements = safetyUpdate;
       }
       
       if (Object.keys(updatePayload).length === 0) {
@@ -706,7 +715,7 @@ const JobsFormPage: React.FC = () => {
       ws.mergeCells(`A2:${lastColLetter}2`);
       const s = ws.getCell('A2');
       const exportVesselName = vessels.find((v: any) => v.id === vesselId)?.name || 'Vessel';
-      const exportJobTitle = templateData.woTitle || templateData.jobTitle || '';
+      const exportJobTitle = templateData.woTitle || '';
       s.value = `Work History — ${exportJobTitle || templateData.componentName || templateData.componentCode || 'Component'} — Job: ${templateData.woTemplateCode || '-'}`;
       s.font = { size: 12, bold: true, color: { argb: 'FF2C3E50' }, name: 'Arial' };
       s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
@@ -798,7 +807,7 @@ const JobsFormPage: React.FC = () => {
       const margin = 10;
 
       const pdfVesselName = vessels.find((v: any) => v.id === vesselId)?.name || 'Vessel';
-      const pdfJobTitle = templateData.woTitle || templateData.jobTitle || templateData.componentName || templateData.componentCode || '';
+      const pdfJobTitle = templateData.woTitle || templateData.componentName || templateData.componentCode || '';
       doc.setFillColor(30, 90, 142);
       doc.rect(0, 0, pageWidth, 38, 'F');
       doc.setTextColor(255, 255, 255);
@@ -939,7 +948,7 @@ const JobsFormPage: React.FC = () => {
       {/* Top Header Bar */}
       <div className={`bg-white border-b shadow-sm ${isModifyMode ? 'border-amber-300' : 'border-gray-200'}`}>
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4 md:gap-6">
               <img src={sailLogo} alt="SAIL Logo" className="h-10 w-auto" data-testid="img-logo" />
               <div className="hidden md:block h-8 w-px bg-gray-300" />
@@ -1004,7 +1013,7 @@ const JobsFormPage: React.FC = () => {
                 {isModifyMode ? 'Modify Job' : 'Jobs Form'}
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {isModifyMode && (
                 <Button
                   variant="ghost"
@@ -1124,11 +1133,11 @@ const JobsFormPage: React.FC = () => {
         </aside>
 
         {/* Main Content Area */}
-        <div className="flex-1 px-6 py-6">
+        <div className="flex-1 min-w-0 px-4 sm:px-6 py-6">
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Part A - Job Details */}
-            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
+            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-4 sm:p-6 space-y-8">
             <PartHeader
               id="part-a"
               label="Part A"
@@ -1555,6 +1564,14 @@ const JobsFormPage: React.FC = () => {
               descriptionMarker="JF.A4.2"
               variant="inline"
             >
+              {isEditMode ? (
+                <JobSafetyRequirementsEditor
+                  requirements={templateData.safetyRequirements}
+                  draft={safetyDraft}
+                  onChange={(field, value) => setSafetyDraft(prev => ({ ...prev, [field]: value }))}
+                  disabled={isSaving}
+                />
+              ) : (
               <div className="space-y-3">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-1.5" data-testid="JF.A4.3"><Marker id="JF.A4.3" />Personal Protective Equipment (PPE):</h3>
@@ -1562,9 +1579,9 @@ const JobsFormPage: React.FC = () => {
                     <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.4">
                       <Marker id="JF.A4.4" />
                       {templateData.safetyRequirements.ppeRequirements.map((item, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
-                          <span>{item}</span>
+                        <li key={index} className="flex items-start gap-2 leading-5">
+                          <span className="shrink-0 text-[hsl(var(--primary))]" aria-hidden="true">&bull;</span>
+                          <span className="min-w-0 break-words">{item}</span>
                         </li>
                       ))}
                     </ul>
@@ -1579,9 +1596,9 @@ const JobsFormPage: React.FC = () => {
                     <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.6">
                       <Marker id="JF.A4.6" />
                       {templateData.safetyRequirements.permitRequirements.map((item, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
-                          <span>{item}</span>
+                        <li key={index} className="flex items-start gap-2 leading-5">
+                          <span className="shrink-0 text-[hsl(var(--primary))]" aria-hidden="true">&bull;</span>
+                          <span className="min-w-0 break-words">{item}</span>
                         </li>
                       ))}
                     </ul>
@@ -1596,9 +1613,9 @@ const JobsFormPage: React.FC = () => {
                     <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.8">
                       <Marker id="JF.A4.8" />
                       {templateData.safetyRequirements.otherRequirements.map((item, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
-                          <span>{item}</span>
+                        <li key={index} className="flex items-start gap-2 leading-5">
+                          <span className="shrink-0 text-[hsl(var(--primary))]" aria-hidden="true">&bull;</span>
+                          <span className="min-w-0 break-words">{item}</span>
                         </li>
                       ))}
                     </ul>
@@ -1607,6 +1624,7 @@ const JobsFormPage: React.FC = () => {
                   )}
                 </div>
               </div>
+              )}
             </SectionBlock>
 
             {/* A4. Work History */}

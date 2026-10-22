@@ -1,13 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendToAssistant, ASSISTANT_UNAVAILABLE_MESSAGE } from "@/assistant-widget/assistantClient";
+import { sendToAssistant, ASSISTANT_UNAVAILABLE_MESSAGE, type AssistantReply } from "@/assistant-widget/assistantClient";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   toolsUsed?: string[];
   timestamp: Date;
+  /** assistant answers only: the question it answered and its sources — what "Report this answer" sends */
+  question?: string;
+  citations?: AssistantReply["citations"];
 }
 
 export function useChat() {
@@ -101,6 +104,8 @@ export function useChat() {
           content: data.response,
           toolsUsed: data.toolsUsed,
           timestamp: new Date(),
+          question: messageText.trim(),
+          citations: data.citations,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);

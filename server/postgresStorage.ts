@@ -3,6 +3,7 @@ import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, 
 import { levelsMatch } from '@shared/approvals/level';
 import { getDb } from './db';
 import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
+import { defectSeriesPrefix, formatDefectNumber, highestInSeries, type DefectSide } from './utils/defectNumberSeries';
 import {
   users,
   fleets,
@@ -10,6 +11,8 @@ import {
   vessels,
   pmsVesselSettings,
   companyStandardGraceSettings,
+  type CompanyStandardGraceSettings,
+  type InsertCompanyStandardGraceSettings,
   companyApprovalSettings,
   type CompanyApprovalSettings,
   defectApprovalSettings,
@@ -1322,7 +1325,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createComponent(component: InsertComponent): Promise<Component> {
+  async createComponent(component: InsertComponent & { id?: Component["id"] }): Promise<Component> {
     const db = await getDb();
     const id = component.id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({
@@ -1609,7 +1612,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createFleetScopedComponent(component: InsertComponent): Promise<Component> {
+  async createFleetScopedComponent(component: InsertComponent & { id?: Component["id"] }): Promise<Component> {
     const db = await getDb();
     const id = component.id || `FC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({
@@ -2279,7 +2282,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(componentDocuments).values(doc).returning();
     // Sync field logging — INSERT
-    try { await logFieldChanges('component_documents', String(result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc create:', e); }
+    try { await logFieldChanges('component_documents', String(result[0].cduuid ?? result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc create:', e); }
     return result[0];
   }
 
@@ -2296,7 +2299,7 @@ export class PostgresStorage {
     }
     // Sync field logging — UPDATE
     if (existingDoc[0]) {
-      try { await logFieldChanges('component_documents', String(id), (existingDoc[0] as any).vesselCode || null, existingDoc[0], result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc update:', e); }
+      try { await logFieldChanges('component_documents', String(existingDoc[0].cduuid ?? id), (existingDoc[0] as any).vesselCode || null, existingDoc[0], result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc update:', e); }
     }
     return result[0];
   }
@@ -2409,7 +2412,7 @@ export class PostgresStorage {
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     if (history.length === 0) return [];
 
-    const workOrderIds = [...new Set(history.map(h => h.workOrderId))];
+    const workOrderIds = Array.from(new Set(history.map(h => h.workOrderId)));
     const anomalies = await db.select({
       workOrderId: workOrderAnomalies.workOrderId,
       daysLate: workOrderAnomalies.daysLate,
@@ -5205,50 +5208,50 @@ export class PostgresStorage {
       }
     }
     
-    // Get or create defect sequence for this vessel/year
-    const existingSeq = await db.select()
-      .from(defectSequences)
-      .where(and(
-        eq(defectSequences.vesselId, vesselId),
-        eq(defectSequences.year, currentYear)
-      ));
-    
-    let nextSeq: number;
-    if (existingSeq.length === 0) {
-      // Create new sequence for this vessel/year starting at 1
-      const seqResult = await db.insert(defectSequences).values({
-        vesselId,
-        year: currentYear,
-        lastSequence: 1,
-      }).returning();
-      nextSeq = 1;
-      // Sync field logging — INSERT
-      try { await logFieldChanges('defect_sequences', String(seqResult[0].id), vesselId, null, seqResult[0], 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences create:', e); }
-    } else {
-      // Increment existing sequence
-      nextSeq = existingSeq[0].lastSequence + 1;
-      const oldSeq = { ...existingSeq[0] };
-      await db.update(defectSequences)
-        .set({ lastSequence: nextSeq })
-        .where(and(
-          eq(defectSequences.vesselId, vesselId),
-          eq(defectSequences.year, currentYear)
-        ));
-      // Sync field logging — UPDATE
-      try { await logFieldChanges('defect_sequences', String(existingSeq[0].id), vesselId, oldSeq, { ...oldSeq, lastSequence: nextSeq }, 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences update:', e); }
+    // Defect numbers per side (server/utils/defectNumberSeries.ts, 13-Oct-2026): the ship numbers its own series
+    // (D048-26-0004 — unchanged format) and the office its own (D048-26-O0001), so the two can never give out the
+    // same number while offline from each other (the Testvessel / pilot defect loss). The next number is the highest
+    // already used in THIS side's series + 1 — defects sync, so this stays right after a re-provision.
+    const { getInstanceRole } = await import('./modules/sync/syncRole');
+    const side: DefectSide = (await getInstanceRole()) === 'ship' ? 'ship' : 'shore';
+    const prefix = defectSeriesPrefix(vesselSeq, yearShort, side);
+    const usedIds = await db.execute(sql`SELECT id FROM defects WHERE vessel_id = ${vesselId} AND id LIKE ${prefix + '%'}`);
+    let nextSeq = highestInSeries((usedIds.rows as any[]).map((r) => String(r.id)), prefix) + 1;
+
+    // Ship only: the per-vessel/year counter stays as a floor (e.g. numbers already printed on board). It is local
+    // bookkeeping now — no field log: the office never numbers in the ship series, and syncing this row by its
+    // per-instance integer id was the "defect_sequences.<id> … missing NOT-NULL [year]" error.
+    const existingSeq = side === 'ship'
+      ? await db.select().from(defectSequences)
+          .where(and(eq(defectSequences.vesselId, vesselId), eq(defectSequences.year, currentYear)))
+      : [];
+    if (existingSeq.length > 0) nextSeq = Math.max(nextSeq, existingSeq[0].lastSequence + 1);
+
+    // Two people raising a defect at the same moment can pick the same number: on a duplicate number, take the next.
+    let result: Defect[] = [];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        result = await db.insert(defects).values({
+          ...defect,
+          id: formatDefectNumber(prefix, nextSeq),
+          duuid: randomUUID(),
+        }).returning();
+        break;
+      } catch (e: any) {
+        const dupNumber = e?.code === '23505' && String(e?.constraint || '').startsWith('defects_pkey');
+        if (!dupNumber || attempt >= 9) throw e;
+        nextSeq++;
+      }
     }
-    
-    // Format: D{VesselCode 3 digits}-{Year 2 digits}-{Seq 4 digits}
-    const vesselCode = String(vesselSeq).padStart(3, '0');
-    const yearCode = String(yearShort).padStart(2, '0');
-    const seqCode = String(nextSeq).padStart(4, '0');
-    const id = `D${vesselCode}-${yearCode}-${seqCode}`;
-    
-    const result = await db.insert(defects).values({
-      ...defect,
-      id,
-      duuid: randomUUID(),
-    }).returning();
+
+    if (side === 'ship') {
+      if (existingSeq.length === 0) {
+        await db.insert(defectSequences).values({ vesselId, year: currentYear, lastSequence: nextSeq });
+      } else if (nextSeq > existingSeq[0].lastSequence) {
+        await db.update(defectSequences).set({ lastSequence: nextSeq })
+          .where(and(eq(defectSequences.vesselId, vesselId), eq(defectSequences.year, currentYear)));
+      }
+    }
 
     // Sync field logging — INSERT
     try { await logFieldChanges('defects', result[0].duuid, defect.vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect create:', e); }
@@ -5343,7 +5346,7 @@ export class PostgresStorage {
     }
 
     const existingLinks = Array.isArray(defect.linkedDefects) ? defect.linkedDefects : [];
-    const mergedLinks = [...new Set([...existingLinks, ...linkedDefectIds])];
+    const mergedLinks = Array.from(new Set([...existingLinks, ...linkedDefectIds]));
 
     const result = await db.update(defects)
       .set({ linkedDefects: mergedLinks, updatedAt: new Date() })
@@ -6169,6 +6172,14 @@ export class PostgresStorage {
   // vessel_id log row is silently dropped and NEVER syncs (the historic
   // null-vessel trap). Every approval-step log below must stamp the PARENT's
   // vessel_id, resolved via these best-effort lookups.
+
+  /** The change request's UUID for a local id — stamped on comments/attachments so sync can find the right parent. */
+  private async crUuid(changeRequestId: number): Promise<string | null> {
+    const db = await getDb();
+    const r = await db.select({ u: changeRequest.cruuid }).from(changeRequest)
+      .where(eq(changeRequest.id, changeRequestId)).limit(1);
+    return r[0]?.u ?? null;
+  }
 
   private async crVesselId(changeRequestId: number): Promise<string | null> {
     try {
@@ -7117,7 +7128,8 @@ export class PostgresStorage {
 
   async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
     const db = await getDb();
-    const result = await db.insert(changeRequestAttachment).values(attachment).returning();
+    const changeRequestUuid = attachment.changeRequestUuid ?? await this.crUuid(attachment.changeRequestId);
+    const result = await db.insert(changeRequestAttachment).values({ ...attachment, changeRequestUuid }).returning();
     const created = result[0];
     // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
     try {
@@ -7142,7 +7154,8 @@ export class PostgresStorage {
 
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
     const db = await getDb();
-    const result = await db.insert(changeRequestComment).values(comment).returning();
+    const changeRequestUuid = comment.changeRequestUuid ?? await this.crUuid(comment.changeRequestId);
+    const result = await db.insert(changeRequestComment).values({ ...comment, changeRequestUuid }).returning();
     // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
     try {
       const vId = await this.crVesselId(result[0].changeRequestId);
@@ -8971,7 +8984,7 @@ export class PostgresStorage {
     }
     
     // Mark groups with 2+ defects as recurring
-    for (const [key, group] of defectGroups) {
+    for (const [key, group] of Array.from(defectGroups)) {
       if (group.length >= 2) {
         for (const defect of group) {
           const [updated] = await db.update(defects)
@@ -9533,7 +9546,7 @@ export class PostgresStorage {
     }
   }
 
-  async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string }>> {
+  async getComponentSiblings(componentId: string): Promise<Array<{ cuuid: string; name: string | null }>> {
     const db = await getDb();
     const comp = await db.select().from(components).where(
       or(eq(components.cuuid, componentId), eq(components.id, componentId))
@@ -10808,7 +10821,7 @@ export class PostgresStorage {
     }
     
     // Add linked spares (deduplicated)
-    for (const spareId of linkedSpareIds) {
+    for (const spareId of Array.from(linkedSpareIds)) {
       if (!spareIdSet.has(spareId)) {
         spareIdSet.add(spareId);
         // Look up spare by integer ID to get suuid for getSpareWithInventory

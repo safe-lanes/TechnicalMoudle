@@ -12,6 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { resultState, reviewEmptyTitle } from "./syncConflictStates";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -160,7 +161,7 @@ export default function SyncConflictReview() {
     queryKey: ["/technical/api/sync/conflicts/review/tables"],
     queryFn: async () => {
       const res = await fetch("/technical/api/sync/conflicts/review/tables");
-      if (!res.ok) return { tables: [] };
+        if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
   });
@@ -232,10 +233,12 @@ export default function SyncConflictReview() {
     },
   });
 
-  const rows = conflictsQuery.data?.rows ?? [];
-  const total = conflictsQuery.data?.total ?? 0;
+  const listState = resultState(conflictsQuery);
+  const resultReady = listState === "ready";
+  const rows = resultReady ? conflictsQuery.data?.rows ?? [] : [];
+  const total = resultReady ? conflictsQuery.data?.total ?? 0 : 0;
   const totalPages = Math.ceil(total / pageSize);
-  const tables = tablesQuery.data?.tables ?? [];
+  const tables = tablesQuery.isSuccess ? tablesQuery.data.tables : [];
   const isActioning = applyMutation.isPending || dismissMutation.isPending;
 
   return (
@@ -249,7 +252,7 @@ export default function SyncConflictReview() {
           Sync Conflict Review
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Review and resolve field-level sync conflicts between ship and shore
+          Review and resolve field-level sync conflicts between ship and shore. By default this review covers the full fleet.
         </p>
       </div>
 
@@ -278,7 +281,7 @@ export default function SyncConflictReview() {
             setPage(0);
           }}
         >
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[200px]" disabled={!tablesQuery.isSuccess}>
             <SelectValue placeholder="All modules" />
           </SelectTrigger>
           <SelectContent>
@@ -290,11 +293,16 @@ export default function SyncConflictReview() {
             ))}
           </SelectContent>
         </Select>
+        {tablesQuery.isError && (
+          <div role="alert" className="text-sm text-red-700">
+            Could not load module filters. <Button variant="link" onClick={() => tablesQuery.refetch()}>Retry</Button>
+          </div>
+        )}
 
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => conflictsQuery.refetch()}
+          onClick={() => { conflictsQuery.refetch(); if (tablesQuery.isError) tablesQuery.refetch(); }}
         >
           <RefreshCw
             className={`h-4 w-4 ${conflictsQuery.isFetching ? "animate-spin" : ""}`}
@@ -302,12 +310,18 @@ export default function SyncConflictReview() {
         </Button>
 
         <span className="text-sm text-muted-foreground ml-auto">
-          {total} conflict{total !== 1 ? "s" : ""}
+          {resultReady ? `${total} conflict${total !== 1 ? "s" : ""}` : conflictsQuery.isError ? "Count unavailable" : "Loading conflicts..."}
         </span>
       </div>
 
       {/* ── Conflict Cards ── */}
-      {conflictsQuery.isLoading ? (
+      {listState === "error" ? (
+        <Card><CardContent className="py-12 text-center" role="alert">
+          <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-red-500" />
+          <p>Could not load conflicts{(conflictsQuery.error as Error)?.message === "403" ? " — access denied" : ""}.</p>
+          <Button variant="outline" className="mt-3" onClick={() => conflictsQuery.refetch()}>Retry</Button>
+        </CardContent></Card>
+      ) : listState === "loading" ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -324,10 +338,10 @@ export default function SyncConflictReview() {
           <CardContent className="py-12 text-center">
             <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-400" />
             <h3 className="text-lg font-semibold text-gray-700">
-              No conflicts to review
+              {reviewEmptyTitle(statusFilter as "resolved" | "unresolved")}
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              All your synced changes are in agreement.
+              {statusFilter === "resolved" ? "No conflicts match the resolved filter." : "No conflicts match the unresolved filter."}
             </p>
           </CardContent>
         </Card>
@@ -508,7 +522,7 @@ export default function SyncConflictReview() {
       )}
 
       {/* ── Pagination ── */}
-      {totalPages > 1 && (
+      {resultReady && totalPages > 1 && (
         <div className="flex items-center justify-center gap-4">
           <Button
             variant="outline"

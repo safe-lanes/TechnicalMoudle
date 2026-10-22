@@ -95,7 +95,8 @@ export async function pullHandler(req: Request, res: Response) {
       vesselId,
       instanceId,
       lastCheckpoint ? new Date(lastCheckpoint) : null,
-      tableCheckpoints
+      tableCheckpoints,
+      Array.isArray(req.body?.capabilities) ? req.body.capabilities.filter((c: unknown) => typeof c === 'string') : undefined
     );
     res.json(result);
   } catch (error: any) {

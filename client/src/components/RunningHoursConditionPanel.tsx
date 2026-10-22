@@ -20,6 +20,8 @@ import { ChevronDown, ChevronRight, Save, RefreshCw, Check, ChevronsUpDown, Hist
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatProfessionalDate } from "@/lib/dateUtils";
+import { componentErrorDescription, componentResponseError } from "@/lib/componentErrorFeedback";
+import { ComponentLoadErrors } from "@/components/ComponentLoadErrors";
 
 interface MasterComponent {
   id: string;
@@ -83,33 +85,33 @@ export default function RunningHoursConditionPanel({
   const [pendingCounterType, setPendingCounterType] = useState<string>("");
   const [masterSourceOpen, setMasterSourceOpen] = useState(false);
 
-  const { data: rhConfig, isLoading: isLoadingConfig } = useQuery<RHConfig>({
+  const { data: rhConfig, isLoading: isLoadingConfig, error: configError } = useQuery<RHConfig>({
     queryKey: ["/technical/api/rh-config", componentId],
     queryFn: async () => {
       const res = await fetch(`/technical/api/rh-config/${componentId}`);
-      if (!res.ok) throw new Error("Failed to fetch RH config");
+      if (!res.ok) throw await componentResponseError(res);
       return res.json();
     },
     enabled: !!componentId,
     staleTime: 0, // Always refetch on mount to get latest cascade updates
   });
 
-  const { data: masterComponents = [], isLoading: isLoadingMasters } = useQuery<MasterComponent[]>({
+  const { data: masterComponents = [], isLoading: isLoadingMasters, error: mastersError } = useQuery<MasterComponent[]>({
     queryKey: ["/technical/api/rh-config/master-components", vesselId],
     queryFn: async () => {
       const res = await fetch(`/technical/api/rh-config/master-components/${vesselId}`);
-      if (!res.ok) throw new Error("Failed to fetch master components");
+      if (!res.ok) throw await componentResponseError(res);
       return res.json();
     },
     enabled: !!vesselId && (pendingCounterType === "INHERITED" || rhConfig?.rhCounterType === "INHERITED"),
     staleTime: 0, // Always refetch on mount to get latest values
   });
 
-  const { data: replacementHistory = [] } = useQuery<MeterReplacementEvent[]>({
+  const { data: replacementHistory = [], error: historyError } = useQuery<MeterReplacementEvent[]>({
     queryKey: ["/technical/api/running-hours/replacement-history", componentId],
     queryFn: async () => {
       const res = await fetch(`/technical/api/running-hours/replacement-history/${componentId}`);
-      if (!res.ok) throw new Error("Failed to fetch replacement history");
+      if (!res.ok) throw await componentResponseError(res);
       return res.json();
     },
     enabled: !!componentId,
@@ -143,8 +145,8 @@ export default function RunningHoursConditionPanel({
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update RH configuration",
+        title: "RH Configuration Save Failed",
+        description: componentErrorDescription(error, "The RH configuration could not be saved. Check the counter type and source, then try again."),
         variant: "destructive",
       });
     },
@@ -168,8 +170,8 @@ export default function RunningHoursConditionPanel({
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update running hours",
+        title: "Running Hours Update Failed",
+        description: componentErrorDescription(error, "The running hours could not be updated. Check the reading and try again."),
         variant: "destructive",
       });
     },
@@ -194,7 +196,7 @@ export default function RunningHoursConditionPanel({
     const rhValue = parseFloat(localRHValue);
     if (isNaN(rhValue) || rhValue < 0) {
       toast({
-        title: "Invalid Value",
+        title: "Running Hours Update Failed",
         description: "Running hours must be a non-negative number",
         variant: "destructive",
       });
@@ -230,6 +232,9 @@ export default function RunningHoursConditionPanel({
 
   const isEditable = rhConfig?.rhCounterType === "MASTER" && !readOnly;
 
+  if (configError || mastersError || historyError) return <ComponentLoadErrors failures={[
+    ["RH Configuration", configError], ["RH Sources", mastersError], ["Meter Replacement History", historyError],
+  ]} />;
   if (isLoadingConfig) {
     return (
       <div className="border border-[#52baf3] rounded-lg p-4 mb-4" data-testid="rh-panel-loading">

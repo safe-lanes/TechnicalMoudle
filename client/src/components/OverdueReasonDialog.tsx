@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { useWorkOrderToast as useToast } from "@/hooks/use-work-order-toast";
 
 const OTHER_REASON = "Other Reason";
 
@@ -57,7 +57,7 @@ export default function OverdueReasonDialog({
   onClose,
   onSaved,
 }: OverdueReasonDialogProps) {
-  const { toast } = useToast();
+  const { toast } = useToast("Overdue Reason Save Failed");
 
   const [selectedReason, setSelectedReason] = useState("");
   const [reasonDetails, setReasonDetails] = useState("");

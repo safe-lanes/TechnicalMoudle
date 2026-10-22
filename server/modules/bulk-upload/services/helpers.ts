@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import { stripSFISuffix } from '@shared/utils/sfiCode';
 
 export const TEMPLATE_VERSION = '2.0.0';
 export const TEMPLATE_VERSION_DATE = '2025-11-28';

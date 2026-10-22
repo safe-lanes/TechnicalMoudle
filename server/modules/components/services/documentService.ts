@@ -5,6 +5,7 @@ import { objectStorageClient, ObjectNotFoundError } from '../../../objectStorage
 import { insertComponentDocumentSchema } from '@shared/schema';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../shared/errors';
 import { FileSyncProcessor } from '../../sync/fileSyncProcessor';
+import { assertShipVesselAccess } from './shipVesselAccess';
 
 interface UserInfo {
   username: string;
@@ -42,14 +43,10 @@ function deleteFromLocalFS(fileKey: string): void {
 }
 
 export async function listDocuments(componentId: string, user: UserInfo) {
+  assertShipVesselAccess(user);
   const component = await repo.findById(componentId);
   if (!component) throw new NotFoundError('Component not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (component.vesselCode !== user.vesselId) {
-      throw new ForbiddenError('Cannot access documents for components from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, component.vesselCode);
 
   const documents = await repo.findDocuments(componentId);
 
@@ -61,8 +58,10 @@ export async function listDocuments(componentId: string, user: UserInfo) {
 }
 
 export async function createDocument(body: any, file: Express.Multer.File, user: UserInfo) {
+  assertShipVesselAccess(user);
   const component = await repo.findById(body.componentId);
   if (!component) throw new ValidationError('Invalid componentId - component not found');
+  assertShipVesselAccess(user, component.vesselCode);
 
   if (component.componentCode !== body.componentCode) {
     throw new ValidationError('componentCode mismatch - does not match component\'s code');
@@ -122,7 +121,7 @@ export async function createDocument(body: any, file: Express.Multer.File, user:
     // Queue file for sync (best-effort — never blocks upload)
     try {
       await FileSyncProcessor.queueFileForSync(
-        'component_documents', String(createdDoc.id), createdDoc.fileKey,
+        'component_documents', String(createdDoc.cduuid ?? createdDoc.id), createdDoc.fileKey,
         createdDoc.fileName, createdDoc.fileSize ?? null, createdDoc.vesselCode
       );
     } catch (syncErr) {
@@ -199,14 +198,10 @@ export async function deleteDocument(id: number) {
 }
 
 export async function downloadDocument(id: number, user: UserInfo): Promise<{ buffer: Buffer; fileName: string; contentType: string }> {
+  assertShipVesselAccess(user);
   const document = await repo.findDocument(id);
   if (!document) throw new NotFoundError('Document not found');
-
-  if (user.role === 'Ship' && user.vesselId) {
-    if (user.vesselId !== document.vesselCode) {
-      throw new ForbiddenError('Cannot access documents from other vessels');
-    }
-  }
+  assertShipVesselAccess(user, document.vesselCode);
 
   if (user.role === 'Ship' && !document.canShipDownload) {
     throw new ForbiddenError('Insufficient permissions to download this document');

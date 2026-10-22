@@ -48,7 +48,9 @@ import { isWorkOrderB3Applicable, sanitizeWorkOrderB3Fields } from '@shared/work
 // Type for history mode payload
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
-  execution: WorkOrderExecution;
+  execution: WorkOrderExecution & Partial<Pick<WorkOrder,
+    'riskAssessmentStatus' | 'safetyChecklistsStatus' | 'operationalFormsStatus'
+  >>;
 }
 
 interface WorkOrderFormProps {

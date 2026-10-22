@@ -32,7 +32,8 @@ import {
 } from "lucide-react";
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
 import { useVessel } from "@/contexts/VesselContext";
-import { useToast } from "@/hooks/use-toast";
+import { useWorkOrderToast as useToast } from "@/hooks/use-work-order-toast";
+import { workOrderResponseError, workOrderErrorDescription } from "@/lib/workOrderErrorFeedback";
 import { viewAuthedDocument } from "@/lib/authedDownload";
 
 const OTHER_REASON = "Other Reason";
@@ -141,7 +142,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   onConfirm,
 }) => {
   const { vesselId } = useVessel();
-  const { toast } = useToast();
+  const { toast } = useToast("Postponement Failed");
 
   const [formData, setFormData] = useState({
     workOrderId: "",
@@ -382,8 +383,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
           body: fd,
         });
         if (!response.ok) {
-          const errBody = await response.json().catch(() => ({}));
-          throw new Error(errBody.message || errBody.error || `Failed to upload ${file.name}`);
+          throw await workOrderResponseError(response);
         }
         const result: PostponementDoc = await response.json();
         setPostponementDocs((prev) => [...prev, result]);
@@ -399,8 +399,10 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     } catch (error: any) {
       console.error("Upload error:", error);
       toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload document. Please try again.",
+        title: uploadedCount > 0 ? "Documents Partially Uploaded" : "Document Upload Failed",
+        description: uploadedCount > 0
+          ? `${uploadedCount} file(s) uploaded. ${workOrderErrorDescription(error, "The remaining documents could not be uploaded. Please try again.")}`
+          : error,
         variant: "destructive",
       });
     } finally {
@@ -463,8 +465,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         body: fd,
       });
       if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody.message || errBody.error || `Failed to upload ${file.name}`);
+        throw await workOrderResponseError(response);
       }
       const result: PostponementDoc = await response.json();
       setRiskAssessmentDoc(result);
@@ -513,14 +514,14 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   const handleDeleteDoc = async (docId: string) => {
     try {
       const response = await fetch(`/technical/api/work-order-documents/${docId}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Failed to delete document");
+      if (!response.ok) throw await workOrderResponseError(response);
       setPostponementDocs((prev) => prev.filter((d) => d.id !== docId));
       toast({ title: "Document deleted", description: "The document has been removed." });
     } catch (error) {
       console.error("Delete error:", error);
       toast({
         title: "Delete failed",
-        description: "Failed to delete document. Please try again.",
+        description: error,
         variant: "destructive",
       });
     }

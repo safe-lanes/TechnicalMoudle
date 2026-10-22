@@ -166,31 +166,31 @@ function exportSingleReportToPdf(report: NoonReport, vesselName: string) {
 
   // Voyage info
   section("VOYAGE INFORMATION");
-  row([["Status", report.status.toUpperCase()], ["Voyage No.", str(report.voyageNo)], ["Condition", str(report.condition)], [""]]);
+  row([["Status", report.status.toUpperCase()], ["Voyage No.", str(report.voyageNo)], ["Condition", str(report.condition)], ["", ""]]);
   row([["From", str(report.portFrom)], ["To", str(report.portTo)], ["Next Port", str(report.nextPort)], ["ETA / DTG", `${fmt(report.distanceToGo, 0)} NM`]]);
 
   section("NAVIGATION");
-  row([["Speed (kts)", fmt(report.speed, 1)], ["Distance (NM)", fmt(report.distanceSailed, 0)], ["Course (°)", fmt(report.course, 0)], [""]]);
+  row([["Speed (kts)", fmt(report.speed, 1)], ["Distance (NM)", fmt(report.distanceSailed, 0)], ["Course (°)", fmt(report.course, 0)], ["", ""]]);
 
   section("WEATHER");
   row([["Wind Dir", str(report.windDirection)], ["Wind Force (Bft)", str(report.windForce)], ["Sea State", str(report.seaState)], ["Visibility", str(report.visibility)]]);
-  row([["Air Temp (°C)", fmt(report.airTemperature, 1)], ["Sea Temp (°C)", fmt(report.seaTemperature, 1)], [""], [""]]);
+  row([["Air Temp (°C)", fmt(report.airTemperature, 1)], ["Sea Temp (°C)", fmt(report.seaTemperature, 1)], ["", ""], ["", ""]]);
 
   section("FUEL CONSUMPTION (MT)");
   row([["HFO", fmt(report.hfoConsumption, 3)], ["LSMGO", fmt(report.lsmgoConsumption, 3)], ["MGO", fmt(report.mgoConsumption, 3)], ["VLSFO", fmt(report.vlsfoConsumption, 3)]]);
-  row([["LPG", fmt(report.lpgConsumption, 3)], ["Total", totalCons(report)], [""], [""]]);
+  row([["LPG", fmt(report.lpgConsumption, 3)], ["Total", totalCons(report)], ["", ""], ["", ""]]);
 
   section("ROB AT NOON (MT)");
   row([["HFO", fmt(report.hfoRob, 3)], ["LSMGO", fmt(report.lsmgoRob, 3)], ["MGO", fmt(report.mgoRob, 3)], ["VLSFO", fmt(report.vlsfoRob, 3)]]);
 
   section("MACHINERY");
-  row([["ME Load (%MCR)", fmt(report.meLoad, 1)], ["ME RPM", fmt(report.meRpm, 0)], [""], [""]]);
+  row([["ME Load (%MCR)", fmt(report.meLoad, 1)], ["ME RPM", fmt(report.meRpm, 0)], ["", ""], ["", ""]]);
 
   section("EMISSIONS");
-  row([["CO₂ Total (t)", fmt(report.co2Total, 2)], ["EEOI", fmt(report.eeoi, 4)], ["CII Rating", str(report.ciiRating)], [""]]);
+  row([["CO₂ Total (t)", fmt(report.co2Total, 2)], ["EEOI", fmt(report.eeoi, 4)], ["CII Rating", str(report.ciiRating)], ["", ""]]);
 
   section("CARGO & REMARKS");
-  row([["Draft Fwd (m)", fmt(report.draftForward, 2)], ["Draft Aft (m)", fmt(report.draftAft, 2)], ["Cargo (MT)", fmt(report.cargoQuantity, 0)], [""]]);
+  row([["Draft Fwd (m)", fmt(report.draftForward, 2)], ["Draft Aft (m)", fmt(report.draftAft, 2)], ["Cargo (MT)", fmt(report.cargoQuantity, 0)], ["", ""]]);
 
   if (report.generalRemarks) {
     doc.setTextColor(...gray);
@@ -309,8 +309,10 @@ function EmailDialog({ report, vesselName, smtpConfigured, onClose }: EmailDialo
   const [cc, setCc] = useState("");
 
   const emailMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/technical/api/nr-reports/${report.id}/email`, { to, cc, vesselName }),
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/technical/api/nr-reports/${report.id}/email`, { to, cc, vesselName });
+      return response.json() as Promise<{ success?: boolean; message?: string; previewUrl?: string }>;
+    },
     onSuccess: (data: { success?: boolean; message?: string; previewUrl?: string }) => {
       toast({
         title: "Email sent",

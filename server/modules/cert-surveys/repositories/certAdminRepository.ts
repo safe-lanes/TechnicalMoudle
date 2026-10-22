@@ -12,7 +12,10 @@ import { eq, and, inArray, or, like, notInArray, sql } from 'drizzle-orm';
 // Optional `tx` lets callers run repo operations inside a Drizzle transaction
 // (e.g. saveMasterCertificates wraps master upserts + applicability fan-out so
 // a 23505/42P10 mid-flight rolls back cleanly instead of leaving orphan rows).
-function getDb(tx?: any) {
+type CertAdminDb = ReturnType<typeof getPostgresClient>['db'];
+type CertAdminTx = Parameters<Parameters<CertAdminDb['transaction']>[0]>[0];
+
+function getDb(tx?: CertAdminTx): CertAdminDb | CertAdminTx | null {
   if (tx) return tx;
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -31,7 +34,7 @@ export async function getMasterCertificates() {
     .orderBy(shipCertificatesMaster.sequence);
 }
 
-export async function getMasterCertificateByMasterId(masterId: string, tx?: any) {
+export async function getMasterCertificateByMasterId(masterId: string, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.select().from(shipCertificatesMaster)
@@ -39,7 +42,7 @@ export async function getMasterCertificateByMasterId(masterId: string, tx?: any)
     .limit(1);
 }
 
-export async function getMasterCertificateSystemFlag(masterId: string, tx?: any) {
+export async function getMasterCertificateSystemFlag(masterId: string, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.select({ id: shipCertificatesMaster.id, isSystemDefined: shipCertificatesMaster.isSystemDefined })
@@ -48,7 +51,7 @@ export async function getMasterCertificateSystemFlag(masterId: string, tx?: any)
     .limit(1);
 }
 
-export async function updateMasterCertificate(masterId: string, data: any, tx?: any) {
+export async function updateMasterCertificate(masterId: string, data: any, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.update(shipCertificatesMaster)
@@ -56,13 +59,13 @@ export async function updateMasterCertificate(masterId: string, data: any, tx?: 
     .where(eq(shipCertificatesMaster.masterId, masterId));
 }
 
-export async function insertMasterCertificate(data: any, tx?: any) {
+export async function insertMasterCertificate(data: any, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.insert(shipCertificatesMaster).values(data);
 }
 
-export async function deleteMasterCertificate(masterId: string, tx?: any) {
+export async function deleteMasterCertificate(masterId: string, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.update(shipCertificatesMaster)
@@ -119,7 +122,7 @@ export async function getApplicabilityByVesselId(vesselId: string) {
     ));
 }
 
-export async function getApplicabilityByVesselAndMaster(vesselId: string, masterId: string, tx?: any) {
+export async function getApplicabilityByVesselAndMaster(vesselId: string, masterId: string, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.select()
@@ -131,7 +134,7 @@ export async function getApplicabilityByVesselAndMaster(vesselId: string, master
     ));
 }
 
-export async function insertApplicability(data: any, tx?: any) {
+export async function insertApplicability(data: any, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   // Make insert idempotent against the partial unique index
@@ -152,7 +155,7 @@ export async function insertApplicabilityBulk(data: Array<{
   masterId: string;
   isApplicable: boolean;
   isDeleted?: boolean;
-}>, tx?: any) {
+}>, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   // Make insert idempotent against the partial unique index
@@ -168,7 +171,7 @@ export async function insertApplicabilityBulk(data: Array<{
     .returning();
 }
 
-export async function updateApplicability(vesselId: string, masterId: string, isApplicable: boolean, tx?: any) {
+export async function updateApplicability(vesselId: string, masterId: string, isApplicable: boolean, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.update(vesselCertificateApplicability)
@@ -181,7 +184,7 @@ export async function updateApplicability(vesselId: string, masterId: string, is
     .returning();
 }
 
-export async function bulkUpdateApplicability(vesselIds: string[], masterId: string, isApplicable: boolean, tx?: any) {
+export async function bulkUpdateApplicability(vesselIds: string[], masterId: string, isApplicable: boolean, tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.update(vesselCertificateApplicability)
@@ -203,7 +206,7 @@ export async function getDistinctVessels() {
   }).from(vesselCertificateApplicability);
 }
 
-export async function getApplicabilityByMasterIds(masterIds: string[], tx?: any) {
+export async function getApplicabilityByMasterIds(masterIds: string[], tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.select({
@@ -216,7 +219,7 @@ export async function getApplicabilityByMasterIds(masterIds: string[], tx?: any)
     ));
 }
 
-export async function getAllVessels(tx?: any) {
+export async function getAllVessels(tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.select({
@@ -242,7 +245,7 @@ export async function getCompanyCertificates() {
     );
 }
 
-export async function getCompanyApplicableMasterIds(tx?: any) {
+export async function getCompanyApplicableMasterIds(tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.select({
@@ -261,7 +264,7 @@ export async function getCompanyApplicableMasterIds(tx?: any) {
     );
 }
 
-export async function getAllApplicabilityRecords(tx?: any) {
+export async function getAllApplicabilityRecords(tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   return db.select({
@@ -273,7 +276,7 @@ export async function getAllApplicabilityRecords(tx?: any) {
     );
 }
 
-export async function softDeleteApplicabilityByMasterIds(masterIds: string[], tx?: any) {
+export async function softDeleteApplicabilityByMasterIds(masterIds: string[], tx?: CertAdminTx) {
   const db = getDb(tx);
   if (!db) return null;
   if (masterIds.length === 0) return [];

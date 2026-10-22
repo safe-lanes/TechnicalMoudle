@@ -30,11 +30,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import ChangeRequestFormExact from "./ChangeRequestFormExact";
-import ViewChangeRequestModal from "./ViewChangeRequestModal";
-import EditChangeRequestModal from "./EditChangeRequestModal";
-import AddCommentModal from "./AddCommentModal";
-import ApproveRejectModal from "./ApproveRejectModal";
+import ChangeRequestFormExact from "@/pages/change-requests/ChangeRequestFormExact";
+import ViewChangeRequestModal from "@/pages/change-requests/ViewChangeRequestModal";
+import EditChangeRequestModal from "@/pages/change-requests/EditChangeRequestModal";
+import AddCommentModal from "@/pages/change-requests/AddCommentModal";
+import ApproveRejectModal from "@/pages/change-requests/ApproveRejectModal";
 import { cn } from "@/lib/utils";
 import type { ChangeRequest } from "@shared/schema";
 

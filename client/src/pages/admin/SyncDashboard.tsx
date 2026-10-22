@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import AutoSyncSettingsCard from "@/components/sync/AutoSyncSettingsCard";
+import { countState, resultState } from "./syncConflictStates";
 
 // ── Types ──
 
@@ -194,8 +195,10 @@ function statusBadge(status: string) {
 
 export default function SyncDashboard() {
   const { toast } = useToast();
-  const { canEdit } = usePermissions();
+  const { canEdit, canViewMenu } = usePermissions();
   const canEditSync = canEdit("admin-sync-dashboard");
+  const canViewConflicts = canViewMenu("admin-sync-conflicts");
+  const canEditConflicts = canEdit("admin-sync-conflicts");
   const { isShip } = useSyncInstanceInfo();
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
@@ -283,15 +286,17 @@ export default function SyncDashboard() {
   const conflictCountQuery = useQuery<{ total: number; fromLog: number; fromOld: number }>({
     queryKey: ["/technical/api/sync/conflicts/review/count", selectedVesselId],
     queryFn: async () => {
-      if (!selectedVesselId) return { total: 0, fromLog: 0, fromOld: 0 };
       const res = await fetch(`/technical/api/sync/conflicts/review/count?vesselId=${selectedVesselId}`);
-      if (!res.ok) return { total: 0, fromLog: 0, fromOld: 0 };
+      if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
     enabled: !!selectedVesselId,
     refetchInterval: 30_000,
   });
-  const totalConflictCount = conflictCountQuery.data?.total ?? 0;
+  // Do not present cached data as current while a refetch is pending or has failed.
+  const countStatus = countState(selectedVesselId, conflictCountQuery);
+  const countReady = countStatus === "ready";
+  const totalConflictCount = countReady ? conflictCountQuery.data?.total ?? null : null;
 
   // ── Sync Trigger ──
   const syncMutation = useMutation({
@@ -352,6 +357,7 @@ export default function SyncDashboard() {
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["/technical/api/sync/batches"] });
       queryClient.invalidateQueries({ queryKey: ["/technical/api/sync/conflicts"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/sync/conflicts/review/count"] });
       queryClient.invalidateQueries({ queryKey: ["/technical/api/sync/file/queue"] });
 
       setTimeout(() => {
@@ -412,6 +418,7 @@ export default function SyncDashboard() {
     onSuccess: () => {
       toast({ title: "Conflict Resolved" });
       queryClient.invalidateQueries({ queryKey: ["/technical/api/sync/conflicts"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/sync/conflicts/review/count"] });
     },
     onError: (err: any) => {
       toast({ title: "Resolution Failed", description: err.message, variant: "destructive" });
@@ -457,6 +464,7 @@ export default function SyncDashboard() {
               batchesQuery.refetch();
               conflictsQuery.refetch();
               fileQueueQuery.refetch();
+               if (selectedVesselId) conflictCountQuery.refetch();
             }}
             data-testid="btn-refresh-all"
           >
@@ -488,24 +496,25 @@ export default function SyncDashboard() {
           </CardContent>
         </Card>
         <Card
-          className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-md hover:bg-amber-50/40 transition-all"
-          onClick={() => setLocation("/admin/sync-conflicts")}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLocation("/admin/sync-conflicts"); } }}
-          role="link"
-          tabIndex={0}
-          aria-label={`Conflicts — ${totalConflictCount} need resolution. Click to review.`}
-          data-testid="tile-conflicts-nav"
+          className={`border-l-4 border-l-amber-500 ${canViewConflicts ? "cursor-pointer hover:shadow-md hover:bg-amber-50/40 transition-all" : ""}`}
+          onClick={canViewConflicts ? () => setLocation("/admin/sync-conflicts") : undefined}
+          onKeyDown={canViewConflicts ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLocation("/admin/sync-conflicts"); } } : undefined}
+          role={canViewConflicts ? "link" : undefined}
+          tabIndex={canViewConflicts ? 0 : undefined}
+          aria-label={canViewConflicts ? "Open Conflict Review" : undefined}
+          data-testid={canViewConflicts ? "tile-conflicts-nav" : "tile-conflicts-status"}
         >
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertTriangle className="h-4 w-4" />
-              Conflicts
+              Conflicts (selected vessel)
             </div>
             <div className="text-lg font-semibold mt-1">
-              {totalConflictCount}
-              {totalConflictCount > 0 && (
+              {countReady ? totalConflictCount : countStatus === "error" ? "Unavailable" : countStatus === "select-vessel" ? "Select a vessel" : "Loading..."}
+              {countReady && totalConflictCount! > 0 && (
                 <span className="text-xs text-amber-600 ml-1">need resolution</span>
               )}
+              {conflictCountQuery.isError && <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); conflictCountQuery.refetch(); }}>Retry count</Button>}
             </div>
           </CardContent>
         </Card>
@@ -740,30 +749,42 @@ export default function SyncDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            {conflicts.length === 0 ? (
+            {resultState(conflictsQuery) === "error" ? (
+              <div role="alert" className="text-center py-8">
+                Could not load the dashboard conflict list.
+                <Button variant="link" onClick={() => conflictsQuery.refetch()}>Retry</Button>
+              </div>
+            ) : resultState(conflictsQuery) === "loading" ? (
+              <div className="text-center py-8 text-muted-foreground">Loading conflicts...</div>
+            ) : conflicts.length === 0 ? (
               /* Two distinct empty states. Some conflicts are resolvable inline here; others are
                  only actionable on Conflict Review. Showing "all synced" whenever THIS list was
                  empty contradicted the count directly above it. The user is never shown the
                  reason — just one honest number and a way to act on it. */
-              totalConflictCount > 0 ? (
+              countReady && totalConflictCount! > 0 ? (
                 <div className="text-center py-8" data-testid="conflicts-needs-review">
                   <AlertTriangle className="h-10 w-10 mx-auto mb-2 text-amber-400" />
                   <p className="font-medium">
                     {totalConflictCount} {totalConflictCount === 1 ? "conflict needs" : "conflicts need"} review
                   </p>
-                  <Button
+                  {canViewConflicts && <Button
                     variant="link"
                     className="mt-1"
                     onClick={() => setLocation("/admin/sync-conflicts")}
                     data-testid="link-open-conflict-review"
                   >
                     Open Conflict Review →
-                  </Button>
+                  </Button>}
                 </div>
-              ) : (
+              ) : countReady && totalConflictCount === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="h-10 w-10 mx-auto mb-2 text-green-300" />
                   <p>No conflicts - all synced!</p>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground" role={conflictCountQuery.isError ? "alert" : undefined}>
+                  {conflictCountQuery.isError ? "Conflict count unavailable." : "Checking conflict count..."}
+                  {conflictCountQuery.isError && <Button variant="link" onClick={() => conflictCountQuery.refetch()}>Retry count</Button>}
                 </div>
               )
             ) : (
@@ -795,7 +816,7 @@ export default function SyncDashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
-                            {canEditSync && (
+                            {canEditConflicts && (
                               <>
                             <Button
                               variant="outline"
@@ -835,7 +856,7 @@ export default function SyncDashboard() {
                 </Table>
               </ScrollArea>
             )}
-            {conflicts.length > 0 && totalConflictCount > conflicts.length && (
+            {canViewConflicts && countReady && conflicts.length > 0 && totalConflictCount! > conflicts.length && (
               /* The table shows only what can be resolved inline. Without this the row count
                  would silently disagree with the total above. */
               <div className="pt-2 text-center">

@@ -35,9 +35,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { FEATURES } from '@/config/features';
-import { SPARES_TEMPLATE_FIELDS } from '@shared/sparesTemplateFields';
 import { useVessels } from "@/hooks/useVessels";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
+import { resolveSpareMakerDefault } from "./spareMakerDefault";
 
 interface Spare {
   id: number;
@@ -127,7 +127,7 @@ const Spares: React.FC = () => {
     }
     return "";
   });
-  const { vesselId, setVesselId, isMyVessels, assignedVesselIds, pickerVessels } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds, pickerVessels, vessels: contextVessels } = useVessel();
   // 'my' aggregates across the assigned mini-fleet via the 'all' read path with a
   // vesselIds allow-list. The path segment becomes 'all'; the allow-list narrows it.
   const sparesScopeSegment = isMyVessels ? 'all' : vesselId;
@@ -167,7 +167,7 @@ const Spares: React.FC = () => {
   const { isChangeMode } = useChangeMode();
   
   // UI Role context for role-based visibility
-  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const { uiRole, isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { isOfficeUser } = useAuth();
   const { resolvedUserName } = useResolvedUserName();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
@@ -260,6 +260,7 @@ const Spares: React.FC = () => {
     note: "",
     isRotationItem: false
   });
+  const [addMakerOverridden, setAddMakerOverridden] = useState(false);
   
   // Comprehensive edit spare form (includes all fields from Spare Part Details)
   const [editSpareForm, setEditSpareForm] = useState({
@@ -1223,6 +1224,18 @@ const Spares: React.FC = () => {
   // pushes the hierarchical (dotted-code) component filter down into SQL so the
   // page payload stays bounded even when a component is selected.
   const activeOnlyForRole = (isVessel || isHeadOfDept) && !isExternal;
+  const componentSparesExportScope = `${sparesScopeKey}|${activeOnlyForRole}|${pickerVessels.map(v => v.id).join(",")}`;
+  const componentSparesExportScopeRef = useRef(componentSparesExportScope);
+  componentSparesExportScopeRef.current = componentSparesExportScope;
+
+  const uniqueSparesExportScope = JSON.stringify([
+    vesselId, activeOnlyForRole, uiRole, assignedVesselIds, contextVessels.map(v => v.id),
+  ]);
+  const uniqueSparesExportScopeRef = useRef({ key: uniqueSparesExportScope });
+  if (uniqueSparesExportScopeRef.current.key !== uniqueSparesExportScope) {
+    // Replace the token, so changing away and back also invalidates an export.
+    uniqueSparesExportScopeRef.current = { key: uniqueSparesExportScope };
+  }
 
   const { data: sparesResponse, isLoading, refetch } = useQuery<{ items: any[]; total: number }>({
     queryKey: [
@@ -1442,12 +1455,12 @@ const Spares: React.FC = () => {
   }, [fetchedComponents]);
 
   const flattenedComponents = useMemo(() => {
-    const result: { id: string; code: string; name: string; fleetEquipmentCode?: string; actualId?: string }[] = [];
+    const result: { id: string; code: string; name: string; fleetEquipmentCode?: string; actualId?: string; maker?: string | null; makerCode?: string | null }[] = [];
     const flatten = (nodes: ComponentNode[]) => {
       for (const node of nodes) {
         const hasChildren = node.children && node.children.length > 0;
         if (!hasChildren) {
-          result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode, actualId: node.actualId });
+          result.push({ id: node.id, code: node.code, name: node.name, fleetEquipmentCode: node.fleetEquipmentCode, actualId: node.actualId, maker: node.maker, makerCode: node.makerCode });
         }
         if (node.children) flatten(node.children);
       }
@@ -1455,6 +1468,17 @@ const Spares: React.FC = () => {
     flatten(componentTree);
     return result;
   }, [componentTree]);
+
+  const selectedAddComponent = flattenedComponents.find(c => c.id === addSpareForm.componentId);
+  useEffect(() => {
+    if (!selectedAddComponent || addMakerOverridden) return;
+    const selectedMaker = resolveSpareMakerDefault(selectedAddComponent, makerListData);
+    setAddSpareForm(prev =>
+      prev.maker === selectedMaker.maker && prev.makerCode === selectedMaker.makerCode
+        ? prev
+        : { ...prev, ...selectedMaker }
+    );
+  }, [selectedAddComponent, makerListData, addMakerOverridden]);
 
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
@@ -1673,6 +1697,7 @@ const Spares: React.FC = () => {
       invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
       toast({ title: "Success", description: "Spare created successfully" });
       setIsAddSpareModalOpen(false);
+      setAddMakerOverridden(false);
       setAddSpareForm({
         partCode: "",
         partName: "",
@@ -2123,47 +2148,6 @@ const Spares: React.FC = () => {
     setSelectedComponentId(null);
   };
 
-  const mapSpareToTemplateRow = (spare: Spare, componentCode?: string, componentName?: string) => {
-    const row: Record<string, any> = {};
-    for (const field of SPARES_TEMPLATE_FIELDS) {
-      if (field.key === 'reserved') {
-        row[field.header] = '';
-        continue;
-      }
-      switch (field.key) {
-        case 'partCode': row[field.header] = spare.partCode || ''; break;
-        case 'fleetEquipmentCode': row[field.header] = spare.fleetEquipmentCode || ''; break;
-        case 'fleetEquipmentName': row[field.header] = ''; break;
-        case 'componentCode': row[field.header] = componentCode || spare.componentCode || ''; break;
-        case 'componentName': row[field.header] = componentName || spare.componentName || ''; break;
-        case 'partName': row[field.header] = spare.partName || ''; break;
-        case 'partNumber': row[field.header] = spare.partNumber || ''; break;
-        case 'uom': row[field.header] = spare.uom || ''; break;
-        case 'drawingNumber': row[field.header] = spare.drawingNumber || ''; break;
-        case 'positionNumber': row[field.header] = spare.positionNumber || ''; break;
-        case 'note': row[field.header] = spare.note || ''; break;
-        case 'specification': row[field.header] = spare.specification || ''; break;
-        case 'maker': row[field.header] = spare.maker || ''; break;
-        case 'makerCode': row[field.header] = spare.makerCode || ''; break;
-        case 'manualName': row[field.header] = spare.manualName || ''; break;
-        case 'pageNumber': row[field.header] = spare.pageNumber || ''; break;
-        case 'criticality': row[field.header] = spare.critical || spare.criticality || ''; break;
-        case 'totalRob': row[field.header] = spare.rob ?? 0; break;
-        case 'locationA': row[field.header] = spare.location || ''; break;
-        case 'locationARob': row[field.header] = spare.robLocationA ?? 0; break;
-        case 'locationB': row[field.header] = spare.location2 || ''; break;
-        case 'locationBRob': row[field.header] = spare.robLocationB ?? 0; break;
-        case 'minimumStock': row[field.header] = spare.min ?? 0; break;
-        case 'isActive': row[field.header] = spare.isActive === false ? 'No' : 'Yes'; break;
-        case 'ihm': row[field.header] = spare.ihm || ''; break;
-        case 'evidenceType': row[field.header] = spare.evidenceType || ''; break;
-        case 'isRotationItem': row[field.header] = spare.isRotationItem ? 'Yes' : 'No'; break;
-        default: row[field.header] = ''; break;
-      }
-    }
-    return row;
-  };
-
   const exportHistoryToExcel = () => {
     const now = new Date();
     const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
@@ -2213,31 +2197,44 @@ const Spares: React.FC = () => {
     });
   };
 
-  const exportUniqueSparesToExcel = () => {
+  const exportUniqueSparesToExcel = async () => {
+    if (exportingType) return;
+    const exportScope = uniqueSparesExportScopeRef.current;
     setExportingType('unique');
     try {
-      const now = new Date();
-      const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-      const fname = `spares_master_${vesselId}_${ts}.xlsx`;
-      const seenCodes = new Set<string>();
-      const exportRows: Record<string, any>[] = [];
-
-      for (const spare of filteredSpares) {
-        if (seenCodes.has(spare.partCode)) continue;
-        seenCodes.add(spare.partCode);
-        exportRows.push(mapSpareToTemplateRow(spare));
+      const assertCurrent = () => {
+        if (uniqueSparesExportScopeRef.current !== exportScope) {
+          throw new Error("Vessel or authorization scope changed during export. Please export again for the selected scope.");
+        }
+      };
+      const {
+        uniqueSparesVesselIds, fetchUniqueSparesData, uniqueSparesFilename,
+        buildUniqueSparesWorkbook, downloadUniqueSparesWorkbook,
+      } = await import("./uniqueSparesExport");
+      assertCurrent();
+      const vesselIds = uniqueSparesVesselIds(
+        vesselId, isMyVessels, assignedVesselIds, contextVessels.map(v => v.id),
+      );
+      if (!sparesScopeReady || !vesselIds.length) {
+        toast({ title: "No Data", description: "No vessels available in the selected scope." });
+        return;
       }
-
-      const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
-      const ws = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
-      ws['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Unique Spare Master');
-      XLSX.writeFile(wb, fname);
-
+      // Validate the display name before fetching; timestamp the finished export.
+      uniqueSparesFilename(vesselId, contextVessels);
+      const data = await fetchUniqueSparesData(vesselIds, activeOnlyForRole, async url => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to fetch complete unique-spare data. Export was not downloaded.");
+        return response.json();
+      }, assertCurrent);
+      if (!data.rows.length) {
+        toast({ title: "No Data", description: "No eligible unique spares available to export." });
+        return;
+      }
+      const fname = uniqueSparesFilename(vesselId, contextVessels);
+      await downloadUniqueSparesWorkbook(buildUniqueSparesWorkbook(data), fname, assertCurrent);
       toast({
         title: "Export Successful",
-        description: `Exported ${exportRows.length} unique spare master entries to ${fname}`
+        description: `Exported ${data.rows.length} unique spare master entries to ${fname}`
       });
       setExportDialogOpen(false);
     } catch (err: any) {
@@ -2255,61 +2252,49 @@ const Spares: React.FC = () => {
   const exportComponentSparesToExcel = async () => {
     setExportingType('component');
     try {
-      const linksRes = await fetch(`/technical/api/inventory/spare-links/${vesselId}`);
-      if (!linksRes.ok) throw new Error('Failed to fetch spare-component links');
-      const linksJson = await linksRes.json();
-      const links: Array<{ spareId: number; spareUuid: string; componentId: string; vesselId: string }> = linksJson.data || [];
-
-      const sparesArray = Array.isArray(sparesData) ? sparesData : [];
-      const spareById = new Map<number, Spare>();
-      const spareByUuid = new Map<string, Spare>();
-      for (const s of sparesArray) {
-        spareById.set(s.id, s);
-        if (s.suuid) spareByUuid.set(s.suuid, s);
-      }
-
-      const componentsMap = new Map<string, { code: string; name: string }>();
-      for (const s of sparesArray) {
-        const lcs = s.linkedComponents || [];
-        for (const lc of lcs) {
-          if (!componentsMap.has(lc.componentId)) {
-            componentsMap.set(lc.componentId, { code: lc.componentCode, name: lc.componentName });
-          }
+      const assertCurrent = () => {
+        if (componentSparesExportScopeRef.current !== componentSparesExportScope) {
+          throw new Error("Vessel scope changed during export. Please export again for the selected scope.");
         }
+      };
+      const {
+        componentSparesVesselIds, fetchComponentSparesData,
+        buildComponentSparesWorkbook, downloadComponentSparesWorkbook, componentSparesFilename,
+      } = await import("./componentSparesExport");
+      assertCurrent();
+      const vesselIds = componentSparesVesselIds(
+        vesselId, isMyVessels, assignedVesselIds, pickerVessels.map(v => v.id),
+      );
+      if (!sparesScopeReady || !vesselIds.length) {
+        toast({ title: "No Data", description: "No vessels available in the selected scope." });
+        return;
       }
-
-      const now = new Date();
-      const ts = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-      const fname = `component_spares_${vesselId}_${ts}.xlsx`;
-      const exportRows: Record<string, any>[] = [];
-
-      for (const link of links) {
-        const spare = spareById.get(link.spareId) || spareByUuid.get(link.spareUuid);
-        const comp = componentsMap.get(link.componentId);
-        if (spare) {
-          exportRows.push(mapSpareToTemplateRow(spare, comp?.code || spare.componentCode || '', comp?.name || spare.componentName || ''));
-        } else {
-          const placeholderRow: Record<string, string> = {};
-          for (const field of SPARES_TEMPLATE_FIELDS) {
-            placeholderRow[field.header] = field.key === 'componentCode' ? (comp?.code || '')
-              : field.key === 'componentName' ? (comp?.name || '')
-              : field.key === 'partCode' ? `(spare #${link.spareId})`
-              : '';
-          }
-          exportRows.push(placeholderRow);
-        }
+      const data = await fetchComponentSparesData(vesselIds, activeOnlyForRole, async url => {
+        const response = await fetch(url);
+        if (!response.ok) throw Object.assign(
+          new Error("Failed to fetch complete component-spare data. Export was not downloaded."),
+          { status: response.status },
+        );
+        return response.json();
+      }, assertCurrent);
+      if (!data.rows.length) {
+        toast({
+          title: "No Data",
+          description: "No eligible component-spare links available to export." +
+            (data.excludedUnavailableSpareLinks
+              ? ` Excluded ${data.excludedUnavailableSpareLinks} retained links to unavailable spares; these are not in the current inventory.`
+              : ""),
+        });
+        return;
       }
-
-      const hdrs = SPARES_TEMPLATE_FIELDS.map(f => f.header);
-      const ws = XLSX.utils.json_to_sheet(exportRows, { header: hdrs });
-      ws['!cols'] = SPARES_TEMPLATE_FIELDS.map(f => ({ wch: f.width }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Component Spares');
-      XLSX.writeFile(wb, fname);
-
+      const fname = componentSparesFilename(vesselId, contextVessels);
+      await downloadComponentSparesWorkbook(buildComponentSparesWorkbook(data), fname, assertCurrent);
       toast({
         title: "Export Successful",
-        description: `Exported ${exportRows.length} of ${links.length} component-spare entries to ${fname}`
+        description: `Exported ${data.rows.length} component-spare entries to ${fname}` +
+          (data.excludedUnavailableSpareLinks
+            ? `. Excluded ${data.excludedUnavailableSpareLinks} retained links to unavailable spares; these are not in the current inventory.`
+            : "")
       });
       setExportDialogOpen(false);
     } catch (err: any) {
@@ -4151,7 +4136,7 @@ const Spares: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={exportComponentSparesToExcel}
-                  disabled={!!exportingType || !Array.isArray(sparesData) || sparesData.length === 0}
+                  disabled={!!exportingType || !sparesScopeReady}
                   data-testid="button-export-component-excel"
                 >
                   {exportingType === 'component' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
@@ -4513,7 +4498,8 @@ const Spares: React.FC = () => {
                                   key={comp.id}
                                   value={`${comp.code} ${comp.name}`}
                                   onSelect={() => {
-                                    setAddSpareForm({...addSpareForm, componentId: comp.id});
+                                    setAddMakerOverridden(false);
+                                    setAddSpareForm(prev => ({ ...prev, componentId: comp.id, maker: "", makerCode: "" }));
                                     setComponentCodePopoverOpen(false);
                                   }}
                                   data-testid={`component-option-${comp.code}`}
@@ -4702,7 +4688,8 @@ const Spares: React.FC = () => {
                               <CommandItem
                                 value="__clear__"
                                 onSelect={() => {
-                                  setAddSpareForm({...addSpareForm, maker: "", makerCode: ""});
+                                  setAddMakerOverridden(true);
+                                  setAddSpareForm(prev => ({ ...prev, maker: "", makerCode: "" }));
                                   setAddMakerSearch('');
                                   setAddMakerPopoverOpen(false);
                                 }}
@@ -4717,7 +4704,8 @@ const Spares: React.FC = () => {
                                 key={m.id}
                                 value={m.makerName}
                                 onSelect={() => {
-                                  setAddSpareForm({...addSpareForm, maker: m.makerName, makerCode: m.makerCode});
+                                  setAddMakerOverridden(true);
+                                  setAddSpareForm(prev => ({ ...prev, maker: m.makerName, makerCode: m.makerCode }));
                                   setAddMakerSearch('');
                                   setAddMakerPopoverOpen(false);
                                 }}

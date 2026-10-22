@@ -380,7 +380,7 @@ export async function resolveHierarchyScopeByRankId(vesselId: string, userRankId
 
   const teamUuids = collectDescendants(meUuids);
   const teamRankIds = new Set<string>();
-  for (const uuid of teamUuids) {
+  for (const uuid of Array.from(teamUuids)) {
     const node = nodeByUuid.get(uuid);
     if (node) teamRankIds.add(node.rankId);
   }

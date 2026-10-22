@@ -68,7 +68,7 @@ export function computeSpareConsumptionDelta(
     }
   }
 
-  for (const [compositeKey, prevDeducted] of previousDeductionMap.entries()) {
+  for (const [compositeKey, prevDeducted] of Array.from(previousDeductionMap.entries())) {
     if (!currentCompositeKeys.has(compositeKey) && prevDeducted > 0) {
       const [partKey, locName] = compositeKey.split('::');
       const prevEntry = previousConsumed.find(p => {
