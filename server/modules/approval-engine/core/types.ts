@@ -142,7 +142,9 @@ export type EngineEvent =
   | { type: 'request-completed'; tenantId: string; requuid: string; scope: Scope; subjectRef: string }
   | { type: 'request-returned'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; returnedBy: string; remarks: string | null }
   /** 28-Sep-2026: the SENDER withdrew a pending request; approverUserIds = the active step's approvers. */
-  | { type: 'request-withdrawn'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; withdrawnBy: string; approverUserIds: string[]; reason: string | null };
+  | { type: 'request-withdrawn'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; withdrawnBy: string; approverUserIds: string[]; reason: string | null }
+  /** 22-Oct-2026 (Jeevan #9): one approver approved / rejected one step — hosts record per-step history from it. */
+  | { type: 'slot-decided'; tenantId: string; requuid: string; scope: Scope; subjectRef: string; vesselId: string | null; nodeKey: string; nodeLabel: string | null; decision: 'approve' | 'reject'; decidedBy: string; remarks: string | null; adminOverride: boolean };
 
 // ── Card contract (v3 §A4) — the module adapter ─────────────────────────────
 export interface CardScope {

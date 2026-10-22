@@ -770,6 +770,7 @@ export async function updateDefect(id: string, body: any, actor?: import('./defe
   const partialDefectSchema = insertDefectSchema.partial();
   const validatedData = partialDefectSchema.parse(gated.body);
   const updated = await defectsRepo.updateDefect(id, validatedData);
+  await recordDefectSubmissions(current, updated);
   const approvalSubmissions: Array<import('./defectsApprovalHooks').ExtensionSubmissionOutcome> = [];
   const recordSubmissionFailure = async (payload: any) => {
     try {
@@ -1101,4 +1102,53 @@ export async function unlockDefectPartA(id: string, reason: string, actor?: impo
     });
   } catch (e) { console.error('[defects] Part A unlock audit write failed (unlock saved):', e); }
   return updated;
+}
+
+// ── Approval history for Defects (Jeevan #9, 22-Oct-2026) ─────────────────────────────────────────────
+// The shared, synced approval_history table: "submitted" is recorded where it happens (vessel or office);
+// step decisions are recorded on shore from the engine (approvals/engineGateway.recordDefectStepFromEvent).
+
+/** After a save: a NEW extension entry = "requested"; C1 closeout just confirmed = "sent for verification". */
+async function recordDefectSubmissions(previous: any, updated: any): Promise<void> {
+  if (!updated?.duuid || !updated?.vesselId) return;
+  const { recordApprovalEvent } = await import('../../approvals/approvalHistoryService');
+  const before = new Set((Array.isArray(previous?.targetDateExtensions) ? previous.targetDateExtensions : []).map((e: any) => e?.id));
+  for (const e of Array.isArray(updated.targetDateExtensions) ? updated.targetDateExtensions : []) {
+    if (!e?.id || before.has(e.id)) continue;
+    await recordApprovalEvent({ vesselId: updated.vesselId, subjectType: 'defect-extension', subjectRef: updated.duuid, eventType: 'submitted',
+      remarks: e.newTargetDate ? `New target date ${String(e.newTargetDate).slice(0, 10)} — ${e.reasonForExtension ?? ''}` : e.reasonForExtension ?? null });
+    // No chain (legacy fallback): the entry was saved already decided — record that decision too.
+    if (e.status === 'Approved' || e.status === 'Rejected') {
+      await recordApprovalEvent({ vesselId: updated.vesselId, subjectType: 'defect-extension', subjectRef: updated.duuid,
+        eventType: e.status === 'Approved' ? 'approved' : 'rejected', remarks: e.approverComments ?? null });
+    }
+  }
+  if (updated.confirmCompleted === true && previous?.confirmCompleted !== true) {
+    await recordApprovalEvent({ vesselId: updated.vesselId, subjectType: 'defect-verification', subjectRef: updated.duuid, eventType: 'submitted',
+      remarks: updated.closureComment ?? null });
+  }
+}
+
+/** GET /defects/:id/approval-process — extension + verification history, every attempt, both sides. */
+export async function getDefectApprovalProcess(id: string) {
+  const defect: any = await defectsRepo.getDefect(id);
+  if (!defect) throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
+  const { approvalProcess } = await import('../../approvals/approvalHistoryService');
+  // Older records (before this history existed): rebuilt from the defect's own fields — who/when may be missing.
+  const extLegacy: any[] = [];
+  for (const e of Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : []) {
+    extLegacy.push({ type: 'submitted', at: e.requestedAt || null, byName: e.requestedByName ?? null, byPosition: e.requestedByPosition ?? null, remarks: e.reasonForExtension ?? null });
+    if (e.status === 'Approved' || e.status === 'Rejected') {
+      extLegacy.push({ type: e.status === 'Approved' ? 'approved' : 'rejected', at: e.approvalDate || null, remarks: e.approverComments ?? null });
+    } else if (e.status === 'Withdrawn') {
+      extLegacy.push({ type: 'withdrawn', at: e.withdrawnAt || null });
+    }
+  }
+  const verLegacy: any[] = [];
+  if (defect.confirmCompleted) verLegacy.push({ type: 'submitted', at: defect.dateCompleted || null, byName: defect.closedByName ?? null, byPosition: defect.closedByRank ?? null, remarks: defect.closureComment ?? null });
+  if (defect.verified) verLegacy.push({ type: 'approved', at: defect.dateVerified || defect.verifiedDate || null, byName: defect.verifiedByName ?? null, byPosition: defect.verifiedByOfficePosition ?? null });
+  return {
+    extension: await approvalProcess('defect-extension', defect.duuid, extLegacy),
+    verification: await approvalProcess('defect-verification', defect.duuid, verLegacy),
+  };
 }

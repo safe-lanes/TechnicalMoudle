@@ -39,6 +39,7 @@ import {
   type DefectApprovalChain,
 } from "@/components/approvals/ApprovalChainProgress";
 import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
+import { ApprovalProcessSection, type ApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import {
   Form,
   FormControl,
@@ -644,6 +645,16 @@ export default function DefectFormWizard({
       return Array.isArray(payload) ? payload : [];
     },
     staleTime: 60_000,
+  });
+  // Jeevan #9: extension + verification history from the shared, synced approval history (both sides).
+  const defectApprovalProcess = useQuery<{ extension: ApprovalProcess; verification: ApprovalProcess } | null>({
+    queryKey: ['/technical/api/defects/', currentDefect?.id ?? null, 'approval-process'],
+    enabled: !!currentDefect?.id,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/defects/${encodeURIComponent(String(currentDefect!.id))}/approval-process`);
+      return res.ok ? res.json() : null;
+    },
   });
   const extensionApproval = useDefectApprovalChain(approvalDefectId, "extension");
   const verificationApproval = useDefectApprovalChain(approvalDefectId, "verification");
@@ -2380,6 +2391,7 @@ export default function DefectFormWizard({
                     {extensionUi.showContainer && (
                       <div className="border border-amber-300 rounded-lg p-6 bg-amber-50/30 space-y-6">
                         <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B5. Target Date Extension</h3>
+                        <ApprovalProcessSection blocks={[{ title: "Target date extension", process: defectApprovalProcess.data?.extension }]} />
                         {orphanedRequestedExtension && (
                           <div
                             className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
@@ -2791,6 +2803,7 @@ export default function DefectFormWizard({
                   {/* C2. Verification Section */}
                   <div className="space-y-6 pt-4">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C2. Verification</h3>
+                    <ApprovalProcessSection blocks={[{ title: "Verification", process: defectApprovalProcess.data?.verification }]} />
                     {hasPendingExtensionRequest && (
                       <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c2-extension-pending-warning">
                         Verification is blocked while the extension approval is pending.

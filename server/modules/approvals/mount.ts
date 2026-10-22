@@ -10,7 +10,7 @@ import { technicalApprovalCard } from './approvalCard';
 import { defectsApprovalCard } from '../defects/approvalCard';
 import { approvalEventNotifier } from './approvalNotifier';
 import { AlsTenantRepositoryProvider, currentEngineTenantId } from './tenantProvider';
-import { setTechnicalEngine } from './engineGateway';
+import { setTechnicalEngine, recordDefectStepFromEvent } from './engineGateway';
 
 /** Host admin roles for the Approval Engine: builder access (F6) + the engine decide override
  *  on zero-approver steps (F3b). Single source of truth for both. */
@@ -52,7 +52,7 @@ export async function mountTechnicalApprovals(app: Express): Promise<void> {
       return { userId: r.user?.userUuid ?? 'anonymous', role: id.role, userType: id.userType, isAdmin };
     },
     requireConfigWrite: (req: Request, res: Response, next: NextFunction) => configGuard(req as AuthenticatedRequest, res, next),
-    onEvent: approvalEventNotifier,
+    onEvent: (evt) => { approvalEventNotifier(evt); recordDefectStepFromEvent(evt); },
   });
   setTechnicalEngine(engine);
   console.log('🔏 Approval engine mounted at /technical/api/approval-engine (Technical + Defects cards registered)');

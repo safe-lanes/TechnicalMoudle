@@ -314,6 +314,7 @@ export class ApprovalEngine {
           .map((s) => ({ nodeKey: s.nodeKey, slotOrdinal: s.slotOrdinal, status: 'superseded' as const })),
       ];
       await repo.applySlotUpdates(requuid, updates, null);
+      this.emitSlotDecided(ctx, request!, nodeKey, node?.label ?? null, 'reject', effRemarks, adminOverride);
       return this.finalize(ctx, card, request!, 'returned', ctx.actor.userId, effRemarks, nodeKey);
     }
 
@@ -331,6 +332,7 @@ export class ApprovalEngine {
       }
     }
     await repo.applySlotUpdates(requuid, updates, undefined);
+    this.emitSlotDecided(ctx, request!, nodeKey, node?.label ?? null, 'approve', effRemarks, adminOverride);
     if (!satisfied) {
       return { requuid, requestStatus: 'pending', nodeKey, nodeSatisfied: false, activatedNodeKey: null };
     }
@@ -341,6 +343,12 @@ export class ApprovalEngine {
     }
     await this.activateNode(ctx, card, request!, nextNode.key);
     return { requuid, requestStatus: 'pending', nodeKey, nodeSatisfied: true, activatedNodeKey: nextNode.key };
+  }
+
+  private emitSlotDecided(ctx: EngineCtx, request: RequestRow, nodeKey: string, nodeLabel: string | null,
+    decision: 'approve' | 'reject', remarks: string | null, adminOverride: boolean) {
+    this.emit({ type: 'slot-decided', tenantId: ctx.tenantId, requuid: request.requuid, scope: request.scope, subjectRef: request.subjectRef,
+      vesselId: request.vesselId ?? null, nodeKey, nodeLabel, decision, decidedBy: ctx.actor.userId, remarks, adminOverride });
   }
 
   /** Terminal transition + exactly-once onDecision (guarded by the repository transition). */

@@ -13,7 +13,9 @@ import { getRequestContext } from '../../middleware/requestContext';
 import * as repo from './approvalHistoryRepository';
 import type { ApprovalHistoryRow } from './approvalHistorySchema';
 
-export type HistorySubjectType = 'wo-completion' | 'wo-postponement' | 'wo-re-postponement' | 'change-request';
+export type HistorySubjectType = 'wo-completion' | 'wo-postponement' | 'wo-re-postponement' | 'change-request'
+  // Jeevan #9 (22-Oct-2026): Defects use the same synced history — subjectRef = defect duuid.
+  | 'defect-extension' | 'defect-verification';
 export type HistoryEventType =
   | 'submitted' | 'approved' | 'rejected' | 'forwarded' | 'completed'
   | 'ts-acknowledged' | 'ts-rejected' | 'reopened'
@@ -85,12 +87,13 @@ export interface LegacyEvent {
 
 interface RawEvent { type: string; at: string | null; byName: string | null; byPosition: string | null; remarks: string | null; stepLabel: string | null }
 
-const isPostponement = (t: string) => t === 'wo-postponement' || t === 'wo-re-postponement';
+const isPostponement = (t: string) => t === 'wo-postponement' || t === 'wo-re-postponement' || t === 'defect-extension';
 
 function labelFor(subjectType: string, e: RawEvent, attempt: number): string {
   const step = e.stepLabel ? ` — ${e.stepLabel}` : '';
   switch (e.type) {
     case 'submitted':
+      if (subjectType === 'defect-verification') return attempt > 1 ? 'Closed out again — sent for verification' : 'Closed out — sent for verification';
       return isPostponement(subjectType) ? (attempt > 1 ? 'Requested again' : 'Requested') : (attempt > 1 ? 'Resubmitted' : 'Submitted');
     case 'approved': return `Approved${step}`;
     case 'rejected': return `Rejected${step}`;

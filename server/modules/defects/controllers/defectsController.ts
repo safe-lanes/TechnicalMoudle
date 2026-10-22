@@ -277,6 +277,14 @@ export async function getDefectClosureHistory(req: Request, res: Response) {
   }
 }
 
+export async function getDefectApprovalProcess(req: Request, res: Response) {
+  try {
+    res.json(await defectsService.getDefectApprovalProcess(req.params.id));
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to fetch defect approval process');
+  }
+}
+
 export async function getDefectApprovalDiagnostics(_req: Request, res: Response) {
   try {
     res.json(await defectsService.getDefectApprovalDiagnostics());

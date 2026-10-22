@@ -92,6 +92,13 @@ router.get('/defects/:id/closure-history',
   requireVesselAccess,
   asyncHandler(defectsCtrl.getDefectClosureHistory));
 
+// GET /defects/:id/approval-process — Jeevan #9: extension + verification history (synced, both sides)
+router.get('/defects/:id/approval-process',
+  asyncHandler(defectsCtrl.loadDefectVesselAccess),
+  asyncHandler(defectsCtrl.enforceDefectVesselIdentity),
+  requireVesselAccess,
+  asyncHandler(defectsCtrl.getDefectApprovalProcess));
+
 // GET    /defects/:id — get single defect
 router.get('/defects/:id', asyncHandler(defectsCtrl.getDefect));
 

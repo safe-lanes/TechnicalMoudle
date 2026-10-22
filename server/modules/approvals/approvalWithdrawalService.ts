@@ -35,7 +35,7 @@ interface SubjectState {
   stateText: string;
   scopes: Scope[];
   reset: (actor: { userUuid: string; name: string | null }) => Promise<void>;
-  /** Approval history subject (Technical only; defect extensions keep their own history). */
+  /** Approval history subject (defect extensions too since Jeevan #9, 22-Oct-2026). */
   historySubject: HistorySubjectType | null;
 }
 
@@ -64,7 +64,7 @@ async function subjectState(type: WithdrawalSubjectType, subjectRef: string, ext
   const entry = await extensionEntrySender(subjectRef, extensionId);
   if (!entry) return null;
   return {
-    historySubject: null,
+    historySubject: 'defect-extension',
     ref: entry.duuid, vesselId: entry.vesselId, sender: entry.sender, waiting: entry.status === 'Requested', stateText: entry.status ?? 'unknown',
     scopes: [scopeFor('defects', 'defects-extension'), scopeFor('defects', 'defects-repeat-extension')],
     reset: () => withdrawExtensionEntry(entry.duuid, extensionId),

@@ -8,7 +8,7 @@
  *   - EngineError → AppError translation (asyncHandler understands AppError only),
  *   - the shore-side ARRIVAL SWEEP (CRs / postponement WOs that arrived via sync).
  */
-import { ApprovalEngine, EngineError, stuckEmptySlot, stepApprovers, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
+import { ApprovalEngine, EngineError, stuckEmptySlot, stepApprovers, type EngineCtx, type EngineEvent, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
 import { AppError } from '../shared/errors';
 import { recordApprovalEvent, type HistorySubjectType } from './approvalHistoryService';
 import { currentEngineTenantId } from './tenantProvider';
@@ -297,6 +297,21 @@ const HISTORY_SUBJECT: Record<string, HistorySubjectType> = {
 };
 export const historySubjectFor = (scope: Scope): HistorySubjectType | null =>
   (scope.moduleId === 'technical' ? HISTORY_SUBJECT[scope.screenId] ?? null : null);
+
+/** Jeevan #9 (22-Oct-2026): Defects record per-step history from the engine's 'slot-decided' event — defect
+ *  decisions are made through the engine's own decide route, which never passes through this gateway. */
+const DEFECT_HISTORY_SUBJECT: Record<string, HistorySubjectType> = {
+  'defects-extension': 'defect-extension', 'defects-repeat-extension': 'defect-extension', 'defects-verification': 'defect-verification',
+};
+export function recordDefectStepFromEvent(evt: EngineEvent): void {
+  if (evt.type !== 'slot-decided' || evt.scope.moduleId !== 'defects') return;
+  const subjectType = DEFECT_HISTORY_SUBJECT[evt.scope.screenId];
+  if (!subjectType) return;
+  void recordApprovalEvent({
+    vesselId: evt.vesselId, subjectType, subjectRef: evt.subjectRef,
+    eventType: evt.decision === 'approve' ? 'approved' : 'rejected', stepLabel: evt.nodeLabel, remarks: evt.remarks,
+  });
+}
 
 /** Record one approval-step decision (approved / rejected, with the step name) in the approval history. */
 async function recordTechnicalDecision(scope: Scope, subjectRef: string, request: RequestRow, nodeKey: string, decision: 'approve' | 'reject', remarks: string | null) {

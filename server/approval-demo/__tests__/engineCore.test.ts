@@ -282,3 +282,17 @@ describe('D3 — one person, one slot per step', () => {
     expect(d.requestStatus).toBe('approved');
   });
 });
+
+// Jeevan #9 (22-Oct-2026): every step decision is announced so hosts can record per-step history.
+describe("'slot-decided' event", () => {
+  it('fires once per approval and per rejection with the step label', async () => {
+    await engine.saveWorkflow(office('admin'), wf(SCOPE_REQ, 'normal', [{ roles: ['demo-role-reviewer'], rule: 'any' }, { roles: ['demo-role-manager'], rule: 'all' }]));
+    const r = await engine.submit(office('crew'), { scope: SCOPE_REQ, subjectRef: 'EV-1', subject: {} });
+    await engine.decide(office('user-rev-1'), (r as any).requuid, { decision: 'approve', remarks: 'ok' });
+    await engine.decide(office('user-mgr-1'), (r as any).requuid, { decision: 'reject', remarks: 'no' });
+    const decided = events.filter((e) => e.type === 'slot-decided') as any[];
+    expect(decided.map((e) => [e.nodeLabel, e.decision, e.decidedBy, e.remarks])).toEqual([
+      ['Step 1', 'approve', 'user-rev-1', 'ok'], ['Step 2', 'reject', 'user-mgr-1', 'no'],
+    ]);
+  });
+});
