@@ -52,6 +52,19 @@ export async function recordApprovalEvent(input: {
   }
 }
 
+/**
+ * QA round 2 (WD-01..06): who sent a subject for approval — the actor of its LATEST 'submitted' event.
+ * approval_history is written where the request is sent (ship or shore) and syncs both ways, so this works
+ * on both sides without a new column. Null when no submission was recorded (requests from before 29-Sep).
+ */
+export async function latestSubmitterUuid(subjectType: HistorySubjectType, subjectRef: string): Promise<string | null> {
+  const events = await repo.listEvents(subjectRef, [subjectType]);
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].eventType === 'submitted') return events[i].actorUuid ?? null;
+  }
+  return null;
+}
+
 // ── Display ────────────────────────────────────────────────────────────────────
 
 export interface ProcessEvent {

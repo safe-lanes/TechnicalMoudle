@@ -526,7 +526,12 @@ export async function changeRequestSender(cruuid: string): Promise<{ id: number;
   const cr = await crRepo.getChangeRequestByUuid(cruuid);
   if (!cr) return null;
   const { functionId } = await classifyChangeRequestScope(cr);
-  return { id: cr.id, sender: cr.requestedByUserId ?? null, status: cr.status, vesselId: cr.vesselId ?? null, functionId };
+  // QA round 2 (WD-01..06): requested_by_user_id holds the sender's DISPLAY NAME, so it never matched the
+  // signed-in user's id and Withdraw stayed hidden. The sender is the user id of the latest 'submitted'
+  // approval-history event (synced both ways) — no schema change.
+  const { latestSubmitterUuid } = await import('../../approvals/approvalHistoryService');
+  const sender = await latestSubmitterUuid('change-request', cr.cruuid);
+  return { id: cr.id, sender, status: cr.status, vesselId: cr.vesselId ?? null, functionId };
 }
 
 // ── Approval Steps ──

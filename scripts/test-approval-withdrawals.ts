@@ -138,7 +138,7 @@ async function shipWo(job: any, label: string) {
 
   hr('W1. ship CR withdrawn on board → the office cancels it after sync');
   const crR = await call(SHIP, 'POST', '/change-requests', { vesselId: V, category: 'spares', title: `${TAG} ship CR`, reason: TAG, targetType: 'spare', targetId: spare.suuid,
-    proposedChangesJson: [{ id: 1, field: 'remarks', oldValue: spare.remarks, newValue: 'WDRW-SHOULD-NOT-APPLY' }], status: 'submitted', requestedByUserId: CE.id }, CE);
+    proposedChangesJson: [{ id: 1, field: 'remarks', oldValue: spare.remarks, newValue: 'WDRW-SHOULD-NOT-APPLY' }], status: 'submitted', /* QA round 2: the real screens send the DISPLAY NAME here (useResolvedUserName) — send it the same way, so the sender check is tested as users hit it */ requestedByUserId: CE.name }, CE);
   const cr = crR.json; if (cr?.cruuid) refs.push(cr.cruuid);
   await sync('W1a');
   check('shore: chain started for the ship CR', (await engineReqs('technical', 'pms-spares-cr', cr.cruuid))[0]?.status === 'pending');
@@ -197,7 +197,7 @@ async function shipWo(job: any, label: string) {
 
   hr('W4. shore CR withdrawn by its sender in the office → settled at once');
   const crS = await call(SHORE, 'POST', '/change-requests', { vesselId: V, category: 'spares', title: `${TAG} office CR`, reason: TAG, targetType: 'spare', targetId: spare.suuid,
-    proposedChangesJson: [{ id: 1, field: 'remarks', oldValue: spare.remarks, newValue: 'WDRW-OFFICE' }], status: 'submitted', requestedByUserId: OFFICE_SENDER.id }, OFFICE_SENDER);
+    proposedChangesJson: [{ id: 1, field: 'remarks', oldValue: spare.remarks, newValue: 'WDRW-OFFICE' }], status: 'submitted', /* QA round 2: the real screens send the DISPLAY NAME here (useResolvedUserName) — send it the same way, so the sender check is tested as users hit it */ requestedByUserId: OFFICE_SENDER.name }, OFFICE_SENDER);
   const cr4 = crS.json; if (cr4?.cruuid) refs.push(cr4.cruuid);
   check('shore: chain started', (await engineReqs('technical', 'pms-spares-cr', cr4.cruuid))[0]?.status === 'pending');
   check('shore: a stranger withdraws → 403', (await call(SHORE, 'POST', '/approvals/withdrawals', { subjectType: 'change-request', subjectRef: cr4.cruuid }, STRANGER)).status === 403);
