@@ -27,6 +27,12 @@ describe('approval history actor position', () => {
     await expect(currentActor()).resolves.toMatchObject({ position: 'Sail Admin' });
   });
 
+  it('office user with a position the login sent explicitly → that position', async () => {
+    ctx.actor = resolveAuditActor({ userUuid: '400', fullName: 'T S', userType: 'Office', rank_name: 'Technical Superintendent', rankIsDefault: false, forwardedRole: 'Admin' });
+    lookupUser.mockResolvedValue({ name: 'T S', role: 'Admin', designation: 'Other' });
+    await expect(currentActor()).resolves.toMatchObject({ position: 'Technical Superintendent' });
+  });
+
   it('ship user → rank', async () => {
     ctx.actor = resolveAuditActor({ userUuid: 's1', fullName: 'Ship CE', userType: 'Ship', rank_name: 'Chief Engineer', rankIsDefault: false });
     await expect(currentActor()).resolves.toMatchObject({ name: 'Ship CE', position: 'Chief Engineer' });

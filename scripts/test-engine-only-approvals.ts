@@ -121,8 +121,9 @@ async function cleanup() {
   const r1 = await newCr(`${TAG} no chain`, 'EOA-SHOULD-NOT-APPLY');
   const d1 = await trackDraft(`${TAG} no chain`);
   check('HTTP 400 with the "not set up" message', r1.status === 400 && /No approval workflow is set up for "Modify PMS — Spare Change Requests" \(Normal Spares\)/.test(r1.json?.error ?? ''));
-  check('CR stays a draft (not submitted)', d1?.status === 'draft');
-  check('no old Level 1/2 step rows created', Number((await sql(`SELECT count(*) c FROM change_request_approval WHERE change_request_id=$1`, [d1.id]))[0].c) === 0);
+  // QA round 2 CR-01 (22-Oct-2026): readiness is checked BEFORE saving — a refused submit leaves NO orphan draft.
+  check('no CR saved (no orphan draft)', !d1);
+  check('no old Level 1/2 step rows created', !d1 || Number((await sql(`SELECT count(*) c FROM change_request_approval WHERE change_request_id=$1`, [d1.id]))[0].c) === 0);
 
   hr('2. scope switched off → BLOCKED ("switched off")');
   check('admin switches the scope off', (await call('PUT', `${AE}/scopes/enabled`, { scope: scope('pms-spares-cr'), enabled: false }, ADMIN)).status === 200);

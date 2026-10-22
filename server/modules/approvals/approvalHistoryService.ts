@@ -26,9 +26,10 @@ export async function currentActor(): Promise<HistoryActor> {
   const a = getRequestContext()?.actor;
   if (!a || a.actorId === 'system') return { uuid: null, name: null, position: null };
   let name = a.actorName ?? (a.actorType !== 'Ship' ? a.actorLabel : null);
-  // Jeevan #3: a ship user is shown by RANK; an office user by DESIGNATION (user master), then role —
-  // never by a rank (office users have none; the mock default used to show "Chief Engineer").
-  let position: string | null = a.actorType === 'Ship' ? (a.actorRank ?? a.actorLabel) : null;
+  // Jeevan #3: a ship user is shown by RANK; an office user by a position the login actually sent, else
+  // DESIGNATION (user master), then role. The mock DEFAULT rank ("Chief Engineer") is already dropped for
+  // office users by resolveAuditActor (actorRank = null), so it can never show here.
+  let position: string | null = a.actorType === 'Ship' ? (a.actorRank ?? a.actorLabel) : (a.actorRank ?? null);
   if (!name || !position) {
     const u = await repo.lookupUser(a.actorId).catch(() => null);
     name = name ?? u?.name ?? null;
