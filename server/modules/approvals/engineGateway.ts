@@ -8,7 +8,7 @@
  *   - EngineError → AppError translation (asyncHandler understands AppError only),
  *   - the shore-side ARRIVAL SWEEP (CRs / postponement WOs that arrived via sync).
  */
-import { ApprovalEngine, EngineError, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
+import { ApprovalEngine, EngineError, stuckEmptySlot, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
 import { AppError } from '../shared/errors';
 import { recordApprovalEvent, type HistorySubjectType } from './approvalHistoryService';
 import { currentEngineTenantId } from './tenantProvider';
@@ -268,8 +268,8 @@ export function approvalActorCanDecide(
   const mine = active.find((slot) => (slot.resolvedApproverIds ?? []).includes(actorUserId));
   if (mine) return { canDecide: true, slotId: `${mine.nodeKey}:${mine.slotOrdinal}` };
   if (isApprovalAdminRole(actorRole ?? getRequestContext()?.rbacRole)) {
-    const stuck = active.length > 0 && active.every((slot) => (slot.resolvedApproverIds ?? []).length === 0);
-    if (stuck) return { canDecide: true, slotId: `${active[0].nodeKey}:${active[0].slotOrdinal}` };
+    const empty = stuckEmptySlot(request.snapshot.nodes, request.slots);
+    if (empty) return { canDecide: true, slotId: `${empty.nodeKey}:${empty.slotOrdinal}` };
   }
   return { canDecide: false, slotId: null };
 }

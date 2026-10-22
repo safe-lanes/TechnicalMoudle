@@ -37,3 +37,20 @@ describe('findStalledSteps', () => {
     expect(findStalledSteps([{ requuid: 'r3', submittedAt: new Date(0).toISOString(), slots: [slot({ status: 'pending' })] }], now, 24 * H)).toHaveLength(0);
   });
 });
+
+// Jeevan #14(a), 22-Oct-2026: an ALL step where ONE role has nobody is stalled too (needs the snapshot).
+describe('findStalledSteps — partly empty ALL step', () => {
+  const now = new Date('2026-10-22T12:00:00Z');
+  const old = new Date(now.getTime() - 48 * 3600_000).toISOString();
+  const s = (roleLabel: string, ids: string[] | null) => ({ nodeKey: 'n1', status: 'active', roleLabel, resolvedApproverIds: ids, decidedAt: null });
+  it('flags the empty role when the quorum is ALL', () => {
+    const r = findStalledSteps([{ requuid: 'r1', submittedAt: old, slots: [s('CE', ['u1']), s('TSI', [])],
+      snapshot: { nodes: [{ key: 'n1', quorum: { rule: 'all' } }] } }], now, 0);
+    expect(r).toHaveLength(1);
+    expect(r[0].roleLabels).toEqual(['TSI']);
+  });
+  it('not stalled when the quorum is ANY and someone can act', () => {
+    expect(findStalledSteps([{ requuid: 'r1', submittedAt: old, slots: [s('CE', ['u1']), s('TSI', [])],
+      snapshot: { nodes: [{ key: 'n1', quorum: { rule: 'any' } }] } }], now, 0)).toHaveLength(0);
+  });
+});

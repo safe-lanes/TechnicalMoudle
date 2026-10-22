@@ -15,6 +15,7 @@
  */
 import { and, eq } from 'drizzle-orm';
 import { masterUsers } from '@shared/schema';
+import { stuckEmptySlot } from '../approval-engine';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { approvalNotifications } from './notificationSchema';
@@ -38,7 +39,7 @@ type SlotLike = { nodeKey: string; status: string; roleLabel: string; resolvedAp
 
 /** Pure: pending requests whose active step has nobody to approve and is older than warnMs. */
 export function findStalledSteps(
-  requests: Array<{ requuid: string; submittedAt: string; slots: SlotLike[] }>,
+  requests: Array<{ requuid: string; submittedAt: string; slots: SlotLike[]; snapshot?: { nodes: Array<{ key: string; quorum?: { rule: string; n?: number } }> } }>,
   now: Date,
   warnMs: number,
 ): StalledCandidate[] {
@@ -46,7 +47,11 @@ export function findStalledSteps(
   for (const r of requests) {
     const active = r.slots.filter((s) => s.status === 'active');
     if (active.length === 0) continue;
-    if (!active.every((s) => (s.resolvedApproverIds ?? []).length === 0)) continue;
+    // Jeevan #14(a): with the workflow snapshot, "stuck" = the reachable approvers cannot meet the quorum.
+    const stuck = r.snapshot
+      ? stuckEmptySlot(r.snapshot.nodes, r.slots) !== null
+      : active.every((s) => (s.resolvedApproverIds ?? []).length === 0);
+    if (!stuck) continue;
     const decided = r.slots
       .map((s) => (s.decidedAt ? Date.parse(s.decidedAt) : NaN))
       .filter((t) => !Number.isNaN(t));
@@ -56,7 +61,7 @@ export function findStalledSteps(
       requuid: r.requuid,
       nodeKey: active[0].nodeKey,
       stalledSince: since,
-      roleLabels: Array.from(new Set(active.map((s) => s.roleLabel))),
+      roleLabels: Array.from(new Set(active.filter((s) => (s.resolvedApproverIds ?? []).length === 0).map((s) => s.roleLabel))),
     });
   }
   return out;

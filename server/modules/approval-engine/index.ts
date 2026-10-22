@@ -20,7 +20,7 @@ import { createEngineRouter, type RouterDeps } from './http/router';
 
 export * from './core/types';
 export { CardRegistry, CardRegistrationError } from './core/registry';
-export { ApprovalEngine, EngineError } from './core/engine';
+export { ApprovalEngine, EngineError, stuckEmptySlot } from './core/engine';
 export { validateWorkflowV1, WorkflowValidationError, MAX_APPROVAL_STEPS } from './core/validateWorkflow';
 export type { ApprovalRepository, TenantRepositoryProvider } from './core/repository';
 export { DrizzleApprovalRepository, DrizzlePoolProvider } from './db/drizzleRepository';

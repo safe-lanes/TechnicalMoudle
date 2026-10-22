@@ -33,6 +33,26 @@ function quorumNeeded(rule: { rule: string; n?: number } | undefined, slotCount:
   return rule.n as number;
 }
 
+/**
+ * Jeevan #14(a), 22-Oct-2026: the active step is STUCK when the slots that have approvers cannot reach the
+ * quorum on their own (e.g. an 'all' step where one role has nobody on that vessel). Returns the first
+ * EMPTY active slot of a stuck step (the only slot an admin may decide), else null. Shared by decide(),
+ * the screens' can-decide mirror and the stalled-approval warning.
+ */
+export function stuckEmptySlot<S extends { nodeKey: string; status: string; resolvedApproverIds: string[] | null }>(
+  nodes: ReadonlyArray<{ key: string; quorum?: { rule: string; n?: number } }>,
+  slots: readonly S[],
+): S | null {
+  const active = slots.filter((s) => s.status === 'active');
+  if (active.length === 0) return null;
+  const stepSlots = slots.filter((s) => s.nodeKey === active[0].nodeKey);
+  const approvedSoFar = stepSlots.filter((s) => s.status === 'approved').length;
+  const reachable = active.filter((s) => (s.resolvedApproverIds ?? []).length > 0).length;
+  const node = nodes.find((n) => n.key === active[0].nodeKey);
+  if (approvedSoFar + reachable >= quorumNeeded(node?.quorum, stepSlots.length)) return null;
+  return active.find((s) => (s.resolvedApproverIds ?? []).length === 0) ?? null;
+}
+
 export class ApprovalEngine {
   constructor(private deps: EngineDeps) {}
 
@@ -250,17 +270,10 @@ export class ApprovalEngine {
     const isAdminActor = !!ctx.actor.isAdmin;
     let mine = active.find((s) => (s.resolvedApproverIds ?? []).includes(ctx.actor.userId));
     let adminOverride = false;
-    if (!mine && isAdminActor && active.length > 0) {
-      // Jeevan #14(a), 22-Oct-2026: the step is stuck when the slots that DO have approvers cannot reach the
-      // quorum on their own (e.g. an 'all' step where one role has nobody on that vessel). The admin may then
-      // decide one of the EMPTY slots only — never a slot someone could act on.
-      const activeNode = request!.snapshot.nodes.find((n) => n.key === active[0].nodeKey);
-      const stepSlots = slots.filter((s) => s.nodeKey === active[0].nodeKey);
-      const approvedSoFar = stepSlots.filter((s) => s.status === 'approved').length;
-      const reachable = active.filter((s) => (s.resolvedApproverIds ?? []).length > 0).length;
-      const stepStuck = approvedSoFar + reachable < quorumNeeded(activeNode?.quorum, stepSlots.length);
-      const emptySlot = active.find((s) => (s.resolvedApproverIds ?? []).length === 0);
-      if (stepStuck && emptySlot) { mine = emptySlot; adminOverride = true; }
+    if (!mine && isAdminActor) {
+      // Jeevan #14(a): a stuck step — the admin may decide one of its EMPTY slots only.
+      const emptySlot = stuckEmptySlot(request!.snapshot.nodes, slots);
+      if (emptySlot) { mine = emptySlot; adminOverride = true; }
     }
     if (!mine) {
       err(403, 'NOT_YOUR_TURN', 'you are not an approver for the currently active step of this request');

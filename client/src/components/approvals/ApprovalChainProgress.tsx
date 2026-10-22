@@ -132,7 +132,16 @@ export function useApprovalChain(screenId: string, subjectRef: string | null | u
   // the decision is recorded there as an admin override. Admins do NOT get the button on steps
   // that already have other resolved approvers.
   const isAdmin = !!currentUser?.role && APPROVAL_ADMIN_ROLES.has(currentUser.role);
-  const activeAllUnresolved = activeSlots.length > 0 && activeSlots.every((s) => (s.resolvedApproverIds ?? []).length === 0);
+  // Jeevan #14(a): mirrors engine.decide — the step is stuck when the slots that have approvers cannot
+  // reach the quorum on their own (e.g. an ALL step where one role has nobody on that vessel).
+  const activeNode = pending?.snapshot.nodes.find((n) => n.key === activeSlots[0]?.nodeKey);
+  const stepSlots = pending?.slots.filter((s) => s.nodeKey === activeSlots[0]?.nodeKey) ?? [];
+  const quorumNeeded = !activeNode?.quorum || activeNode.quorum.rule === "all" ? stepSlots.length
+    : activeNode.quorum.rule === "any" ? 1 : Number(activeNode.quorum.n);
+  const reachable = activeSlots.filter((s) => (s.resolvedApproverIds ?? []).length > 0).length;
+  const activeAllUnresolved = activeSlots.length > 0
+    && activeSlots.some((s) => (s.resolvedApproverIds ?? []).length === 0)
+    && stepSlots.filter((s) => s.status === "approved").length + reachable < quorumNeeded;
   const canDecide = !!pending && (
     (!!currentUser?.userUuid && activeSlots.some((s) => (s.resolvedApproverIds ?? []).includes(currentUser.userUuid!)))
     || (isAdmin && activeAllUnresolved)
