@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
 import * as defectsService from '../services/defectsService';
+import {
+  generateDefectLogPdf,
+  getDefectLogPdfFilename,
+  type DefectLogPdfRow,
+} from '../services/defectLogPdfService';
 
 // ── GET /defects ──
 
@@ -31,6 +36,29 @@ export async function getDefects(req: Request, res: Response) {
     res.json(defects);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch defects" });
+  }
+}
+
+export async function exportDefectLogPdf(req: Request, res: Response) {
+  const rows = req.body?.rows;
+  if (
+    !Array.isArray(rows) ||
+    rows.some((row) => !row || typeof row !== 'object' || Array.isArray(row))
+  ) {
+    return res.status(400).json({ error: 'Defect Log rows are required for PDF export.' });
+  }
+
+  try {
+    const generatedAt =
+      typeof req.body?.generatedAt === 'string' ? req.body.generatedAt.slice(0, 40) : undefined;
+    const pdf = await generateDefectLogPdf(rows as DefectLogPdfRow[], generatedAt);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${getDefectLogPdfFilename()}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(Buffer.from(pdf));
+  } catch (error) {
+    console.error('Failed to generate Defect Log PDF:', error);
+    return res.status(500).json({ error: 'Could not generate the Defect Log PDF.' });
   }
 }
 

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +18,6 @@ import {
   Download,
   Ship
 } from "lucide-react";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
-import type { TableColumn } from "@/lib/pdfReportGenerator";
 import { PeriodPicker, type PeriodValue } from "@/components/filters/PeriodPicker";
 import { 
   Tooltip,
@@ -285,6 +284,7 @@ export default function DefectsLogWithTabs() {
   const [selectedVessel, setSelectedVessel] = useState("all");
   const { data: allVessels = [] } = useVessels();
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
   
   const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ 
     open: false, 
@@ -369,54 +369,54 @@ export default function DefectsLogWithTabs() {
     setSelectedVessel("all");
   };
 
-  const handleExportPdf = () => {
-    const formatDate = (dateStr: string | null | undefined): string => {
-      if (!dateStr) return "-";
-      const parts = dateStr.split("-");
-      if (parts.length === 3 && parts[0].length === 4) {
-        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  const handleExportPdf = async () => {
+    if (isPdfExporting) return;
+    setIsPdfExporting(true);
+
+    try {
+      const rows = getDefectsForExport().map((defect) => {
+        const row = makeDefectLogExportRow(defect);
+        return Object.fromEntries(
+          Object.entries(row).map(([column, value]) => [column, value || "-"]),
+        );
+      });
+      const generatedAt = format(new Date(), "dd MMM yyyy HH:mm");
+      const response = await apiRequest("POST", "/technical/api/defects/export-pdf", {
+        rows,
+        generatedAt,
+      });
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/pdf")) {
+        throw new Error("The server did not return a PDF file.");
       }
-      return dateStr;
-    };
 
-    const columns: TableColumn[] = [
-      { header: 'ID', field: 'id', width: 25 },
-      { header: 'Vessel', field: 'vessel', width: 20 },
-      { header: 'Issue Date', field: 'issueDate', width: 18 },
-      { header: 'Category', field: 'category', width: 15 },
-      { header: 'Component', field: 'component', width: 20 },
-      { header: 'Description', field: 'description', width: 40 },
-      { header: 'Target Date', field: 'targetDate', width: 18 },
-      { header: 'Date Compl.', field: 'dateCompleted', width: 18 },
-      { header: 'Status', field: 'status', width: 18 },
-      { header: 'Priority', field: 'priority', width: 15 },
-    ];
+      const pdfBlob = await response.blob();
+      const signature = new TextDecoder().decode(await pdfBlob.slice(0, 5).arrayBuffer());
+      if (signature !== "%PDF-") {
+        throw new Error("The downloaded file is not a valid PDF.");
+      }
 
-    const data = filteredDefects.map((defect: Defect) => {
-      const computedStatus = getComputedStatus(defect);
-      return {
-        id: defect.id || '-',
-        vessel: defect.vesselName || defect.vesselId || '-',
-        issueDate: formatDate(defect.issueDate),
-        category: `${defect.category || '-'}${defect.is_coc ? ' (CoC)' : ''}`,
-        component: defect.componentHardwareLevel3 || '-',
-        description: defect.description || '-',
-        targetDate: formatDate(defect.targetCloseDate),
-        dateCompleted: formatDate(defect.dateCompleted),
-        status: computedStatus.label,
-        priority: defect.priority || '-',
-      };
-    });
-
-    pdfReportGenerator.generateReport(
-      {
-        title: 'Defects Log',
-        subtitle: `Total: ${filteredDefects.length} defect${filteredDefects.length !== 1 ? 's' : ''}`,
-        orientation: 'landscape',
-      },
-      columns,
-      data
-    );
+      const disposition = response.headers.get("content-disposition") || "";
+      const filenameMatch = disposition.match(/filename="([^"]+)"/i);
+      const filename = filenameMatch?.[1] || "Defects_Log.pdf";
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = downloadUrl;
+      downloadLink.download = filename;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (error) {
+      console.error("Failed to export Defect Log PDF:", error);
+      toast({
+        title: "PDF export failed",
+        description: "Could not create the Defect Log PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPdfExporting(false);
+    }
   };
 
   const getDefectsForExport = (): Defect[] => {
@@ -848,11 +848,12 @@ export default function DefectsLogWithTabs() {
               variant="outline"
               size="sm"
               onClick={handleExportPdf}
+              disabled={isPdfExporting}
               className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
               data-testid="button-export-defects-log"
             >
               <Download className="h-4 w-4" />
-              Export
+              {isPdfExporting ? "Exporting..." : "Export"}
             </Button>
             <Button
               variant="outline"
