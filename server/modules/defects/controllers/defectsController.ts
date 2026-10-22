@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import * as defectsService from '../services/defectsService';
+import { defectReportPdfSchema } from '@shared/defectReportPdf';
+import { generateDefectReportPdf, getDefectReportPdfFilename } from '../services/defectReportPdfService';
 import {
   generateDefectLogPdf,
   getDefectLogPdfFilename,
@@ -59,6 +61,30 @@ export async function exportDefectLogPdf(req: Request, res: Response) {
   } catch (error) {
     console.error('Failed to generate Defect Log PDF:', error);
     return res.status(500).json({ error: 'Could not generate the Defect Log PDF.' });
+  }
+}
+
+// ── POST /defects/:id/export-pdf ──
+
+export async function exportDefectReportPdf(req: Request, res: Response) {
+  const parsed = defectReportPdfSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid Defect Report PDF data.' });
+  }
+  try {
+    // Keep current form values (including unsaved edits), but bind the report's
+    // identity to an existing record using the same read path as the form.
+    const defect = await defectsService.getDefect(req.params.id);
+    if (!defect) return res.status(404).json({ error: 'Defect not found.' });
+    const report = { ...parsed.data, reportId: String(defect.id) };
+    const pdf = await generateDefectReportPdf(report);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${getDefectReportPdfFilename(report.reportId)}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(Buffer.from(pdf));
+  } catch (error) {
+    console.error('Failed to generate individual Defect Report PDF:', error);
+    return res.status(500).json({ error: 'Could not generate the Defect Report PDF. Please try again.' });
   }
 }
 

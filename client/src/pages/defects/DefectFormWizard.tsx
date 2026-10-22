@@ -12,7 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, Plus, Edit, Trash2, Eye, X, Paperclip, Download } from "lucide-react";
-import { pdfReportGenerator, DefectReportPdfData, formatDate } from "@/lib/pdfReportGenerator";
+import { formatDate } from "@/lib/pdfReportGenerator";
+import type { DefectReportPdfData } from "@shared/defectReportPdf";
 import { insertDefectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -110,6 +111,8 @@ export default function DefectFormWizard({
   const [createdDefectId, setCreatedDefectId] = useState<number | null>(null);
   // Prevent duplicate saves from rapid clicks
   const [isSaving, setIsSaving] = useState(false);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
+  const pdfExportInFlight = useRef(false);
   
   // B5 Target Date Extension state
   const [showExtensionForm, setShowExtensionForm] = useState(false);
@@ -729,7 +732,11 @@ export default function DefectFormWizard({
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
+    if (pdfExportInFlight.current || !currentDefect?.id) return;
+    pdfExportInFlight.current = true;
+    setIsPdfExporting(true);
+    try {
     const data = form.getValues();
     const vesselName = vessels.find((v: any) => v.id === data.vesselId)?.name || data.vesselName || '';
     const sourceName = findSourceById(data.source || '')?.name || data.source || '';
@@ -749,7 +756,7 @@ export default function DefectFormWizard({
     const lastExt = targetDateExtensions.length > 0 ? targetDateExtensions[targetDateExtensions.length - 1] : null;
 
     const pdfData: DefectReportPdfData = {
-      reportId: currentDefect?.defectId || defectId,
+      reportId: String(currentDefect.id),
       vessel: vesselName,
       category: data.equipmentCategory || '',
       dateObserved: formatDate(data.issueDate),
@@ -804,7 +811,37 @@ export default function DefectFormWizard({
       verifiedByOfficePosition: data.verifiedByOfficePosition || '',
     };
 
-    pdfReportGenerator.generateDefectReportPdf(pdfData);
+    const response = await apiRequest(
+      "POST", `/technical/api/defects/${encodeURIComponent(currentDefect.id)}/export-pdf`, pdfData,
+    );
+    if (!response.headers.get("content-type")?.includes("application/pdf")) {
+      throw new Error("The server did not return a PDF file.");
+    }
+    const blob = await response.blob();
+    if (new TextDecoder().decode(await blob.slice(0, 5).arrayBuffer()) !== "%PDF-") {
+      throw new Error("The downloaded file is not a valid PDF.");
+    }
+    const filename = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/i)?.[1]
+      || "Defect_Report.pdf";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("Failed to export individual Defect Report PDF:", error);
+      toast({
+        title: "PDF export failed",
+        description: "Could not create the Defect Report PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      pdfExportInFlight.current = false;
+      setIsPdfExporting(false);
+    }
   };
 
   return (
@@ -817,11 +854,12 @@ export default function DefectFormWizard({
             <Button
               variant="outline"
               onClick={handleExportPdf}
+              disabled={isPdfExporting}
               className="text-gray-700 border-gray-300 h-9"
               data-testid="button-export-pdf"
             >
               <Download className="h-4 w-4 mr-2" />
-              Export
+              {isPdfExporting ? "Exporting..." : "Export"}
             </Button>
           )}
           {currentDefect && isViewMode && (

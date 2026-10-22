@@ -9,4 +9,4 @@
 - [CLI runtime stalls](cli-runtime-stalls.md) — compare shell and workflow Node executables when checks stall before reporting results.
 - [PMS documentation audience](pms-documentation-audience.md) — Claude has no codebase access; shared documentation must explain behaviour without source lookup.
 - [Vessel Job work-instruction PDFs](job-work-instruction-scope.md) — vessel Jobs only, stable vessel-separated paths, and sync both file metadata and PDFs.
-- [Defect Log PDF preservation](defect-log-pdf-preservation.md) — restore the top Export action without changing the legacy PDF layout or switching it to Excel.
+- [Defect PDF preservation](defect-log-pdf-preservation.md) — keep legacy layouts; individual report exports use current form values without saving.

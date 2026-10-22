@@ -101,7 +101,7 @@ export function buildDefectLogPdfHtml(rows: DefectLogPdfRow[]): string {
 </html>`;
 }
 
-function getChromiumPath(): string {
+export function getChromiumPath(): string {
   const candidates = [
     process.env.PUPPETEER_EXECUTABLE_PATH,
     "/repl/tools/bin/chromium",
