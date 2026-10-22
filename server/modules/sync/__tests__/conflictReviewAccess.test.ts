@@ -49,7 +49,8 @@ describe("Sync Conflict Review permission wiring (shared shore/vessel UI)", () =
     expect(sidebar).toMatch(/id: "sync-conflicts", label: "Conflict Review"/);
     expect(sidebar).toContain("return canViewSidebarItem(subModule, item.id)");
     expect(module).toContain('selectedMenuItem === "sync-conflicts"');
-    expect(module).toContain("!canViewSidebarItem(selectedSubModule, selectedMenuItem)");
+    // Approval branch maps the retired "approval-engine" link to "approval-workflow" before the same check.
+    expect(module).toMatch(/!canViewSidebarItem\(selectedSubModule, (selectedMenuItem|selectedMenuItem === "approval-engine" \? "approval-workflow" : selectedMenuItem)\)/);
     expect(dashboard).toMatch(/setLocation\("\/admin\/sync-conflicts"\)/);
   });
 
