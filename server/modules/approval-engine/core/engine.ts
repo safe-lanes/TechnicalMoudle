@@ -39,7 +39,7 @@ function quorumNeeded(rule: { rule: string; n?: number } | undefined, slotCount:
  * EMPTY active slot of a stuck step (the only slot an admin may decide), else null. Shared by decide(),
  * the screens' can-decide mirror and the stalled-approval warning.
  */
-export function stuckEmptySlot<S extends { nodeKey: string; status: string; resolvedApproverIds: string[] | null }>(
+export function stuckEmptySlot<S extends { nodeKey: string; status: string; resolvedApproverIds: string[] | null; decidedBy?: string | null }>(
   nodes: ReadonlyArray<{ key: string; quorum?: { rule: string; n?: number } }>,
   slots: readonly S[],
 ): S | null {
@@ -47,10 +47,18 @@ export function stuckEmptySlot<S extends { nodeKey: string; status: string; reso
   if (active.length === 0) return null;
   const stepSlots = slots.filter((s) => s.nodeKey === active[0].nodeKey);
   const approvedSoFar = stepSlots.filter((s) => s.status === 'approved').length;
-  const reachable = active.filter((s) => (s.resolvedApproverIds ?? []).length > 0).length;
+  // D3: someone who already approved in this step cannot fill another of its slots.
+  const approvedBy = stepApprovers(stepSlots);
+  const canAct = (s: S) => (s.resolvedApproverIds ?? []).some((id) => !approvedBy.has(id));
+  const reachable = active.filter(canAct).length;
   const node = nodes.find((n) => n.key === active[0].nodeKey);
   if (approvedSoFar + reachable >= quorumNeeded(node?.quorum, stepSlots.length)) return null;
-  return active.find((s) => (s.resolvedApproverIds ?? []).length === 0) ?? null;
+  return active.find((s) => !canAct(s)) ?? null;
+}
+
+/** Users who already approved a slot of this step (D3: one person, one slot per step). */
+export function stepApprovers(stepSlots: ReadonlyArray<{ status: string; decidedBy?: string | null }>): Set<string> {
+  return new Set(stepSlots.filter((s) => s.status === 'approved' && s.decidedBy).map((s) => s.decidedBy as string));
 }
 
 export class ApprovalEngine {
@@ -268,12 +276,19 @@ export class ApprovalEngine {
     // recorded DISTINCTLY as an admin override in the slot remarks (below) + the audit row via
     // onDecision — it is NOT a normal approval.
     const isAdminActor = !!ctx.actor.isAdmin;
-    let mine = active.find((s) => (s.resolvedApproverIds ?? []).includes(ctx.actor.userId));
+    // Decision D3 (Ghazi, 22-Oct-2026): one person may NOT fill two slots of the same step — "all must
+    // approve" means different people. A user holding two roles approves once; the other slot needs someone else.
+    const alreadyApprovedHere = active.length > 0
+      && stepApprovers(slots.filter((s) => s.nodeKey === active[0].nodeKey)).has(ctx.actor.userId);
+    let mine = alreadyApprovedHere ? undefined : active.find((s) => (s.resolvedApproverIds ?? []).includes(ctx.actor.userId));
     let adminOverride = false;
-    if (!mine && isAdminActor) {
+    if (!mine && isAdminActor && !alreadyApprovedHere) {
       // Jeevan #14(a): a stuck step — the admin may decide one of its EMPTY slots only.
       const emptySlot = stuckEmptySlot(request!.snapshot.nodes, slots);
       if (emptySlot) { mine = emptySlot; adminOverride = true; }
+    }
+    if (!mine && alreadyApprovedHere) {
+      err(403, 'ALREADY_APPROVED_THIS_STEP', 'you have already approved this step; the remaining approval must come from a different person');
     }
     if (!mine) {
       err(403, 'NOT_YOUR_TURN', 'you are not an approver for the currently active step of this request');

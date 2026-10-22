@@ -20,7 +20,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { ApprovalCard, DecisionNotice, Scope } from '../approval-engine';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
-import { admnRoleMaster, masterUsers, masterUserVessels, mocApprovers, changeRequest, workOrders } from '@shared/schema';
+import { admnRoleMaster, masterUsers, masterUserVessels, mocApprovers, changeRequest, workOrders, vessels } from '@shared/schema';
 import { isVesselScopeStrict } from './vesselScopeFlag';
 import { classifyChangeRequestScope } from '../change-requests/services/changeRequestsService';
 import { classifyWoForPostponement, classifyWoForRePostponement } from '../work-orders/services/workOrderService';
@@ -190,23 +190,38 @@ export const technicalApprovalCard: ApprovalCard = {
  * names and needs no subject. Ship-typed roles are vessel-scoped at runtime, so the names
  * here are the fleet-wide candidate set (flagged vesselScoped). Empty names ⇒ the ⚠ marker.
  */
-export async function resolveApproverNames(roleId: string): Promise<{ roleLabel: string | null; names: string[]; vesselScoped: boolean }> {
+export type ApproverUser = { id: string; name: string; vessels: string[] };
+
+/** Jeevan #2 (22-Oct-2026): each approver with the vessels assigned to them (active assignments). */
+async function withAssignedVessels(users: Array<{ id: string; name: string | null }>): Promise<ApproverUser[]> {
+  const named = users.filter((u): u is { id: string; name: string } => !!u.name);
+  if (named.length === 0) return [];
+  const rows = await db().select({ userUuid: masterUserVessels.userUuid, vesselId: masterUserVessels.vesselId, vesselName: vessels.name })
+    .from(masterUserVessels)
+    .leftJoin(vessels, eq(vessels.id, masterUserVessels.vesselId))
+    .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.userUuid, named.map((u) => u.id))));
+  const byUser = new Map<string, string[]>();
+  for (const r of rows) byUser.set(r.userUuid, [...(byUser.get(r.userUuid) ?? []), r.vesselName ?? r.vesselId]);
+  return named.map((u) => ({ id: u.id, name: u.name, vessels: (byUser.get(u.id) ?? []).sort() }));
+}
+
+export async function resolveApproverNames(roleId: string): Promise<{ roleLabel: string | null; names: string[]; vesselScoped: boolean; users: ApproverUser[] }> {
   if (roleId === MOC_POOL_ROLE_L1 || roleId === MOC_POOL_ROLE_L2) {
     const level = roleId.slice('moc:'.length);
-    const rows = await db().select({ name: masterUsers.fullName })
+    const rows = await db().select({ id: masterUsers.id, name: masterUsers.fullName })
       .from(mocApprovers)
       .innerJoin(masterUsers, eq(mocApprovers.userUuid, masterUsers.id))
       .where(and(eq(mocApprovers.approverLevel, level), eq(mocApprovers.isActive, 1),
         eq(mocApprovers.isDeleted, false), eq(mocApprovers.modulename, 'Technical'), eq(masterUsers.isDeleted, false)));
-    return { roleLabel: `Approver Pool — ${level}`, names: rows.map((r) => r.name).filter((n): n is string => !!n), vesselScoped: false };
+    return { roleLabel: `Approver Pool — ${level}`, names: rows.map((r) => r.name).filter((n): n is string => !!n), vesselScoped: false, users: await withAssignedVessels(rows) };
   }
   const role = (await db().select().from(admnRoleMaster)
     .where(and(eq(admnRoleMaster.ruid, roleId), eq(admnRoleMaster.isDeleted, false))).limit(1))[0];
-  if (!role) return { roleLabel: null, names: [], vesselScoped: false };
-  const users = await db().select({ name: masterUsers.fullName }).from(masterUsers)
+  if (!role) return { roleLabel: null, names: [], vesselScoped: false, users: [] };
+  const users = await db().select({ id: masterUsers.id, name: masterUsers.fullName }).from(masterUsers)
     .where(and(eq(masterUsers.role, role.assignedRole), eq(masterUsers.isDeleted, false)));
   // Under strict vessel-scope, office roles are ALSO scoped to the subject's vessel at runtime
   // (not just ship roles) — so the admin panel flags them "vessel-scoped at runtime" too.
   const vesselScoped = role.roletype === 'Ship' || isVesselScopeStrict();
-  return { roleLabel: role.assignedRole, names: users.map((u) => u.name).filter((n): n is string => !!n), vesselScoped };
+  return { roleLabel: role.assignedRole, names: users.map((u) => u.name).filter((n): n is string => !!n), vesselScoped, users: await withAssignedVessels(users) };
 }

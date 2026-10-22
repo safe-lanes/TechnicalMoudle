@@ -116,6 +116,9 @@ router.get('/defects/:defectId/attachments', asyncHandler(defectsCtrl.getDefectA
 router.post('/defects/:defectId/attachments', asyncHandler(defectsCtrl.createDefectAttachment));
 
 // POST /defects/:id/notes — add note to defect
+// Part A unlock (Jeevan #10 / D2) — the service enforces Sail Admin + reason.
+router.post('/defects/:id/part-a-unlock', asyncHandler(defectsCtrl.unlockDefectPartA));
+
 router.post('/defects/:id/notes', asyncHandler(defectsCtrl.addDefectNote));
 
 // PATCH /defects/:id/link — link related defects

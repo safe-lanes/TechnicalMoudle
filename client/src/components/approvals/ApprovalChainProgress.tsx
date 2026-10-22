@@ -138,11 +138,15 @@ export function useApprovalChain(screenId: string, subjectRef: string | null | u
   const stepSlots = pending?.slots.filter((s) => s.nodeKey === activeSlots[0]?.nodeKey) ?? [];
   const quorumNeeded = !activeNode?.quorum || activeNode.quorum.rule === "all" ? stepSlots.length
     : activeNode.quorum.rule === "any" ? 1 : Number(activeNode.quorum.n);
-  const reachable = activeSlots.filter((s) => (s.resolvedApproverIds ?? []).length > 0).length;
+  // Decision D3: someone who already approved in this step cannot fill another of its slots.
+  const approvedHere = new Set(stepSlots.filter((s) => s.status === "approved" && s.decidedBy).map((s) => s.decidedBy as string));
+  const canActOn = (s: { resolvedApproverIds: string[] | null }) => (s.resolvedApproverIds ?? []).some((id) => !approvedHere.has(id));
+  const reachable = activeSlots.filter(canActOn).length;
   const activeAllUnresolved = activeSlots.length > 0
-    && activeSlots.some((s) => (s.resolvedApproverIds ?? []).length === 0)
+    && activeSlots.some((s) => !canActOn(s))
     && stepSlots.filter((s) => s.status === "approved").length + reachable < quorumNeeded;
-  const canDecide = !!pending && (
+  const meApprovedHere = !!currentUser?.userUuid && approvedHere.has(currentUser.userUuid);
+  const canDecide = !!pending && !meApprovedHere && (
     (!!currentUser?.userUuid && activeSlots.some((s) => (s.resolvedApproverIds ?? []).includes(currentUser.userUuid!)))
     || (isAdmin && activeAllUnresolved)
   );

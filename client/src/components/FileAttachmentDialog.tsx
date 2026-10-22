@@ -27,6 +27,8 @@ interface FileAttachmentDialogProps {
   onAttachmentsChange: (attachments: FileAttachment[]) => void;
   title?: string;
   itemName?: string;
+  /** View only: no upload, no remove (e.g. a locked defect Part A). */
+  readOnly?: boolean;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -39,6 +41,7 @@ export function FileAttachmentDialog({
   onAttachmentsChange,
   title = 'Manage Attachments',
   itemName,
+  readOnly = false,
 }: FileAttachmentDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -179,7 +182,7 @@ export function FileAttachmentDialog({
               data-testid="input-file-attachment"
             />
 
-            <Button
+            {!readOnly && <Button
               type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
@@ -191,7 +194,7 @@ export function FileAttachmentDialog({
                 <span className="text-sm text-gray-600">Click to upload files</span>
                 <span className="text-xs text-gray-400">PDF, JPG, PNG (max 5MB)</span>
               </div>
-            </Button>
+            </Button>}
 
             {attachments.length > 0 && (
               <div className="h-[200px] w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-md border p-2">
@@ -238,7 +241,7 @@ export function FileAttachmentDialog({
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
+                        {!readOnly && <Button
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -247,7 +250,7 @@ export function FileAttachmentDialog({
                           data-testid={`button-remove-${attachment.id}`}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </Button>}
                       </div>
                     </div>
                   ))}

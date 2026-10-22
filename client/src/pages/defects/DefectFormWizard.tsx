@@ -30,6 +30,8 @@ import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobo
 import { VesselComponentCombobox, type VesselComponentSelection } from "@/components/VesselComponentCombobox";
 import { getActiveRank } from "@/lib/activeRank";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiErrorMessage } from "@/lib/apiErrorMessage";
 import {
   ApprovalChainProgress,
   defectApprovalChainQueryKey,
@@ -58,6 +60,7 @@ import {
   hasPendingExtensionForEntries,
   isApprovalUnavailableOnInstance,
   extensionOutcome,
+  isPartAUnlocked,
   isOrphanedRequestedExtensionAt,
   formatDefectAuditTimestamp,
   hasAuditDisplayValue,
@@ -81,6 +84,8 @@ type ExtensionHistoryRecord = {
   approverComments?: string;
   approved?: boolean;
   approvalDate?: string;
+  requestedByName?: string | null;
+  requestedByPosition?: string | null;
 };
 
 type RejectedClosureAttempt = {
@@ -248,6 +253,13 @@ function ExtensionCard({
           </div>
           <div><span className="text-slate-500">Reason for extension</span><div className="whitespace-pre-wrap">{entry.reasonForExtension || "Not recorded"}</div></div>
         </>
+      )}
+      {entry.requestedByName && (
+        <div className="text-slate-600" data-testid={`extension-submitted-by-${entry.id}`}>
+          Submitted by <span className="font-medium text-slate-800">{entry.requestedByName}</span>
+          {entry.requestedByPosition ? ` (${entry.requestedByPosition})` : ""}
+          {entry.requestedAt ? ` on ${String(entry.requestedAt).slice(0, 10)}` : ""}
+        </div>
       )}
       {outcome && (
         <div className={`rounded border p-3 text-sm ${outcome.status === "Approved" ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`} data-testid={`extension-outcome-${entry.id}`}>
@@ -636,6 +648,23 @@ export default function DefectFormWizard({
   const extensionApproval = useDefectApprovalChain(approvalDefectId, "extension");
   const verificationApproval = useDefectApprovalChain(approvalDefectId, "verification");
   const canEditDefect = canEdit("defects-active");
+  // Part A lock (Jeevan #10 / D2): read-only after the first save; a Sail Admin may unlock ONE edit, with a reason.
+  const { currentUser } = useAuth();
+  const [partAUnlockedLocal, setPartAUnlockedLocal] = useState(false);
+  const [partAUnlockReason, setPartAUnlockReason] = useState("");
+  const [partAUnlockOpen, setPartAUnlockOpen] = useState(false);
+  const partALocked = !!currentDefect?.id && !partAUnlockedLocal && !isPartAUnlocked(currentDefect?.auditTrail);
+  const canUnlockPartA = currentUser?.role === "Sail Admin";
+  const unlockPartA = async () => {
+    try {
+      await apiRequest('POST', `/technical/api/defects/${currentDefect!.id}/part-a-unlock`, { reason: partAUnlockReason });
+      setPartAUnlockedLocal(true); setPartAUnlockOpen(false); setPartAUnlockReason("");
+      void queryClient.invalidateQueries({ queryKey: ['defects'] });
+      toast({ title: "Part A unlocked", description: "You can change Part A once; it locks again when you save." });
+    } catch (error) {
+      toast({ title: "Could not unlock Part A", description: apiErrorMessage(error, "Unlock failed."), variant: "destructive" });
+    }
+  };
   const verificationDisplay = resolveVerificationDisplay(
     verificationApproval.data,
     currentDefect,
@@ -1451,6 +1480,21 @@ export default function DefectFormWizard({
                   </div>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">Describe what happened</p>
+                {partALocked && (
+                  <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" data-testid="part-a-locked-note">
+                    Part A is locked after the first save and cannot be changed.
+                    {canUnlockPartA && !isViewMode && !partAUnlockOpen && (
+                      <Button type="button" variant="outline" size="sm" className="ml-3" onClick={() => setPartAUnlockOpen(true)} data-testid="button-part-a-unlock">Unlock</Button>
+                    )}
+                    {partAUnlockOpen && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Input value={partAUnlockReason} onChange={(e) => setPartAUnlockReason(e.target.value)} placeholder="Reason for unlocking (required)" className="h-9 text-sm" data-testid="input-part-a-unlock-reason" />
+                        <Button type="button" size="sm" disabled={!partAUnlockReason.trim()} onClick={() => void unlockPartA()} data-testid="button-part-a-unlock-confirm">Unlock Part A</Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setPartAUnlockOpen(false)}>Cancel</Button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="h-0.5 bg-blue-500 mt-3 mb-6" />
                 
                 <div className="space-y-6">
@@ -1485,7 +1529,7 @@ export default function DefectFormWizard({
                               form.setValue('equipmentModel', '');
                             }} 
                             value={field.value || ""} 
-                            disabled={isViewMode}
+                            disabled={isViewMode || partALocked}
                           >
                             <SelectTrigger data-testid="select-vessel" className="h-10 text-sm border-gray-300">
                               <SelectValue placeholder="Select vessel">
@@ -1510,7 +1554,7 @@ export default function DefectFormWizard({
                         name="equipmentCategory"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode || partALocked}>
                             <SelectTrigger data-testid="select-equipment-category" className="h-10 text-sm border-gray-300">
                               <SelectValue placeholder="Select category">
                                 {field.value || "Select category"}
@@ -1534,7 +1578,7 @@ export default function DefectFormWizard({
                         max={new Date().toISOString().split('T')[0]}
                         data-testid="input-date-observed"
                         className="h-10 text-sm border-gray-300"
-                        disabled={isViewMode}
+                        disabled={isViewMode || partALocked}
                       />
                     </div>
 
@@ -1545,7 +1589,7 @@ export default function DefectFormWizard({
                         name="source"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode || partALocked}>
                             <SelectTrigger data-testid="select-source" className="h-10 text-sm border-gray-300">
                               <SelectValue placeholder="Select source">
                                 {field.value 
@@ -1578,7 +1622,7 @@ export default function DefectFormWizard({
                           form.setValue('equipmentMake', selection.maker || '');
                           form.setValue('equipmentModel', selection.model || '');
                         }}
-                        disabled={isViewMode}
+                        disabled={isViewMode || partALocked}
                         placeholder="Select component"
                         testId="combobox-component"
                       />
@@ -1592,7 +1636,7 @@ export default function DefectFormWizard({
                         max={new Date().toISOString().split('T')[0]}
                         data-testid="input-date-reported-office"
                         className="h-10 text-sm border-gray-300"
-                        disabled={isViewMode}
+                        disabled={isViewMode || partALocked}
                       />
                     </div>
 
@@ -1603,7 +1647,7 @@ export default function DefectFormWizard({
                         name="defectCategory"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode || partALocked}>
                             <SelectTrigger data-testid="select-defect-category" className="h-10 text-sm border-gray-300">
                               <SelectValue placeholder="Select defect category">
                                 {field.value || "Select defect category"}
@@ -1639,7 +1683,7 @@ export default function DefectFormWizard({
                         max={new Date().toISOString().split('T')[0]}
                         data-testid="input-date-registered-system"
                         className="h-10 text-sm border-gray-300"
-                        disabled={isViewMode}
+                        disabled={isViewMode || partALocked}
                       />
                     </div>
 
@@ -1650,7 +1694,7 @@ export default function DefectFormWizard({
                         name="defectType"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode || partALocked}>
                             <SelectTrigger data-testid="select-defect-type" className="h-10 text-sm border-gray-300">
                               <SelectValue placeholder="Select defect type">
                                 {field.value || "Select defect type"}
@@ -1713,7 +1757,7 @@ export default function DefectFormWizard({
                               form.setValue("raisedById", value);
                             }} 
                             value={form.watch("raisedByRank") && field.value ? `${form.watch("raisedByRank")} - ${field.value}` : ""}
-                            disabled={isViewMode}
+                            disabled={isViewMode || partALocked}
                           >
                             <SelectTrigger data-testid="select-raised-by" className="h-10 text-sm border-gray-300">
                               <SelectValue placeholder="Select person">
@@ -1747,7 +1791,7 @@ export default function DefectFormWizard({
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 data-testid="checkbox-coc"
-                                disabled={isViewMode}
+                                disabled={isViewMode || partALocked}
                               />
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1772,7 +1816,7 @@ export default function DefectFormWizard({
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 data-testid="checkbox-critical-eqpt"
-                                disabled={isViewMode}
+                                disabled={isViewMode || partALocked}
                               />
                               <Label htmlFor="critical" className="text-sm font-normal cursor-pointer text-gray-700">
                                 Critical Eqpt.
@@ -1815,7 +1859,7 @@ export default function DefectFormWizard({
                               checked={field.value === 'atSea'}
                               onCheckedChange={(checked) => field.onChange(checked ? 'atSea' : 'atPort')}
                               data-testid="switch-vessel-location"
-                              disabled={isViewMode}
+                              disabled={isViewMode || partALocked}
                               className="data-[state=checked]:bg-blue-600"
                             />
                             <span className={`text-sm font-medium ${field.value === 'atSea' ? 'text-blue-600' : 'text-gray-500'}`}>
@@ -1840,7 +1884,7 @@ export default function DefectFormWizard({
                                 placeholder="Enter port name"
                                 className="h-10 text-sm border-gray-300"
                                 data-testid="input-port-name"
-                                disabled={isViewMode}
+                                disabled={isViewMode || partALocked}
                               />
                             )}
                           />
@@ -1851,7 +1895,7 @@ export default function DefectFormWizard({
                             name="vesselLocationDetail"
                             control={form.control}
                             render={({ field }) => (
-                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode || partALocked}>
                                 <SelectTrigger data-testid="select-vessel-location" className="h-10 text-sm border-gray-300">
                                   <SelectValue placeholder="Select location" />
                                 </SelectTrigger>
@@ -1880,7 +1924,7 @@ export default function DefectFormWizard({
                                 placeholder="e.g., 12.9716° N"
                                 className="h-10 text-sm border-gray-300"
                                 data-testid="input-latitude"
-                                disabled={isViewMode}
+                                disabled={isViewMode || partALocked}
                               />
                             )}
                           />
@@ -1897,7 +1941,7 @@ export default function DefectFormWizard({
                                 placeholder="e.g., 77.5946° E"
                                 className="h-10 text-sm border-gray-300"
                                 data-testid="input-longitude"
-                                disabled={isViewMode}
+                                disabled={isViewMode || partALocked}
                               />
                             )}
                           />
@@ -1908,7 +1952,7 @@ export default function DefectFormWizard({
                             name="vesselLocationDetail"
                             control={form.control}
                             render={({ field }) => (
-                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode || partALocked}>
                                 <SelectTrigger data-testid="select-vessel-location" className="h-10 text-sm border-gray-300">
                                   <SelectValue placeholder="Select location" />
                                 </SelectTrigger>
@@ -1938,7 +1982,7 @@ export default function DefectFormWizard({
                           onChange={(e) => field.onChange(e.target.value)}
                           className="bg-white min-h-[120px]"
                           placeholder="Enter defect description..."
-                          disabled={isViewMode}
+                          disabled={isViewMode || partALocked}
                         />
                       )}
                     />
@@ -2833,6 +2877,7 @@ export default function DefectFormWizard({
         onOpenChange={setIsPartAAttachmentDialogOpen}
         attachments={partAAttachments}
         onAttachmentsChange={setPartAAttachments}
+        readOnly={partALocked}
         title="Part A Attachments - Defect Photos"
         itemName="Defect Photo"
       />

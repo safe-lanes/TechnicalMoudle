@@ -649,3 +649,11 @@ export function extensionOutcome(entry: {
     confirmation: entry.electronicConfirmation || "",
   };
 }
+
+/** Part A lock (Jeevan #10 / D2) — mirrors server/modules/defects/services/defectPartALock.ts: unlocked when the
+ *  latest Part A trail entry is a Sail Admin unlock not yet used by an edit. */
+export function isPartAUnlocked(auditTrail: unknown): boolean {
+  if (!Array.isArray(auditTrail)) return false;
+  const last = [...auditTrail].reverse().find((e: any) => e?.action === "part-a-unlocked" || e?.action === "part-a-edited");
+  return (last as any)?.action === "part-a-unlocked";
+}

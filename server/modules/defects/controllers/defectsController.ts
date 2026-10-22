@@ -324,6 +324,17 @@ export async function updateDefect(req: Request, res: Response) {
   }
 }
 
+// ── POST /defects/:id/part-a-unlock ── (Jeevan #10 / D2: Sail Admin, with a reason)
+
+export async function unlockDefectPartA(req: Request, res: Response) {
+  try {
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : '';
+    res.json(await defectsService.unlockDefectPartA(req.params.id, reason, defectActor(req)));
+  } catch (error: any) {
+    return sendDefectError(res, error, 'Failed to unlock Part A');
+  }
+}
+
 // ── DELETE /defects/:id ──
 
 export async function deleteDefect(req: Request, res: Response) {

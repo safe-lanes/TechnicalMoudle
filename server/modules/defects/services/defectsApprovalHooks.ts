@@ -31,6 +31,7 @@ import {
   approvalReadinessScoped,
 } from '../../approvals/engineGateway';
 import type { Scope } from '../../approval-engine';
+import { currentActor } from '../../approvals/approvalHistoryService';
 
 export interface DefectActor {
   userUuid?: string | null;
@@ -51,6 +52,9 @@ type ExtensionEntry = {
   electronicConfirmation?: string; requestedAt: string;
   /** 28-Sep-2026 (E6): who asked — set by the SERVER from the verified actor on a new entry. */
   requestedByUserId?: string | null;
+  /** Jeevan #6 (22-Oct-2026): who submitted — name + rank/position, set by the SERVER on a new entry. */
+  requestedByName?: string | null;
+  requestedByPosition?: string | null;
   withdrawnAt?: string;
 };
 const entriesHaveRequested = (entries: unknown): boolean =>
@@ -489,6 +493,10 @@ export async function gateDefectUpdate(
         // NEW entry — 28-Sep-2026 (E6): record the requester from the verified actor (never the
         // browser's value), so only that user can later withdraw it.
         e.requestedByUserId = actor.userUuid ?? null;
+        // Jeevan #6: "Submitted by <name> (<rank/position>)" — travels with the defect by sync.
+        const who = await currentActor().catch(() => null);
+        e.requestedByName = who?.name ?? null;
+        e.requestedByPosition = who?.position ?? null;
         if (onShip) {
           if (e.status !== 'Requested' || e.approved !== undefined) downgradeToRequested(e); // ship = submit-only (approved deviation)
           continue; // engine is shore-only; the arrival sweep submits after sync
@@ -530,8 +538,12 @@ export async function gateDefectUpdate(
       }
       // E6: the requester / withdrawal stamps are server-owned — keep the stored values whatever the browser sent.
       e.requestedByUserId = cur.requestedByUserId;
+      e.requestedByName = cur.requestedByName;
+      e.requestedByPosition = cur.requestedByPosition;
       e.withdrawnAt = cur.withdrawnAt;
       if (e.requestedByUserId === undefined) delete e.requestedByUserId;
+      if (e.requestedByName === undefined) delete e.requestedByName;
+      if (e.requestedByPosition === undefined) delete e.requestedByPosition;
       if (e.withdrawnAt === undefined) delete e.withdrawnAt;
       const isDecision = cur.status === 'Requested' && (e.status === 'Approved' || e.status === 'Rejected');
       if (e.status !== undefined && e.status !== cur.status && !isDecision) {

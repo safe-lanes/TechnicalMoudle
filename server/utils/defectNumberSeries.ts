@@ -22,6 +22,20 @@ export function defectSeriesPrefix(vesselCode: number | string, yearShort: numbe
   return `D${vc}-${yy}-${side === 'shore' ? OFFICE_DEFECT_SERIES_MARK : ''}`;
 }
 
+/**
+ * Decision D1 (Ghazi, 22-Oct-2026, Jeevan #11): the defect number carries the vessel's V-code —
+ *   ship   : {VCODE}-{yy}-{seq}     e.g. 0123-26-0005
+ *   office : {VCODE}-{yy}-O{seq}    e.g. 0123-26-O0001
+ * Null when the vessel has no usable V-code (letters/digits only) → the caller keeps the D{vessel} series.
+ * Existing defects keep their numbers.
+ */
+export function vcodeDefectSeriesPrefix(vCode: string | null | undefined, yearShort: number, side: DefectSide): string | null {
+  const vc = (vCode ?? '').trim();
+  if (!/^[A-Za-z0-9]+$/.test(vc)) return null;
+  const yy = String(yearShort % 100).padStart(2, '0');
+  return `${vc}-${yy}-${side === 'shore' ? OFFICE_DEFECT_SERIES_MARK : ''}`;
+}
+
 /** Highest running number used in this series among `ids` (0 if none). Ids of the other series never match. */
 export function highestInSeries(ids: readonly string[], prefix: string): number {
   const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`);

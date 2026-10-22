@@ -8,7 +8,7 @@
  *   - EngineError → AppError translation (asyncHandler understands AppError only),
  *   - the shore-side ARRIVAL SWEEP (CRs / postponement WOs that arrived via sync).
  */
-import { ApprovalEngine, EngineError, stuckEmptySlot, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
+import { ApprovalEngine, EngineError, stuckEmptySlot, stepApprovers, type EngineCtx, type RequestRow, type RequestSlotRow, type Scope, type StoredWorkflow } from '../approval-engine';
 import { AppError } from '../shared/errors';
 import { recordApprovalEvent, type HistorySubjectType } from './approvalHistoryService';
 import { currentEngineTenantId } from './tenantProvider';
@@ -265,7 +265,8 @@ export function approvalActorCanDecide(
 ): { canDecide: boolean; slotId: string | null } {
   if (request.status !== 'pending' || !actorUserId) return { canDecide: false, slotId: null };
   const active = request.slots.filter((slot) => slot.status === 'active');
-  const mine = active.find((slot) => (slot.resolvedApproverIds ?? []).includes(actorUserId));
+  const doneHere = active.length > 0 && stepApprovers(request.slots.filter((s) => s.nodeKey === active[0].nodeKey)).has(actorUserId);
+  const mine = doneHere ? undefined : active.find((slot) => (slot.resolvedApproverIds ?? []).includes(actorUserId));
   if (mine) return { canDecide: true, slotId: `${mine.nodeKey}:${mine.slotOrdinal}` };
   if (isApprovalAdminRole(actorRole ?? getRequestContext()?.rbacRole)) {
     const empty = stuckEmptySlot(request.snapshot.nodes, request.slots);

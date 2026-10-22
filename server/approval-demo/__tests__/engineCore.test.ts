@@ -254,3 +254,31 @@ describe('multi-stage consistency (Jeevan #14)', () => {
       .rejects.toMatchObject({ statusCode: 403, code: 'NOT_YOUR_TURN' });
   });
 });
+
+// Decision D3 (Ghazi, 22-Oct-2026): one person may NOT fill two slots of the same ALL step.
+describe('D3 — one person, one slot per step', () => {
+  const admin: EngineCtx = { tenantId: 'default', actor: { userId: 'sys-admin', role: 'Super Admin', userType: 'Office', isAdmin: true } };
+  it('a user holding both roles approves once; the second approval must be someone else', async () => {
+    // user-dir-1 holds BOTH roles of the step; user-dir-2 holds the second one too.
+    DEMO_HOLDERS.default['demo-role-d3a'] = ['user-dir-1'];
+    DEMO_HOLDERS.default['demo-role-d3b'] = ['user-dir-1', 'user-dir-2'];
+    await engine.saveWorkflow(office('admin'), wf(SCOPE_REQ, 'normal', [{ roles: ['demo-role-d3a', 'demo-role-d3b'], rule: 'all' }]));
+    const r = await engine.submit(office('crew'), { scope: SCOPE_REQ, subjectRef: 'D3-1', subject: {} });
+    const requuid = (r as any).requuid;
+    expect((await engine.decide(office('user-dir-1'), requuid, { decision: 'approve' })).nodeSatisfied).toBe(false);
+    await expect(engine.decide(office('user-dir-1'), requuid, { decision: 'approve' }))
+      .rejects.toMatchObject({ statusCode: 403, code: 'ALREADY_APPROVED_THIS_STEP' });
+    expect((await engine.decide(office('user-dir-2'), requuid, { decision: 'approve' })).requestStatus).toBe('approved');
+  });
+  it('the only holder of both roles already approved → step is stuck → admin may fill the other slot', async () => {
+    DEMO_HOLDERS.default['demo-role-d3c'] = ['user-mgr-1'];
+    await engine.saveWorkflow(office('admin'), wf(SCOPE_REQ, 'normal', [{ roles: ['demo-role-manager', 'demo-role-d3c'], rule: 'all' }]));
+    const r = await engine.submit(office('crew'), { scope: SCOPE_REQ, subjectRef: 'D3-2', subject: {} });
+    const requuid = (r as any).requuid;
+    await engine.decide(office('user-mgr-1'), requuid, { decision: 'approve' });
+    await expect(engine.decide(office('user-mgr-1'), requuid, { decision: 'approve' }))
+      .rejects.toMatchObject({ code: 'ALREADY_APPROVED_THIS_STEP' });
+    const d = await engine.decide(admin, requuid, { decision: 'approve' });
+    expect(d.requestStatus).toBe('approved');
+  });
+});

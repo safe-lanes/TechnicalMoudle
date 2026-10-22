@@ -61,7 +61,9 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
   // classification: steps, roles, quorum, resolved approver names, and a ⚠ marker where a role
   // resolves to nobody (the same silent-stall risk F3 addresses at runtime).
   const [viewSteps, setViewSteps] = useState<Array<{ label: string; rule: string; slots: Array<{ roleId: string; roleLabel: string }> }> | null>(null);
-  const [approverNames, setApproverNames] = useState<Record<string, { names: string[]; vesselScoped: boolean; error?: string }>>({});
+  const [approverNames, setApproverNames] = useState<Record<string, { names: string[]; vesselScoped: boolean; error?: string; users?: Array<{ id: string; name: string; vessels: string[] }> }>>({});
+  // Jeevan #1: only the active version is listed; older versions behind "Show history".
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
 
   useEffect(() => { api('GET', '/registry').then(setTree).catch((e) => setMsg({ err: String(e.message) })); }, [api]);
   const hostKey = hostScope ? `${hostScope.moduleId}|${hostScope.screenId}/${hostScope.actionId ?? ''}` : '';
@@ -111,7 +113,7 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
           // Jeevan #13: a refused/failed lookup is NOT "no approver" — say it could not be loaded.
           if (!res.ok) return [rid, { names: [], vesselScoped: false, error: `could not load the approvers (HTTP ${res.status})` }] as const;
           const j = await res.json();
-          return [rid, { names: j.names ?? [], vesselScoped: !!j.vesselScoped }] as const;
+          return [rid, { names: j.names ?? [], vesselScoped: !!j.vesselScoped, users: Array.isArray(j.users) ? j.users : undefined }] as const;
         } catch { return [rid, { names: [], vesselScoped: false, error: 'could not load the approvers' }] as const; }
       }));
       if (!cancelled) setApproverNames(Object.fromEntries(entries));
@@ -227,13 +229,28 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
             {msg.ok && <div style={S.ok}>{msg.ok}</div>}
 
             <div style={{ ...S.h, marginTop: 16 }}>Versions</div>
-            {versions.filter((v) => v.classification === classification).map((v) => (
-              <div key={v.wfuuid} style={S.row}>
-                <span style={S.chip}>v{v.version}</span>
-                <span>{v.status}</span>
-                <span style={{ color: '#667085', fontSize: 12 }}>{new Date(v.createdAt).toLocaleString()}</span>
-              </div>
-            ))}
+            {(() => {
+              const mine = versions.filter((v) => v.classification === classification).sort((a, b) => b.version - a.version);
+              const current = mine.find((v) => v.status === 'active') ?? mine[0];
+              const older = mine.filter((v) => v !== current);
+              const row = (v: WorkflowSummary) => (
+                <div key={v.wfuuid} style={S.row} data-testid={`workflow-version-${v.version}`}>
+                  <span style={S.chip}>v{v.version}</span>
+                  <span>{v.status}</span>
+                  <span style={{ color: '#667085', fontSize: 12 }}>{new Date(v.createdAt).toLocaleString()}</span>
+                </div>
+              );
+              return (<>
+                {current ? row(current) : <div style={{ color: '#667085', fontSize: 13 }}>No version saved yet.</div>}
+                {older.length > 0 && (
+                  <button type="button" onClick={() => setShowVersionHistory((x) => !x)} data-testid="toggle-version-history"
+                    style={{ background: 'none', border: 'none', color: '#1570ef', cursor: 'pointer', padding: '4px 0', fontSize: 13 }}>
+                    {showVersionHistory ? 'Hide history' : `Show history (${older.length})`}
+                  </button>
+                )}
+                {showVersionHistory && older.map(row)}
+              </>);
+            })()}
 
             {/* F7 — read-only view of the configured approvers/tiers for the active version */}
             {viewSteps && viewSteps.length > 0 && (
@@ -247,6 +264,34 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
                     {st.slots.map((sl) => {
                       const r = approverNames[sl.roleId];
                       const empty = !!r && !r.error && r.names.length === 0;
+                      // Jeevan #2: a table of approvers with their assigned vessels.
+                      if (r && !r.error && !empty && r.users) {
+                        return (
+                          <div key={sl.roleId} style={{ marginLeft: 12, marginTop: 4 }}>
+                            <div style={{ fontWeight: 500, fontSize: 13 }}>{sl.roleLabel}</div>
+                            <table data-testid="configured-approver-table" style={{ borderCollapse: 'collapse', fontSize: 12, marginTop: 4, width: '100%' }}>
+                              <thead><tr style={{ background: '#f9fafb', textAlign: 'left' }}>
+                                <th style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>User</th>
+                                <th style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>Role</th>
+                                <th style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>Assigned vessels</th>
+                              </tr></thead>
+                              <tbody>{r.users.map((u) => (
+                                <tr key={u.id}>
+                                  <td style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>{u.name}</td>
+                                  <td style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>{sl.roleLabel}</td>
+                                  <td style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>
+                                    {u.vessels.length > 0 ? u.vessels.join(', ')
+                                      : r.vesselScoped
+                                        ? <span data-testid="approver-no-vessel" style={{ color: '#b42318' }}>⚠ no vessel assigned — cannot approve any request</span>
+                                        : <span style={{ color: '#667085' }}>all vessels</span>}
+                                  </td>
+                                </tr>
+                              ))}</tbody>
+                            </table>
+                            {r.vesselScoped && <div style={{ color: '#667085', fontSize: 12, marginTop: 2 }}>Approvers for a request are those assigned that request's vessel in SAILERP.</div>}
+                          </div>
+                        );
+                      }
                       return (
                         <div key={sl.roleId} style={{ marginLeft: 12, fontSize: 13, marginTop: 2 }}>
                           <span style={{ fontWeight: 500 }}>{sl.roleLabel}</span>

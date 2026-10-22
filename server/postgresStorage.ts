@@ -3,7 +3,7 @@ import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, 
 import { levelsMatch } from '@shared/approvals/level';
 import { getDb } from './db';
 import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
-import { defectSeriesPrefix, formatDefectNumber, highestInSeries, type DefectSide } from './utils/defectNumberSeries';
+import { defectSeriesPrefix, formatDefectNumber, highestInSeries, vcodeDefectSeriesPrefix, type DefectSide } from './utils/defectNumberSeries';
 import {
   users,
   fleets,
@@ -5174,7 +5174,7 @@ export class PostgresStorage {
     
     // Get vessel sequence number (based on creation order)
     // First try from vessels table
-    const vesselResult = await db.select({ vesselSequence: vessels.vesselSequence })
+    const vesselResult = await db.select({ vesselSequence: vessels.vesselSequence, vCode: vessels.vCode })
       .from(vessels)
       .where(eq(vessels.vuuid, vesselId));
     
@@ -5214,9 +5214,13 @@ export class PostgresStorage {
     // already used in THIS side's series + 1 — defects sync, so this stays right after a re-provision.
     const { getInstanceRole } = await import('./modules/sync/syncRole');
     const side: DefectSide = (await getInstanceRole()) === 'ship' ? 'ship' : 'shore';
-    const prefix = defectSeriesPrefix(vesselSeq, yearShort, side);
-    const usedIds = await db.execute(sql`SELECT id FROM defects WHERE vessel_id = ${vesselId} AND id LIKE ${prefix + '%'}`);
-    let nextSeq = highestInSeries((usedIds.rows as any[]).map((r) => String(r.id)), prefix) + 1;
+    // Decision D1 (22-Oct-2026): vessels with a V-code number as {VCODE}-yy-[O]nnnn. The running number carries
+    // on from this side's older D{vessel} series, so this year's count does not restart.
+    const legacyPrefix = defectSeriesPrefix(vesselSeq, yearShort, side);
+    const prefix = vcodeDefectSeriesPrefix(vesselResult[0]?.vCode, yearShort, side) ?? legacyPrefix;
+    const usedIds = await db.execute(sql`SELECT id FROM defects WHERE vessel_id = ${vesselId} AND (id LIKE ${prefix + '%'} OR id LIKE ${legacyPrefix + '%'})`);
+    const used = (usedIds.rows as any[]).map((r) => String(r.id));
+    let nextSeq = Math.max(highestInSeries(used, prefix), highestInSeries(used, legacyPrefix)) + 1;
 
     // Ship only: the per-vessel/year counter stays as a floor (e.g. numbers already printed on board). It is local
     // bookkeeping now — no field log: the office never numbers in the ship series, and syncing this row by its

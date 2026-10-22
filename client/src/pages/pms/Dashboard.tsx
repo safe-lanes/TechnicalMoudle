@@ -83,7 +83,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useApprovalChain, resolveCanAct, ApprovalNotStartedNote } from "@/components/approvals/ApprovalChainProgress";
+import { useApprovalChain, resolveCanAct, ApprovalNotStartedNote, ApprovalChainProgress } from "@/components/approvals/ApprovalChainProgress";
+import { ApprovalProcessSection, useChangeRequestApprovalProcess, useWorkOrderApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import { anyLevelMatches } from "@shared/approvals/level";
 import { useApprovalScopeConfig } from "@/hooks/useApprovalScopeConfig";
 
@@ -884,6 +885,8 @@ const Dashboard = () => {
   // 25-Sep-2026: engine-only for engine-governed CR targets; Work-Order-target CRs keep the legacy gate.
   const crUserCanActFinal = resolveCanAct(crEngineChain, crUserCanAct, !!crEngineScreenId);
   const crAwaitingNoChain = !!crEngineScreenId && opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && !crEngineChain.hasChain && !crEngineChain.isLoading;
+  // Jeevan #4: the Dashboard change-request popup shows the approval process too (same as Modify PMS).
+  const dashCrProcess = useChangeRequestApprovalProcess(opDetailChangeRequest?.id ?? null);
 
   // Gate logic for the postponement decision dialog
   const postponeUserApproverLevels: string[] = localApprovers
@@ -919,6 +922,8 @@ const Dashboard = () => {
   const postponeChainRePost = useApprovalChain('pms-wo-re-postponement', postponeDecisionDialog.open ? postponeWoUuid : null);
   const postponeEngineChain = postponeChainPost.hasChain ? postponeChainPost : postponeChainRePost;
   const postponeUserCanActFinal = resolveCanAct(postponeEngineChain, postponeUserCanAct);
+  // Jeevan #5: the Dashboard postponement popup shows the approval progress + history (same as the WO screen).
+  const dashPostponeProcess = useWorkOrderApprovalProcess(postponeDecisionDialog.open ? postponeWoId : null);
 
   const superintendentSummaryParams = new URLSearchParams();
   if (isMyVessels) {
@@ -3444,6 +3449,12 @@ const Dashboard = () => {
 
                     <div className="flex-1 overflow-y-auto px-1">
                       <div className="space-y-3 py-4">
+                        {postponeDecisionDialog.wo && postponeWoUuid && (
+                          <div data-testid="dashboard-postpone-approval">
+                            <ApprovalChainProgress screenId={postponeChainPost.hasChain || !postponeChainRePost.hasChain ? 'pms-wo-postponement' : 'pms-wo-re-postponement'} subjectRef={postponeWoUuid} />
+                            <ApprovalProcessSection blocks={[{ title: "Postponement", process: dashPostponeProcess.data?.postponement }, { title: "Re-Postponement", process: dashPostponeProcess.data?.rePostponement }]} />
+                          </div>
+                        )}
                         {postponeDecisionDialog.wo && (
                           <>
                             <div className="grid grid-cols-2 gap-4">
@@ -4711,6 +4722,12 @@ const Dashboard = () => {
                   </div>
                 )}
               </div>
+            </div>
+            <div data-testid="dashboard-cr-approval">
+              {crEngineScreenId && (opDetailChangeRequest as any)?.cruuid && (
+                <ApprovalChainProgress screenId={crEngineScreenId} subjectRef={(opDetailChangeRequest as any).cruuid} />
+              )}
+              <ApprovalProcessSection blocks={[{ title: "Change request approval", process: dashCrProcess.data }]} />
             </div>
             <DialogFooter className="flex justify-between mt-4">
               <div className="flex gap-2">

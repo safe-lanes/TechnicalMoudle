@@ -760,6 +760,11 @@ export async function updateDefect(id: string, body: any, actor?: import('./defe
     throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
   }
   await assertDefectEvidenceRules(current, body);
+  // Part A lock (Jeevan #10 / D2): a Part A change after the first save needs a Sail Admin unlock.
+  const { applyPartALock } = await import('./defectPartALock');
+  const { currentActor } = await import('../../approvals/approvalHistoryService');
+  const who = await currentActor().catch(() => null);
+  body = applyPartALock(current, body, { userUuid: actor?.userUuid ?? who?.uuid ?? null, name: who?.name ?? null });
   const { gateDefectUpdate, afterDefectUpdate } = await import('./defectsApprovalHooks');
   const gated = await gateDefectUpdate(current, body, actor ?? {});
   const partialDefectSchema = insertDefectSchema.partial();
@@ -1077,4 +1082,23 @@ export async function recalculateRecurringDefects(equipmentKey: string, windowMo
     throw Object.assign(new Error("equipmentKey is required"), { statusCode: 400 });
   }
   return defectsRepo.calculateAndUpdateRecurringDefects(equipmentKey, windowMonths || 12);
+}
+
+/** POST /defects/:id/part-a-unlock — Sail Admin only, with a reason (Jeevan #10 / D2). One Part A edit, then locked again. */
+export async function unlockDefectPartA(id: string, reason: string, actor?: import('./defectsApprovalHooks').DefectActor) {
+  const current = await defectsRepo.getDefect(id);
+  if (!current) throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
+  const { unlockPartATrail } = await import('./defectPartALock');
+  const { currentActor } = await import('../../approvals/approvalHistoryService');
+  const who = await currentActor().catch(() => null);
+  const auditTrail = unlockPartATrail(current, reason, { userUuid: actor?.userUuid ?? who?.uuid ?? null, name: who?.name ?? null, role: actor?.role ?? null });
+  const updated = await defectsRepo.updateDefect(id, { auditTrail } as any);
+  try {
+    await defectsRepo.createAuditLog({
+      userId: actor?.userUuid || 'unknown', vesselCode: (current as any).vesselId ?? null,
+      entityType: 'defect', entityId: (current as any).duuid ?? id, actionType: 'part_a_unlocked',
+      fieldName: 'partA', oldValue: 'locked', newValue: 'unlocked', source: 'user', payload: { reason: reason.trim() },
+    });
+  } catch (e) { console.error('[defects] Part A unlock audit write failed (unlock saved):', e); }
+  return updated;
 }
