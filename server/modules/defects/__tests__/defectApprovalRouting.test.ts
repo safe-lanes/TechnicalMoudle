@@ -311,6 +311,20 @@ describe('Defects approval routing', () => {
     }, { userUuid: 'master-1', rankName: 'Master' })).resolves.toBeDefined();
   });
 
+  it('QA DF-06: on the vessel a Requested extension blocks closure (no engine on board)', async () => {
+    mocks.isShipInstance.mockResolvedValue(true);
+    const current = { ...baseDefect, targetDateExtensions: [{ id: 'req', status: 'Requested' }] };
+    await expect(gateDefectUpdate(current, { confirmCompleted: true }, { userUuid: 'master-1', rankName: 'Master' }))
+      .rejects.toMatchObject({ statusCode: 409, details: { code: 'EXTENSION_PENDING_CLOSEOUT' } });
+    // an extension added in the SAME save as the closure is refused too
+    await expect(gateDefectUpdate({ ...baseDefect, targetDateExtensions: [] }, {
+      confirmCompleted: true, targetDateExtensions: [{ id: 'new', status: 'Requested' }],
+    }, { userUuid: 'master-1', rankName: 'Master' })).rejects.toMatchObject({ statusCode: 409 });
+    // decided extension: closure allowed
+    const decided = { ...baseDefect, targetDateExtensions: [{ id: 'ok', status: 'Approved' }] };
+    await expect(gateDefectUpdate(decided, { confirmCompleted: true }, { userUuid: 'master-1', rankName: 'Master' })).resolves.toBeDefined();
+  });
+
   it('blocks C1 and C2 when an extension has a pending engine request', async () => {
     const current = {
       ...baseDefect,

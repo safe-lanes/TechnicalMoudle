@@ -1,3 +1,4 @@
+import { apiErrorMessage } from "@/lib/apiErrorMessage";
 import { useState, useEffect, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -379,7 +380,7 @@ const JobsFormPage: React.FC = () => {
       console.error('Error submitting change request:', error);
       toast({
         title: "Error",
-        description: "Failed to submit change request. Please try again.",
+        description: apiErrorMessage(error, "Failed to submit change request. Please try again."),
         variant: "destructive"
       });
     }

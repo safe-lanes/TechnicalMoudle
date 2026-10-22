@@ -173,6 +173,16 @@ export async function createChangeRequest(body: any) {
 
   const submitAfterCreate = validatedData.status === 'submitted';
 
+  // QA round 2 (CR-01): refuse BEFORE saving when the approval workflow is not ready, so a refused
+  // "submit" no longer leaves an orphan draft behind. Same check submitChangeRequestWorkflow makes.
+  if (submitAfterCreate) {
+    const cls = await classifyChangeRequestScope({ targetType: validatedData.targetType ?? null, targetId: resolvedTargetId });
+    if (cls.functionId && cls.variableName) {
+      const gw = await import('../../approvals/engineGateway');
+      await gw.assertTechnicalApprovalReady(cls.functionId, cls.variableName);
+    }
+  }
+
   const requestData = {
     ...validatedData,
     vesselId: validatedData.vesselId,

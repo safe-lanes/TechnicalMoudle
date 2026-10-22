@@ -1,3 +1,4 @@
+import { apiErrorMessage } from "@/lib/apiErrorMessage";
 import React, { useState, useMemo, useEffect } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
@@ -1221,7 +1222,7 @@ const Stores: React.FC = () => {
       console.error('Error submitting change request:', error);
       toast({
         title: "Error",
-        description: "Failed to submit change request. Please try again.",
+        description: apiErrorMessage(error, "Failed to submit change request. Please try again."),
         variant: "destructive"
       });
     } finally {

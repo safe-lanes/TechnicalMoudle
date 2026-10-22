@@ -250,7 +250,9 @@ export async function assertDefectCloseoutAllowed(current: any, actor: DefectAct
   }
   const requested = Array.isArray(current.targetDateExtensions)
     && current.targetDateExtensions.some((entry: any) => entry?.status === 'Requested');
-  if (!(await isShip()) && requested && await pendingEngineRequestInScopes(extensionScopes(), current.duuid)) {
+  // QA round 2 (DF-06): the vessel has no engine, so on board a 'Requested' entry IS the pending
+  // extension (the Master closes on board). Ashore the engine request decides, as before.
+  if (requested && ((await isShip()) || await pendingEngineRequestInScopes(extensionScopes(), current.duuid))) {
     throw new AppError(409, 'This defect has a pending extension approval; complete that approval before closing the defect.', { code: 'EXTENSION_PENDING_CLOSEOUT' });
   }
 }
@@ -377,8 +379,11 @@ export async function gateDefectUpdate(
       }
     }
   }
-  if (c1Changed && !onShip && (incomingGovernedExtension
-    || (entriesHaveRequested(current.targetDateExtensions) && await getPendingExtensionRequest()))) {
+  // QA round 2 (DF-06): on board, a Requested extension (already saved, or in this same save) blocks C1.
+  const shipExtensionPending = onShip
+    && (entriesHaveRequested(current.targetDateExtensions) || entriesHaveRequested(out.targetDateExtensions));
+  if (c1Changed && (shipExtensionPending || (!onShip && (incomingGovernedExtension
+    || (entriesHaveRequested(current.targetDateExtensions) && await getPendingExtensionRequest()))))) {
     throw new AppError(409,
       'This defect has a pending extension approval; complete that approval before changing closeout fields.',
       { code: 'EXTENSION_PENDING_CLOSEOUT' });

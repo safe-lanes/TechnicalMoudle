@@ -3330,6 +3330,11 @@ export async function approvePostponement(id: string, body: any, opts: { viaEngi
     const gw = await import('../../approvals/engineGateway');
     const decided = await gw.maybeEngineDecide('pms-wo-postponement', wo.wouuid, 'approve', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
     if (decided) return (await repo.findById(id)) || wo;
+    // QA round 2 (PP-04/AP-04): the approval popups call this endpoint for BOTH kinds. When the WO's
+    // pending engine request is a RE-postponement, decide it there instead of refusing.
+    if (!opts.viaEngine && await gw.pendingEngineRequest('pms-wo-re-postponement', wo.wouuid)) {
+      return approveRePostponement(id, body);
+    }
     // 25-Sep-2026: no direct decision any more — only the engine's final decision applies.
     if (!opts.viaEngine) {
       const cls = await classifyWoForPostponement(wo);
@@ -3427,6 +3432,11 @@ export async function rejectPostponement(id: string, body: any, opts: { viaEngin
     const gw = await import('../../approvals/engineGateway');
     const decided = await gw.maybeEngineDecide('pms-wo-postponement', wo.wouuid, 'reject', body.userUuid || body.approvedBy || 'system', body.approvalRemarks ?? null);
     if (decided) return (await repo.findById(id)) || wo;
+    // QA round 2 (PP-04/AP-04): the approval popups call this endpoint for BOTH kinds. When the WO's
+    // pending engine request is a RE-postponement, decide it there instead of refusing.
+    if (!opts.viaEngine && await gw.pendingEngineRequest('pms-wo-re-postponement', wo.wouuid)) {
+      return rejectRePostponement(id, body);
+    }
     // 25-Sep-2026: no direct decision any more — only the engine's final decision applies.
     if (!opts.viaEngine) {
       const cls = await classifyWoForPostponement(wo);

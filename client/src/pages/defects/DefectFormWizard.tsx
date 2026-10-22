@@ -56,6 +56,7 @@ import {
   resolveVerificationDisplay,
   shouldRenderVerificationApproval,
   hasPendingExtensionForEntries,
+  isApprovalUnavailableOnInstance,
   isOrphanedRequestedExtensionAt,
   formatDefectAuditTimestamp,
   hasAuditDisplayValue,
@@ -550,6 +551,8 @@ export default function DefectFormWizard({
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
+  // QA round 2 (DF-09): ids of uploaded defect files chosen as C1 closure evidence.
+  const [closureFiles, setClosureFiles] = useState<string[]>([]);
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const [partAAttachments, setPartAAttachments] = useState<FileAttachment[]>([]);
   const [isPartAAttachmentDialogOpen, setIsPartAAttachmentDialogOpen] = useState(false);
@@ -711,7 +714,9 @@ export default function DefectFormWizard({
         ? "Withdrawn"
         : displayedExtension?.status;
   const hasPendingExtension = extensionUi.state === "requester-pending" || extensionUi.state === "approver-pending";
-  const hasPendingExtensionRequest = hasPendingExtensionForEntries(targetDateExtensions, currentExtensionChain);
+  const hasPendingExtensionRequest = hasPendingExtensionForEntries(targetDateExtensions, currentExtensionChain, {
+    approvalUnavailableOnInstance: isApprovalUnavailableOnInstance(extensionApproval.error),
+  });
   const latestExtensionIndex = latestExtension
     ? targetDateExtensions.findIndex((entry) => entry.id === latestExtension.id)
     : -1;
@@ -835,6 +840,7 @@ export default function DefectFormWizard({
       if (currentDefect.attachments && Array.isArray(currentDefect.attachments)) {
         setFileAttachments(currentDefect.attachments);
       }
+      setClosureFiles(Array.isArray(currentDefect.closureFiles) ? currentDefect.closureFiles : []);
       
       if (currentDefect.targetDateExtensions && Array.isArray(currentDefect.targetDateExtensions)) {
         setTargetDateExtensions(currentDefect.targetDateExtensions);
@@ -987,6 +993,8 @@ export default function DefectFormWizard({
         reference: defectId,
         partAAttachments: partAAttachments,
         attachments: fileAttachments,
+        // only files still uploaded to this defect (server accepts nothing else)
+        closureFiles: closureFiles.filter((id) => fileAttachments.some((a) => a.id === id)),
         targetDateExtensions: extensionsOverride ?? targetDateExtensions,
       };
       
@@ -1262,7 +1270,7 @@ export default function DefectFormWizard({
 
 
     const pdfData: DefectReportPdfData = {
-      reportId: currentDefect?.defectId || defectId,
+      reportId: currentDefect?.id || defectId, // QA PDF: the record's id is `id` (e.g. D001-26-0100)
       vessel: vesselName,
       category: data.equipmentCategory || '',
       dateObserved: formatDate(data.issueDate),
@@ -1331,7 +1339,13 @@ export default function DefectFormWizard({
       verifiedByOfficePosition: data.verifiedByOfficePosition || '',
     };
 
-    pdfReportGenerator.generateDefectReportPdf(pdfData);
+    try {
+      pdfReportGenerator.generateDefectReportPdf(pdfData);
+    } catch (err) {
+      // QA round 2 (PDF-01..03): a failure used to be swallowed — the button seemed to do nothing.
+      console.error('Defect PDF export failed:', err);
+      toast({ title: 'Export failed', description: 'The defect report PDF could not be created. Please try again.', variant: 'destructive' });
+    }
   };
 
   return (
@@ -2665,6 +2679,42 @@ export default function DefectFormWizard({
                           disabled={isViewMode || !isMasterRank}
                         />
                       </div>
+                    </div>
+
+                    {/* QA round 2 (DF-09): closure evidence — chosen from the files uploaded to this defect */}
+                    <div className="space-y-2" data-testid="c1-closure-evidence">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm text-gray-600">Closure evidence</label>
+                        {!isViewMode && isMasterRank && !hasPendingExtensionRequest && (
+                          <Button type="button" variant="outline" size="sm" className="border-gray-300"
+                            onClick={() => setIsAttachmentDialogOpen(true)} data-testid="button-c1-attachments">
+                            <Paperclip className="h-4 w-4 mr-2" />
+                            Attachment(s)
+                            {fileAttachments.length > 0 && (
+                              <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{fileAttachments.length}</span>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                      {fileAttachments.length === 0 ? (
+                        <p className="text-sm text-gray-500">No files uploaded to this defect yet. Upload rectification documents with Attachment(s), then tick the ones that evidence the closure.</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {fileAttachments.map((file) => (
+                            <li key={file.id} className="flex items-center gap-2 text-sm">
+                              <Checkbox
+                                id={`closure-file-${file.id}`}
+                                checked={closureFiles.includes(file.id)}
+                                onCheckedChange={(checked) => setClosureFiles((prev) =>
+                                  checked ? Array.from(new Set([...prev, file.id])) : prev.filter((id) => id !== file.id))}
+                                disabled={isViewMode || !isMasterRank || hasPendingExtensionRequest}
+                                data-testid={`checkbox-closure-file-${file.id}`}
+                              />
+                              <label htmlFor={`closure-file-${file.id}`} className="text-gray-700">{file.name}</label>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
 
                     {/* Submit Button for C1 */}

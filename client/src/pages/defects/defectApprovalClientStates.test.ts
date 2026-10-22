@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   hasPendingExtensionApproval,
   hasPendingExtensionForEntries,
+  isApprovalUnavailableOnInstance,
   isOrphanedRequestedExtension,
   isOrphanedRequestedExtensionAt,
   resolveDefectApprovalPresentation,
@@ -39,6 +40,15 @@ describe("Defect approval client presentation states", () => {
     expect(isOrphanedRequestedExtensionAt(entries, 2, chain)).toBe(true);
     expect(hasPendingExtensionForEntries([], chain)).toBe(false);
     expect(isOrphanedRequestedExtensionAt(entries, 1, { requestUuid: null, requestStatus: "none" })).toBe(true);
+  });
+  it("on the vessel (engine unavailable) a Requested entry is the pending extension — QA DF-06", () => {
+    const shipError = { status: 503, code: "APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE" };
+    expect(isApprovalUnavailableOnInstance(shipError)).toBe(true);
+    expect(isApprovalUnavailableOnInstance(new Error("x"))).toBe(false);
+    const onBoard = { approvalUnavailableOnInstance: true };
+    expect(hasPendingExtensionForEntries([{ status: "Requested" }], undefined, onBoard)).toBe(true);
+    expect(hasPendingExtensionForEntries([{ status: "Approved" }], undefined, onBoard)).toBe(false);
+    expect(hasPendingExtensionForEntries([{ status: "Requested" }], undefined)).toBe(false); // ashore: needs the engine request
   });
   it("distinguishes no-workflow, loading, error, and unavailable", () => {
     expect(resolveDefectApprovalPresentation({ isLoading: false, error: null, data: { hasActiveWorkflow: false, currentUserCanDecide: false } }, true).state).toBe("no-workflow");

@@ -1,3 +1,4 @@
+import { apiErrorMessage } from "@/lib/apiErrorMessage";
 import React, { useState } from "react";
 import { X, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ export const ReviewChangesDrawer: React.FC<ReviewChangesDrawerProps> = ({
         title: targetType === "component" ? "Change Request Submission Failed" : "Error",
         description: targetType === "component"
           ? componentErrorDescription(error, "The change request could not be submitted. Check your changes and try again.")
-          : "Failed to submit change request",
+          : apiErrorMessage(error, "Failed to submit change request"),
         variant: "destructive"
       });
     } finally {

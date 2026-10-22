@@ -287,9 +287,20 @@ export function hasPendingExtensionApproval(
 export function hasPendingExtensionForEntries(
   entries: Array<{ status?: string | null }> | null | undefined,
   chain: { requestUuid?: string | null; requestStatus?: string | null } | null | undefined,
+  opts: { approvalUnavailableOnInstance?: boolean } = {},
 ): boolean {
-  return hasPendingExtensionApproval(chain) &&
-    (entries ?? []).some((entry) => String(entry.status ?? "").toLowerCase() === "requested");
+  const requested = (entries ?? []).some((entry) => String(entry.status ?? "").toLowerCase() === "requested");
+  // QA round 2 (DF-06): on the vessel the engine is not reachable, so a Requested entry IS the
+  // pending extension (same rule the server applies on board).
+  if (opts.approvalUnavailableOnInstance) return requested;
+  return hasPendingExtensionApproval(chain) && requested;
+}
+
+/** True when the approval endpoint says the engine is not on this instance (the vessel). */
+export function isApprovalUnavailableOnInstance(error: unknown): boolean {
+  return typeof error === "object" && error !== null &&
+    (error as { code?: unknown }).code === "APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE" &&
+    (error as { status?: unknown }).status === 503;
 }
 
 /** Stored Requested entries without a persisted request are visible orphan warnings,

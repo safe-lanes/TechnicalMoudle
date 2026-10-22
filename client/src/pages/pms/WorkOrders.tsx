@@ -976,20 +976,25 @@ const WorkOrders: React.FC = () => {
     setCurrentPage(1);
   };
 
+  // QA round 2 (PP-04/AP-04): open the review popup for a WO awaiting office approval. Since the
+  // 25-Sep cutover the old Level 1/2 step rows are no longer created, so the status is the signal;
+  // the legacy step check is kept for requests raised before the cutover.
+  const isAwaitingOfficeReview = async (workOrder: WorkOrderWithHydratedData): Promise<boolean> => {
+    if (workOrder.status === 'Awaiting Office Approval' || (workOrder as any).computedStatus === 'Awaiting Office Approval') return true;
+    try {
+      const res = await fetch(`/technical/api/work-orders/${workOrder.id}/postpone-approval-steps`, { credentials: 'include' });
+      const steps: any[] = res.ok ? await res.json() : [];
+      return steps.some((s: any) => s.status === 'Pending');
+    } catch {
+      return false; // network error: fall through to the postpone form, as before
+    }
+  };
+
   const handlePostponeClick = async (workOrder: WorkOrderWithHydratedData) => {
-    if (isOfficeUser) {
-      try {
-        const res = await fetch(
-          `/technical/api/work-orders/${workOrder.id}/postpone-approval-steps`,
-          { credentials: 'include' }
-        );
-        const steps: any[] = res.ok ? await res.json() : [];
-        if (steps.some((s: any) => s.status === 'Pending')) {
-          setPostponeApprovalWorkOrder(workOrder);
-          setPostponeApprovalDialogOpen(true);
-          return;
-        }
-      } catch { /* fall through to postpone form on network error */ }
+    if (isOfficeUser && await isAwaitingOfficeReview(workOrder)) {
+      setPostponeApprovalWorkOrder(workOrder);
+      setPostponeApprovalDialogOpen(true);
+      return;
     }
     setSelectedWorkOrder(workOrder);
     setPostponeDialogOpen(true);
@@ -1033,19 +1038,10 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleTimerClick = async (workOrder: WorkOrderWithHydratedData) => {
-    if (isOfficeUser) {
-      try {
-        const res = await fetch(
-          `/technical/api/work-orders/${workOrder.id}/postpone-approval-steps`,
-          { credentials: 'include' }
-        );
-        const steps: any[] = res.ok ? await res.json() : [];
-        if (steps.some((s: any) => s.status === 'Pending')) {
-          setPostponeApprovalWorkOrder(workOrder);
-          setPostponeApprovalDialogOpen(true);
-          return;
-        }
-      } catch { /* fall through to postpone form on network error */ }
+    if (isOfficeUser && await isAwaitingOfficeReview(workOrder)) {
+      setPostponeApprovalWorkOrder(workOrder);
+      setPostponeApprovalDialogOpen(true);
+      return;
     }
     // WO already has an approved postponement — open the Re-Postponement screen
     if (workOrder.status === 'Postponement Approved' || workOrder.computedStatus === 'Postponement Approved') {
