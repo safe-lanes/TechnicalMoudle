@@ -61,7 +61,7 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
   // classification: steps, roles, quorum, resolved approver names, and a ⚠ marker where a role
   // resolves to nobody (the same silent-stall risk F3 addresses at runtime).
   const [viewSteps, setViewSteps] = useState<Array<{ label: string; rule: string; slots: Array<{ roleId: string; roleLabel: string }> }> | null>(null);
-  const [approverNames, setApproverNames] = useState<Record<string, { names: string[]; vesselScoped: boolean }>>({});
+  const [approverNames, setApproverNames] = useState<Record<string, { names: string[]; vesselScoped: boolean; error?: string }>>({});
 
   useEffect(() => { api('GET', '/registry').then(setTree).catch((e) => setMsg({ err: String(e.message) })); }, [api]);
   const hostKey = hostScope ? `${hostScope.moduleId}|${hostScope.screenId}/${hostScope.actionId ?? ''}` : '';
@@ -102,14 +102,17 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
         .sort((a: any, b: any) => a.ordinal - b.ordinal)
         .map((n: any) => ({ label: n.label || n.key, rule: n.quorum?.rule ?? 'all', slots: (n.slots ?? []).map((s: any) => ({ roleId: s.roleId, roleLabel: s.roleLabel })) }));
       setViewSteps(steps);
+      // Jeevan #13: open the editor on the CURRENT chain (it was always empty, so the saved workflow looked missing).
+      setRows((current) => current.length > 0 ? current : steps.map((s: any) => ({ roles: s.slots, rule: s.rule === 'any' ? 'any' : 'all' })));
       const uniqueRoleIds = Array.from(new Set(steps.flatMap((s: any) => s.slots.map((x: any) => x.roleId))));
       const entries = await Promise.all(uniqueRoleIds.map(async (rid) => {
         try {
           const res = await fetch(`/technical/api/approvals/role-approvers?roleId=${encodeURIComponent(rid as string)}`);
-          if (!res.ok) return [rid, { names: [], vesselScoped: false }] as const;
+          // Jeevan #13: a refused/failed lookup is NOT "no approver" — say it could not be loaded.
+          if (!res.ok) return [rid, { names: [], vesselScoped: false, error: `could not load the approvers (HTTP ${res.status})` }] as const;
           const j = await res.json();
           return [rid, { names: j.names ?? [], vesselScoped: !!j.vesselScoped }] as const;
-        } catch { return [rid, { names: [], vesselScoped: false }] as const; }
+        } catch { return [rid, { names: [], vesselScoped: false, error: 'could not load the approvers' }] as const; }
       }));
       if (!cancelled) setApproverNames(Object.fromEntries(entries));
     }).catch(() => { if (!cancelled) setViewSteps(null); });
@@ -243,11 +246,12 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
                     </div>
                     {st.slots.map((sl) => {
                       const r = approverNames[sl.roleId];
-                      const empty = !!r && r.names.length === 0;
+                      const empty = !!r && !r.error && r.names.length === 0;
                       return (
                         <div key={sl.roleId} style={{ marginLeft: 12, fontSize: 13, marginTop: 2 }}>
                           <span style={{ fontWeight: 500 }}>{sl.roleLabel}</span>
                           {!r ? <span style={{ color: '#667085' }}> — resolving…</span>
+                            : r.error ? <span data-testid="configured-approver-load-error" style={{ color: '#667085' }}> — {r.error}</span>
                             : empty
                               ? <span data-testid="configured-approver-unresolved" style={{ color: '#b42318' }}> — ⚠ no approver resolved for this role</span>
                               : <span style={{ color: '#475467' }}> — {r.names.join(', ')}{r.vesselScoped ? ' (vessel-scoped at runtime — the approvers for a given request are those assigned that vessel in SAILERP)' : ''}</span>}

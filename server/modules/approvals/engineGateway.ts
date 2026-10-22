@@ -365,11 +365,14 @@ export async function approvalArrivalSweep(vesselId: string): Promise<{ submitte
     .where(and(eq(workOrders.vesselId, vesselId), eq(workOrders.status, 'Awaiting Office Approval')));
   for (const wo of wos) {
     const rows = await db.select().from(workOrderPostponements).where(eq(workOrderPostponements.workOrderId, wo.wouuid));
-    const awaiting = rows.some((r) => r.status === 'Awaiting Approval');
-    if (!awaiting) continue;
+    const awaitingRows = rows.filter((r) => r.status === 'Awaiting Approval');
+    if (awaitingRows.length === 0) continue;
     const isRe = rows.some((r) => r.status === 'Approved');
     const screenId = isRe ? 'pms-wo-re-postponement' : 'pms-wo-postponement';
-    const requuid = await maybeEngineSubmit(screenId, wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId, wo.postponeApprover ?? null);
+    // Jeevan #14(g), 22-Oct-2026: the submitter is the sender recorded on the request row — NOT
+    // postponeApprover (that is the approver field, always "Office").
+    const latest = awaitingRows.reduce((a, b) => ((b.postponementNumber ?? 0) > (a.postponementNumber ?? 0) ? b : a));
+    const requuid = await maybeEngineSubmit(screenId, wo.wouuid, { kind: 'wo', workOrderId: wo.wouuid }, wo.vesselId, latest.createdByUuid ?? null);
     if (requuid) submitted++;
   }
 

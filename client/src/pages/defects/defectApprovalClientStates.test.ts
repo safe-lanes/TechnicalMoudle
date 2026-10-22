@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extensionOutcome,
   hasPendingExtensionApproval,
   hasPendingExtensionForEntries,
   isApprovalUnavailableOnInstance,
@@ -147,5 +148,22 @@ describe("Defect approval client presentation states", () => {
     expect(formatDiagnosticsUnresolved(base)).toContain("V1");
     expect(formatDiagnosticsUnresolved(base)).toContain("Master");
     expect(formatDiagnosticsUnresolved(base)).toContain("cannot approve");
+  });
+});
+// Jeevan #7 / #8 (22-Oct-2026): the vessel has no engine chain, but the decisions are synced onto the defect.
+describe("vessel shows the synced approval outcome", () => {
+  it("C2 shows the defect's own verification fields when there is no chain", () => {
+    const defect = { verified: true, dateVerified: "2026-10-20T00:00:00Z", verifiedByName: "J Naik", verifiedByOfficePosition: "Technical Officer" };
+    const shipError = Object.assign(new Error("503"), { status: 503, code: "APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE" });
+    expect(isApprovalUnavailableOnInstance(shipError)).toBe(true);
+    expect(resolveVerificationDisplay(null, defect)).toEqual({ date: "", name: "", position: "" });
+    expect(resolveVerificationDisplay(null, defect, { approvalUnavailableOnInstance: true })).toEqual({ date: "2026-10-20T00:00:00Z", name: "J Naik", position: "Technical Officer" });
+    expect(resolveVerificationDisplay(undefined, { verified: false, verifiedByName: "x" }, { approvalUnavailableOnInstance: true })).toEqual({ date: "", name: "", position: "" });
+  });
+  it("extension outcome only for decided entries", () => {
+    expect(extensionOutcome({ status: "Requested" })).toBeNull();
+    expect(extensionOutcome({ status: "Approved", approvalDate: "2026-10-21T10:00:00Z", approverComments: "ok", electronicConfirmation: "Approved via approval workflow by J Naik on 2026-10-21" }))
+      .toEqual({ status: "Approved", date: "2026-10-21", comments: "ok", confirmation: "Approved via approval workflow by J Naik on 2026-10-21" });
+    expect(extensionOutcome({ status: "Rejected" })).toMatchObject({ status: "Rejected", date: "", comments: "" });
   });
 });

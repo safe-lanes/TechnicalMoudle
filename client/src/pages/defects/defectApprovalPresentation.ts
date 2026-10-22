@@ -368,8 +368,18 @@ export function resolveVerificationDisplay(
     verifiedByName?: string | null;
     verifiedByOfficePosition?: string | null;
   } | null | undefined,
+  opts: { approvalUnavailableOnInstance?: boolean } = {},
 ) {
   if (!chain) {
+    // Jeevan #8: on the vessel there is no approval engine (503), but the verification outcome IS synced onto
+    // the defect — show it. While loading / on other errors it stays blank (no stale attribution).
+    if (opts.approvalUnavailableOnInstance && defect?.verified === true) {
+      return {
+        date: defect.dateVerified || defect.verifiedDate || "",
+        name: defect.verifiedByName || "",
+        position: defect.verifiedByOfficePosition || "",
+      };
+    }
     return { date: "", name: "", position: "" };
   }
   const hasEngineRequest = Boolean(chain.requestUuid);
@@ -621,5 +631,21 @@ export function projectRejectedClosureHistory<T extends { id: string | number; a
   return {
     attempts: ordered,
     defaultExpandedIds: ordered.length === 1 ? [String(ordered[0].id)] : [],
+  };
+}
+
+/** Jeevan #7: the decision the office wrote onto a B5 entry (synced to the vessel). Null while still Requested. */
+export function extensionOutcome(entry: {
+  status?: string | null;
+  approvalDate?: string | null;
+  approverComments?: string | null;
+  electronicConfirmation?: string | null;
+} | null | undefined): { status: "Approved" | "Rejected"; date: string; comments: string; confirmation: string } | null {
+  if (!entry || (entry.status !== "Approved" && entry.status !== "Rejected")) return null;
+  return {
+    status: entry.status,
+    date: entry.approvalDate ? String(entry.approvalDate).slice(0, 10) : "",
+    comments: entry.approverComments || "",
+    confirmation: entry.electronicConfirmation || "",
   };
 }

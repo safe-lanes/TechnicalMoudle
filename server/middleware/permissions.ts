@@ -92,7 +92,8 @@ async function getPermState(req: AuthenticatedRequest): Promise<PermState> {
  * (array = any-of, for bulk save endpoints that both insert and update).
  */
 export function requirePermission(
-  resource: string,
+  /** One menu name, or several: allowed when the role has the action on ANY of them (Approvals QA #13). */
+  resource: string | string[],
   action: PermissionAction | PermissionAction[],
   options: RequirePermissionOptions = {},
 ) {
@@ -120,9 +121,12 @@ export function requirePermission(
         });
       }
 
-      const muid = state.menuByName.get(resource);
-      const perm = muid ? state.permsByMuid.get(muid) : undefined;
-      const allowed = !!perm && actions.some((a) => (perm as any)[ACTION_FLAG[a]] === true);
+      const resources = Array.isArray(resource) ? resource : [resource];
+      const allowed = resources.some((r) => {
+        const muid = state.menuByName.get(r);
+        const perm = muid ? state.permsByMuid.get(muid) : undefined;
+        return !!perm && actions.some((a) => (perm as any)[ACTION_FLAG[a]] === true);
+      });
       if (!allowed) {
         return res.status(403).json({
           error: "Forbidden - Insufficient permissions",

@@ -57,6 +57,7 @@ import {
   shouldRenderVerificationApproval,
   hasPendingExtensionForEntries,
   isApprovalUnavailableOnInstance,
+  extensionOutcome,
   isOrphanedRequestedExtensionAt,
   formatDefectAuditTimestamp,
   hasAuditDisplayValue,
@@ -235,6 +236,8 @@ function ExtensionCard({
     status: status || entry.status,
     reasonForExtension: entry.reasonForExtension,
   });
+  // Jeevan #7: without an engine chain (vessel, or entries from before the engine) show the decision itself.
+  const outcome = chain ? null : extensionOutcome(entry);
   const body = (
     <div className="space-y-4 border-t border-slate-100 p-4 text-sm">
       {children ?? (
@@ -246,8 +249,15 @@ function ExtensionCard({
           <div><span className="text-slate-500">Reason for extension</span><div className="whitespace-pre-wrap">{entry.reasonForExtension || "Not recorded"}</div></div>
         </>
       )}
+      {outcome && (
+        <div className={`rounded border p-3 text-sm ${outcome.status === "Approved" ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`} data-testid={`extension-outcome-${entry.id}`}>
+          <div className="font-medium">{outcome.status}{outcome.date ? ` on ${outcome.date}` : ""}</div>
+          {outcome.confirmation && <div className="mt-1">{outcome.confirmation}</div>}
+          {outcome.comments && <div className="mt-1 whitespace-pre-wrap"><span className="text-slate-600">Approver comments: </span>{outcome.comments}</div>}
+        </div>
+      )}
       <div>
-        {approval !== undefined ? approval : (chain ? <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} /> : (
+        {outcome && approval === undefined ? null : approval !== undefined ? approval : (chain ? <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} /> : (
           <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${entry.id}`}>
             No approval chain is associated with this entry. Historical approval data was not inferred.
           </div>
@@ -629,6 +639,7 @@ export default function DefectFormWizard({
   const verificationDisplay = resolveVerificationDisplay(
     verificationApproval.data,
     currentDefect,
+    { approvalUnavailableOnInstance: isApprovalUnavailableOnInstance(verificationApproval.error) },
   );
   
   // Compute the correct is_coc default: use existing defect value if available, otherwise use isCoc prop for new defects
@@ -2359,7 +2370,7 @@ export default function DefectFormWizard({
                                   <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${displayedExtension.id}`}>
                                     No approval chain is associated with this entry. Historical approval data was not inferred.
                                   </div>
-                                ) : (
+                                ) : extensionOutcome(displayedExtension) && isApprovalUnavailableOnInstance(extensionApproval.error) ? null : (
                                   <DefectApprovalStatus
                                     action="extension"
                                     defectId={approvalDefectId}

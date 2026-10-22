@@ -26,11 +26,13 @@ export async function currentActor(): Promise<HistoryActor> {
   const a = getRequestContext()?.actor;
   if (!a || a.actorId === 'system') return { uuid: null, name: null, position: null };
   let name = a.actorName ?? (a.actorType !== 'Ship' ? a.actorLabel : null);
-  let position = a.actorRank ?? (a.actorType === 'Ship' ? a.actorLabel : a.actorRole);
+  // Jeevan #3: a ship user is shown by RANK; an office user by DESIGNATION (user master), then role —
+  // never by a rank (office users have none; the mock default used to show "Chief Engineer").
+  let position: string | null = a.actorType === 'Ship' ? (a.actorRank ?? a.actorLabel) : null;
   if (!name || !position) {
     const u = await repo.lookupUser(a.actorId).catch(() => null);
     name = name ?? u?.name ?? null;
-    position = position ?? u?.role ?? null;
+    position = position ?? u?.designation ?? a.actorRole ?? u?.role ?? null;
   }
   return { uuid: a.actorId, name: name?.trim() || null, position: position?.trim() || null };
 }

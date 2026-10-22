@@ -36,8 +36,8 @@ export async function listEvents(subjectRef: string, subjectTypes: string[]): Pr
 }
 
 /** Name + role from master data (older records only; the table is not synced to vessels). */
-export async function lookupUser(userUuid: string): Promise<{ name: string | null; role: string | null } | null> {
-  const [u] = await db().select({ name: masterUsers.fullName, role: masterUsers.role })
+export async function lookupUser(userUuid: string): Promise<{ name: string | null; role: string | null; designation: string | null } | null> {
+  const [u] = await db().select({ name: masterUsers.fullName, role: masterUsers.role, designation: masterUsers.designation })
     .from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1);
-  return u ? { name: u.name?.trim() || null, role: u.role?.trim() || null } : null;
+  return u ? { name: u.name?.trim() || null, role: u.role?.trim() || null, designation: u.designation?.trim() || null } : null;
 }

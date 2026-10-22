@@ -50,7 +50,10 @@ router.get('/approvals/notifications', asyncHandler(async (req, res) => {
 
 // GET /approvals/role-approvers?roleId=<ruid|moc:Level N> — F7: resolved approver NAMES for the
 // admin read-only "View configured approvers" panel. Office-only (same audience as the builder).
-router.get('/approvals/role-approvers', requireRole(['PMS Admin', 'Sail Admin', 'Super Admin']), asyncHandler(async (req, res) => {
+// Approvals QA (Jeevan #13): the read-only panel is shown to everyone who may VIEW the Approval Workflow page
+// (PMS or Defects) — the old admin-name-only guard returned 403 to those viewers and the screen showed it as
+// "no approver resolved".
+router.get('/approvals/role-approvers', requirePermission(['approval-workflow-pms', 'approval-workflow-defects'], 'view', { enforce: true, unconfigured: 'deny' }), asyncHandler(async (req, res) => {
   const roleId = String(req.query.roleId ?? '');
   if (!roleId) return void res.status(400).json({ error: 'roleId required' });
   res.json(await resolveApproverNames(roleId));

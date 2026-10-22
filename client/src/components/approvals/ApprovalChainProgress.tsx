@@ -31,7 +31,7 @@ interface SlotView {
   resolvedApproverIds: string[] | null;
 }
 interface RequestView {
-  requuid: string; status: "pending" | "approved" | "returned";
+  requuid: string; status: "pending" | "approved" | "returned" | "withdrawn";
   currentNodeKey: string | null; submittedAt: string;
   snapshot: { nodes: Array<{ key: string; type: string; label: string; ordinal: number; quorum?: { rule: string; n?: number } }> };
   slots: SlotView[];
@@ -144,6 +144,9 @@ export function useApprovalChain(screenId: string, subjectRef: string | null | u
   return {
     hasChain: !!pending,
     request: pending,
+    // Jeevan #14(e): the newest request whatever its status (status() is newest-first) — for showing
+    // progress after the decision. Never use it to decide whether someone can act.
+    latestRequest: (q.data ?? [])[0] ?? null,
     canDecide,
     hasUnresolvedApprover: !!pending && unresolvedActiveSlots.length > 0,
     unresolvedRoleLabels: unresolvedActiveSlots.map((s) => s.roleLabel),
@@ -186,7 +189,7 @@ export function ApprovalChainProgress({
 }) {
   // Keep the existing request/status behavior untouched for PMS and Work Orders. A supplied
   // chain intentionally disables that legacy query and only changes this component's data view.
-  const { request } = useApprovalChain(screenId, chain !== undefined ? null : subjectRef);
+  const { latestRequest: request } = useApprovalChain(screenId, chain !== undefined ? null : subjectRef);
   if (chain !== undefined) {
     if (!chain || (!chain.hasActiveWorkflow && !chain.steps?.length && !["rejected", "returned"].includes(String(chain.requestStatus).toLowerCase()))) return null;
     return <DefectChainProgress chain={chain} />;
@@ -195,7 +198,14 @@ export function ApprovalChainProgress({
   const steps = request.snapshot.nodes.filter((n) => n.type === "approval-step").sort((a, b) => a.ordinal - b.ordinal);
   return (
     <div style={{ border: "1px solid #e4e7ec", borderRadius: 8, padding: 10, margin: "8px 0", fontSize: 13 }} data-testid="approval-chain-progress">
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>Approval progress</div>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+        Approval progress
+        {request.status !== "pending" && (
+          <span data-testid="approval-chain-final-status" style={{ marginLeft: 8, fontWeight: 500, color: request.status === "approved" ? "#067647" : "#b42318" }}>
+            — {request.status === "approved" ? "Approved" : request.status === "returned" ? "Returned" : request.status === "withdrawn" ? "Withdrawn" : request.status}
+          </span>
+        )}
+      </div>
       {steps.map((n) => {
         const slots = request.slots.filter((s) => s.nodeKey === n.key);
         return (

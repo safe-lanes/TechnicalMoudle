@@ -26,8 +26,28 @@ export interface EngineDeps {
   now?: () => Date;
 }
 
+/** Quorum size for an approval node ('all' = every slot, 'any' = 1, 'nOfM' = n). */
+function quorumNeeded(rule: { rule: string; n?: number } | undefined, slotCount: number): number {
+  if (!rule || rule.rule === 'all') return slotCount;
+  if (rule.rule === 'any') return 1;
+  return rule.n as number;
+}
+
 export class ApprovalEngine {
   constructor(private deps: EngineDeps) {}
+
+  // Jeevan #14(c), 22-Oct-2026: decisions on ONE request run one at a time. Two approvers of an 'all'
+  // step deciding together each counted "1 of 2" → neither advanced the step → stuck. In-process is
+  // enough: the host runs one Node process (PM2 fork mode, single instance).
+  private requestLocks = new Map<string, Promise<unknown>>();
+  private async serialized<T>(ctx: EngineCtx, requuid: string, fn: () => Promise<T>): Promise<T> {
+    const key = `${ctx.tenantId}:${requuid}`;
+    const prior = this.requestLocks.get(key) ?? Promise.resolve();
+    const run = prior.catch(() => undefined).then(fn);
+    const tail = run.catch(() => undefined);
+    this.requestLocks.set(key, tail);
+    try { return await run; } finally { if (this.requestLocks.get(key) === tail) this.requestLocks.delete(key); }
+  }
 
   private emit(evt: EngineEvent) {
     try { this.deps.onEvent?.(evt); } catch (e) { console.error('[approval-engine] onEvent listener failed:', e); }
@@ -186,6 +206,9 @@ export class ApprovalEngine {
    * sender of its record); the engine only refuses a request that is no longer pending (409).
    */
   async withdraw(ctx: EngineCtx, requuid: string, reason: string | null): Promise<{ requuid: string; status: 'withdrawn' }> {
+    return this.serialized(ctx, requuid, () => this.withdrawUnlocked(ctx, requuid, reason));
+  }
+  private async withdrawUnlocked(ctx: EngineCtx, requuid: string, reason: string | null): Promise<{ requuid: string; status: 'withdrawn' }> {
     const repo = this.repo(ctx);
     const request = await repo.getRequest(requuid);
     if (!request) err(404, 'NOT_FOUND', `request ${requuid} not found`);
@@ -206,6 +229,9 @@ export class ApprovalEngine {
 
   // ── decide ─────────────────────────────────────────────────────────────────
   async decide(ctx: EngineCtx, requuid: string, input: DecideInput): Promise<DecideResult> {
+    return this.serialized(ctx, requuid, () => this.decideUnlocked(ctx, requuid, input));
+  }
+  private async decideUnlocked(ctx: EngineCtx, requuid: string, input: DecideInput): Promise<DecideResult> {
     const repo = this.repo(ctx);
     const request = await repo.getRequest(requuid);
     if (!request) err(404, 'NOT_FOUND', `request ${requuid} not found`);
@@ -224,9 +250,17 @@ export class ApprovalEngine {
     const isAdminActor = !!ctx.actor.isAdmin;
     let mine = active.find((s) => (s.resolvedApproverIds ?? []).includes(ctx.actor.userId));
     let adminOverride = false;
-    if (!mine && isAdminActor) {
-      const stepStuck = active.length > 0 && active.every((s) => (s.resolvedApproverIds ?? []).length === 0);
-      if (stepStuck) { mine = active[0]; adminOverride = true; }
+    if (!mine && isAdminActor && active.length > 0) {
+      // Jeevan #14(a), 22-Oct-2026: the step is stuck when the slots that DO have approvers cannot reach the
+      // quorum on their own (e.g. an 'all' step where one role has nobody on that vessel). The admin may then
+      // decide one of the EMPTY slots only — never a slot someone could act on.
+      const activeNode = request!.snapshot.nodes.find((n) => n.key === active[0].nodeKey);
+      const stepSlots = slots.filter((s) => s.nodeKey === active[0].nodeKey);
+      const approvedSoFar = stepSlots.filter((s) => s.status === 'approved').length;
+      const reachable = active.filter((s) => (s.resolvedApproverIds ?? []).length > 0).length;
+      const stepStuck = approvedSoFar + reachable < quorumNeeded(activeNode?.quorum, stepSlots.length);
+      const emptySlot = active.find((s) => (s.resolvedApproverIds ?? []).length === 0);
+      if (stepStuck && emptySlot) { mine = emptySlot; adminOverride = true; }
     }
     if (!mine) {
       err(403, 'NOT_YOUR_TURN', 'you are not an approver for the currently active step of this request');
@@ -260,8 +294,7 @@ export class ApprovalEngine {
       { nodeKey, slotOrdinal: mine!.slotOrdinal, status: 'approved', decidedBy: ctx.actor.userId, decidedAt: now, remarks: effRemarks },
     ];
     const approvedCount = nodeSlots.filter((s) => s.status === 'approved').length + 1;
-    const rule = node.quorum!;
-    const needed = rule.rule === 'all' ? nodeSlots.length : rule.rule === 'any' ? 1 : (rule.n as number);
+    const needed = quorumNeeded(node.quorum!, nodeSlots.length);
     const satisfied = approvedCount >= needed;
     if (satisfied) {
       for (const s of nodeSlots) {

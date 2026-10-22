@@ -53,6 +53,8 @@ export function resolveAuditActor(user: any): AuditActor {
   const uuid: string | null = (user.userUuid && String(user.userUuid).trim()) || null;
   const email: string | null = (user.email && String(user.email).trim()) || null;
   const rank: string | null = (user.rank_name && String(user.rank_name).trim()) || null;
+  // Jeevan #3: the mock default rank is not the person's rank (office users have none).
+  const explicitRank: string | null = user.rankIsDefault === true ? null : rank;
   const role: string | null = (user.forwardedRole && String(user.forwardedRole).trim())
     || (user.role && String(user.role).trim()) || null;
   const name: string | null =
@@ -81,7 +83,7 @@ export function resolveAuditActor(user: any): AuditActor {
     actorLabel: name || email || 'Office User',
     actorEmail: email,
     actorType: userType || 'Office',
-    actorRank: rank,
+    actorRank: explicitRank,
     actorRole: role,
     actorName: name,
   };

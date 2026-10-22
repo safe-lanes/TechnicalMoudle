@@ -216,3 +216,41 @@ describe('tenant isolation (B8.7, provider-level)', () => {
     expect((await engine.listWorkflows(t2, SCOPE_REQ))).toHaveLength(1);
   });
 });
+
+// Jeevan #14 (22-Oct-2026) — multi-stage consistency.
+describe('multi-stage consistency (Jeevan #14)', () => {
+  const admin: EngineCtx = { tenantId: 'default', actor: { userId: 'sys-admin', role: 'Super Admin', userType: 'Office', isAdmin: true } };
+  it('(c) two approvers of an ALL step deciding at the same moment → the step still advances', async () => {
+    await engine.saveWorkflow(office('admin'), wf(SCOPE_REQ, 'normal', [
+      { roles: ['demo-role-reviewer', 'demo-role-manager'], rule: 'all' },
+      { roles: ['demo-role-director'], rule: 'any' },
+    ]));
+    const r = await engine.submit(office('crew'), { scope: SCOPE_REQ, subjectRef: 'RACE-1', subject: {} });
+    const requuid = (r as any).requuid;
+    const results = await Promise.all([
+      engine.decide(office('user-rev-1'), requuid, { decision: 'approve' }),
+      engine.decide(office('user-mgr-1'), requuid, { decision: 'approve' }),
+    ]);
+    expect(results.filter((x) => x.nodeSatisfied)).toHaveLength(1);
+    const slots = await provider.forTenant('default').getSlots(requuid);
+    expect(slots.find((s) => s.nodeKey === 'step-2')!.status).toBe('active');
+  });
+  it('(a) ALL step where one role has nobody: admin may decide the EMPTY slot only', async () => {
+    await engine.saveWorkflow(office('admin'), wf(SCOPE_REQ, 'normal', [{ roles: ['demo-role-reviewer', 'demo-role-nobody'], rule: 'all' }]));
+    const r = await engine.submit(office('crew'), { scope: SCOPE_REQ, subjectRef: 'EMPTY-1', subject: {} });
+    const requuid = (r as any).requuid;
+    expect((await engine.decide(office('user-rev-1'), requuid, { decision: 'approve' })).nodeSatisfied).toBe(false);
+    const d = await engine.decide(admin, requuid, { decision: 'approve', remarks: 'nobody holds the role' });
+    expect(d.requestStatus).toBe('approved');
+    const slots = await provider.forTenant('default').getSlots(requuid);
+    const empty = slots.find((s) => s.roleId === 'demo-role-nobody')!;
+    expect(empty.decidedBy).toBe('sys-admin');
+    expect(empty.remarks).toMatch(/^\[ADMIN OVERRIDE/);
+  });
+  it('(a) ANY step with a reachable approver is NOT stuck → admin gets 403', async () => {
+    await engine.saveWorkflow(office('admin'), wf(SCOPE_REQ, 'normal', [{ roles: ['demo-role-reviewer', 'demo-role-nobody'], rule: 'any' }]));
+    const r = await engine.submit(office('crew'), { scope: SCOPE_REQ, subjectRef: 'EMPTY-2', subject: {} });
+    await expect(engine.decide(admin, (r as any).requuid, { decision: 'approve' }))
+      .rejects.toMatchObject({ statusCode: 403, code: 'NOT_YOUR_TURN' });
+  });
+});
