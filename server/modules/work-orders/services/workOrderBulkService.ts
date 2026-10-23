@@ -1,5 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
-import { requiresOfficeReview } from '@shared/officeReviewer';
+import { jobRequiresOfficeReview } from '@shared/officeReviewer';
 import { ValidationError } from '../../shared/errors';
 import { calculateMissedCycles, calculateNextDueDate, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
@@ -148,7 +148,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       if (existingWO.jobId) {
         try {
           const linkedJob = await repo.findJob(existingWO.jobId);
-          if (linkedJob && requiresOfficeReview(linkedJob.officeReviewerRoleRuids)) {
+          if (linkedJob && jobRequiresOfficeReview(linkedJob)) {
             requiresLevel2Review = true;
           }
         } catch (err) {

@@ -4,6 +4,7 @@ import { jobs, insertJobSchema } from '../../../../shared/schema';
 import {
   officeReviewerRoleRuidsSchema, normalizeOfficeReviewerRoles, officeReviewerRolesEqual,
   requiresOfficeReview, validateOfficeReviewerRoles, normalizeApprovalOverride, approvalValuesEqual,
+  jobRequiresOfficeReview,
 } from '../../../../shared/officeReviewer';
 
 describe('Office Reviewer configuration contract', () => {
@@ -48,5 +49,19 @@ describe('Office Reviewer configuration contract', () => {
     expect(normalizeApprovalOverride('jobTitle', 'Text')).toBe('Text');
     expect(approvalValuesEqual('officeReviewerRoleRuids', ['A', 'B'], ['B', 'A'])).toBe(true);
     expect(approvalValuesEqual('officeReviewerRoleRuids', ['A'], [])).toBe(false);
+  });
+});
+
+// Ghazi, 23-Oct-2026: roles decide; while they are empty the legacy "Reviewer Rank" keeps review on.
+describe('jobRequiresOfficeReview', () => {
+  it.each([
+    [{ officeReviewerRoleRuids: ['A'], level2ReviewerRankId: null }, true],
+    [{ officeReviewerRoleRuids: [], level2ReviewerRankId: 'Office' }, true],
+    [{ officeReviewerRoleRuids: null, level2ReviewerRankId: 'Office' }, true],
+    [{ officeReviewerRoleRuids: [], level2ReviewerRankId: '  ' }, false],
+    [{ officeReviewerRoleRuids: [], level2ReviewerRankId: null }, false],
+    [null, false],
+  ])('%j → %s', (job, expected) => {
+    expect(jobRequiresOfficeReview(job as any)).toBe(expected);
   });
 });

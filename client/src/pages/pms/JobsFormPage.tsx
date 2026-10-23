@@ -220,6 +220,10 @@ const JobsFormPage: React.FC = () => {
   const [originalData, setOriginalData] = useState<Record<string, any>>({});
   const [safetyDraft, setSafetyDraft] = useState<JobSafetyDraft>({});
 
+  // Ghazi, 23-Oct-2026: the legacy "Reviewer Rank" still turns office review on while no Office Reviewer roles are set.
+
+  const [legacyOfficeReview, setLegacyOfficeReview] = useState(false);
+
   const [templateData, setTemplateData] = useState({
     woTitle: "",
     component: "",
@@ -282,6 +286,8 @@ const JobsFormPage: React.FC = () => {
         const templateDataFromContext = Object.fromEntries(
           Object.entries(context.templateData).filter(([key]) => key !== "level2ReviewerRankId"),
         );
+        const legacyRank = (context.templateData as { level2ReviewerRankId?: unknown }).level2ReviewerRankId;
+        setLegacyOfficeReview(typeof legacyRank === "string" && legacyRank.trim() !== "");
         const newTemplateData = {
           ...templateDataFromContext,
           woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
@@ -1337,6 +1343,11 @@ const JobsFormPage: React.FC = () => {
                     valueMarker="JF.A1.L2R.2"
                     testId="jobs-office-reviewer-select"
                   />
+                  {legacyOfficeReview && normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids).length === 0 && (
+                    <p className="col-span-full -mt-2 text-xs text-amber-700" data-testid="jobs-office-review-legacy-note">
+                      Office review is ON for this Job (from the old "Reviewer Rank" setting). Selecting Office Reviewer roles replaces it.
+                    </p>
+                  )}
                   <EditableField 
                     label="Job Priority" 
                     field="jobPriority"

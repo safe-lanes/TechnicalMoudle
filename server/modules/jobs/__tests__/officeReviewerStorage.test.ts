@@ -104,7 +104,8 @@ function request(overrides: any = {}) {
 }
 
 describe('Actual Office Reviewer storage write paths (isolated fixtures)', () => {
-  it('replaces roles, clears, preserves omitted properties and does not touch tracking/legacy values', async () => {
+  // Ghazi, 23-Oct-2026: a real change of the roles retires the legacy "Reviewer Rank"; other saves keep it.
+  it('replaces roles, clears, preserves omitted properties; a role change retires the legacy value', async () => {
     const f = fixture();
     await f.storage.updateJob('local-job', { officeReviewerRoleRuids: ['C', 'A'] });
     expect(f.records.get(f.jobs)![0].officeReviewerRoleRuids).toEqual(['A', 'C']);
@@ -112,9 +113,17 @@ describe('Actual Office Reviewer storage write paths (isolated fixtures)', () =>
     expect(f.records.get(f.jobs)![0].officeReviewerRoleRuids).toEqual(['A', 'C']);
     await f.storage.updateJob('uuid-job', { officeReviewerRoleRuids: [] });
     expect(f.records.get(f.jobs)![0]).toMatchObject({
-      officeReviewerRoleRuids: [], level2ReviewerRankId: 'Office', lastDoneRH: '1000', nextDueRH: '1100',
+      officeReviewerRoleRuids: [], level2ReviewerRankId: null, lastDoneRH: '1000', nextDueRH: '1100',
     });
     expect(f.writes[0].value.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it('keeps the legacy value when the roles are re-saved unchanged or not sent', async () => {
+    const f = fixture();
+    await f.storage.updateJob('uuid-job', { jobPriority: 'High' });
+    const before = f.records.get(f.jobs)![0].officeReviewerRoleRuids;
+    await f.storage.updateJob('uuid-job', { officeReviewerRoleRuids: before });
+    expect(f.records.get(f.jobs)![0].level2ReviewerRankId).toBe('Office');
   });
 
   it('retains historical role IDs even when missing from the active catalog', async () => {
@@ -130,11 +139,11 @@ describe('Actual Office Reviewer storage write paths (isolated fixtures)', () =>
     expect(f.writes).toHaveLength(0);
   });
 
-  it('defaults new Jobs to [] and strips legacy configuration on create', async () => {
+  it('defaults new Jobs to [] and keeps a legacy value sent by the Excel import', async () => {
     const f = fixture();
     const result = await f.storage.createJob({ vesselId: 'vessel', level2ReviewerRankId: 'Office' });
     expect(result.officeReviewerRoleRuids).toEqual([]);
-    expect(result).not.toHaveProperty('level2ReviewerRankId');
+    expect(result.level2ReviewerRankId).toBe('Office');
   });
 
   it('validates proposed changes without prematurely writing the Job', async () => {

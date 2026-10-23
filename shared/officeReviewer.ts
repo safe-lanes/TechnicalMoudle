@@ -31,6 +31,20 @@ export function requiresOfficeReview(value: unknown): boolean {
   return normalizeOfficeReviewerRoles(value).length > 0;
 }
 
+/**
+ * Job-level decision (Ghazi, 23-Oct-2026): office review is on when the Job has Office Reviewer roles, OR —
+ * while that list is empty — when the legacy "Reviewer Rank" (level2_reviewer_rank_id; the old screen offered only
+ * "Office") is set. Role names differ per company, so legacy values cannot be copied into role IDs; existing Jobs
+ * therefore keep their review until someone changes the Office Reviewer roles (which clears the legacy value).
+ */
+export function jobRequiresOfficeReview(
+  job: { officeReviewerRoleRuids?: unknown; level2ReviewerRankId?: unknown } | null | undefined,
+): boolean {
+  if (!job) return false;
+  if (requiresOfficeReview(job.officeReviewerRoleRuids)) return true;
+  return typeof job.level2ReviewerRankId === "string" && job.level2ReviewerRankId.trim() !== "";
+}
+
 /** Newly added IDs must be active; unchanged IDs survive catalog lag/deactivation. */
 export function validateOfficeReviewerRoles(
   value: unknown,

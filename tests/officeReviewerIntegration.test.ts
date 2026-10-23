@@ -139,7 +139,8 @@ describe.sequential('isolated migration and real ORM / Modify PMS / receiver wri
       expect(job.nextDueDate).toBe(baseline.nextDueDate);
       expect(job.lastDoneDate).toBe(baseline.lastDoneDate);
       expect(job.trackingRebaselinedAt).toBeNull();
-      expect(job.level2ReviewerRankId).toBe('Office');
+      // Ghazi, 23-Oct-2026: changing the roles retires the legacy "Reviewer Rank".
+      expect(job.level2ReviewerRankId).toBeNull();
       expect(job.updatedAt.getTime()).toBeGreaterThanOrEqual(baseline.updatedAt.getTime());
     }
     await updateJob(job.juuid, { officeReviewerRoleRuids: ['A'] });

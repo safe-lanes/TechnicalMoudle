@@ -54,7 +54,7 @@ const baseWorkOrder = {
 describe('final approval date projection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    repo.findJob.mockResolvedValue({ juuid: 'job-1', level2ReviewerRankId: 'Office', officeReviewerRoleRuids: [] });
+    repo.findJob.mockResolvedValue({ juuid: 'job-1', level2ReviewerRankId: null, officeReviewerRoleRuids: [] });
     repo.update.mockImplementation(async (_id, updates) => ({ ...baseWorkOrder, ...updates }));
     repo.createAuditLog.mockResolvedValue(undefined);
     finalizeWorkOrderCompletion.mockResolvedValue(undefined);
@@ -74,17 +74,24 @@ describe('final approval date projection', () => {
     expect(finalizeWorkOrderCompletion).toHaveBeenCalledWith('wo-1');
   });
 
-  it.each([null, [], ['role-A'], ['role-A', 'role-B']].map(selection => ({ selection })))(
-    'bulk approval uses new array $selection only, never legacy Office', async ({ selection }) => {
-      repo.findJob.mockResolvedValue({ juuid: 'job-1', level2ReviewerRankId: 'Office', officeReviewerRoleRuids: selection });
+  // Ghazi, 23-Oct-2026: the roles decide; while they are empty the legacy "Reviewer Rank" still turns review on.
+  it.each([
+    { selection: null, legacy: 'Office', review: true },
+    { selection: [], legacy: 'Office', review: true },
+    { selection: [], legacy: null, review: false },
+    { selection: ['role-A'], legacy: null, review: true },
+    { selection: ['role-A', 'role-B'], legacy: 'Office', review: true },
+  ])(
+    'bulk approval: roles $selection + legacy $legacy → office review $review', async ({ selection, legacy, review }) => {
+      repo.findJob.mockResolvedValue({ juuid: 'job-1', level2ReviewerRankId: legacy, officeReviewerRoleRuids: selection });
       repo.findById.mockResolvedValueOnce({ ...baseWorkOrder, status: 'Pending Approval' });
       const { bulkApprove } = await import('../services/workOrderBulkService');
       const result = await bulkApprove(['wo-1'], 'Chief Engineer');
       expect(result.results.failed).toEqual([]);
       expect(repo.update).toHaveBeenCalledWith('wo-1', expect.objectContaining({
-        status: selection?.length ? 'Pending Office Review' : 'Completed',
+        status: review ? 'Pending Office Review' : 'Completed',
       }));
-      expect(finalizeWorkOrderCompletion.mock.calls.length).toBe(selection?.length ? 0 : 1);
+      expect(finalizeWorkOrderCompletion.mock.calls.length).toBe(review ? 0 : 1);
     }
   );
 

@@ -1,5 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
-import { requiresOfficeReview } from '@shared/officeReviewer';
+import { jobRequiresOfficeReview } from '@shared/officeReviewer';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
@@ -1943,7 +1943,7 @@ export async function updateWorkOrder(id: string, body: any) {
   if (isApprovalTransition && existingWO.jobId) {
     try {
       const linkedJob = await repo.findJob(existingWO.jobId);
-      if (linkedJob && requiresOfficeReview(linkedJob.officeReviewerRoleRuids)) {
+      if (linkedJob && jobRequiresOfficeReview(linkedJob)) {
         interceptedForL2Review = true;
         updateData.status = 'Pending Office Review';
         updateData.approvalDate = new Date().toISOString();

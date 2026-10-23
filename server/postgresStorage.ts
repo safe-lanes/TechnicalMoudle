@@ -7,6 +7,7 @@ import {
   normalizeOfficeReviewerRoles,
   validateOfficeReviewerRoles,
   isOfficeReviewerField,
+  sameOfficeReviewerRoles,
 } from '../shared/officeReviewer';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { getDb } from './db';
@@ -2756,8 +2757,9 @@ export class PostgresStorage {
 
   async createJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
+    // The legacy "Reviewer Rank" may be set on create (Excel import) — it keeps office review on while the Office
+    // Reviewer roles are empty (shared/officeReviewer.ts jobRequiresOfficeReview).
     const jobData = { ...job };
-    delete jobData.level2ReviewerRankId;
     jobData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
       db, Object.prototype.hasOwnProperty.call(jobData, 'officeReviewerRoleRuids') ? jobData.officeReviewerRoleRuids : [], [],
     );
@@ -2773,8 +2775,9 @@ export class PostgresStorage {
 
   async updateJob(id: string, data: Partial<InsertJob>): Promise<Job> {
     const db = await getDb();
+    // The legacy "Reviewer Rank" reaches here only from the Excel import (jobService drops it for the screens);
+    // it is cleared below whenever the Office Reviewer roles change in the same save.
     const safeData = { ...data };
-    delete safeData.level2ReviewerRankId;
     if (Object.prototype.hasOwnProperty.call(safeData, 'officeReviewerRoleRuids')) {
       const existing = (await db.select().from(jobs).where(and(
         or(eq(jobs.juuid, id), eq(jobs.id, id)),
@@ -2784,6 +2787,11 @@ export class PostgresStorage {
       safeData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
         db, safeData.officeReviewerRoleRuids, existing.officeReviewerRoleRuids,
       );
+      // Changing the Office Reviewer roles retires the legacy "Reviewer Rank" (so it can never keep review on
+      // after the roles were cleared). Re-saving the same roles leaves it alone.
+      if (!sameOfficeReviewerRoles(existing.officeReviewerRoleRuids, safeData.officeReviewerRoleRuids)) {
+        safeData.level2ReviewerRankId = null;
+      }
     }
     const result = await db.update(jobs)
       .set({ ...safeData, updatedAt: new Date() })
@@ -6708,6 +6716,10 @@ export class PostgresStorage {
       safeUpdateData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
         tx, safeUpdateData.officeReviewerRoleRuids, beforeState.officeReviewerRoleRuids,
       );
+      // Same rule as updateJob: a real change of the roles retires the legacy "Reviewer Rank".
+      if (!sameOfficeReviewerRoles(beforeState.officeReviewerRoleRuids, safeUpdateData.officeReviewerRoleRuids)) {
+        safeUpdateData.level2ReviewerRankId = null;
+      }
     }
 
     // Legacy field translations for jobs - UI uses different field names than schema
