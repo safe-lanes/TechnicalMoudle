@@ -39,15 +39,19 @@ export async function persistMaintenanceHistory(history: InsertComponentMaintena
     if (!source) throw new Error('Maintenance history source Work Order not found');
     const [vessel] = source.vesselId ? await tx.select().from(vessels)
       .where(or(eq(vessels.vuuid, source.vesselId), eq(vessels.id, source.vesselId))).limit(1) : [];
-    if (!vessel?.vCode) throw new Error('Maintenance history requires a resolved vessel code');
+    // 23-Oct-2026: history keeps the Work Order's vessel id as vessel_code — what every existing row and the sync
+    // field log use. Requiring vessels.v_code refused the save on every vessel without one (all 18 pilot vessels).
+    const vesselCode = source.vesselId ?? vessel?.vuuid ?? null;
+    if (!vesselCode) throw new Error('Maintenance history source Work Order has no vessel');
+    const vesselIds = [vesselCode, vessel?.vuuid, vessel?.id, vessel?.vCode].filter((v): v is string => !!v);
     const [component] = await tx.select().from(components)
       .where(eq(components.cuuid, history.componentId)).limit(1);
-    if (!component?.componentCode || ![vessel.vuuid, vessel.id, vessel.vCode].includes(component.vesselId ?? '')) {
+    if (!component?.componentCode || !vesselIds.includes(component.vesselId ?? '')) {
       throw new Error('Maintenance history component is missing or belongs to another vessel');
     }
     const [job] = source.jobId ? await tx.select().from(jobs)
       .where(eq(jobs.juuid, source.jobId)).limit(1) : [];
-    if (job && ![vessel.vuuid, vessel.id, vessel.vCode].includes(job.vesselId ?? '')) {
+    if (job && !vesselIds.includes(job.vesselId ?? '')) {
       throw new Error('Maintenance history Job belongs to another vessel');
     }
     const existing = await tx.select().from(componentMaintenanceHistory)
@@ -71,7 +75,7 @@ export async function persistMaintenanceHistory(history: InsertComponentMaintena
     const [inserted] = await tx.insert(componentMaintenanceHistory).values({
       ...history,
       componentCode: component.componentCode,
-      vesselCode: vessel.vCode,
+      vesselCode,
       jobId: job?.juuid ?? null,
       jobCode: job?.jobNo ?? null,
       sourceWorkOrderId: isVisibleMaintenanceHistory(history) ? history.sourceWorkOrderId : source.wouuid,

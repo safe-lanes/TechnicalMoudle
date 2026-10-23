@@ -16,6 +16,7 @@ class HistoryDatabase {
   source = { wouuid: 'source-uuid', vesselId: 'vessel-uuid', jobId: 'job-uuid' };
   component = { cuuid: 'component-uuid', componentCode: '601.01', vesselId: 'vessel-uuid' };
   job = { juuid: 'job-uuid', jobNo: 'JOB-123', vesselId: 'vessel-uuid' };
+  vessel: any = { vuuid: 'vessel-uuid', id: 'local-vessel', vCode: 'VES-9' };
   private tail = Promise.resolve();
   async transaction(work: (tx: any) => Promise<any>) {
     const previous = this.tail;
@@ -27,7 +28,7 @@ class HistoryDatabase {
       select: () => ({
         from: (table: unknown) => {
           const read = () => table === workOrders ? [this.source]
-            : table === vessels ? [{ vuuid: 'vessel-uuid', id: 'local-vessel', vCode: 'VES-9' }]
+            : table === vessels ? (this.vessel ? [this.vessel] : [])
             : table === components ? [this.component]
             : table === jobs ? [this.job]
             : table === componentMaintenanceHistory ? this.rows : [];
@@ -81,7 +82,8 @@ describe('actual history transaction boundary', () => {
     expect(db.logs).toHaveLength(2);
     expect(db.locks).toBe(12);
     expect(db.rows.filter(isVisibleMaintenanceHistory)).toHaveLength(1);
-    expect(db.rows.every(row => row.vesselCode === 'VES-9' && row.componentCode === '601.01'
+    // vessel_code = the Work Order's vessel id (as every existing row), not vessels.v_code
+    expect(db.rows.every(row => row.vesselCode === 'vessel-uuid' && row.componentCode === '601.01'
       && row.jobCode === 'JOB-123' && row.workOrderId === 'source-uuid')).toBe(true);
   });
 
@@ -128,6 +130,15 @@ describe('actual history transaction boundary', () => {
     }) };
     await expect(persistMaintenanceHistory(competing)).rejects.toThrow('basis changed');
     expect(db.rows).toHaveLength(1);
+    expect(db.logs).toHaveLength(1);
+  });
+
+  // 23-Oct-2026: a vessel without a V-code (all pilot vessels) must still save its history.
+  it('saves history for a vessel without a V-code, logged under the vessel id', async () => {
+    db.vessel = { vuuid: 'vessel-uuid', id: 'local-vessel', vCode: null };
+    await persistMaintenanceHistory(actual);
+    expect(db.rows).toHaveLength(1);
+    expect(db.rows[0].vesselCode).toBe('vessel-uuid');
     expect(db.logs).toHaveLength(1);
   });
 
