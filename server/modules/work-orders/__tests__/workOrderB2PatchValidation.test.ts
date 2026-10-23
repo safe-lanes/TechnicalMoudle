@@ -51,7 +51,7 @@ describe('PATCH Work Order B2 snapshot validation', () => {
     repo.findJob.mockResolvedValue({
       juuid: 'job-1',
       jobNo: 'JOB-1',
-      level2ReviewerRankId: 'Office',
+      level2ReviewerRankId: null, // no office review: these cases are about B2 validation, not review routing
       officeReviewerRoleRuids: [],
       lastDoneRH: 6000,
       nextDueRH: 6500,
@@ -206,7 +206,7 @@ describe('PATCH Work Order B2 snapshot validation', () => {
   });
 
   it.each([null, [], ['role-A'], ['role-A', 'role-B']].map(selection => ({ selection })))(
-    'single approval uses only new reviewer array $selection', async ({ selection }) => {
+    'single approval with roles $selection + legacy Office → office review', async ({ selection }) => {
       const pending = {
         id: 'wo-1', wouuid: 'wo-uuid', workOrderNo: 'JOB-1-2026-1',
         status: 'Pending Approval', maintenanceBasis: 'Calendar',
@@ -216,6 +216,7 @@ describe('PATCH Work Order B2 snapshot validation', () => {
       };
       repo.findById.mockResolvedValue(pending);
       repo.findJob.mockResolvedValue({
+        // Ghazi, 23-Oct-2026: with no roles, the legacy "Reviewer Rank" ('Office') still turns review on.
         juuid: 'job-1', jobNo: 'JOB-1', level2ReviewerRankId: 'Office',
         officeReviewerRoleRuids: selection, maintenanceBasis: 'Calendar',
       });
@@ -224,7 +225,7 @@ describe('PATCH Work Order B2 snapshot validation', () => {
       const result = await updateWorkOrder('wo-1', {
         status: 'Completed', approvalAction: 'approved', userId: 'Chief Engineer',
       });
-      expect(result.workOrder.status).toBe(selection?.length ? 'Pending Office Review' : 'Completed');
+      expect(result.workOrder.status).toBe('Pending Office Review');
     }
   );
 
