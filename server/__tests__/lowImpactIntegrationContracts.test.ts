@@ -178,7 +178,8 @@ describe("dormant integrations stay outside startup, migration discovery and pro
       .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
     expect(membership).toHaveLength(123);
     expect(createHash("sha256").update(JSON.stringify(membership)).digest("hex"))
-      .toBe("680cfe86dc32bcbde444fc788e328d8683ac5359fedcbcf2d575665cfaf2b0b0");
+      // Updated 23-Oct-2026 for the approved sync fix 43c895faf (component_documents identity id → cduuid, mig 182).
+      .toBe("70d2fa72c76893430b4fb94ac0217a0861a3c87035e57a0cceb2a499ae04b692");
   });
   it("leaves Access Control saves mapping flags directly and omitting generated ids", () => {
     const storage = source("server/postgresStorage.ts");

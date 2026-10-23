@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// 23-Oct-2026: the role catalogue is read through the Job repository (not storage directly).
 vi.mock('../repositories/jobRepository', () => ({
   findById: vi.fn(), findComponent: vi.fn(), update: vi.fn(),
-}));
-vi.mock('../../../storage', () => ({
-  storage: { getActiveRoles: async () => ['A', 'B', 'C'].map(ruid => ({ ruid, isActive: true, isDeleted: false })) },
+  getActiveRoles: async () => ['A', 'B', 'C'].map(ruid => ({ ruid, isActive: true, isDeleted: false })),
 }));
 import * as repo from '../repositories/jobRepository';
 import { updateJob } from '../services/jobService';

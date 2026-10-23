@@ -127,6 +127,8 @@ describe('maintenance history keeps anomaly query inputs and output', () => {
     ]]);
     const Subject = p.method('getMaintenanceHistoryByVessel', {
       getDb: async () => q.db, eq: p.eq, and: p.and, desc: p.desc, sql: p.sql,
+      // 9e894a6f6 hides skipped cycles from every history read (Ghazi 23-Oct-2026: keep hidden)
+      visibleMaintenanceHistory: 'visible-history',
       componentMaintenanceHistory: { vesselCode: 'history.vesselCode', dateCompleted: 'history.dateCompleted' },
       workOrderAnomalies: { workOrderId: 'anomalies.workOrderId', daysLate: 'anomalies.daysLate',
         anomalyType: 'anomalies.type' },
@@ -138,7 +140,7 @@ describe('maintenance history keeps anomaly query inputs and output', () => {
     'preserves order, null IDs and query/aggregation contract for %j', async ids => {
       const after = await run(true, ids);
       expect(after).toEqual(await run(false, ids));
-      expect(after.calls[0].where).toEqual(['eq', 'history.vesselCode', 'ship-A']);
+      expect(after.calls[0].where).toEqual(['and', 'visible-history', ['eq', 'history.vesselCode', 'ship-A']]);
       expect(after.calls[0].orderBy).toEqual(['desc', 'history.dateCompleted']);
       expect(after.result.map((r: any) => r.workOrderId)).toEqual(ids);
       expect(after.result.map((r: any) => r.backdatingDays))

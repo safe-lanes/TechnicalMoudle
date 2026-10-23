@@ -6,6 +6,11 @@ export async function findJobs(vesselId?: string, componentId?: string, vesselId
   return storage.getJobs(vesselId, componentId, vesselIds);
 }
 
+/** Active roles — the Office Reviewer role catalogue (validation of newly added role IDs). */
+export async function getActiveRoles() {
+  return storage.getActiveRoles();
+}
+
 export async function findById(id: string) {
   return storage.getJob(id);
 }
