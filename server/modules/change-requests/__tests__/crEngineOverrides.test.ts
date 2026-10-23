@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // the final approver's overrides are applied then; a non-final step leaves the CR unchanged.
 const repo = vi.hoisted(() => ({
   getChangeRequest: vi.fn(), getSpare: vi.fn(), getJob: vi.fn(), approveChangeRequest: vi.fn(),
-  getChangeRequestApprovalSteps: vi.fn(async () => []), updateChangeRequestApprovalStep: vi.fn(),
+  getChangeRequestApprovalSteps: vi.fn(async () => []), updateChangeRequestApprovalStep: vi.fn(), updateChangeRequest: vi.fn(),
 }));
 const gw = vi.hoisted(() => ({ maybeEngineDecide: vi.fn(), refuseDirectDecision: vi.fn() }));
 vi.mock('../repositories/changeRequestsRepository', () => repo);
@@ -40,14 +40,24 @@ describe('approver value changes through the approval engine', () => {
     expect(repo.approveChangeRequest.mock.calls[0][4]).toEqual(overrides);
   });
 
-  it('non-final step: nothing is applied and nothing is left behind for a later call', async () => {
+  it('non-final step: nothing is applied yet; the edits are recorded for the final apply', async () => {
     gw.maybeEngineDecide.mockResolvedValue({ requestStatus: 'pending', nodeSatisfied: true, activatedNodeKey: 'step-2' });
-    await approveChangeRequest(7, { comment: 'ok', overriddenChanges: overrides });
+    await approveChangeRequest(7, { comment: 'ok', reviewerId: 'u1', overriddenChanges: overrides });
     expect(repo.approveChangeRequest).not.toHaveBeenCalled();
+    // recorded exactly as the old Level 1/2 flow did — storage.finaliseApprovedCRWithStep collects these
+    const saved = repo.updateChangeRequest.mock.calls[0][1].revisionHistory;
+    expect(saved.at(-1)).toMatchObject({ type: 'partial_approval', approvedBy: 'u1',
+      overriddenFields: [{ field: 'remarks', originalNewValue: '100', approverNewValue: '80', modifiedBy: 'u1' }] });
     // a later engine re-entry for the same CR does not pick up the earlier step's overrides
     gw.maybeEngineDecide.mockResolvedValue(null);
     await approveChangeRequest(7, { comment: 'ok' }, { viaEngine: true });
     expect(repo.approveChangeRequest.mock.calls[0][4]).toBeUndefined();
+  });
+
+  it('a non-final step without edits records nothing', async () => {
+    gw.maybeEngineDecide.mockResolvedValue({ requestStatus: 'pending', nodeSatisfied: true, activatedNodeKey: 'step-2' });
+    await approveChangeRequest(7, { comment: 'ok' });
+    expect(repo.updateChangeRequest).not.toHaveBeenCalled();
   });
 
   it('invalid override is refused before any decision', async () => {

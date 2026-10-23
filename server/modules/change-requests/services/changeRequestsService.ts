@@ -392,10 +392,30 @@ async function assertTargetApplicableOnThisInstance(targetType: string | null | 
   );
 }
 
-// 23-Oct-2026 (merge of replit_dev): the approver's value changes (Nilesh's override) must survive the engine.
-// The engine's FINAL decision re-enters approveChangeRequest({ viaEngine }) inside the same request, so the final
-// approver's overrides are held here for that one call. Overrides made at an earlier step are not stored.
+// 23-Oct-2026 (merge of replit_dev): the approvers' value changes (Nilesh's overrides) must survive the engine.
+// - FINAL step: the engine's decision re-enters approveChangeRequest({ viaEngine }) inside the same request, so the
+//   final approver's overrides are held here for that one call.
+// - EARLIER steps: recorded as a 'partial_approval' entry in the CR's revisionHistory — the same record the old
+//   Level 1/2 flow wrote, which the final apply (storage.finaliseApprovedCRWithStep) already collects (later wins).
 const pendingEngineOverrides = new Map<number, Array<{ field: string; approverNewValue: string | string[] }>>();
+
+async function recordStepOverrides(id: number, overrides: Array<{ field: string; approverNewValue: string | string[] }>,
+  reviewerId: string, comment: string): Promise<void> {
+  const fresh = await crRepo.getChangeRequest(id);
+  if (!fresh) return;
+  const now = new Date().toISOString();
+  const proposed = Array.isArray(fresh.proposedChangesJson) ? fresh.proposedChangesJson as any[] : [];
+  const entry = {
+    type: 'partial_approval', approvedBy: reviewerId, approvedAt: now, approvalLevel: 'Approval step', comments: comment,
+    overriddenFields: overrides.map((o) => ({
+      field: o.field,
+      originalNewValue: proposed.find((c) => (c.field ?? c.columnName) === o.field)?.newValue ?? null,
+      approverNewValue: o.approverNewValue, modifiedBy: reviewerId, modifiedAt: now,
+    })),
+  };
+  const history = Array.isArray(fresh.revisionHistory) ? fresh.revisionHistory as any[] : [];
+  await crRepo.updateChangeRequest(id, { revisionHistory: [...history, entry] as any });
+}
 
 export async function approveChangeRequest(id: number, body: {
   comment: string;
@@ -457,7 +477,13 @@ export async function approveChangeRequest(id: number, body: {
       } finally {
         if (!opts.viaEngine) pendingEngineOverrides.delete(id);
       }
-      if (decided) return (await crRepo.getChangeRequest(id))!;
+      if (decided) {
+        // A non-final step: keep this approver's value changes for the final apply.
+        if (!opts.viaEngine && overriddenChanges?.length && decided.requestStatus === 'pending') {
+          await recordStepOverrides(id, overriddenChanges, reviewerId || 'reviewer', comment);
+        }
+        return (await crRepo.getChangeRequest(id))!;
+      }
       // 25-Sep-2026: no direct approval any more — only the engine's final decision applies.
       if (!opts.viaEngine) await gw.refuseDirectDecision(cls.functionId, cls.variableName ?? '');
       await supersedeLegacyCrSteps(id, 'approved');

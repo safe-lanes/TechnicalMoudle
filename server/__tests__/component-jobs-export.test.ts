@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
@@ -224,8 +224,13 @@ beforeEach(() => {
   ] as any);
 });
 
+// The reference workbook lives in attached_assets/, which .gitignore excludes — it exists only in the Replit
+// workspace where it was uploaded. Without it this comparison cannot run anywhere else, so it is skipped (with
+// this reason) instead of failing. To make it run everywhere, commit the template under a tracked fixtures path.
+const hasReferenceTemplate = existsSync(REFERENCE_TEMPLATE);
+
 describe("Component Jobs export workbook", () => {
-  it("matches the uploaded job template headers, Lists, and AB1 version marker", async () => {
+  it.skipIf(!hasReferenceTemplate)("matches the uploaded job template headers, Lists, and AB1 version marker (needs attached_assets/jobs_template_(37)_1790855295976.xlsx)", async () => {
     const reference = new ExcelJS.Workbook();
     await reference.xlsx.readFile(REFERENCE_TEMPLATE);
     const referenceJobs = reference.getWorksheet("Vessel_Job")!;
