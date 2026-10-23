@@ -10,3 +10,4 @@
 - [PMS documentation audience](pms-documentation-audience.md) — Claude has no codebase access; shared documentation must explain behaviour without source lookup.
 - [Vessel Job work-instruction PDFs](job-work-instruction-scope.md) — vessel Jobs only, stable vessel-separated paths, and sync both file metadata and PDFs.
 - [Defect PDF preservation](defect-log-pdf-preservation.md) — keep legacy layouts; individual report exports use current form values without saving.
+- [Spare classification policy](spare-classification-policy.md) — approved category/quantity scope, fleet inheritance, and unresolved legacy-import exception.
