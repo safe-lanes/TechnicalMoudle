@@ -136,7 +136,8 @@ describe('severe review: isolated source probes (not full API/database tests)', 
     return { remove, lookup, res, run: () => run({ params: { documentId: 'doc-1' } }, res) };
   }
 
-  it.fails('[KNOWN DEFECT] current completed-parent deletion should be blocked', async () => {
+  // Was a KNOWN DEFECT (it.fails); fixed on replit-work (woDocumentController resolves the parent WO) — now a regression guard.
+  it('completed-parent deletion is blocked', async () => {
     const f = deletion('Completed');
     await f.run();
     expect(f.remove).not.toHaveBeenCalled();
@@ -235,25 +236,27 @@ describe('severe review: isolated source probes (not full API/database tests)', 
     }
   });
 
-  it('generic PATCH history guard treats SKIPPED as existing history (block-level reproduction)', async () => {
+  // Was a block-level reproduction of SKIPPED rows counting as existing history. 9e894a6f6 hides skipped cycles from
+  // the lookup, so the actual completion record is now created — this guards that.
+  it('generic PATCH history guard no longer treats SKIPPED as existing history', async () => {
     const skipped = { workOrderId: 'wo-canonical', status: 'SKIPPED', isSkipped: true };
+    let predicate: unknown;
     const Lookup = probe.method('getMaintenanceHistoryByWorkOrderId', {
       getDb: async () => ({ select: () => ({ from: () => ({
-        where: async () => [skipped],
+        where: async (p: unknown) => { predicate = p; return JSON.stringify(p).includes('visible-history') ? [] : [skipped]; },
       }) }) }),
       componentMaintenanceHistory: { workOrderId: 'work_order_id' },
       eq: (...args: unknown[]) => args,
+      and: (...args: unknown[]) => ['and', ...args],
+      visibleMaintenanceHistory: 'visible-history',
     });
     const existingHistory = await new Lookup().getMaintenanceHistoryByWorkOrderId('wo-canonical');
+    expect(JSON.stringify(predicate)).toContain('visible-history');
+    // The guard is `if (existingHistory) { skip } else { create }` — a skipped-only WO now reaches "create".
+    expect(existingHistory).toBeUndefined();
     const text = probe.extract('server/modules/work-orders/services/workOrderService.ts', (node: any) =>
       probe.ts.isIfStatement(node) && node.expression.getText() === 'existingHistory'
       && node.getText().includes('freshWorkOrder.id'));
-    const createMaintenanceHistory = vi.fn();
-    await probe.exported(`async function probe() { ${text} }`, 'probe', {
-      existingHistory, freshWorkOrder: { id: 'wo-local' },
-      repo: { createMaintenanceHistory },
-    })();
-    expect(existingHistory.status).toBe('SKIPPED');
-    expect(createMaintenanceHistory).not.toHaveBeenCalled();
+    expect(text).toContain('skipping duplicate creation');
   });
 });

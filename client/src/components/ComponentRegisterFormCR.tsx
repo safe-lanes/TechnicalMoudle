@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -941,19 +943,17 @@ export default function ComponentRegisterFormCR({
                 <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <Label className={getLabelClass('A.installation')}>Installation Date</Label>
-                    <Input 
-                      type="date"
+                    <ComponentDateInput
                       value={componentData.installation}
-                      onChange={(e) => handleInputChange('installation', e.target.value, 'A')}
+                      onChange={(value) => handleInputChange('installation', value, 'A')}
                       className={getFieldClass('A.installation', "border-[#52baf3] border-2")}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className={getLabelClass('A.commissionedDate')}>Commissioned Date</Label>
-                    <Input 
-                      type="date"
+                    <ComponentDateInput
                       value={componentData.commissionedDate}
-                      onChange={(e) => handleInputChange('commissionedDate', e.target.value, 'A')}
+                      onChange={(value) => handleInputChange('commissionedDate', value, 'A')}
                       className={getFieldClass('A.commissionedDate', "border-[#52baf3] border-2")}
                     />
                   </div>
@@ -1182,10 +1182,9 @@ export default function ComponentRegisterFormCR({
                                 />
                               </td>
                               <td className="px-4 py-2">
-                                <Input 
-                                  type="date"
+                                <ComponentDateInput
                                   value={wo.initialNextDue}
-                                  onChange={(e) => handleWorkOrderFieldChange(wo.id!, 'initialNextDue', e.target.value)}
+                                  onChange={(value) => handleWorkOrderFieldChange(wo.id!, 'initialNextDue', value)}
                                   className="h-8"
                                 />
                               </td>
@@ -1223,7 +1222,7 @@ export default function ComponentRegisterFormCR({
                               <td className="px-4 py-2 text-sm">{wo.assignedTo}</td>
                               <td className="px-4 py-2 text-sm">{wo.frequencyType}</td>
                               <td className="px-4 py-2 text-sm">{wo.frequencyValue}</td>
-                              <td className="px-4 py-2 text-sm">{wo.initialNextDue}</td>
+                              <td className="px-4 py-2 text-sm">{formatComponentDate(wo.initialNextDue, "")}</td>
                               <td className="px-4 py-2 text-sm">{wo.notes}</td>
                               <td className="px-4 py-2">
                                 {!wo.pendingDelete && (

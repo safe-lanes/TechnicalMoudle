@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2, Eye, Loader2, Paperclip, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Marker } from "@/components/Marker";
@@ -35,7 +36,9 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useVessels } from "@/hooks/useVessels";
-import { formatProfessionalDate, parseDate } from "@/lib/dateUtils";
+import { parseDate } from "@/lib/dateUtils";
+import { formatComponentDate, formatComponentChangeValue } from "@/lib/componentDatePresentation";
+import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
 import {
   Select,
   SelectContent,
@@ -582,10 +585,9 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.31"><Marker id="B7.A.31" /> Installation Date</label>
           {isChangeMode ? (
-            <input
-              type="date"
+            <ComponentDateInput
               value={componentData.installationDate}
-              onChange={(e) => handleFieldChange('installationDate', e.target.value)}
+              onChange={(value) => handleFieldChange('installationDate', value)}
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('installationDate') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
@@ -593,17 +595,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             />
           ) : (
             <div className="text-sm text-gray-900" data-testid="B7.A.32">
-              <Marker id="B7.A.32" /> {componentData.installationDate}
+              <Marker id="B7.A.32" /> {formatComponentDate(componentData.installationDate, "")}
             </div>
           )}
         </div>
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.33"><Marker id="B7.A.33" /> Commissioned Date</label>
           {isChangeMode ? (
-            <input
-              type="date"
+            <ComponentDateInput
               value={componentData.commissionedDate}
-              onChange={(e) => handleFieldChange('commissionedDate', e.target.value)}
+              onChange={(value) => handleFieldChange('commissionedDate', value)}
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('commissionedDate') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
@@ -611,7 +612,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             />
           ) : (
             <div className="text-sm text-gray-900" data-testid="B7.A.34">
-              <Marker id="B7.A.34" /> {componentData.commissionedDate}
+              <Marker id="B7.A.34" /> {formatComponentDate(componentData.commissionedDate, "")}
             </div>
           )}
         </div>
@@ -809,7 +810,7 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   
   // Get last updated date
   const getLastUpdated = (comp: any) => {
-    return comp?.lastUpdated || latestUpdate?.dateUpdatedLocal || latestUpdate?.updatedAt || '—';
+    return formatComponentDate(comp?.lastUpdated || latestUpdate?.dateUpdatedLocal || latestUpdate?.updatedAt);
   };
 
   const runningHoursColumnDefs = React.useMemo<ColDef[]>(() => {
@@ -920,17 +921,17 @@ const getJobFrequencyDisplay = (job: any): string =>
 
 const getJobNextDueDateDisplay = (job: any): string => {
   if (job.maintenanceBasis === 'Running Hours') {
-    return job.rhEstimatedDueDate ? formatProfessionalDate(job.rhEstimatedDueDate) : 'Not available';
+    return job.rhEstimatedDueDate ? formatComponentDate(job.rhEstimatedDueDate) : 'Not available';
   }
   if (job.maintenanceBasis === 'Dual Frequency') {
     const calendar = parseDate(job.nextDueDate);
     const rh = parseDate(job.rhEstimatedDueDate);
     if (!calendar && !rh) return 'Not available';
-    if (!calendar) return formatProfessionalDate(job.rhEstimatedDueDate);
-    if (!rh) return formatProfessionalDate(job.nextDueDate);
-    return formatProfessionalDate(calendar <= rh ? job.nextDueDate : job.rhEstimatedDueDate);
+    if (!calendar) return formatComponentDate(job.rhEstimatedDueDate);
+    if (!rh) return formatComponentDate(job.nextDueDate);
+    return formatComponentDate(calendar <= rh ? job.nextDueDate : job.rhEstimatedDueDate);
   }
-  return formatProfessionalDate(job.nextDueDate);
+  return formatComponentDate(job.nextDueDate);
 };
 
 const isJobNextDueDateExpected = (job: any): boolean => {
@@ -956,8 +957,8 @@ const getJobNextDueDateTooltip = (job: any, displayedValue: string): string => {
   const calendar = parseDate(job.nextDueDate);
   const rh = parseDate(job.rhEstimatedDueDate);
   if (!calendar && !rh) return 'Not available — insufficient calendar and RH history';
-  const calendarText = calendar ? formatProfessionalDate(job.nextDueDate) : 'Not available';
-  const rhText = rh ? formatProfessionalDate(job.rhEstimatedDueDate) : 'Not available';
+  const calendarText = calendar ? formatComponentDate(job.nextDueDate) : 'Not available';
+  const rhText = rh ? formatComponentDate(job.rhEstimatedDueDate) : 'Not available';
   const basis = calendar && rh && calendar.getTime() === rh.getTime()
     ? 'Calendar + RH'
     : !calendar
@@ -1236,7 +1237,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
         minWidth: 145,
         flex: 1,
         headerComponent: header('Last Done Date', 'B7.C.6', 'B7.C.6'),
-        valueGetter: ({ data }) => data ? formatProfessionalDate(data.lastDoneDate) : '—',
+        valueGetter: ({ data }) => data ? formatComponentDate(data.lastDoneDate) : '—',
         tooltipValueGetter: ({ value }) => value,
       },
       {
@@ -1411,6 +1412,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   const componentDbId = selectedComponent?.actualId;
   const { data: maintenanceHistory = [], isLoading, error: historyLoadError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-maintenance-history/${componentDbId}`],
+    select: rows => rows.filter(isVisibleMaintenanceHistory),
     enabled: !!componentDbId,
   });
   
@@ -1457,10 +1459,11 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
       {
         headerName: 'Date Completed',
         field: 'dateCompleted',
+        valueFormatter: ({ value }) => formatComponentDate(value, ""),
         minWidth: 155,
         flex: 1,
         headerComponent: header('Date Completed', 'B7.D.7', 'B7.D.7'),
-        tooltipField: 'dateCompleted',
+        tooltipValueGetter: ({ value }) => formatComponentDate(value, ""),
       },
       {
         headerName: 'Running Hours',
@@ -2515,7 +2518,7 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
         <label className="text-xs font-medium text-gray-600 block mb-1">Last Class Survey</label>
         <Input
           readOnly
-          value={record.lastClassSurvey || ""}
+          value={formatComponentDate(record.lastClassSurvey, "")}
           className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
           data-testid="view-last-class-survey"
         />
@@ -2524,7 +2527,7 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
         <label className="text-xs font-medium text-gray-600 block mb-1">Next Class Survey</label>
         <Input
           readOnly
-          value={record.nextClassSurvey || record.nextSurveyDue || ""}
+          value={formatComponentDate(record.nextClassSurvey || record.nextSurveyDue, "")}
           className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
           data-testid="view-next-class-survey"
         />
@@ -2621,7 +2624,7 @@ const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }>
                 <td className="py-3 px-3 text-gray-900 font-medium">{req.requisitionNo}</td>
                 <td className="py-3 px-3 text-gray-900">{req.itemOrService}</td>
                 <td className="py-3 px-3 text-gray-900">{req.quantity} {req.uom}</td>
-                <td className="py-3 px-3 text-gray-900">{req.raisedOn}</td>
+                <td className="py-3 px-3 text-gray-900">{formatComponentDate(req.raisedOn, "")}</td>
                 <td className="py-3 px-3">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                     req.priority === 'Urgent' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
@@ -4470,6 +4473,7 @@ const Components: React.FC = () => {
           onClose={() => setShowReviewDrawer(false)}
           targetType="component"
           targetId={selectedComponent.actualId || selectedComponent.id}
+          formatValue={formatComponentChangeValue}
         />
       )}
       

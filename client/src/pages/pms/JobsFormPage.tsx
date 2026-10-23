@@ -1,12 +1,14 @@
 import { apiErrorMessage } from "@/lib/apiErrorMessage";
 import { useState, useEffect, Fragment } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2, Loader2, FileSpreadsheet, ChevronDown, Clock } from "lucide-react";
-import { normalizeDateToDDMMMYYYY, formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
+import { formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
+import { formatJobFormDate } from "@/lib/jobFormDatePresentation";
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { Marker } from "@/components/Marker";
@@ -37,6 +39,7 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 import JobSafetyRequirementsEditor from "@/components/pms/JobSafetyRequirementsEditor";
 import { buildJobSafetyUpdate, type JobSafetyDraft } from "@/lib/jobSafetyRequirements";
+import { OfficeReviewerRoleSelect, normalizeOfficeReviewerRoleRuids, sameOfficeReviewerRoles } from "@/components/OfficeReviewerRoleSelect";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "select" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
   <div className="space-y-2">
@@ -218,6 +221,10 @@ const JobsFormPage: React.FC = () => {
   const [originalData, setOriginalData] = useState<Record<string, any>>({});
   const [safetyDraft, setSafetyDraft] = useState<JobSafetyDraft>({});
 
+  // Ghazi, 23-Oct-2026: the legacy "Reviewer Rank" still turns office review on while no Office Reviewer roles are set.
+
+  const [legacyOfficeReview, setLegacyOfficeReview] = useState(false);
+
   const [templateData, setTemplateData] = useState({
     woTitle: "",
     component: "",
@@ -231,7 +238,7 @@ const JobsFormPage: React.FC = () => {
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
-    level2ReviewerRankId: "",
+    officeReviewerRoleRuids: [] as string[],
     jobPriority: "Medium",
     classRelated: "No",
     department: "",
@@ -277,8 +284,13 @@ const JobsFormPage: React.FC = () => {
         // This ensures clicking a job from component X always binds to component X
         const effectiveComponentCode = activeComponentCode || context.templateData.componentCode || context.templateData.sfiCode || '';
         
+        const templateDataFromContext = Object.fromEntries(
+          Object.entries(context.templateData).filter(([key]) => key !== "level2ReviewerRankId"),
+        );
+        const legacyRank = (context.templateData as { level2ReviewerRankId?: unknown }).level2ReviewerRankId;
+        setLegacyOfficeReview(typeof legacyRank === "string" && legacyRank.trim() !== "");
         const newTemplateData = {
-          ...context.templateData,
+          ...templateDataFromContext,
           woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
           woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
           componentName: context.templateData.componentName || '',
@@ -289,7 +301,7 @@ const JobsFormPage: React.FC = () => {
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           nextDueReading: context.templateData.nextDueRH || '',
           briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || '',
-          level2ReviewerRankId: context.templateData.level2ReviewerRankId || ''
+          officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(context.templateData.officeReviewerRoleRuids)
         };
         
         setTemplateData(prev => ({
@@ -309,14 +321,21 @@ const JobsFormPage: React.FC = () => {
     }));
   };
 
+  const handleOfficeReviewerChange = (ruids: string[]) => {
+    setTemplateData(prev => ({ ...prev, officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(ruids) }));
+  };
+
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
+    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
         changedFields.push(field);
       }
+    }
+    if (!sameOfficeReviewerRoles(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)) {
+      changedFields.push('officeReviewerRoleRuids');
     }
     return changedFields;
   };
@@ -465,8 +484,8 @@ const JobsFormPage: React.FC = () => {
       if (templateData.approver !== originalData.approver) {
         updatePayload.approver = templateData.approver;
       }
-      if (templateData.level2ReviewerRankId !== originalData.level2ReviewerRankId) {
-        updatePayload.level2ReviewerRankId = templateData.level2ReviewerRankId || null;
+      if (!sameOfficeReviewerRoles(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)) {
+        updatePayload.officeReviewerRoleRuids = normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids);
       }
       if (templateData.jobPriority !== originalData.jobPriority) {
         updatePayload.jobPriority = templateData.jobPriority;
@@ -641,7 +660,7 @@ const JobsFormPage: React.FC = () => {
   };
 
   const buildWorkHistoryForExport = () => {
-    const raw = templateData.workHistory || [];
+    const raw = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
     return raw
       .filter((h: any) => {
         const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
@@ -867,43 +886,6 @@ const JobsFormPage: React.FC = () => {
       toast({ variant: 'destructive', title: 'Export failed', description: 'Could not generate the PDF file. Please try again.' });
     } finally {
       setIsExportingHistoryPDF(false);
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-';
-    try {
-      let normalizedDate = dateStr;
-      
-      // Handle non-standard formats like "2025-11-28T1200" (missing colon in time)
-      if (/^\d{4}-\d{2}-\d{2}T\d{4}$/.test(dateStr)) {
-        normalizedDate = dateStr.replace(/T(\d{2})(\d{2})$/, 'T$1:$2:00');
-      }
-      
-      // Handle DD-MMM-YYYY format (e.g., "28-Nov-2025")
-      const ddMmmYyyyMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-      if (ddMmmYyyyMatch) {
-        const [, day, month, year] = ddMmmYyyyMatch;
-        const monthMap: Record<string, string> = {
-          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
-          'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-        };
-        const monthNum = monthMap[month];
-        if (monthNum) {
-          normalizedDate = `${year}-${monthNum}-${day.padStart(2, '0')}`;
-        }
-      }
-      
-      const date = new Date(normalizedDate);
-      if (isNaN(date.getTime())) return dateStr;
-      
-      return date.toLocaleDateString('en-GB', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
-      });
-    } catch {
-      return dateStr;
     }
   };
 
@@ -1352,20 +1334,21 @@ const JobsFormPage: React.FC = () => {
                     labelMarker="JF.A1.19"
                     valueMarker="JF.A1.20"
                   />
-                  <EditableField 
-                    label="Level 2 Reviewer (Rank)" 
-                    field="level2ReviewerRankId"
-                    value={templateData.level2ReviewerRankId} 
-                    originalValue={originalData.level2ReviewerRankId}
-                    onChange={handleFieldChange}
-                    isModifyMode={isModifyMode}
-                    isEditMode={isEditMode}
-                    type="select"
-                    options={ensureRankInOptions([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId)}
-                    displayValue={getRankLabel([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId) || templateData.level2ReviewerRankId || '— None —'}
+                  <OfficeReviewerRoleSelect
+                    label="Office Reviewer"
+                    value={templateData.officeReviewerRoleRuids}
+                    onChange={handleOfficeReviewerChange}
+                    disabled={!isModifyMode && !isEditMode}
+                    changed={!sameOfficeReviewerRoles(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)}
                     labelMarker="JF.A1.L2R.1"
                     valueMarker="JF.A1.L2R.2"
+                    testId="jobs-office-reviewer-select"
                   />
+                  {legacyOfficeReview && normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids).length === 0 && (
+                    <p className="col-span-full -mt-2 text-xs text-amber-700" data-testid="jobs-office-review-legacy-note">
+                      Office review is ON for this Job (from the old "Reviewer Rank" setting). Selecting Office Reviewer roles replaces it.
+                    </p>
+                  )}
                   <EditableField 
                     label="Job Priority" 
                     field="jobPriority"
@@ -1401,14 +1384,14 @@ const JobsFormPage: React.FC = () => {
                     />
                   ) : templateData.maintenanceBasis === 'Dual Frequency' ? (
                     <>
-                      <ReadOnlyField label="Next Due Date (Calendar)" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
+                      <ReadOnlyField label="Next Due Date (Calendar)" value={formatJobFormDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
                       <ReadOnlyField
                         label="Next Due RH"
                         value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
                       />
                     </>
                   ) : (
-                    <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
+                    <ReadOnlyField label="Next Due Date" value={formatJobFormDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
                   )}
                   {(templateData.maintenanceBasis === 'Running Hours' || templateData.maintenanceBasis === 'Dual Frequency') && (() => {
                     const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
@@ -1436,7 +1419,7 @@ const JobsFormPage: React.FC = () => {
                         </Label>
                         <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
                           {lastDate ? (
-                            <>{normalizeDateToDDMMMYYYY(lastDate)}{(() => { const r = formatRelativeTime(lastDate); return r ? ` (${r})` : ''; })()}</>
+                            <>{formatJobFormDate(lastDate)}{(() => { const r = formatRelativeTime(lastDate); return r ? ` (${r})` : ''; })()}</>
                           ) : (
                             <span className="italic text-gray-400">First maintenance cycle</span>
                           )}
@@ -1643,7 +1626,7 @@ const JobsFormPage: React.FC = () => {
                     size="sm"
                     variant="outline"
                     onClick={handleExportWorkHistoryExcel}
-                    disabled={isExportingHistoryExcel || (templateData.workHistory || []).length === 0}
+                    disabled={isExportingHistoryExcel || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                     data-testid="button-export-history-excel"
                     className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-40"
                   >
@@ -1655,7 +1638,7 @@ const JobsFormPage: React.FC = () => {
                     size="sm"
                     variant="outline"
                     onClick={handleExportWorkHistoryPDF}
-                    disabled={isExportingHistoryPDF || (templateData.workHistory || []).length === 0}
+                    disabled={isExportingHistoryPDF || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                     data-testid="button-export-history-pdf"
                     className="h-7 text-xs border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-40"
                   >
@@ -1667,7 +1650,7 @@ const JobsFormPage: React.FC = () => {
               }
             >
               {(() => {
-                const rawHistory = templateData.workHistory || [];
+                const rawHistory = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
 
                 const filteredHistory = rawHistory.filter((h: any) => {
                   const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
@@ -1688,7 +1671,7 @@ const JobsFormPage: React.FC = () => {
                   <>
                     {/* Filter bar */}
                     <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
-                      <PeriodPicker value={historyPeriod} onChange={handleHistoryPeriodChange} className="min-w-[160px]" />
+                      <PeriodPicker value={historyPeriod} onChange={handleHistoryPeriodChange} className="min-w-[160px]" dateDisplayFormat="DD-MM-YYYY" />
                       <input type="hidden" value={historyComponentFilter} data-testid="select-history-component" />
                       <input type="hidden" value={historyDateFrom} data-testid="input-history-date-from" />
                       <input type="hidden" value={historyDateTo} data-testid="input-history-date-to" />
@@ -1740,7 +1723,7 @@ const JobsFormPage: React.FC = () => {
                                   className={`border-b border-gray-200 cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                                   data-testid={`row-history-${index}`}
                                 >
-                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
+                                  <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatJobFormDate(record.isSkipped ? (record.skippedCycleDate || record.completionDate || record.workDate) : (record.completionDate || record.workDate))}</td>
                                   <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.isSkipped ? '—' : (record.woNo || '-')}</td>
                                   <td className="p-2 max-w-[180px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.isSkipped ? 'Cycle not performed' : (record.description || '-')}</td>
                                   <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.isSkipped ? '—' : (record.performedBy || '-')}</td>
@@ -1786,7 +1769,7 @@ const JobsFormPage: React.FC = () => {
                                           <>
                                             <div>
                                               <span className="font-medium text-gray-600">Skipped Cycle Date:</span>{' '}
-                                              <span className="text-gray-800">{formatDate(record.skippedCycleDate) || '—'}</span>
+                                              <span className="text-gray-800">{formatJobFormDate(record.skippedCycleDate) || '—'}</span>
                                             </div>
                                             <div>
                                               <span className="font-medium text-gray-600">Source Work Order:</span>{' '}
@@ -1801,7 +1784,7 @@ const JobsFormPage: React.FC = () => {
                                           <>
                                             <div>
                                               <span className="font-medium text-gray-600">Completion Date:</span>{' '}
-                                              <span className="text-gray-800">{record.completionDate || record.workDate || '—'}</span>
+                                              <span className="text-gray-800">{formatJobFormDate(record.completionDate || record.workDate, '—')}</span>
                                             </div>
                                             <div>
                                               <span className="font-medium text-gray-600">Running Hours:</span>{' '}

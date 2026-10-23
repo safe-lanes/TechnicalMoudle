@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ComponentDateInput } from "./ComponentDateInput";
 import {
   Dialog,
   DialogContent,
@@ -201,10 +202,9 @@ export function AddDraftJobModal({
                   data-testid="input-draft-last-done-rh"
                 />
               ) : (
-                <input
-                  type="date"
+                <ComponentDateInput
                   value={formData.lastDoneDate}
-                  onChange={e => setField('lastDoneDate', e.target.value)}
+                  onChange={value => setField('lastDoneDate', value)}
                   className="text-sm w-full px-2 py-1.5 border rounded border-gray-300 focus:border-blue-400 focus:outline-none"
                   data-testid="input-draft-last-done-date"
                 />

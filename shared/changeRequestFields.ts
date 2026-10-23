@@ -7,7 +7,7 @@
 export interface FieldDefinition {
   columnName: string;
   displayName: string;
-  type: 'text' | 'number' | 'boolean' | 'date' | 'select';
+  type: 'text' | 'number' | 'boolean' | 'date' | 'select' | 'json';
   editable: boolean;
   options?: string[];
 }
@@ -42,6 +42,7 @@ export const COMPONENT_FIELDS: FieldDefinition[] = [
 ];
 
 export const JOB_FIELDS: FieldDefinition[] = [
+  { columnName: 'officeReviewerRoleRuids', displayName: 'Office Reviewer', type: 'json', editable: true },
   { columnName: 'jobTitle', displayName: 'Job Title', type: 'text', editable: true },
   { columnName: 'jobNo', displayName: 'Job Number', type: 'text', editable: false },
   { columnName: 'assignedTo', displayName: 'Assigned To', type: 'text', editable: true },

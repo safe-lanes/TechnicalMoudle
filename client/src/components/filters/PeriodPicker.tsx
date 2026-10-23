@@ -5,59 +5,24 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  formatPeriodDate,
+  formatPeriodDisplayValue,
+  PERIOD_MONTHS as MONTHS,
+  type PeriodDateDisplayFormat,
+  type PeriodValue,
+} from "@/lib/periodPickerPresentation";
 
-type PeriodMode = "yearQuarterMonth" | "dateRange";
-
-interface PeriodValue {
-  mode: PeriodMode;
-  year?: number;
-  quarter?: number;
-  month?: number;
-  dateFrom?: Date;
-  dateTo?: Date;
-}
+type PeriodMode = PeriodValue["mode"];
 
 interface PeriodPickerProps {
   value?: PeriodValue | null;
   onChange: (value: PeriodValue | null) => void;
   className?: string;
+  dateDisplayFormat?: PeriodDateDisplayFormat;
 }
 
-const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-const MONTH_FULL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-function formatDisplayValue(value: PeriodValue | null | undefined): string {
-  if (!value) return "";
-
-  if (value.mode === "yearQuarterMonth") {
-    if (value.month !== undefined && value.year) {
-      return `${MONTHS[value.month]}-${value.year}`;
-    }
-    if (value.quarter !== undefined && value.year) {
-      return `Q${value.quarter}-${value.year}`;
-    }
-    if (value.year) {
-      return `${value.year}`;
-    }
-    return "";
-  }
-
-  if (value.mode === "dateRange") {
-    if (value.dateFrom && value.dateTo) {
-      const fmt = (d: Date) => `${d.getDate().toString().padStart(2, "0")} ${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
-      return `${fmt(value.dateFrom)} - ${fmt(value.dateTo)}`;
-    }
-    if (value.dateFrom) {
-      const d = value.dateFrom;
-      return `From ${d.getDate().toString().padStart(2, "0")} ${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
-    }
-    return "";
-  }
-
-  return "";
-}
-
-export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) {
+export function PeriodPicker({ value, onChange, className, dateDisplayFormat = "DD MMM YYYY" }: PeriodPickerProps) {
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
 
@@ -132,11 +97,10 @@ export function PeriodPicker({ value, onChange, className }: PeriodPickerProps) 
     setSelectedMonth(undefined);
   };
 
-  const displayValue = formatDisplayValue(value);
+  const displayValue = formatPeriodDisplayValue(value, dateDisplayFormat);
 
   const formatDateForInput = (d: Date | undefined) => {
-    if (!d) return "";
-    return `${d.getDate().toString().padStart(2, "0")} ${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
+    return formatPeriodDate(d, dateDisplayFormat);
   };
 
   return (

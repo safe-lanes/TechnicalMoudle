@@ -1,4 +1,7 @@
+import { validateReviewerSelection } from './officeReviewerValidation';
+import { officeReviewerRoleRuidsSchema } from '@shared/officeReviewer';
 import * as repo from '../repositories/jobRepository';
+import { isVisibleMaintenanceHistory } from '@shared/workOrders/maintenanceHistoryVisibility';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../shared/errors';
 
 interface UserInfo {
@@ -98,6 +101,10 @@ export async function createJob(body: any) {
 
   const jobCreateSchema = insertJobSchema.extend({ juuid: z.string().optional() });
   const createInput = { ...body };
+  delete createInput.level2ReviewerRankId;
+  createInput.officeReviewerRoleRuids = await validateReviewerSelection(
+    Object.prototype.hasOwnProperty.call(createInput, 'officeReviewerRoleRuids') ? createInput.officeReviewerRoleRuids : []
+  );
   if (!Object.prototype.hasOwnProperty.call(createInput, 'lastDoneDate')) {
     if (Object.prototype.hasOwnProperty.call(createInput, 'lastCompletedDate')) {
       createInput.lastDoneDate = createInput.lastCompletedDate;
@@ -287,6 +294,12 @@ export async function updateJob(id: string, body: any) {
   const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import('@shared/dateUtils');
 
   let updateData = { ...body };
+  delete updateData.level2ReviewerRankId;
+  if (Object.prototype.hasOwnProperty.call(updateData, 'officeReviewerRoleRuids')) {
+    const result = officeReviewerRoleRuidsSchema.safeParse(updateData.officeReviewerRoleRuids);
+    if (!result.success) throw new ValidationError('Office Reviewer must be an array of unique nonempty role IDs');
+    updateData.officeReviewerRoleRuids = result.data.slice().sort();
+  }
   if (!Object.prototype.hasOwnProperty.call(updateData, 'lastDoneDate')) {
     if (Object.prototype.hasOwnProperty.call(updateData, 'lastCompletedDate')) {
       updateData.lastDoneDate = updateData.lastCompletedDate;
@@ -328,6 +341,12 @@ export async function updateJob(id: string, body: any) {
   const existingJob = await repo.findById(id);
   if (!existingJob) {
     throw new NotFoundError('Job not found');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updateData, 'officeReviewerRoleRuids')) {
+    updateData.officeReviewerRoleRuids = await validateReviewerSelection(
+      updateData.officeReviewerRoleRuids, existingJob.officeReviewerRoleRuids
+    );
   }
 
   // Validate jobNo if it is being changed: blank values are not allowed
@@ -525,10 +544,11 @@ export async function getJobMaintenanceHistory(jobId: string, user: UserInfo) {
   }
 
   let history = await repo.findMaintenanceHistoryByJobId(jobId);
+  history = history.filter(isVisibleMaintenanceHistory);
   if (history.length === 0 && job.jobNo) {
     history = await repo.findMaintenanceHistoryByJobCode(job.jobNo);
   }
-  return history;
+  return history.filter(isVisibleMaintenanceHistory);
 }
 
 // ── Generate Work Order ──

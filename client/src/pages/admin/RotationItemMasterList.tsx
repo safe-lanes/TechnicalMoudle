@@ -1,3 +1,4 @@
+import { useAdminUrlState, useAdminOptionValidation } from "@/hooks/useAdminUrlState";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -70,10 +71,11 @@ function statusBadge(status: string) {
 
 export default function RotationItemMasterList({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
-  const { data: vessels = [] } = useVessels();
-  const [selectedVesselId, setSelectedVesselId] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { data: vessels = [], isLoading: vesselsLoading, error: vesselsError } = useVessels();
+  const [selectedVesselId, setSelectedVesselId] = useAdminUrlState<string>("master.rotation.vessel", "");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.rotation.search", "");
+  const [statusFilter, setStatusFilter] = useAdminUrlState<string>("master.rotation.status", "all", ["all", "Installed", "Spare", "In Store", "Retired"]);
+  useAdminOptionValidation(selectedVesselId, setSelectedVesselId, !vesselsLoading && !vesselsError ? vessels.map(v => v.id) : undefined);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MasterItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<MasterItem | null>(null);

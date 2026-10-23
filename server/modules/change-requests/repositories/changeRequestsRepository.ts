@@ -34,7 +34,7 @@ export async function deleteChangeRequest(id: number): Promise<void> {
 
 // ── Workflow Actions ──
 
-export async function approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+export async function approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string | string[] }>): Promise<ChangeRequest> {
   return storage.approveChangeRequest(id, reviewerId, comment, role, overriddenChanges);
 }
 

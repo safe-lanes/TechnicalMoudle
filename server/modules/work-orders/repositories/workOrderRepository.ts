@@ -1,4 +1,7 @@
 import { storage } from '../../../storage';
+import { getDb } from '../../../db';
+import { componentMaintenanceHistory } from '@shared/schema';
+import { eq, or } from 'drizzle-orm';
 
 // ── Core Work Order Methods ──
 
@@ -156,6 +159,15 @@ export async function getInventoryTransactions(vesselId: string, options?: any) 
 }
 
 // ── Maintenance History ──
+
+/** Internal provenance/retry read: deliberately includes hidden skipped rows. */
+export async function findMaintenanceHistoryForSource(sourceId: string) {
+  const db = await getDb();
+  return db.select().from(componentMaintenanceHistory).where(or(
+    eq(componentMaintenanceHistory.workOrderId, sourceId),
+    eq(componentMaintenanceHistory.sourceWorkOrderId, sourceId),
+  ));
+}
 
 export async function createMaintenanceHistory(data: any) {
   return storage.createComponentMaintenanceHistory(data);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators, formatWorkOrderDateDDMMYYYY, workOrderOverdueCompletionMessage } from "@shared/dateUtils";
 import {
   AlertDialog,
@@ -82,6 +83,7 @@ import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection
 import { ApprovalProcessSection, useWorkOrderApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import { WorkOrderDateInput } from "@/components/pms/WorkOrderDateInput";
 import { getLowerRunningHoursWarning, RunningHoursUpdateError } from "./runningHoursErrorFeedback";
+import { OfficeReviewerRoleSelect, normalizeOfficeReviewerRoleRuids, sameOfficeReviewerRoles } from "@/components/OfficeReviewerRoleSelect";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -237,7 +239,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const workOrderContext = resolvedMode === 'template' ? jobContext : woContext;
   const isContextLoading = resolvedMode === 'template' ? isJobContextLoading : isWoContextLoading;
 
-  const hasReviewerTab = resolvedMode !== 'template' && !!(workOrderContext as any)?.job?.level2ReviewerRankId;
+  const reviewerStatus = (workOrderContext as any)?.workOrder?.status;
+  const hasReviewerTab = resolvedMode !== 'template' && (
+    normalizeOfficeReviewerRoleRuids((workOrderContext as any)?.job?.officeReviewerRoleRuids).length > 0 ||
+    reviewerStatus === 'Pending Office Review'
+  );
   const navStepsWithReviewer = hasReviewerTab
     ? [...navSteps, { id: 'part-c', label: 'C', title: 'Reviewer' }]
     : navSteps;
@@ -296,7 +302,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
-    level2ReviewerRankId: null as string | null,
+    officeReviewerRoleRuids: [] as string[],
     jobPriority: "Medium",
     classRelated: "No",
     department: "",
@@ -729,7 +735,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const buildWorkHistoryForExport = () => {
-    const raw = templateData.workHistory || [];
+    const raw = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
     return raw
       .filter((h: any) => {
         const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
@@ -1146,8 +1152,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const useRhWorkOrderSnapshot =
           useWorkOrderSnapshot
           && context.templateData.maintenanceBasis === 'Running Hours';
+        const templateDataFromContext = Object.fromEntries(
+          Object.entries(context.templateData).filter(([key]) => key !== "level2ReviewerRankId"),
+        );
         const normalizedTemplateData = {
-          ...context.templateData,
+          ...templateDataFromContext,
+          maintenanceBasis: context.templateData.maintenanceBasis,
           // Map backend field names to frontend field names
           woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
           woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
@@ -1171,6 +1181,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           criticality: context.templateData.criticality || '',
           isActive: context.templateData.isActive || 'Yes',
           briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || '',
+          officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(
+            Object.prototype.hasOwnProperty.call(context.job || {}, 'officeReviewerRoleRuids')
+              ? context.job.officeReviewerRoleRuids
+              : context.templateData.officeReviewerRoleRuids,
+          ),
           nextDueDate: context.templateData.nextDueDate || '',
           requiredSpareParts: context.templateData.requiredSpareParts || [],
           requiredTools: context.templateData.requiredTools || [],
@@ -1417,13 +1432,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     });
   };
 
-  const handleReviewerChange = (value: string | null) => {
+  const handleOfficeReviewerChange = (ruids: string[]) => {
     hasUserTouchedForm.current = true;
     setTemplateData(prev => {
+      const normalized = normalizeOfficeReviewerRoleRuids(ruids);
       if (isModifyMode && trackFieldChange) {
-        trackFieldChange('level2ReviewerRankId', value, prev.level2ReviewerRankId);
+        if (!sameOfficeReviewerRoles(normalized, prev.officeReviewerRoleRuids)) {
+          trackFieldChange('officeReviewerRoleRuids', normalized, prev.officeReviewerRoleRuids);
+        }
       }
-      return { ...prev, level2ReviewerRankId: value };
+      return { ...prev, officeReviewerRoleRuids: normalized };
     });
   };
 
@@ -3267,7 +3285,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           : templateData.maintenanceBasis === 'Running Hours'
             ? parseInt(normalizedFrequency, 10)
             : undefined,
-        level2ReviewerRankId: templateData.level2ReviewerRankId || null,
+        officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids),
         lastDoneRH: (templateData as any).lastDoneRH ? String((templateData as any).lastDoneRH).trim() : null,
         lastDoneDate: mapLastCompletedOnToLastDoneDate((templateData as any).lastCompletedOn),
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
@@ -4753,21 +4771,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 {!isUnplannedCreate && (
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.L2R">Level 2 Reviewer (Rank)</Label>
-                  <Select
-                    value={templateData.level2ReviewerRankId || ''}
-                    onValueChange={(value) => handleReviewerChange(value || null)}
+                <OfficeReviewerRoleSelect
+                    label="Office Reviewer"
+                    value={templateData.officeReviewerRoleRuids}
+                    onChange={handleOfficeReviewerChange}
                     disabled={isPartAReadOnly}
-                  >
-                    <SelectTrigger className="text-sm" data-testid="select-level2-reviewer-rank">
-                      <SelectValue placeholder="— None —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Office">Office</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    labelMarker="WOF.A1.L2R"
+                    testId="work-order-office-reviewer-select"
+                />
                 )}
 
                 {!isUnplannedCreate && (
@@ -5252,7 +5263,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={handleExportWorkHistoryExcel}
-                  disabled={isExportingHistoryExcel || (templateData.workHistory || []).length === 0}
+                  disabled={isExportingHistoryExcel || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                   data-testid="button-export-history-excel"
                   className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-40"
                 >
@@ -5264,7 +5275,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={handleExportWorkHistoryPDF}
-                  disabled={isExportingHistoryPDF || (templateData.workHistory || []).length === 0}
+                  disabled={isExportingHistoryPDF || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                   data-testid="button-export-history-pdf"
                   className="h-7 text-xs border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-40"
                 >
@@ -5276,7 +5287,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             }
           >
             {(() => {
-              const rawHistory = templateData.workHistory || [];
+              const rawHistory = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
               type SpareUsedItem = { partName?: string; partCode?: string; quantity?: number | null };
               const allHistory = rawHistory.map((history: any) => {
                 if (history.isSkipped) {
@@ -7451,10 +7462,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 variant="inline"
               >
                 <div className="space-y-4">
-                  {!!templateData.level2ReviewerRankId && (
+                  {normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids).length > 0 && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800" data-testid="text-reviewer-rank-info">
-                      <span className="font-medium">Reviewer Rank:</span>
-                      <span>{templateData.level2ReviewerRankId}</span>
+                      <span className="font-medium">Office Reviewer roles are configured.</span>
                     </div>
                   )}
                   <div className="space-y-2">

@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type FleetComponents, type MakerList } from "@shared/schema";
@@ -20,7 +21,7 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   const canCreateMasters = canCreate("admin-masters");
   const canEditMasters = canEdit("admin-masters");
   const canDeleteMasters = canDelete("admin-masters");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.components.search", "");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<FleetComponents | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());

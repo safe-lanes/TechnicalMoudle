@@ -72,8 +72,8 @@ export async function deleteDocument(req: Request, res: Response) {
   const { documentId } = req.params;
 
   const doc = await findDocById(documentId);
-  if (doc && doc.workOrderUuid) {
-    const wo = await woRepo.findById(doc.workOrderUuid);
+  if (doc && doc.workOrderId) {
+    const wo = await woRepo.findById(doc.workOrderId);
     if (wo && isCompletedStatus(wo.status)) {
       return res.status(403).json({ error: 'Editing is not allowed because the Work Order is completed.' });
     }

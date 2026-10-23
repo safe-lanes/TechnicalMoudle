@@ -1,4 +1,5 @@
 import * as repo from '../repositories/componentRepository';
+import { isVisibleMaintenanceHistory } from '@shared/workOrders/maintenanceHistoryVisibility';
 import { insertComponentClassRegulatorySchema, insertComponentRequisitionSchema } from '@shared/schema';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../../shared/errors';
 import { assertShipVesselAccess } from './shipVesselAccess';
@@ -171,12 +172,12 @@ export async function deleteRequisition(id: number) {
 // ── Maintenance History (read-only) ──
 
 export async function listAllMaintenanceHistory() {
-  return repo.findAllMaintenanceHistory();
+  return (await repo.findAllMaintenanceHistory()).filter(isVisibleMaintenanceHistory);
 }
 
 export async function listVesselMaintenanceHistory(vesselId: string, user?: UserInfo) {
   if (user) assertShipVesselAccess(user, vesselId);
-  return repo.findMaintenanceHistoryByVessel(vesselId);
+  return (await repo.findMaintenanceHistoryByVessel(vesselId)).filter(isVisibleMaintenanceHistory);
 }
 
 export async function listMaintenanceHistory(componentId: string, user: UserInfo) {
@@ -192,13 +193,13 @@ export async function listMaintenanceHistory(componentId: string, user: UserInfo
     history = await repo.findMaintenanceHistoryByCode(component.componentCode, component.vesselCode);
   }
 
-  return history;
+  return history.filter(isVisibleMaintenanceHistory);
 }
 
 export async function getMaintenanceHistoryItem(id: number, user: UserInfo) {
   assertShipVesselAccess(user);
   const item = await repo.findMaintenanceHistoryItem(id);
-  if (!item) throw new NotFoundError('Maintenance history item not found');
+  if (!item || !isVisibleMaintenanceHistory(item)) throw new NotFoundError('Maintenance history item not found');
   assertShipVesselAccess(user, item.vesselCode);
 
   return item;

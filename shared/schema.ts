@@ -1,3 +1,4 @@
+import { officeReviewerRoleRuidsSchema } from "./officeReviewer";
 
 import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -1208,7 +1209,8 @@ export const jobs = pgTable("jobs", {
   briefWorkDescription: text("brief_work_description"),
   jobDescription: text("job_description"), // Detailed job description
   approver: text("approver"), // Rank who approves the job
-  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Optional second-stage reviewer rank (Level 2 Office Review)
+  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Retired legacy column; never use as reviewer configuration or fallback
+  officeReviewerRoleRuids: jsonb("office_reviewer_role_ruids").$type<string[]>().default([]),
   department: text("department"),
   
   // Template data (Part A)
@@ -1242,7 +1244,9 @@ export const jobs = pgTable("jobs", {
   nextDueDateIdx: index("idx_job_next_due").on(table.nextDueDate),
 }));
 
-export const insertJobSchema = createInsertSchema(jobs).omit({
+export const insertJobSchema = createInsertSchema(jobs, {
+  officeReviewerRoleRuids: officeReviewerRoleRuidsSchema.optional().default([]),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -4237,7 +4241,6 @@ export const admRoleMenuAccess = pgTable("adm_role_menu_access", {
 ]);
 
 export const insertAdmRoleMenuAccessSchema = createInsertSchema(admRoleMenuAccess).omit({
-  id: true,
   createdAt: true,
   updatedAt: true,
 });

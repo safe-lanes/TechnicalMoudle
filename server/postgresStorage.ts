@@ -1,4 +1,14 @@
 import { randomUUID } from 'crypto';
+import { persistMaintenanceHistory, visibleMaintenanceHistory } from './modules/work-orders/utils/maintenanceHistoryPersistence';
+import {
+  type ApprovalFieldOverride,
+  approvalValuesEqual,
+  normalizeApprovalOverride,
+  normalizeOfficeReviewerRoles,
+  validateOfficeReviewerRoles,
+  isOfficeReviewerField,
+  sameOfficeReviewerRoles,
+} from '../shared/officeReviewer';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { levelsMatch } from '@shared/approvals/level';
 import { getDb } from './db';
@@ -2353,17 +2363,18 @@ export class PostgresStorage {
     const db = await getDb();
     if (vesselCode) {
       return await db.select().from(componentMaintenanceHistory)
-        .where(eq(componentMaintenanceHistory.vesselCode, vesselCode))
+        .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.vesselCode, vesselCode)))
         .orderBy(desc(componentMaintenanceHistory.createdAt));
     }
     return await db.select().from(componentMaintenanceHistory)
+      .where(visibleMaintenanceHistory)
       .orderBy(desc(componentMaintenanceHistory.createdAt));
   }
 
   async getComponentMaintenanceHistory(componentId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.componentId, componentId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.componentId, componentId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
@@ -2371,6 +2382,7 @@ export class PostgresStorage {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
       .where(and(
+        visibleMaintenanceHistory,
         eq(componentMaintenanceHistory.componentCode, componentCode),
         eq(componentMaintenanceHistory.vesselCode, vesselCode)
       ))
@@ -2380,35 +2392,35 @@ export class PostgresStorage {
   async getMaintenanceHistoryByJobId(jobId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.jobId, jobId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.jobId, jobId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
   async getMaintenanceHistoryByJobCode(jobCode: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.jobCode, jobCode))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.jobCode, jobCode)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
   async getComponentMaintenanceHistoryItem(id: number): Promise<ComponentMaintenanceHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.id, id));
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.id, id)));
     return result[0];
   }
 
   async getMaintenanceHistoryByWorkOrderId(workOrderId: string): Promise<ComponentMaintenanceHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.workOrderId, workOrderId));
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.workOrderId, workOrderId)));
     return result[0];
   }
 
   async getMaintenanceHistoryByVessel(vesselId: string): Promise<any[]> {
     const db = await getDb();
     const history = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.vesselCode, vesselId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.vesselCode, vesselId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     if (history.length === 0) return [];
 
@@ -2438,11 +2450,7 @@ export class PostgresStorage {
 
   // INSERT ONLY - No update or delete methods per immutability requirement
   async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
-    const db = await getDb();
-    const result = await db.insert(componentMaintenanceHistory).values(history).returning();
-    // Sync field logging — INSERT
-    try { await logFieldChanges('component_maintenance_history', result[0].cmhuuid, (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] cmh create:', e); }
-    return result[0];
+    return persistMaintenanceHistory(history);
   }
 
   // ============= MODULE 3: COMPONENT REQUISITIONS =============
@@ -2883,9 +2891,15 @@ export class PostgresStorage {
 
   async createJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
+    // The legacy "Reviewer Rank" may be set on create (Excel import) — it keeps office review on while the Office
+    // Reviewer roles are empty (shared/officeReviewer.ts jobRequiresOfficeReview).
+    const jobData = { ...job };
+    jobData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+      db, Object.prototype.hasOwnProperty.call(jobData, 'officeReviewerRoleRuids') ? jobData.officeReviewerRoleRuids : [], [],
+    );
     const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(jobs).values({
-      ...job,
+      ...jobData,
       id,
       juuid: randomUUID(),
       dataScope: job.dataScope || 'vessel',
@@ -2895,8 +2909,26 @@ export class PostgresStorage {
 
   async updateJob(id: string, data: Partial<InsertJob>): Promise<Job> {
     const db = await getDb();
+    // The legacy "Reviewer Rank" reaches here only from the Excel import (jobService drops it for the screens);
+    // it is cleared below whenever the Office Reviewer roles change in the same save.
+    const safeData = { ...data };
+    if (Object.prototype.hasOwnProperty.call(safeData, 'officeReviewerRoleRuids')) {
+      const existing = (await db.select().from(jobs).where(and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+      )).limit(1))[0];
+      if (!existing) throw new Error(`Job ${id} not found`);
+      safeData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+        db, safeData.officeReviewerRoleRuids, existing.officeReviewerRoleRuids,
+      );
+      // Changing the Office Reviewer roles retires the legacy "Reviewer Rank" (so it can never keep review on
+      // after the roles were cleared). Re-saving the same roles leaves it alone.
+      if (!sameOfficeReviewerRoles(existing.officeReviewerRoleRuids, safeData.officeReviewerRoleRuids)) {
+        safeData.level2ReviewerRankId = null;
+      }
+    }
     const result = await db.update(jobs)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...safeData, updatedAt: new Date() })
       .where(and(
         or(eq(jobs.juuid, id), eq(jobs.id, id)),
         or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
@@ -2906,6 +2938,23 @@ export class PostgresStorage {
       throw new Error(`Job ${id} not found`);
     }
     return result[0];
+  }
+
+  /** Shared by ordinary Job writes and final CR application (using the same tx). */
+  private async validateJobReviewerSelection(db: any, value: unknown, existing: unknown): Promise<string[]> {
+    try {
+      // Retained selections need no catalog lookup; this also tolerates catalog lag.
+      const retained = new Set(normalizeOfficeReviewerRoles(existing));
+      const additions = Array.isArray(value) ? value.filter(id => !retained.has(id)) : [];
+      const active = additions.length ? await db.select({ ruid: admnRoleMaster.ruid })
+        .from(admnRoleMaster).where(and(
+          eq(admnRoleMaster.isActive, true),
+          or(eq(admnRoleMaster.isDeleted, false), isNull(admnRoleMaster.isDeleted)),
+        )) : [];
+      return validateOfficeReviewerRoles(value, existing, active.map((role: { ruid: string }) => role.ruid));
+    } catch (error) {
+      throw new ValidationError(error instanceof Error ? error.message : 'Invalid Office Reviewer selection');
+    }
   }
 
   /** Atomic cycle-and-estimate write; retry against a fresh Job on a failed CAS. */
@@ -6104,6 +6153,7 @@ export class PostgresStorage {
 
   async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
     const db = await getDb();
+    await this.validateReviewerChangeRequest(db, request);
     const result = await db.insert(changeRequest).values({
       ...request,
       targetType: request.targetType || null,
@@ -6124,6 +6174,13 @@ export class PostgresStorage {
     const db = await getDb();
     // Fetch existing for sync field logging
     const existingCR = await this.getChangeRequest(id);
+    if (existingCR && (
+      Object.prototype.hasOwnProperty.call(data, 'proposedChangesJson') ||
+      Object.prototype.hasOwnProperty.call(data, 'targetType') ||
+      Object.prototype.hasOwnProperty.call(data, 'targetId')
+    )) {
+      await this.validateReviewerChangeRequest(db, { ...existingCR, ...data });
+    }
     const result = await db.update(changeRequest)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(changeRequest.id, id))
@@ -6136,6 +6193,28 @@ export class PostgresStorage {
       try { await logFieldChanges('change_request', existingCR.cruuid, (existingCR as any).vesselId || null, existingCR, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CR update:', e); }
     }
     return result[0];
+  }
+
+  private async validateReviewerChangeRequest(
+    db: any,
+    request: { targetType?: string | null; targetId?: string | null; proposedChangesJson?: unknown },
+  ): Promise<void> {
+    if (!Array.isArray(request.proposedChangesJson)) return;
+    const changes = request.proposedChangesJson.filter(change =>
+      typeof change?.field === 'string' && isOfficeReviewerField(change.field),
+    );
+    if (!changes.length) return;
+    if (request.targetType !== 'job' || !request.targetId) {
+      throw new ValidationError('Office Reviewer configuration must target a Job');
+    }
+    const job = (await db.select().from(jobs).where(and(
+      or(eq(jobs.juuid, request.targetId), eq(jobs.id, request.targetId)),
+      or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+    )).limit(1))[0];
+    if (!job) throw new ValidationError('Office Reviewer target Job not found');
+    for (const change of changes) {
+      await this.validateJobReviewerSelection(db, change.newValue, job.officeReviewerRoleRuids);
+    }
   }
 
   async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
@@ -6267,7 +6346,7 @@ export class PostgresStorage {
 
   // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
 
-  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string, overriddenChanges?: ApprovalFieldOverride[]): Promise<ChangeRequest> {
     return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, new Date(), overriddenChanges);
   }
 
@@ -6281,7 +6360,7 @@ export class PostgresStorage {
     reviewerId: string,
     comment: string,
     now: Date,
-    overriddenChanges?: Array<{ field: string; approverNewValue: string }>
+    overriddenChanges?: ApprovalFieldOverride[]
   ): Promise<ChangeRequest> {
     const db = await getDb();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
@@ -6334,11 +6413,11 @@ export class PostgresStorage {
 
         // Map from field -> { approverNewValue, modifiedBy, modifiedAt }
         // Earlier levels go in first so that higher levels can override them.
-        const accumulatedOverrideMap = new Map<string, { approverNewValue: string; modifiedBy: string; modifiedAt: string }>();
+        const accumulatedOverrideMap = new Map<string, { approverNewValue: string | string[]; modifiedBy: string; modifiedAt: string }>();
         for (const partial of partialApprovals) {
           for (const ov of (partial.overriddenFields || [])) {
             accumulatedOverrideMap.set(String(ov.field), {
-              approverNewValue: String(ov.approverNewValue ?? ''),
+              approverNewValue: normalizeApprovalOverride(String(ov.field), ov.approverNewValue),
               modifiedBy: String(ov.modifiedBy ?? partial.approvedBy ?? ''),
               modifiedAt: String(ov.modifiedAt ?? partial.approvedAt ?? now.toISOString())
             });
@@ -6347,7 +6426,7 @@ export class PostgresStorage {
         // Final approver's overrides take precedence over all previous levels
         for (const ov of (overriddenChanges || [])) {
           accumulatedOverrideMap.set(ov.field, {
-            approverNewValue: ov.approverNewValue,
+            approverNewValue: normalizeApprovalOverride(ov.field, ov.approverNewValue),
             modifiedBy: reviewerId,
             modifiedAt: now.toISOString()
           });
@@ -6373,7 +6452,7 @@ export class PostgresStorage {
         const overriddenFields: Array<{
           field: string;
           originalNewValue: any;
-          approverNewValue: string;
+          approverNewValue: string | string[];
           modifiedBy: string;
           modifiedAt: string;
         }> = [];
@@ -6382,7 +6461,7 @@ export class PostgresStorage {
             (c: any) => (c.field ?? c.columnName) === field
           );
           const originalNewValue = original?.newValue ?? null;
-          if (String(originalNewValue ?? '') !== overrideData.approverNewValue) {
+          if (!approvalValuesEqual(field, originalNewValue, overrideData.approverNewValue)) {
             overriddenFields.push({
               field,
               originalNewValue,
@@ -6403,7 +6482,7 @@ export class PostgresStorage {
           appliedFieldCount?: number;
           appliedError?: string;
           comments?: string;
-          overriddenFields?: Array<{ field: string; originalNewValue: any; approverNewValue: string; modifiedBy: string; modifiedAt: string }>;
+          overriddenFields?: Array<{ field: string; originalNewValue: any; approverNewValue: string | string[]; modifiedBy: string; modifiedAt: string }>;
         } = {
           revisionNumber: newRevisionNumber,
           approvedBy: reviewerId,
@@ -6445,9 +6524,36 @@ export class PostgresStorage {
     }
   }
 
-  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: ApprovalFieldOverride[]): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
+    if (overriddenChanges) {
+      if (!Array.isArray(overriddenChanges)) throw new ValidationError('Invalid approval overrides');
+      try {
+        overriddenChanges = overriddenChanges.map(override => {
+          if (!override || typeof override.field !== 'string') throw new Error('Invalid approval override field');
+          return {
+            field: override.field,
+            approverNewValue: normalizeApprovalOverride(override.field, override.approverNewValue),
+          };
+        });
+      } catch (error) {
+        throw new ValidationError(error instanceof Error ? error.message : 'Invalid approval overrides');
+      }
+      const reviewerOverrides = overriddenChanges.filter(override => isOfficeReviewerField(override.field));
+      if (reviewerOverrides.length) {
+        const proposed = Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson as any[] : [];
+        for (const override of reviewerOverrides) {
+          if (!proposed.some(change => change.field === override.field)) {
+            throw new ValidationError('Office Reviewer override must match a proposed field');
+          }
+        }
+        await this.validateReviewerChangeRequest(await getDb(), {
+          ...existing,
+          proposedChangesJson: reviewerOverrides.map(override => ({ field: override.field, newValue: override.approverNewValue })),
+        });
+      }
+    }
 
     // Load approval steps for this CR. 25-Sep-2026: 'Superseded' rows (old Level 1/2 steps
     // replaced by the approval engine's final decision) are settled history, not gates.
@@ -6740,6 +6846,16 @@ export class PostgresStorage {
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
+    delete safeUpdateData.level2ReviewerRankId;
+    if (Object.prototype.hasOwnProperty.call(safeUpdateData, 'officeReviewerRoleRuids')) {
+      safeUpdateData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+        tx, safeUpdateData.officeReviewerRoleRuids, beforeState.officeReviewerRoleRuids,
+      );
+      // Same rule as updateJob: a real change of the roles retires the legacy "Reviewer Rank".
+      if (!sameOfficeReviewerRoles(beforeState.officeReviewerRoleRuids, safeUpdateData.officeReviewerRoleRuids)) {
+        safeUpdateData.level2ReviewerRankId = null;
+      }
+    }
 
     // Legacy field translations for jobs - UI uses different field names than schema
     // woTitle -> jobTitle (UI uses woTitle for display, schema uses jobTitle)
@@ -9700,6 +9816,7 @@ export class PostgresStorage {
     // First try to match by jobId directly
     let results = await db.select().from(componentMaintenanceHistory)
       .where(and(
+        visibleMaintenanceHistory,
         eq(componentMaintenanceHistory.jobId, jobId),
         eq(componentMaintenanceHistory.componentCode, componentCode)
       ))
@@ -9720,7 +9837,9 @@ export class PostgresStorage {
     
     // Get all maintenance history for this component, then filter by jobNo match
     const allRecords = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.componentCode, componentCode))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.componentCode, componentCode),
+        or(eq(componentMaintenanceHistory.vesselCode, job[0].vesselId ?? ''),
+          eq(componentMaintenanceHistory.vesselCode, vesselCode ?? ''))))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     
     // Legacy and vessel-prefixed work order numbers both resolve to the

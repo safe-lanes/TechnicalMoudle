@@ -678,7 +678,7 @@ export async function completeWorkOrder(
         jobId: parentJob?.juuid || parentJob?.id || workOrder.jobId || null,
         jobCode: parentJobNo || null,
         workOrderId: workOrder.wouuid,
-        workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
+        workOrderNo: workOrder.workOrderNo || `WO-${workOrder.id}`,
         jobTitle: workOrder.jobTitle,
         maintenanceType: workOrder.taskType || 'Servicing',
         dateCompleted: normalizeToISO(dateOfCompletion),
@@ -704,71 +704,11 @@ export async function completeWorkOrder(
     console.error('Failed to create maintenance history record:', historyError);
   }
 
-  if (missedCycles >= 1 && component) {
-    try {
-      if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
-        const { createSkippedCycleRecordsRH } = await import('../utils/skippedCycleBackfill');
-        const completionRHValue = parseInt(runningHours);
-        const dueRH = workOrder.nextDueReading ? parseFloat(workOrder.nextDueReading) : 0;
-        let jobIntervalRH = 0;
-        if (workOrder.jobId) {
-          const jobForBackfill = await repo.findJob(workOrder.jobId);
-          if (jobForBackfill?.intervalRunningHour) {
-            jobIntervalRH = jobForBackfill.intervalRunningHour;
-          }
-        }
-        if (!jobIntervalRH && workOrder.frequencyValue) {
-          jobIntervalRH = parseInt(String(workOrder.frequencyValue));
-        }
-        await createSkippedCycleRecordsRH({
-          workOrderId: workOrder.wouuid || workOrder.id,
-          workOrderNo: workOrder.workOrderNo || null,
-          componentId: component.cuuid,
-          componentCode: workOrder.componentCode || component.componentCode || null,
-          vesselCode: workOrder.vesselId || component.vesselId || null,
-          jobId: workOrder.jobId || null,
-          jobCode: workOrder.jobCode || null,
-          jobTitle: workOrder.jobTitle || null,
-          dueRH,
-          completionRH: completionRHValue,
-          intervalRH: jobIntervalRH,
-          missedCycles
-        });
-      } else if (workOrder.maintenanceBasis === 'Dual Frequency') {
-        // Dual Frequency: backfill using calendar leg (always present)
-        const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
-        await createSkippedCycleRecords({
-          workOrderId: workOrder.wouuid || workOrder.id,
-          componentId: component.cuuid,
-          componentCode: workOrder.componentCode || component.componentCode || null,
-          vesselCode: workOrder.vesselId || component.vesselId || null,
-          jobId: workOrder.jobId || null,
-          jobCode: workOrder.jobCode || null,
-          jobTitle: workOrder.jobTitle || null,
-          originalDueDate,
-          missedCycles,
-          frequencyValue: workOrder.frequencyValue,
-          frequencyUnit: workOrder.frequencyUnit
-        });
-      } else if (workOrder.maintenanceBasis === 'Calendar') {
-        const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
-        await createSkippedCycleRecords({
-          workOrderId: workOrder.wouuid || workOrder.id,
-          componentId: component.cuuid,
-          componentCode: workOrder.componentCode || component.componentCode || null,
-          vesselCode: workOrder.vesselId || component.vesselId || null,
-          jobId: workOrder.jobId || null,
-          jobCode: workOrder.jobCode || null,
-          jobTitle: workOrder.jobTitle || null,
-          originalDueDate,
-          missedCycles,
-          frequencyValue: workOrder.frequencyValue,
-          frequencyUnit: workOrder.frequencyUnit
-        });
-      }
-    } catch (err) {
-      console.error('[BACKFILL ERROR] Failed to create skipped cycle records:', err);
-    }
+  try {
+    const { recordSkippedCyclesForWorkOrder } = await import('../utils/skippedCycleBackfill');
+    await recordSkippedCyclesForWorkOrder(workOrder.wouuid, missedCycles, originalDueDate, workOrder.nextDueReading);
+  } catch (err) {
+    console.error('[BACKFILL ERROR] Failed to create skipped cycle records:', err);
   }
 
   // Auto-update parent job's cycle fields
@@ -972,6 +912,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
     console.error(`[Finalize] Work order ${workOrderId} not found`);
     return;
   }
+  if (workOrder.status !== 'Completed') return;
   const vesselCode = workOrder.vesselId
     ? (await repo.getStorage().getVessel(workOrder.vesselId))?.vCode
     : undefined;
@@ -988,7 +929,7 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
       ?? all.find((c: any) => c.componentCode === workOrder.componentCode)
       ?? null;
   }
-  if (!component) {
+  if (!component || (component.vesselId && component.vesselId !== workOrder.vesselId)) {
     console.warn(`[Finalize] Could not find component for WO ${workOrder.workOrderNo} — skipping side-effects`);
     return;
   }
@@ -997,6 +938,12 @@ export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<
   const jobCompletionDate = getJobCompletionDate(workOrder);
   const missedCycles: number = workOrder.missedCycles || 0;
   const originalDueDate: string | null = workOrder.originalDueDate || workOrder.nextDueDate || workOrder.dueDate || null;
+  try {
+    const { recordSkippedCyclesForWorkOrder } = await import('../utils/skippedCycleBackfill');
+    await recordSkippedCyclesForWorkOrder(workOrder.wouuid, missedCycles, originalDueDate);
+  } catch (err) {
+    console.error('[BACKFILL ERROR] Final completion skipped cycle records:', err);
+  }
 
   const normalizeToISO = (d: string): string | null => {
     if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];

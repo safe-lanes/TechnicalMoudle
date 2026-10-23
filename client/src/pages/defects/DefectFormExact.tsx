@@ -90,7 +90,6 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
   const form = useForm<DefectFormData>({
     resolver: zodResolver(defectFormSchema),
     defaultValues: defect ? {
-      id: defect.id,
       vesselId: defect.vesselId || "V001",
       vesselName: defect.vesselName || "MV SEAFARER",
       issueDate: defect.issueDate || "",
@@ -145,7 +144,6 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
       reportReferenceNo: defect.reportReferenceNo || "",
       reportDate: defect.reportDate || "",
     } : {
-      id: defectRef,
       vesselId: "V001",
       vesselName: "MV SEAFARER",
       issueDate: "",

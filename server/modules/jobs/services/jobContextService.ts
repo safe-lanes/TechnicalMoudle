@@ -1,4 +1,5 @@
 import * as repo from '../repositories/jobRepository';
+import { isVisibleMaintenanceHistory } from '@shared/workOrders/maintenanceHistoryVisibility';
 import { NotFoundError } from '../../shared/errors';
 import { ensureArray, ensureJsonObject } from '../../shared/jsonHelpers';
 
@@ -73,7 +74,7 @@ export async function getJobContext(jobId: string) {
       const maintenanceHistoryRecords = await repo.findMaintenanceHistoryByJobId(job.juuid);
       const existingWoIds = new Set(completedWorkOrders.map((wo: any) => wo.wouuid).filter(Boolean));
 
-      for (const h of maintenanceHistoryRecords) {
+      for (const h of maintenanceHistoryRecords.filter(isVisibleMaintenanceHistory)) {
         if (h.isSkipped) {
           workHistory.push({
             woNo: '-',
@@ -172,7 +173,7 @@ export async function getJobContext(jobId: string) {
     intervalRunningHour: job.intervalRunningHour?.toString() || '',
     assignedTo: job.assignedTo,
     approver: job.approver,
-    level2ReviewerRankId: (job as any).level2ReviewerRankId || null,
+    officeReviewerRoleRuids: job.officeReviewerRoleRuids ?? [],
     department: job.department,
     jobPriority: job.jobPriority,
     classRelated: job.classRelated,

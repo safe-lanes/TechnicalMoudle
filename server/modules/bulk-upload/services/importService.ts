@@ -2194,6 +2194,7 @@ export async function performImport(
         // Approver is validated against the Rank Master (admAvailableRanks); persist the
         // file's Approver value (no longer copied from Assigned To).
         approver: row['Approver'] || null,
+        // "Reviewer Rank" keeps office review on (legacy value — see shared/officeReviewer.ts jobRequiresOfficeReview).
         level2ReviewerRankId: row['Reviewer Rank'] ? String(row['Reviewer Rank']).trim() || null : null,
         jobPriority: row['Job Priority'] || null,
         lastDoneDate: lastDoneDate,         // Store Last Done date (for Calendar jobs)
@@ -2641,6 +2642,7 @@ export async function performImport(
       
       const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
       
+
       const reviewerRankRaw = row['Reviewer Rank'] || null;
       const level2ReviewerRankId = reviewerRankRaw ? String(reviewerRankRaw).trim() || null : null;
 

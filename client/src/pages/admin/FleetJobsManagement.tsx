@@ -1,3 +1,4 @@
+import { useAdminUrlState, useAdminOptionValidation } from "@/hooks/useAdminUrlState";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type FleetJobs, type FleetComponents } from "@shared/schema";
@@ -30,8 +31,8 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   const canCreateMasters = canCreate("admin-masters");
   const canEditMasters = canEdit("admin-masters");
   const canDeleteMasters = canDelete("admin-masters");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedEquipment, setSelectedEquipment] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.jobs.search", "");
+  const [selectedEquipment, setSelectedEquipment] = useAdminUrlState<string>("master.jobs.equipment", "all");
   const [isAddMode, setIsAddMode] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<FleetJobs | null>(null);
@@ -335,6 +336,7 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   };
 
   const equipmentOptions = components?.filter(c => c.fleetEquipmentCode && c.fleetEquipmentCode.length === 10) || [];
+  useAdminOptionValidation(selectedEquipment, setSelectedEquipment, components ? equipmentOptions.map(c => c.fleetEquipmentCode!) : undefined, "all");
   const totalJobs = jobs?.length || 0;
 
   const filteredEquipment = useMemo(() => {

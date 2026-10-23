@@ -1,0 +1,13 @@
+- [Vessel Superintendent lock](superintendent-lock.md) — active approval enforcement is per-vessel, defaults OFF, and never falls back to the legacy global setting.
+- [Radix ScrollArea intrinsic width](radix-scrollarea-intrinsic-width.md) — long unbroken content can expand narrow modal lists despite truncation; constrain the viewport and row explicitly.
+- [Running Hours monotonicity](running-hours-monotonicity.md) — normal RH updates never decrease live counters; only explicit approved reset/replacement workflows may do so.
+- [Component UAT writing standard](component-uat-writing-standard.md) — short, direct numbered actions for domain users, with examples separate from steps.
+- [Component date presentation](component-date-presentation.md) — DD-MM-YYYY for Component UI dates only; preserve backend data and API representations.
+- [Job Form date presentation](job-form-date-presentation.md) — DD-MM-YYYY for Job Form date displays and range filters only; preserve saved data and calculations.
+- [Work Order Planner date presentation](work-order-planner-date-presentation.md) — DD-MM-YYYY for Planner UI dates only; preserve saved dates and planning behavior.
+- [Frontend SSR test transforms](frontend-ssr-test-transforms.md) — server-oriented tests may leave JSX untransformed; distinguish this from an application syntax error.
+- [CLI runtime stalls](cli-runtime-stalls.md) — compare shell and workflow Node executables when checks stall before reporting results.
+- [PMS documentation audience](pms-documentation-audience.md) — Claude has no codebase access; shared documentation must explain behaviour without source lookup.
+- [Vessel Job work-instruction PDFs](job-work-instruction-scope.md) — vessel Jobs only, stable vessel-separated paths, and sync both file metadata and PDFs.
+- [Defect PDF preservation](defect-log-pdf-preservation.md) — keep legacy layouts; individual report exports use current form values without saving.
+- [Spare classification policy](spare-classification-policy.md) — approved category/quantity scope, fleet inheritance, and unresolved legacy-import exception.

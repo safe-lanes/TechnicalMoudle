@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ interface VesselMapping {
 }
 
 export default function MasterDataTableView({ onBack }: { onBack?: () => void }) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useAdminUrlState<string>("master.table.search", "");
   const [selectedComponent, setSelectedComponent] = useState<FleetComponent | null>(null);
 
   const { data: fleetComponents = [], isLoading } = useQuery<FleetComponent[]>({

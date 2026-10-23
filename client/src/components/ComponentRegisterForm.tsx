@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -664,8 +666,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
             <Label className={`text-sm ${isModified ? 'text-[#FF3B30]' : 'text-[#52baf3]'} cursor-pointer hover:underline`}>
               {field.label} {field.required && '*'}
             </Label>
-            <Input 
-              type="date"
+            <ComponentDateInput
               placeholder={field.placeholder}
               className={`border-2 focus:border-[${borderColor}]`}
               style={{ borderColor }}
@@ -1033,10 +1034,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Installation Date</Label>
-                      <Input 
-                        type="date"
+                      <ComponentDateInput
                         value={componentData.installationDate || ''}
-                        onChange={(e) => handleInputChange('installationDate', e.target.value)}
+                        onChange={(value) => handleInputChange('installationDate', value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-installation-date"
                       />
@@ -1045,10 +1045,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Commissioning Date</Label>
-                      <Input 
-                        type="date"
+                      <ComponentDateInput
                         value={componentData.commissionedDate || ''}
-                        onChange={(e) => handleInputChange('commissionedDate', e.target.value)}
+                        onChange={(value) => handleInputChange('commissionedDate', value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-commissioned-date"
                       />
@@ -1453,9 +1452,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                                 />
                               </div>
                               <div>
-                                <Input 
+                                <ComponentDateInput
                                   value={componentData.completionDate}
-                                  onChange={(e) => handleInputChange('completionDate', e.target.value)}
+                                  onChange={(value) => handleInputChange('completionDate', value)}
                                   className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
                                 />
                               </div>
@@ -1524,9 +1523,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                               />
                             </div>
                             <div>
-                              <Input 
+                              <ComponentDateInput
                                 value={componentData.completionDate}
-                                onChange={(e) => handleInputChange('completionDate', e.target.value)}
+                                onChange={(value) => handleInputChange('completionDate', value)}
                                 className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
                               />
                             </div>
@@ -1799,17 +1798,17 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </DeletableField>
                         <DeletableField fieldKey="lastDataSurvey">
                           <EditableLabel fieldKey="lastDataSurvey" />
-                          <Input 
+                          <ComponentDateInput
                             value={componentData.classificationData.lastDataSurvey}
-                            onChange={(e) => handleInputChange('classificationData.lastDataSurvey', e.target.value)}
+                            onChange={(value) => handleInputChange('classificationData.lastDataSurvey', value)}
                             className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                           />
                         </DeletableField>
                         <DeletableField fieldKey="nextDataSurvey">
                           <EditableLabel fieldKey="nextDataSurvey" />
-                          <Input 
+                          <ComponentDateInput
                             value={componentData.classificationData.nextDataSurvey}
-                            onChange={(e) => handleInputChange('classificationData.nextDataSurvey', e.target.value)}
+                            onChange={(value) => handleInputChange('classificationData.nextDataSurvey', value)}
                             className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                           />
                         </DeletableField>
@@ -1927,7 +1926,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                                 <div className="text-gray-900">{req.reqNo}</div>
                                 <div className="text-gray-900">{req.reqPart}</div>
                                 <div className="text-gray-900">{req.reqQty}</div>
-                                <div className="text-gray-900">{req.reqDate}</div>
+                                <div className="text-gray-900">{formatComponentDate(req.reqDate, "")}</div>
                                 <div className="text-gray-900">{req.reqStatus}</div>
                               </div>
                             </div>
@@ -1956,7 +1955,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                               <div className="text-gray-900">{req.reqNo}</div>
                               <div className="text-gray-900">{req.reqPart}</div>
                               <div className="text-gray-900">{req.reqQty}</div>
-                              <div className="text-gray-900">{req.reqDate}</div>
+                              <div className="text-gray-900">{formatComponentDate(req.reqDate, "")}</div>
                               <div className="text-gray-900">{req.reqStatus}</div>
                             </div>
                           </div>

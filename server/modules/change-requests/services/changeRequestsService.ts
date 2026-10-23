@@ -1,4 +1,6 @@
 import * as crRepo from '../repositories/changeRequestsRepository';
+import { validateReviewerSelection } from '../../jobs/services/officeReviewerValidation';
+import { officeReviewerRoleRuidsSchema } from '@shared/officeReviewer';
 import { insertChangeRequestSchema, insertChangeRequestCommentSchema, insertChangeRequestAttachmentSchema } from '@shared/schema';
 import { getFieldDefinitions, getEditableFields, type TargetType } from '@shared/changeRequestFields';
 import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from '../../shared/errors';
@@ -156,6 +158,18 @@ export async function getChangeRequest(id: number) {
 }
 
 export async function createChangeRequest(body: any) {
+  if (body.targetType === 'job' && Array.isArray(body.proposedChangesJson)) {
+    const job = body.targetId ? await crRepo.getJob(body.targetId) : undefined;
+    for (const change of body.proposedChangesJson) {
+      if (change.field === 'level2ReviewerRankId') {
+        throw new ValidationError('Legacy reviewer configuration is retired');
+      }
+      if (change.field === 'officeReviewerRoleRuids') {
+        officeReviewerRoleRuidsSchema.parse(change.oldValue);
+        change.newValue = await validateReviewerSelection(change.newValue, job?.officeReviewerRoleRuids);
+      }
+    }
+  }
   const validatedData = insertChangeRequestSchema.parse(body);
 
   if (!validatedData.vesselId) {
@@ -378,13 +392,19 @@ async function assertTargetApplicableOnThisInstance(targetType: string | null | 
   );
 }
 
+// 23-Oct-2026 (merge of replit_dev): the approver's value changes (Nilesh's override) must survive the engine.
+// The engine's FINAL decision re-enters approveChangeRequest({ viaEngine }) inside the same request, so the final
+// approver's overrides are held here for that one call. Overrides made at an earlier step are not stored.
+const pendingEngineOverrides = new Map<number, Array<{ field: string; approverNewValue: string | string[] }>>();
+
 export async function approveChangeRequest(id: number, body: {
   comment: string;
   reviewerId?: string;
   role?: string;
-  overriddenChanges?: Array<{ field: string; approverNewValue: string }>;
+  overriddenChanges?: Array<{ field: string; approverNewValue: string | string[] }>;
 }, opts: { viaEngine?: boolean } = {}) {
-  const { comment, reviewerId, role, overriddenChanges } = body;
+  const { comment, reviewerId, role } = body;
+  const overriddenChanges = body.overriddenChanges ?? (opts.viaEngine ? pendingEngineOverrides.get(id) : undefined);
 
   if (!comment) {
     throw new ValidationError('Comment is required for approval');
@@ -404,6 +424,22 @@ export async function approveChangeRequest(id: number, body: {
 
   await assertTargetApplicableOnThisInstance(existing.targetType, id);
 
+  // Approver value changes are validated BEFORE the decision, so bad input is refused without deciding.
+  if (overriddenChanges) {
+    const job = existing.targetType === 'job' && existing.targetId ? await crRepo.getJob(existing.targetId) : undefined;
+    const proposed = Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson as any[] : [];
+    for (const override of overriddenChanges) {
+      if (override.field === 'officeReviewerRoleRuids') {
+        if (!job || !proposed.some(change => change.field === override.field)) {
+          throw new ValidationError('Office Reviewer override must target a proposed Job field');
+        }
+        override.approverNewValue = await validateReviewerSelection(override.approverNewValue, job.officeReviewerRoleRuids);
+      } else if (typeof override.approverNewValue !== 'string') {
+        throw new ValidationError('Scalar field overrides must be strings');
+      }
+    }
+  }
+
   // Phase 2 / W3 — ENGINE-FIRST, after every safety check above. If the approval engine owns
   // a pending chain for this CR, the decision goes through it: the engine enforces
   // whose-turn/quorum (403/409), and on the terminal step its onDecision callback re-enters
@@ -414,7 +450,13 @@ export async function approveChangeRequest(id: number, body: {
     const gw = await import('../../approvals/engineGateway');
     const cls = await classifyChangeRequestScope(existing);
     if (cls.functionId) {
-      const decided = await gw.maybeEngineDecide(cls.functionId, existing.cruuid, 'approve', reviewerId || 'reviewer', comment);
+      if (overriddenChanges && !opts.viaEngine) pendingEngineOverrides.set(id, overriddenChanges);
+      let decided;
+      try {
+        decided = await gw.maybeEngineDecide(cls.functionId, existing.cruuid, 'approve', reviewerId || 'reviewer', comment);
+      } finally {
+        if (!opts.viaEngine) pendingEngineOverrides.delete(id);
+      }
       if (decided) return (await crRepo.getChangeRequest(id))!;
       // 25-Sep-2026: no direct approval any more — only the engine's final decision applies.
       if (!opts.viaEngine) await gw.refuseDirectDecision(cls.functionId, cls.variableName ?? '');

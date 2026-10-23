@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { useLocation } from "wouter";
 import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2, Check, ChevronsUpDown, X, ChevronUp } from "lucide-react";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { Textarea } from "@/components/ui/textarea";
 import StampSelect from "@/components/StampSelect";
 import {
@@ -49,7 +52,18 @@ interface ComponentRegisterAddEditProps {
   parentComponent?: { code: string; id: string; name: string } | null;
 }
 
-export default function ComponentRegisterAddEdit({
+// Query data can be undefined while loading or after an error. Never allocate a
+// new fallback collection on each keystroke.
+const EMPTY_ROWS: any[] = [];
+
+export default function ComponentRegisterAddEdit(props: ComponentRegisterAddEditProps) {
+  const { vesselId } = useVessel();
+  // Prop/route identity changes are new editing sessions. In-editor Add and tree
+  // selection remain explicit transitions inside that session.
+  return <ComponentEditorSession key={JSON.stringify([vesselId, props.componentId, props.parentComponent?.code])} {...props} />;
+}
+
+function ComponentEditorSession({
   onBack,
   componentId,
   componentCode: propComponentCode,
@@ -140,6 +154,12 @@ export default function ComponentRegisterAddEdit({
   });
 
   const originalIsActiveRef = useRef<string | null>(null);
+  const initializedDraftRef = useRef(false);
+  // Persisted record snapshot for related operations. Editable fields (including
+  // Component Code) must never retarget Jobs or their destructive actions.
+  const [draftRecord, setDraftRecord] = useState<any>(null);
+  const treeLoadedDraftRef = useRef(false);
+  const expandedAncestorsRef = useRef(new Set<string>());
   const [rhSourceOpen, setRhSourceOpen] = useState(false);
 
   const { data: masterComponents = [], error: mastersError } = useQuery<any[]>({
@@ -197,7 +217,7 @@ export default function ComponentRegisterAddEdit({
     information: "",
   });
 
-  const { data: components = [], isLoading: isLoadingComponents, error: registerError } = useQuery<any[]>({
+  const { data: components = EMPTY_ROWS, isLoading: isLoadingComponents, error: registerError } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
   });
 
@@ -269,12 +289,12 @@ export default function ComponentRegisterAddEdit({
   });
 
   // Filter jobs by vesselId at the database level
-  const { data: allJobs = [], error: jobsError } = useQuery<any[]>({
+  const { data: allJobs = EMPTY_ROWS, error: jobsError } = useQuery<any[]>({
     queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: isEditMode && !!vesselId,
   });
 
-  const { data: allSpares = [], error: sparesError } = useQuery<any[]>({
+  const { data: allSpares = EMPTY_ROWS, error: sparesError } = useQuery<any[]>({
     queryKey: ['/technical/api/spares'],
     enabled: isEditMode,
   });
@@ -283,6 +303,7 @@ export default function ComponentRegisterAddEdit({
 
   const { data: maintenanceHistory = [], error: historyError } = useQuery<any[]>({
     queryKey: ['/technical/api/component-maintenance-history', activeComponentId],
+    select: rows => rows.filter(isVisibleMaintenanceHistory),
     queryFn: async () => {
       if (!activeComponentId) return [];
       const response = await fetch(`/technical/api/component-maintenance-history/${activeComponentId}`, {
@@ -454,8 +475,11 @@ export default function ComponentRegisterAddEdit({
   };
 
   useEffect(() => {
-    if (isEditMode && existingComponent && !isLoadingComponent) {
+    if (isEditMode && existingComponent && !isLoadingComponent && !initializedDraftRef.current &&
+        (!existingComponent.vesselId || existingComponent.vesselId === vesselId)) {
       const comp = existingComponent;
+      initializedDraftRef.current = true;
+      setDraftRecord(comp);
       setComponentData({
         // Row 1
         fleetEquipmentCode: comp.fleetEquipmentCode || "",
@@ -500,7 +524,15 @@ export default function ComponentRegisterAddEdit({
       originalIsActiveRef.current = comp.isActive === false ? "No" : "Yes";
       const compCode = propComponentCode || comp.componentCode || comp.id;
       setSelectedTreeNode(compCode);
-      
+    }
+  }, [existingComponent, isLoadingComponent, isEditMode, vesselId, propComponentCode]);
+
+  // Related responses may arrive late or refresh repeatedly. They must never
+  // replace the editable draft, its active-status baseline, or tree selection.
+  useEffect(() => {
+    if (!isEditMode || !draftRecord) return;
+    const comp = draftRecord;
+    const compCode = comp.componentCode || comp.code || comp.id;
       // Auto-expand parent nodes by traversing the parent chain
       const partsToExpand = new Set<string>();
       
@@ -525,9 +557,19 @@ export default function ComponentRegisterAddEdit({
         partsToExpand.add(mainCategory);
       }
       
-      setExpandedNodes(prev => new Set([...Array.from(prev), ...Array.from(partsToExpand)]));
+      // Expand newly discovered ancestors once, including when the list arrives
+      // after details. Do not reopen nodes the user subsequently collapsed.
+      const newlyDiscovered = Array.from(partsToExpand).filter(id => !expandedAncestorsRef.current.has(id));
+      partsToExpand.forEach(id => expandedAncestorsRef.current.add(id));
+      if (newlyDiscovered.length) {
+        setExpandedNodes(prev => new Set([...Array.from(prev), ...newlyDiscovered]));
+      }
+  }, [components, draftRecord, isEditMode]);
 
-      const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
+  useEffect(() => {
+      const componentJobs = isEditMode && draftRecord
+        ? allJobs.filter(j => j.componentCode === (draftRecord.componentCode || draftRecord.code))
+        : EMPTY_ROWS;
       setWorkOrders(componentJobs.map(job => ({
         id: job.id,
         woNo: job.jobNo || job.id,
@@ -538,18 +580,22 @@ export default function ComponentRegisterAddEdit({
         isActive: job.isActive,
       })));
 
-      const componentSpares = allSpares.filter(s => s.componentId === componentId);
+  }, [allJobs, draftRecord, isEditMode]);
+
+  useEffect(() => {
+      const componentSpares = isEditMode && draftRecord
+        ? allSpares.filter(s => s.componentId === selectedComponentId)
+        : EMPTY_ROWS;
       setSpares(componentSpares.map(spare => ({
         id: spare.id,
         partCode: spare.partNumber || spare.id,
         partName: spare.name || spare.description,
         min: spare.minQuantity || 1,
         critical: spare.critical ? "Yes" : "No",
-        location: spare.location || "",
-        location2: spare.location2 || "",
+        location: spare.location || (treeLoadedDraftRef.current ? "Store Room A" : ""),
+        ...(!treeLoadedDraftRef.current ? { location2: spare.location2 || "" } : {}),
       })));
-    }
-  }, [existingComponent, isLoadingComponent, isEditMode, allJobs, allSpares, componentId, propComponentCode, components]);
+  }, [allSpares, selectedComponentId, draftRecord, isEditMode]);
 
   const deriveComponentCategory = (codeOrId: string): string => {
     if (!codeOrId) return '';
@@ -840,6 +886,14 @@ export default function ComponentRegisterAddEdit({
   };
 
   const handleSave = async () => {
+    if (isEditMode && !initializedDraftRef.current) {
+      toast({
+        title: "Component Save Failed",
+        description: "The component details are not available for this vessel. Reopen the component from the register.",
+        variant: "destructive",
+      });
+      return;
+    }
     const requiredPerm = isEditMode ? canEditPerm("pms-components") : canCreatePerm("pms-components");
     if (!requiredPerm) {
       toast({
@@ -1017,6 +1071,13 @@ export default function ComponentRegisterAddEdit({
     
     setIsAddingNew(false);
     setSelectedComponentId(comp.id);
+    // Intentional tree selection owns the draft, even if the original details
+    // request is still pending. Save/document targets retain their existing
+    // contract; correcting that separate identity mismatch is not part of this fix.
+    initializedDraftRef.current = true;
+    setDraftRecord(comp);
+    treeLoadedDraftRef.current = true;
+    expandedAncestorsRef.current = new Set();
     
     setComponentData({
       // Row 1
@@ -1060,26 +1121,6 @@ export default function ComponentRegisterAddEdit({
       lastUpdated: comp.lastUpdated || comp.rhLastUpdated || "",
     });
     
-    const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
-    setWorkOrders(componentJobs.map(job => ({
-      id: job.id,
-      woNo: job.jobNo || job.id,
-      jobTitle: job.jobTitle || job.title,
-      assignedTo: job.assignedTo || "Chief Engineer",
-      dueDate: job.nextDueDate || "",
-      status: job.status || "Due",
-      isActive: job.isActive,
-    })));
-    
-    const componentSpares = allSpares.filter(s => s.componentId === comp.id);
-    setSpares(componentSpares.map(spare => ({
-      id: spare.id,
-      partCode: spare.partNumber || spare.id,
-      partName: spare.name || spare.description,
-      min: spare.minQuantity || 1,
-      critical: spare.critical ? "Yes" : "No",
-      location: spare.location || "Store Room A",
-    })));
   };
 
   const renderTreeNode = (node: ComponentNode, level: number = 0) => {
@@ -1155,6 +1196,8 @@ export default function ComponentRegisterAddEdit({
     <div className="h-full flex flex-col bg-gray-50">
       <ComponentLoadErrors failures={[
         ["Component", componentLoadError], ["Component Register", registerError], ["Maker List", makersError],
+        ["Component Vessel", existingComponent?.vesselId && existingComponent.vesselId !== vesselId
+          ? new Error("These component details belong to a different vessel. Reopen the component from the register.") : null],
         ["RH Sources", mastersError], ["Jobs", jobsError], ["Spares", sparesError],
         ["Maintenance History", historyError], ["Documents", documentsError],
         ["Departments", departmentsError], ["Component Categories", categoryError],
@@ -1178,6 +1221,9 @@ export default function ComponentRegisterAddEdit({
                 
                 setIsAddingNew(true);
                 setSelectedComponentId(null);
+                setDraftRecord(null);
+                originalIsActiveRef.current = null;
+                expandedAncestorsRef.current = new Set();
                 setComponentData({
                   fleetEquipmentCode: "",
                   fleetEquipmentName: "",
@@ -1509,20 +1555,18 @@ export default function ComponentRegisterAddEdit({
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Installation Date</label>
-                    <Input
-                      type="date"
+                    <ComponentDateInput
                       value={componentData.installationDate}
-                      onChange={(e) => handleFieldChange('installationDate', e.target.value)}
+                      onChange={(value) => handleFieldChange('installationDate', value)}
                       className="h-8 text-sm"
                       data-testid="input-installation-date"
                     />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Commissioned Date</label>
-                    <Input
-                      type="date"
+                    <ComponentDateInput
                       value={componentData.commissionedDate}
-                      onChange={(e) => handleFieldChange('commissionedDate', e.target.value)}
+                      onChange={(value) => handleFieldChange('commissionedDate', value)}
                       className="h-8 text-sm"
                       data-testid="input-commissioned-date"
                     />
@@ -1769,10 +1813,9 @@ export default function ComponentRegisterAddEdit({
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="date"
+                          <ComponentDateInput
                             value={componentData.lastUpdated}
-                            onChange={(e) => handleFieldChange('lastUpdated', e.target.value)}
+                            onChange={(value) => handleFieldChange('lastUpdated', value)}
                             className="h-8 text-sm"
                             data-testid="input-last-updated"
                           />
@@ -1858,7 +1901,7 @@ export default function ComponentRegisterAddEdit({
                               </td>
                               <td className={`px-3 py-2 ${textClass}`}>{wo.jobTitle}</td>
                               <td className={`px-3 py-2 ${textClass}`}>{wo.assignedTo}</td>
-                              <td className={`px-3 py-2 ${textClass}`}>{wo.dueDate}</td>
+                              <td className={`px-3 py-2 ${textClass}`}>{formatComponentDate(wo.dueDate, "")}</td>
                               <td className="px-3 py-2">
                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(wo.status)}`}>
                                   {wo.status}
@@ -1927,7 +1970,7 @@ export default function ComponentRegisterAddEdit({
                           <td className="px-3 py-2 text-gray-700">{item.workOrderNo || ""}</td>
                           <td className="px-3 py-2 text-gray-700">{item.performedBy || ""}</td>
                           <td className="px-3 py-2 text-gray-700">{item.runningHoursAtCompletion || ""}</td>
-                          <td className="px-3 py-2 text-gray-700">{item.dateCompleted || ""}</td>
+                          <td className="px-3 py-2 text-gray-700">{formatComponentDate(item.dateCompleted, "")}</td>
                           <td className="px-3 py-2">
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(item.status)}`}>
                               {item.status}
@@ -2071,20 +2114,18 @@ export default function ComponentRegisterAddEdit({
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Last Class Survey</label>
-                      <Input
-                        type="date"
+                      <ComponentDateInput
                         value={classRegData.lastClassSurvey}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, lastClassSurvey: e.target.value }))}
+                        onChange={(value) => setClassRegData(prev => ({ ...prev, lastClassSurvey: value }))}
                         className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-last-class-survey"
                       />
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Next Class Survey</label>
-                      <Input
-                        type="date"
+                      <ComponentDateInput
                         value={classRegData.nextClassSurvey}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, nextClassSurvey: e.target.value }))}
+                        onChange={(value) => setClassRegData(prev => ({ ...prev, nextClassSurvey: value }))}
                         className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-next-class-survey"
                       />

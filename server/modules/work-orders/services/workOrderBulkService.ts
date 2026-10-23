@@ -1,5 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { recordWoEvent } from './woApprovalHistory';
+import { jobRequiresOfficeReview } from '@shared/officeReviewer';
 import { ValidationError } from '../../shared/errors';
 import { calculateMissedCycles, calculateNextDueDate, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
@@ -148,7 +149,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       if (existingWO.jobId) {
         try {
           const linkedJob = await repo.findJob(existingWO.jobId);
-          if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
+          if (linkedJob && jobRequiresOfficeReview(linkedJob)) {
             requiresLevel2Review = true;
           }
         } catch (err) {
@@ -192,22 +193,10 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, approver || 'system');
       } catch (err) { console.error('[FieldLogger] WO bulkApprove:', err); }
 
-      if (!requiresLevel2Review && missedCycles >= 1 && existingWO.maintenanceBasis === 'Calendar') {
+      if (!requiresLevel2Review) {
         try {
-          const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
-          await createSkippedCycleRecords({
-            workOrderId: existingWO.wouuid || workOrderId,
-            componentId: existingWO.componentId || '',
-            componentCode: existingWO.componentCode || null,
-            vesselCode: existingWO.vesselId || null,
-            jobId: existingWO.jobId || null,
-            jobCode: existingWO.jobCode || null,
-            jobTitle: existingWO.jobTitle || null,
-            originalDueDate,
-            missedCycles,
-            frequencyValue: existingWO.frequencyValue || '0',
-            frequencyUnit: existingWO.frequencyUnit || ''
-          });
+          const { recordSkippedCyclesForWorkOrder } = await import('../utils/skippedCycleBackfill');
+          await recordSkippedCyclesForWorkOrder(existingWO.wouuid, missedCycles, originalDueDate, existingWO.nextDueReading);
         } catch (err) {
           console.error('[BACKFILL ERROR] Failed to create skipped cycle records (bulk):', err);
         }
@@ -337,25 +326,11 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     console.error('Failed to create audit log for reviewer approve:', auditError);
   }
 
-  if (missedCycles >= 1 && existingWO.maintenanceBasis === 'Calendar') {
-    try {
-      const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
-      await createSkippedCycleRecords({
-        workOrderId: existingWO.wouuid || workOrderId,
-        componentId: existingWO.component || '',
-        componentCode: existingWO.componentCode || null,
-        vesselCode: existingWO.vesselId || null,
-        jobId: existingWO.jobId || null,
-        jobCode: existingWO.templateCode || null,
-        jobTitle: existingWO.jobTitle || null,
-        originalDueDate,
-        missedCycles,
-        frequencyValue: existingWO.frequencyValue || '0',
-        frequencyUnit: existingWO.frequencyUnit || ''
-      });
-    } catch (err) {
-      console.error('[BACKFILL ERROR] Reviewer approve skipped cycle records:', err);
-    }
+  try {
+    const { recordSkippedCyclesForWorkOrder } = await import('../utils/skippedCycleBackfill');
+    await recordSkippedCyclesForWorkOrder(existingWO.wouuid, missedCycles, originalDueDate, existingWO.nextDueReading);
+  } catch (err) {
+    console.error('[BACKFILL ERROR] Reviewer approve skipped cycle records:', err);
   }
 
   // Run completion side-effects: maintenance history, job cycle dates, spare consumption.

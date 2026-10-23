@@ -17,8 +17,6 @@ import {
   Download,
   Ship
 } from "lucide-react";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
-import type { TableColumn } from "@/lib/pdfReportGenerator";
 import { PeriodPicker, type PeriodValue } from "@/components/filters/PeriodPicker";
 import { 
   Tooltip,
@@ -50,6 +48,17 @@ import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-co
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
+import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
+import type { TableColumn } from "@/lib/pdfReportGenerator";
+import {
+  DEFECT_LOG_EXPORT_COLUMNS,
+  downloadDefectLogCsv,
+  downloadDefectLogExcel,
+  filterDefectsForExport,
+  formatDefectDate,
+  makeDefectLogExportRow,
+  stripDefectHtml,
+} from "./defectLogExport";
 
 interface DefectsFilters {
   periodValue?: PeriodValue | null;
@@ -104,10 +113,7 @@ const CategoryCellRenderer = (params: ICellRendererParams) => {
 };
 
 const stripHtmlTags = (html: string | null | undefined): string => {
-  if (!html) return '';
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return div.textContent || div.innerText || '';
+  return stripDefectHtml(html);
 };
 
 const HtmlTextCellRenderer = (params: ICellRendererParams) => {
@@ -154,35 +160,17 @@ const PriorityCellRenderer = (params: ICellRendererParams) => {
 
 const TwoLineDateCellRenderer = (params: ICellRendererParams) => {
   if (!params.value) return null;
-  
-  try {
-    let date: Date;
-    const value = String(params.value);
-    
-    // Handle DD-MM-YYYY format (e.g., "25-08-2025")
-    const ddmmyyyyMatch = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (ddmmyyyyMatch) {
-      const [, day, month, year] = ddmmyyyyMatch;
-      date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    } else {
-      date = new Date(value);
-    }
-    
-    if (isNaN(date.getTime())) return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
-    
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = date.toLocaleString('en-US', { month: 'short' });
-    const year = date.getFullYear();
-    
-    return (
-      <div className="flex flex-col justify-center text-[13px] text-[#4f5863] leading-tight">
-        <span>{day} {month}</span>
-        <span>{year}</span>
-      </div>
-    );
-  } catch {
-    return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
-  }
+  const formatted = formatDefectDate(params.value);
+  if (!formatted) return null;
+  const match = formatted.match(/^(\d{2} [A-Za-z]{3}) (\d{4})$/);
+  if (!match) return <span className="text-[13px] text-[#4f5863]">{formatted}</span>;
+
+  return (
+    <div className="flex flex-col justify-center text-[13px] text-[#4f5863] leading-tight">
+      <span>{match[1]}</span>
+      <span>{match[2]}</span>
+    </div>
+  );
 };
 
 const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCellContext }) => {
@@ -336,14 +324,21 @@ export default function DefectsLogWithTabs() {
   }, []);
 
   const { data: defects = [], isLoading } = useQuery({
-    queryKey: ['defects', 'active', filters],
+    queryKey: [
+      'defects',
+      'active',
+      filters.vesselId,
+      filters.type,
+      filters.fleet,
+      filters.addGroup,
+      filters.dueOverdue,
+    ],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('statusScope', 'active');
       
       if (filters.vesselId) params.append('vesselId', filters.vesselId);
       if (filters.type) params.append('category', filters.type);
-      if (filters.search) params.append('search', filters.search);
       if (filters.fleet) params.append('fleet', filters.fleet);
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
@@ -375,54 +370,59 @@ export default function DefectsLogWithTabs() {
     setSelectedVessel("all");
   };
 
+  // Browser PDF (decision 23-Oct-2026: no server-side PDF) — the same rows and columns as the CSV / Excel export.
   const handleExportPdf = () => {
-    const formatDate = (dateStr: string | null | undefined): string => {
-      if (!dateStr) return "-";
-      const parts = dateStr.split("-");
-      if (parts.length === 3 && parts[0].length === 4) {
-        return `${parts[2]}-${parts[1]}-${parts[0]}`;
-      }
-      return dateStr;
-    };
+    try {
+      const exportDefects = getDefectsForExport();
+      const columns: TableColumn[] = DEFECT_LOG_EXPORT_COLUMNS.map((header) => ({ header, field: header, width: header === "Description" ? 40 : 18 }));
+      const data = exportDefects.map((defect) => {
+        const row = makeDefectLogExportRow(defect);
+        return Object.fromEntries(Object.entries(row).map(([column, value]) => [column, value || "-"]));
+      });
+      pdfReportGenerator.generateReport(
+        {
+          title: "Defects Log",
+          subtitle: `Total: ${exportDefects.length} defect${exportDefects.length !== 1 ? "s" : ""}`,
+          orientation: "landscape",
+        },
+        columns,
+        data,
+      );
+    } catch (error) {
+      console.error("Failed to export Defect Log PDF:", error);
+      toast({ title: "PDF export failed", description: "Could not create the Defect Log PDF. Please try again.", variant: "destructive" });
+    }
+  };
 
-    const columns: TableColumn[] = [
-      { header: 'ID', field: 'id', width: 25 },
-      { header: 'Vessel', field: 'vessel', width: 20 },
-      { header: 'Issue Date', field: 'issueDate', width: 18 },
-      { header: 'Category', field: 'category', width: 15 },
-      { header: 'Component', field: 'component', width: 20 },
-      { header: 'Description', field: 'description', width: 40 },
-      { header: 'Target Date', field: 'targetDate', width: 18 },
-      { header: 'Date Compl.', field: 'dateCompleted', width: 18 },
-      { header: 'Status', field: 'status', width: 18 },
-      { header: 'Priority', field: 'priority', width: 15 },
-    ];
+  const getDefectsForExport = (): Defect[] => {
+    const gridFilters = gridApi && !gridApi.isDestroyed() ? gridApi.getFilterModel() : null;
+    return filterDefectsForExport(filteredDefects, gridFilters) as Defect[];
+  };
 
-    const data = filteredDefects.map((defect: Defect) => {
-      const computedStatus = getComputedStatus(defect);
-      return {
-        id: defect.id || '-',
-        vessel: defect.vesselName || defect.vesselId || '-',
-        issueDate: formatDate(defect.issueDate),
-        category: `${defect.category || '-'}${defect.is_coc ? ' (CoC)' : ''}`,
-        component: defect.componentHardwareLevel3 || '-',
-        description: defect.description || '-',
-        targetDate: formatDate(defect.targetCloseDate),
-        dateCompleted: formatDate(defect.dateCompleted),
-        status: computedStatus.label,
-        priority: defect.priority || '-',
-      };
-    });
+  const handleExportCsv = () => {
+    try {
+      downloadDefectLogCsv(getDefectsForExport());
+    } catch (error) {
+      console.error("Failed to export Defect Log CSV:", error);
+      toast({
+        title: "Export failed",
+        description: "Could not create the Defect Log CSV file.",
+        variant: "destructive",
+      });
+    }
+  };
 
-    pdfReportGenerator.generateReport(
-      {
-        title: 'Defects Log',
-        subtitle: `Total: ${filteredDefects.length} defect${filteredDefects.length !== 1 ? 's' : ''}`,
-        orientation: 'landscape',
-      },
-      columns,
-      data
-    );
+  const handleExportExcel = () => {
+    try {
+      downloadDefectLogExcel(getDefectsForExport());
+    } catch (error) {
+      console.error("Failed to export Defect Log Excel:", error);
+      toast({
+        title: "Export failed",
+        description: "Could not create the Defect Log Excel file.",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredDefects = useMemo(() => {
@@ -449,6 +449,15 @@ export default function DefectsLogWithTabs() {
           filterName === defectVessel || defectVessel.includes(filterName) || filterName.includes(defectVessel)
         );
       });
+    }
+
+    if (filters.search?.trim()) {
+      const search = filters.search.trim().toLocaleLowerCase();
+      result = result.filter((defect: Defect) =>
+        Object.values(makeDefectLogExportRow(defect)).some((value) =>
+          value.toLocaleLowerCase().includes(search)
+        )
+      );
     }
     
     if (filters.periodValue) {
@@ -528,7 +537,7 @@ export default function DefectsLogWithTabs() {
     }
     
     return result;
-  }, [defects, selectedVessel, allVessels, selectedVesselNames, filters.periodValue, filters.dueOverdue]);
+  }, [defects, selectedVessel, allVessels, selectedVesselNames, filters.search, filters.periodValue, filters.dueOverdue]);
 
   const totalDefects = filteredDefects.length;
   const totalPages = Math.max(1, Math.ceil(totalDefects / pageSize));
@@ -980,6 +989,8 @@ export default function DefectsLogWithTabs() {
                   showExportButtons={true}
                   showFilterButtons={true}
                   showGroupButtons={true}
+                  onExportCsv={handleExportCsv}
+                  onExportExcel={handleExportExcel}
                 />
               </div>
             </div>
