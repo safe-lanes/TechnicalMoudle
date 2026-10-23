@@ -8,7 +8,9 @@ import { BarChart3, PieChart, TrendingUp, FileSpreadsheet, FileText, FileDown, P
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
-const COMING_SOON = false;
+// 23-Oct-2026 (Ghazi): "Coming soon" until the reports are defined — the page showed fixed sample numbers, the
+// 7 report ids do not exist on the server, and Export did nothing. Waiting for Jeevan's report requirements.
+const COMING_SOON = true;
 
 interface ReportFilter {
   vesselId?: string;
