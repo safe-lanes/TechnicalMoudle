@@ -2423,6 +2423,8 @@ export default function DefectFormWizard({
                             approval={(
                               <>
                                 {hasExtensionChainsProjection && !currentExtensionChain ? (
+                                  // Jeevan #7: when the decision itself is shown, "no chain" is noise
+                                  extensionOutcome(displayedExtension) ? null :
                                   <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${displayedExtension.id}`}>
                                     No approval chain is associated with this entry. Historical approval data was not inferred.
                                   </div>
@@ -2828,7 +2830,9 @@ export default function DefectFormWizard({
                       <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
                       <Input value={verificationDisplay.position} readOnly data-testid="input-verified-by-office-position" className="h-10 text-sm border-gray-300 bg-gray-100" />
                     </div>
-                    {!hasPendingExtensionRequest && renderVerificationApproval && (
+                    {!hasPendingExtensionRequest && renderVerificationApproval
+                      // Jeevan #8: on the vessel a verified defect needs no "will be reviewed ashore" note
+                      && !(currentDefect?.verified && isApprovalUnavailableOnInstance(verificationApproval.error)) && (
                       verificationApproval.data &&
                       !verificationApproval.data.hasActiveWorkflow &&
                       !hasPersistedApprovalRequest(verificationApproval.data) ? (

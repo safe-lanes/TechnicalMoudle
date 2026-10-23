@@ -1133,10 +1133,14 @@ async function recordDefectSubmissions(previous: any, updated: any): Promise<voi
 export async function getDefectApprovalProcess(id: string) {
   const defect: any = await defectsRepo.getDefect(id);
   if (!defect) throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
-  const { approvalProcess } = await import('../../approvals/approvalHistoryService');
+  const { approvalProcess, hasRecordedEvents } = await import('../../approvals/approvalHistoryService');
   // Older records (before this history existed): rebuilt from the defect's own fields — who/when may be missing.
+  // Only those: an entry stamped with its submitter (requestedByName) was recorded in the history already, and a
+  // verification that has recorded events is never rebuilt (Date Completed is typed by the user — matching it to
+  // a recorded event by day is unreliable and showed the same closure twice).
   const extLegacy: any[] = [];
   for (const e of Array.isArray(defect.targetDateExtensions) ? defect.targetDateExtensions : []) {
+    if (e.requestedByName) continue;
     extLegacy.push({ type: 'submitted', at: e.requestedAt || null, byName: e.requestedByName ?? null, byPosition: e.requestedByPosition ?? null, remarks: e.reasonForExtension ?? null });
     if (e.status === 'Approved' || e.status === 'Rejected') {
       extLegacy.push({ type: e.status === 'Approved' ? 'approved' : 'rejected', at: e.approvalDate || null, remarks: e.approverComments ?? null });
@@ -1145,8 +1149,9 @@ export async function getDefectApprovalProcess(id: string) {
     }
   }
   const verLegacy: any[] = [];
-  if (defect.confirmCompleted) verLegacy.push({ type: 'submitted', at: defect.dateCompleted || null, byName: defect.closedByName ?? null, byPosition: defect.closedByRank ?? null, remarks: defect.closureComment ?? null });
-  if (defect.verified) verLegacy.push({ type: 'approved', at: defect.dateVerified || defect.verifiedDate || null, byName: defect.verifiedByName ?? null, byPosition: defect.verifiedByOfficePosition ?? null });
+  const verRecorded = await hasRecordedEvents('defect-verification', defect.duuid);
+  if (!verRecorded && defect.confirmCompleted) verLegacy.push({ type: 'submitted', at: defect.dateCompleted || null, byName: defect.closedByName ?? null, byPosition: defect.closedByRank ?? null, remarks: defect.closureComment ?? null });
+  if (!verRecorded && defect.verified) verLegacy.push({ type: 'approved', at: defect.dateVerified || defect.verifiedDate || null, byName: defect.verifiedByName ?? null, byPosition: defect.verifiedByOfficePosition ?? null });
   return {
     extension: await approvalProcess('defect-extension', defect.duuid, extLegacy),
     verification: await approvalProcess('defect-verification', defect.duuid, verLegacy),

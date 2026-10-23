@@ -16,7 +16,7 @@
  *     (modulename 'Technical', is_active=1) — exactly the set verifyApproverForLevel admits.
  *     These exist for the D-2 matrix migration (quorum-`any` pool slots per level).
  */
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import type { ApprovalCard, DecisionNotice, Scope } from '../approval-engine';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
@@ -198,7 +198,8 @@ async function withAssignedVessels(users: Array<{ id: string; name: string | nul
   if (named.length === 0) return [];
   const rows = await db().select({ userUuid: masterUserVessels.userUuid, vesselId: masterUserVessels.vesselId, vesselName: vessels.name })
     .from(masterUserVessels)
-    .leftJoin(vessels, eq(vessels.id, masterUserVessels.vesselId))
+    // assignments hold the vessel's canonical uuid (vuuid) — older rows may hold the short code (id)
+    .leftJoin(vessels, or(eq(vessels.vuuid, masterUserVessels.vesselId), eq(vessels.id, masterUserVessels.vesselId)))
     .where(and(eq(masterUserVessels.isActive, true), inArray(masterUserVessels.userUuid, named.map((u) => u.id))));
   const byUser = new Map<string, string[]>();
   for (const r of rows) byUser.set(r.userUuid, [...(byUser.get(r.userUuid) ?? []), r.vesselName ?? r.vesselId]);

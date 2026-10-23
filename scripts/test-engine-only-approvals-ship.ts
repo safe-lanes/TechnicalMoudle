@@ -150,6 +150,10 @@ async function cleanupShore() {
   await sync('S3');
   check('arrival sweep started the CR chain', (await engineReqs('pms-spares-cr', cr.cruuid))[0]?.status === 'pending');
   check('arrival sweep started the postponement chain', (await engineReqs('pms-wo-postponement', wo.wouuid))[0]?.status === 'pending');
+  // Jeevan #14(g), 22-Oct-2026: the chain's submitter is the ship user who sent it — not the approver field ("Office").
+  const postSubmitter = (await shoreSql(`SELECT submitted_by FROM apprv_requests WHERE screen_id='pms-wo-postponement' AND subject_ref=$1 ORDER BY submitted_at DESC LIMIT 1`, [wo.wouuid]))[0]?.submitted_by;
+  console.log(`   postponement chain submitted_by = ${postSubmitter}`);
+  check('postponement chain submitted by the ship sender (not "Office")', postSubmitter === CE.id);
 
   hr('S4. approver decides on shore → results reach the ship');
   const a = await call(SHORE, 'PUT', `/change-requests/${shoreCr.id}/approve`, { comment: 'ok' }, APPROVER);
@@ -169,6 +173,9 @@ async function cleanupShore() {
   check('SHIP accepts the re-postponement → Awaiting Office Approval', rp.status < 300 && shipSql(`SELECT status FROM work_orders WHERE wouuid='${wo.wouuid}'`) === 'Awaiting Office Approval');
   await sync('S5');
   check('arrival sweep started the re-postponement chain', (await engineReqs('pms-wo-re-postponement', wo.wouuid))[0]?.status === 'pending');
+  const rePostSubmitter = (await shoreSql(`SELECT submitted_by FROM apprv_requests WHERE screen_id='pms-wo-re-postponement' AND subject_ref=$1 ORDER BY submitted_at DESC LIMIT 1`, [wo.wouuid]))[0]?.submitted_by;
+  console.log(`   re-postponement chain submitted_by = ${rePostSubmitter}`);
+  check('re-postponement chain submitted by the ship sender (not "Office")', rePostSubmitter === CE.id);
   const rpa = await call(SHORE, 'POST', `/work-orders/${wo.id}/re-postpone-approve`, { approvedBy: APPROVER.name, approvalRemarks: 'ok', userUuid: APPROVER.id, role: 'Office' }, APPROVER);
   check('shore: re-postponement approved', rpa.status < 300 && (await shoreSql(`SELECT status FROM work_orders WHERE wouuid=$1`, [wo.wouuid]))[0].status === 'Postponement Approved');
   await sync('S5b');

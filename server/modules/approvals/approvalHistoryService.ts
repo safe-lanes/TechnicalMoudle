@@ -135,6 +135,11 @@ export function buildApprovalProcess(subjectType: string, rows: Array<Pick<Appro
   return { subjectType, attempts };
 }
 
+/** True when this subject has at least one recorded history event. */
+export async function hasRecordedEvents(subjectType: HistorySubjectType, subjectRef: string): Promise<boolean> {
+  return (await repo.listEvents(subjectRef, [subjectType])).length > 0;
+}
+
 export async function approvalProcess(subjectType: HistorySubjectType, subjectRef: string, legacy: LegacyEvent[] = []): Promise<ApprovalProcess> {
   return buildApprovalProcess(subjectType, await repo.listEvents(subjectRef, [subjectType]), legacy);
 }
