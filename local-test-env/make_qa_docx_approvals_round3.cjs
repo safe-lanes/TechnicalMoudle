@@ -56,6 +56,7 @@ const AREAS = [
     ['ML-03', 'A role with nobody on that vessel (#14a)', 'Chain: one step with roles A AND B, where nobody holding role B is assigned to the vessel. Approver A approves.', 'Request waits; diagnostics show "a role nobody holds". Sail Admin sees an Approve button on that request and can approve the empty place; the request then completes. (Sail Admin does NOT get the button while someone else can still approve.)'],
     ['ML-04', 'One person, two roles (decision D3)', 'User (g) holds BOTH roles of an "all must approve" step. User (g) approves.', 'User (g) can approve only once. After that, (g) no longer sees Approve; the second place needs a different person. If nobody else holds that role, Sail Admin can complete it (as in ML-03).'],
     ['ML-05', 'Progress stays after the decision (#14e)', 'After a request is approved, reopen it (Modify PMS dialog, postponement popup).', '"Approval progress — Approved" is still shown with each step (it used to disappear).'],
+    ['ML-07', 'Approver changes a value in a two-step chain', 'Two-step chain for a Spare change request. Step 1 approver opens the request, changes the proposed value (e.g. 100 → 80) and approves. Step 2 approver approves without changing it. Repeat with BOTH approvers changing the value.', 'First run: the spare gets the step-1 value (80), not the requested one. Second run: the value of the final (step-2) approver wins.'],
     ['ML-06', 'Ship postponement shows the real sender (#14g)', 'Vessel user (d) requests a postponement; Sync. Office opens it.', 'The request shows the vessel user as the sender (not "Office"); the history "Requested" line has their name and rank.'],
   ]},
   { name: '5. Jeevan — enhancements', cases: [
@@ -95,9 +96,9 @@ const INTENTIONAL = [
   '• Change requests sent BEFORE this build cannot be withdrawn (no sender was recorded).',
   '• Older records show "Not Recorded" where a name or time was never saved.',
   '• Times are shown in UTC with a "Z" (e.g. 23 Oct 2026, 0718 Z).',
+  '• Defects → Reports page shows "Coming soon" — the reports are not defined yet (waiting for requirements). Test PDF export from the defect form and the Defect Log.',
 ];
 const KNOWN_ISSUES = [
-  '• Defects → Reports page: its CSV / Excel / PDF Export buttons are not built yet (they do nothing). Not part of this round — please test PDF export from the defect form\'s Export button.',
   '• Office history rows written before this build may still say "(Chief Engineer)" for office users — only new rows are corrected.',
 ];
 module.exports.TEXTS = { TITLE, SCOPE, INTENTIONAL, KNOWN_ISSUES, DATE };
