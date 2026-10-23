@@ -12,7 +12,7 @@ import {
   resolveDiagnosticsStatus,
   formatDiagnosticsOrphan,
   formatDiagnosticsStalled,
-  formatDiagnosticsUnresolved,
+  projectDiagnosticsUnresolvedBlocks,
   formatDiagnosticsReturnedVerificationStillVerified,
   projectRejectedClosureHistory,
   projectRejectedClosureAuditFields,
@@ -113,13 +113,15 @@ describe("Defect approval client presentation states", () => {
     expect(resolveDiagnosticsStatus({ available: true, healthy: true })).toBe("healthy");
     expect(resolveDiagnosticsGroupState([], true)).toBe("unavailable");
   });
-  it("formats every diagnostic group's actionable identifiers and consequence", () => {
-    expect(formatDiagnosticsUnresolved({ vesselId: "V1", roleId: "R1", roleLabel: "Master", workflowScopes: ["verify"], consequence: "cannot approve" })).toContain("V1");
-    expect(formatDiagnosticsUnresolved({ vesselId: "V1", roleId: "R1", roleLabel: "Master", workflowScopes: ["verify"], consequence: "cannot approve" })).toContain("cannot approve");
-    expect(formatDiagnosticsOrphan({ defectId: "D1", vesselId: "V1", entryId: "E1", requestedAt: "2026-01-01", newTargetDate: "2026-02-01", consequence: "does not block" })).toContain("E1");
-    expect(formatDiagnosticsOrphan({ defectId: "D1", vesselId: "V1", entryId: "E1", requestedAt: "2026-01-01", newTargetDate: "2026-02-01", consequence: "does not block" })).toContain("does not block");
-    expect(formatDiagnosticsStalled({ requestUuid: "Q1", defectId: "D1", vesselId: "V1", screenId: "verify", submittedAt: "2026-01-01", daysPending: 4, consequence: "blocked" })).toContain("4 days pending");
-    expect(formatDiagnosticsReturnedVerificationStillVerified({ requestUuid: "Q1", defectId: "D1", vesselId: "V1", finalizedAt: "2026-01-02", consequence: "verification must be cleared" })).toContain("verification must be cleared");
+  // 23-Oct-2026: rewritten for the compact diagnostics (28-Sep) — rows carry the defect report number and vessel
+  // name; the unresolved-approver group is projected by projectDiagnosticsUnresolvedBlocks.
+  it("formats every diagnostic group's actionable identifiers", () => {
+    expect(formatDiagnosticsOrphan({ defectReportId: "D001-26-0001", vesselName: "Pilot", requestedAt: "2026-01-01", newTargetDate: "2026-02-01", consequence: "does not block" }))
+      .toBe("D001-26-0001 on Pilot — requested 2026-01-01");
+    expect(formatDiagnosticsStalled({ defectReportId: "D001-26-0002", vesselName: "Pilot", submittedAt: "2026-01-01", daysPending: 4, consequence: "blocked" }))
+      .toContain("waiting 4 days");
+    expect(formatDiagnosticsReturnedVerificationStillVerified({ defectReportId: "D001-26-0003", vesselName: "Pilot", finalizedAt: "2026-01-02", consequence: "verification must be cleared" }))
+      .toBe("D001-26-0003 on Pilot");
   });
   it("orders rejected closure attempts oldest first and expands only a single entry", () => {
     expect(projectRejectedClosureHistory([
@@ -138,16 +140,15 @@ describe("Defect approval client presentation states", () => {
       { id: "only", attemptNumber: 1 },
     ]).defaultExpandedIds).toEqual(["only"]);
   });
-  it("formats unresolved approvers safely with or without workflow scopes", () => {
-    const base = { vesselId: "V1", roleId: "R1", roleLabel: "Master", consequence: "cannot approve" };
-    expect(() => formatDiagnosticsUnresolved({ ...base, workflowScopes: ["verify"] })).not.toThrow();
-    expect(formatDiagnosticsUnresolved({ ...base, workflowScopes: ["verify"] })).toContain("V1");
-    expect(formatDiagnosticsUnresolved({ ...base, workflowScopes: ["verify"] })).toContain("Master");
-    expect(formatDiagnosticsUnresolved({ ...base, workflowScopes: ["verify"] })).toContain("cannot approve");
-    expect(() => formatDiagnosticsUnresolved(base)).not.toThrow();
-    expect(formatDiagnosticsUnresolved(base)).toContain("V1");
-    expect(formatDiagnosticsUnresolved(base)).toContain("Master");
-    expect(formatDiagnosticsUnresolved(base)).toContain("cannot approve");
+  it("projects unresolved approvers safely with or without workflow scopes", () => {
+    const row = { vesselId: "V1", vesselName: "Pilot", roles: [{ roleId: "R1", roleName: "Master", issue: "missing-vessel-membership" as const }], consequence: "cannot approve" };
+    for (const rows of [[{ ...row, workflowScopes: ["defects-verification"] }], [row]]) {
+      const blocks = projectDiagnosticsUnresolvedBlocks(rows);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].vesselNames).toEqual(["Pilot"]);
+      expect(blocks[0].instructions.join(" ")).toContain("Master");
+      expect(blocks[0].consequence).toContain("nobody able to action them");
+    }
   });
 });
 // Jeevan #7 / #8 (22-Oct-2026): the vessel has no engine chain, but the decisions are synced onto the defect.

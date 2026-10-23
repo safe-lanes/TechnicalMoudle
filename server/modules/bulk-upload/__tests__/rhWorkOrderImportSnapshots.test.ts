@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The test imports the whole import service tree (~11s on Windows with the approval branch's modules);
+// 5s was not enough even alone. Same remedy as 0c79296d2.
+vi.setConfig({ testTimeout: 30_000 });
 import { resolveWorkOrderPartADates } from '../../work-orders/utils/workOrderPartADates';
 
 const persisted: any[] = [];

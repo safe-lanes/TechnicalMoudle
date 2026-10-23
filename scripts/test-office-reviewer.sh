@@ -18,7 +18,7 @@ initdb -D "$root/data" -A trust --no-locale >/dev/null
 pg_ctl -D "$root/data" -l "$root/server.log" \
   -o "-p 55432 -k $root/socket -h 127.0.0.1" start >/dev/null
 npx vitest run --config tests/office-reviewer.config.ts \
-  tests/officeReviewer.test.ts tests/officeReviewerIntegration.test.ts \
+  tests/officeReviewerRoleSelect.test.ts tests/officeReviewerIntegration.test.ts \
   server/modules/jobs/__tests__/jobFrequencyUpdate.test.ts \
   server/modules/jobs/__tests__/officeReviewer.test.ts \
   server/modules/jobs/__tests__/officeReviewerStorage.test.ts \

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The first test imports the whole route/service tree; under full-suite load that import alone can pass 5s
+// (passes alone). Same remedy as 0c79296d2.
+vi.setConfig({ testTimeout: 30_000 });
+
 const repo = {
   findById: vi.fn(),
   findJob: vi.fn(),
