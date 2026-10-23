@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import { requirePermission } from '../../middleware/permissions';
-import { requireAuth } from '../../middleware/auth';
 import * as defectsCtrl from './controllers/defectsController';
 import * as adminCtrl from './controllers/defectAdminController';
 
@@ -39,12 +38,6 @@ router.get('/defects/count/recurring', asyncHandler(defectsCtrl.getRecurringDefe
 
 // POST /defects — create new defect
 router.post('/defects', asyncHandler(defectsCtrl.createDefect));
-
-// POST /defects/export-pdf — generate the filtered Defect Log PDF
-router.post('/defects/export-pdf', requireAuth, asyncHandler(defectsCtrl.exportDefectLogPdf));
-
-// Individual report: current form display values, without changing saved data.
-router.post('/defects/:id/export-pdf', requireAuth, asyncHandler(defectsCtrl.exportDefectReportPdf));
 
 // POST /defects/reports/:reportKey — generate defect report
 router.post('/defects/reports/:reportKey', asyncHandler(defectsCtrl.generateReport));

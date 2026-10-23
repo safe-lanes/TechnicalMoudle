@@ -1,8 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
-import type { DefectReportPdfData } from '@shared/defectReportPdf';
-export type { DefectReportPdfData } from '@shared/defectReportPdf';
 
 export function formatReportDateRange(dateFrom?: Date | null, dateTo?: Date | null): string {
   if (!dateFrom && !dateTo) return 'All Time';
@@ -59,6 +57,62 @@ export interface TableColumn {
   header: string;
   field: string;
   width?: number;
+}
+
+export interface DefectReportPdfData {
+  reportId: string;
+  vessel: string;
+  category: string;
+  dateObserved: string;
+  source: string;
+  component: string;
+  dateReportedToOffice: string;
+  defectCategory: string;
+  make: string;
+  dateRegisteredInSystem: string;
+  defectType: string;
+  model: string;
+  targetDate: string;
+  raisedBy: string;
+  isCoc: boolean;
+  isCritical: boolean;
+  dateClosed: string;
+  description: string;
+
+  immediateCause: string;
+  immediateCauseExplanation: string;
+  rootCause: string;
+  rootCauseExplanation: string;
+  sireVersion: string;
+  sireReference: string;
+  sireHardwareClass: string;
+  riskLevel: string;
+  priority: string;
+  actions: Array<{
+    actionType: string;
+    description: string;
+    proposedBy: string;
+    responsibility: string;
+    dueDate: string;
+    status: string;
+  }>;
+  targetDateExtension?: {
+    existingTargetDate: string;
+    newTargetDate: string;
+    reasonForExtension: string;
+    approved: string;
+    approvalDate: string;
+    approverComments: string;
+  };
+
+  confirmCompleted: boolean;
+  dateCompleted: string;
+  closedByName: string;
+  closedByRank: string;
+  verified: boolean;
+  dateVerified: string;
+  verifiedByName: string;
+  verifiedByOfficePosition: string;
 }
 
 class PDFReportGenerator {
