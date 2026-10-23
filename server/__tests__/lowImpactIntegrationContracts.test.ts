@@ -176,10 +176,13 @@ describe("dormant integrations stay outside startup, migration discovery and pro
     const membership = Object.entries(SYNC_CONFIG)
       .map(([name, config]) => [name, config.category, config.direction, config.identityColumn])
       .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-    expect(membership).toHaveLength(123);
+    // feature/approval-engine-phase2 adds 12 tables: approval_withdrawals, approval_history (BOTH_EDITABLE),
+    // defect_closure_history (ONE_WAY_SHORE_TO_SHIP) and the NO_SYNC apprv_* engine / defect approval settings tables.
+    expect(membership).toHaveLength(135);
     expect(createHash("sha256").update(JSON.stringify(membership)).digest("hex"))
-      // Updated 23-Oct-2026 for the approved sync fix 43c895faf (component_documents identity id → cduuid, mig 182).
-      .toBe("70d2fa72c76893430b4fb94ac0217a0861a3c87035e57a0cceb2a499ae04b692");
+      // Updated 23-Oct-2026 for the approved sync fix 43c895faf (component_documents id → cduuid, mig 182) and the
+      // approval branch tables above.
+      .toBe("32c6871553dc97e845221d056ebc774f6ff86b0b991b5ac61e4b8ded1d833270");
   });
   it("leaves Access Control saves mapping flags directly and omitting generated ids", () => {
     const storage = source("server/postgresStorage.ts");
