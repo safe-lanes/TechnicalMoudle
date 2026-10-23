@@ -26,6 +26,9 @@ uploads/
 # Deployment output
 ship-deploy/
 
+# Generated compiler and regression-test evidence
+/generated-artifacts/
+
 # Secrets — never commit real env values (.env.example IS tracked)
 .env
 !.env.example

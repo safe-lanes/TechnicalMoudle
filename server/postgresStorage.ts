@@ -1,7 +1,17 @@
 import { randomUUID } from 'crypto';
+import { persistMaintenanceHistory, visibleMaintenanceHistory } from './modules/work-orders/utils/maintenanceHistoryPersistence';
+import {
+  type ApprovalFieldOverride,
+  approvalValuesEqual,
+  normalizeApprovalOverride,
+  normalizeOfficeReviewerRoles,
+  validateOfficeReviewerRoles,
+  isOfficeReviewerField,
+} from '../shared/officeReviewer';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
 import { getDb } from './db';
 import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
+import { defectSeriesPrefix, formatDefectNumber, highestInSeries, type DefectSide } from './utils/defectNumberSeries';
 import {
   users,
   fleets,
@@ -2147,7 +2157,7 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(componentDocuments).values(doc).returning();
     // Sync field logging — INSERT
-    try { await logFieldChanges('component_documents', String(result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc create:', e); }
+    try { await logFieldChanges('component_documents', String(result[0].cduuid ?? result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc create:', e); }
     return result[0];
   }
 
@@ -2164,7 +2174,7 @@ export class PostgresStorage {
     }
     // Sync field logging — UPDATE
     if (existingDoc[0]) {
-      try { await logFieldChanges('component_documents', String(id), (existingDoc[0] as any).vesselCode || null, existingDoc[0], result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc update:', e); }
+      try { await logFieldChanges('component_documents', String(existingDoc[0].cduuid ?? id), (existingDoc[0] as any).vesselCode || null, existingDoc[0], result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc update:', e); }
     }
     return result[0];
   }
@@ -2218,17 +2228,18 @@ export class PostgresStorage {
     const db = await getDb();
     if (vesselCode) {
       return await db.select().from(componentMaintenanceHistory)
-        .where(eq(componentMaintenanceHistory.vesselCode, vesselCode))
+        .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.vesselCode, vesselCode)))
         .orderBy(desc(componentMaintenanceHistory.createdAt));
     }
     return await db.select().from(componentMaintenanceHistory)
+      .where(visibleMaintenanceHistory)
       .orderBy(desc(componentMaintenanceHistory.createdAt));
   }
 
   async getComponentMaintenanceHistory(componentId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.componentId, componentId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.componentId, componentId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
@@ -2236,6 +2247,7 @@ export class PostgresStorage {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
       .where(and(
+        visibleMaintenanceHistory,
         eq(componentMaintenanceHistory.componentCode, componentCode),
         eq(componentMaintenanceHistory.vesselCode, vesselCode)
       ))
@@ -2245,35 +2257,35 @@ export class PostgresStorage {
   async getMaintenanceHistoryByJobId(jobId: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.jobId, jobId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.jobId, jobId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
   async getMaintenanceHistoryByJobCode(jobCode: string): Promise<ComponentMaintenanceHistory[]> {
     const db = await getDb();
     return await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.jobCode, jobCode))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.jobCode, jobCode)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
   async getComponentMaintenanceHistoryItem(id: number): Promise<ComponentMaintenanceHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.id, id));
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.id, id)));
     return result[0];
   }
 
   async getMaintenanceHistoryByWorkOrderId(workOrderId: string): Promise<ComponentMaintenanceHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.workOrderId, workOrderId));
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.workOrderId, workOrderId)));
     return result[0];
   }
 
   async getMaintenanceHistoryByVessel(vesselId: string): Promise<any[]> {
     const db = await getDb();
     const history = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.vesselCode, vesselId))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.vesselCode, vesselId)))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     if (history.length === 0) return [];
 
@@ -2303,11 +2315,7 @@ export class PostgresStorage {
 
   // INSERT ONLY - No update or delete methods per immutability requirement
   async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
-    const db = await getDb();
-    const result = await db.insert(componentMaintenanceHistory).values(history).returning();
-    // Sync field logging — INSERT
-    try { await logFieldChanges('component_maintenance_history', result[0].cmhuuid, (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] cmh create:', e); }
-    return result[0];
+    return persistMaintenanceHistory(history);
   }
 
   // ============= MODULE 3: COMPONENT REQUISITIONS =============
@@ -2748,9 +2756,14 @@ export class PostgresStorage {
 
   async createJob(job: InsertJob): Promise<Job> {
     const db = await getDb();
+    const jobData = { ...job };
+    delete jobData.level2ReviewerRankId;
+    jobData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+      db, Object.prototype.hasOwnProperty.call(jobData, 'officeReviewerRoleRuids') ? jobData.officeReviewerRoleRuids : [], [],
+    );
     const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(jobs).values({
-      ...job,
+      ...jobData,
       id,
       juuid: randomUUID(),
       dataScope: job.dataScope || 'vessel',
@@ -2760,8 +2773,20 @@ export class PostgresStorage {
 
   async updateJob(id: string, data: Partial<InsertJob>): Promise<Job> {
     const db = await getDb();
+    const safeData = { ...data };
+    delete safeData.level2ReviewerRankId;
+    if (Object.prototype.hasOwnProperty.call(safeData, 'officeReviewerRoleRuids')) {
+      const existing = (await db.select().from(jobs).where(and(
+        or(eq(jobs.juuid, id), eq(jobs.id, id)),
+        or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+      )).limit(1))[0];
+      if (!existing) throw new Error(`Job ${id} not found`);
+      safeData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+        db, safeData.officeReviewerRoleRuids, existing.officeReviewerRoleRuids,
+      );
+    }
     const result = await db.update(jobs)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...safeData, updatedAt: new Date() })
       .where(and(
         or(eq(jobs.juuid, id), eq(jobs.id, id)),
         or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted))
@@ -2771,6 +2796,23 @@ export class PostgresStorage {
       throw new Error(`Job ${id} not found`);
     }
     return result[0];
+  }
+
+  /** Shared by ordinary Job writes and final CR application (using the same tx). */
+  private async validateJobReviewerSelection(db: any, value: unknown, existing: unknown): Promise<string[]> {
+    try {
+      // Retained selections need no catalog lookup; this also tolerates catalog lag.
+      const retained = new Set(normalizeOfficeReviewerRoles(existing));
+      const additions = Array.isArray(value) ? value.filter(id => !retained.has(id)) : [];
+      const active = additions.length ? await db.select({ ruid: admnRoleMaster.ruid })
+        .from(admnRoleMaster).where(and(
+          eq(admnRoleMaster.isActive, true),
+          or(eq(admnRoleMaster.isDeleted, false), isNull(admnRoleMaster.isDeleted)),
+        )) : [];
+      return validateOfficeReviewerRoles(value, existing, active.map((role: { ruid: string }) => role.ruid));
+    } catch (error) {
+      throw new ValidationError(error instanceof Error ? error.message : 'Invalid Office Reviewer selection');
+    }
   }
 
   /** Atomic cycle-and-estimate write; retry against a fresh Job on a failed CAS. */
@@ -5071,50 +5113,50 @@ export class PostgresStorage {
       }
     }
     
-    // Get or create defect sequence for this vessel/year
-    const existingSeq = await db.select()
-      .from(defectSequences)
-      .where(and(
-        eq(defectSequences.vesselId, vesselId),
-        eq(defectSequences.year, currentYear)
-      ));
-    
-    let nextSeq: number;
-    if (existingSeq.length === 0) {
-      // Create new sequence for this vessel/year starting at 1
-      const seqResult = await db.insert(defectSequences).values({
-        vesselId,
-        year: currentYear,
-        lastSequence: 1,
-      }).returning();
-      nextSeq = 1;
-      // Sync field logging — INSERT
-      try { await logFieldChanges('defect_sequences', String(seqResult[0].id), vesselId, null, seqResult[0], 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences create:', e); }
-    } else {
-      // Increment existing sequence
-      nextSeq = existingSeq[0].lastSequence + 1;
-      const oldSeq = { ...existingSeq[0] };
-      await db.update(defectSequences)
-        .set({ lastSequence: nextSeq })
-        .where(and(
-          eq(defectSequences.vesselId, vesselId),
-          eq(defectSequences.year, currentYear)
-        ));
-      // Sync field logging — UPDATE
-      try { await logFieldChanges('defect_sequences', String(existingSeq[0].id), vesselId, oldSeq, { ...oldSeq, lastSequence: nextSeq }, 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences update:', e); }
+    // Defect numbers per side (server/utils/defectNumberSeries.ts, 13-Oct-2026): the ship numbers its own series
+    // (D048-26-0004 — unchanged format) and the office its own (D048-26-O0001), so the two can never give out the
+    // same number while offline from each other (the Testvessel / pilot defect loss). The next number is the highest
+    // already used in THIS side's series + 1 — defects sync, so this stays right after a re-provision.
+    const { getInstanceRole } = await import('./modules/sync/syncRole');
+    const side: DefectSide = (await getInstanceRole()) === 'ship' ? 'ship' : 'shore';
+    const prefix = defectSeriesPrefix(vesselSeq, yearShort, side);
+    const usedIds = await db.execute(sql`SELECT id FROM defects WHERE vessel_id = ${vesselId} AND id LIKE ${prefix + '%'}`);
+    let nextSeq = highestInSeries((usedIds.rows as any[]).map((r) => String(r.id)), prefix) + 1;
+
+    // Ship only: the per-vessel/year counter stays as a floor (e.g. numbers already printed on board). It is local
+    // bookkeeping now — no field log: the office never numbers in the ship series, and syncing this row by its
+    // per-instance integer id was the "defect_sequences.<id> … missing NOT-NULL [year]" error.
+    const existingSeq = side === 'ship'
+      ? await db.select().from(defectSequences)
+          .where(and(eq(defectSequences.vesselId, vesselId), eq(defectSequences.year, currentYear)))
+      : [];
+    if (existingSeq.length > 0) nextSeq = Math.max(nextSeq, existingSeq[0].lastSequence + 1);
+
+    // Two people raising a defect at the same moment can pick the same number: on a duplicate number, take the next.
+    let result: Defect[] = [];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        result = await db.insert(defects).values({
+          ...defect,
+          id: formatDefectNumber(prefix, nextSeq),
+          duuid: randomUUID(),
+        }).returning();
+        break;
+      } catch (e: any) {
+        const dupNumber = e?.code === '23505' && String(e?.constraint || '').startsWith('defects_pkey');
+        if (!dupNumber || attempt >= 9) throw e;
+        nextSeq++;
+      }
     }
-    
-    // Format: D{VesselCode 3 digits}-{Year 2 digits}-{Seq 4 digits}
-    const vesselCode = String(vesselSeq).padStart(3, '0');
-    const yearCode = String(yearShort).padStart(2, '0');
-    const seqCode = String(nextSeq).padStart(4, '0');
-    const id = `D${vesselCode}-${yearCode}-${seqCode}`;
-    
-    const result = await db.insert(defects).values({
-      ...defect,
-      id,
-      duuid: randomUUID(),
-    }).returning();
+
+    if (side === 'ship') {
+      if (existingSeq.length === 0) {
+        await db.insert(defectSequences).values({ vesselId, year: currentYear, lastSequence: nextSeq });
+      } else if (nextSeq > existingSeq[0].lastSequence) {
+        await db.update(defectSequences).set({ lastSequence: nextSeq })
+          .where(and(eq(defectSequences.vesselId, vesselId), eq(defectSequences.year, currentYear)));
+      }
+    }
 
     // Sync field logging — INSERT
     try { await logFieldChanges('defects', result[0].duuid, defect.vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect create:', e); }
@@ -5971,6 +6013,7 @@ export class PostgresStorage {
 
   async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
     const db = await getDb();
+    await this.validateReviewerChangeRequest(db, request);
     const result = await db.insert(changeRequest).values({
       ...request,
       targetType: request.targetType || null,
@@ -5991,6 +6034,13 @@ export class PostgresStorage {
     const db = await getDb();
     // Fetch existing for sync field logging
     const existingCR = await this.getChangeRequest(id);
+    if (existingCR && (
+      Object.prototype.hasOwnProperty.call(data, 'proposedChangesJson') ||
+      Object.prototype.hasOwnProperty.call(data, 'targetType') ||
+      Object.prototype.hasOwnProperty.call(data, 'targetId')
+    )) {
+      await this.validateReviewerChangeRequest(db, { ...existingCR, ...data });
+    }
     const result = await db.update(changeRequest)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(changeRequest.id, id))
@@ -6003,6 +6053,28 @@ export class PostgresStorage {
       try { await logFieldChanges('change_request', existingCR.cruuid, (existingCR as any).vesselId || null, existingCR, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CR update:', e); }
     }
     return result[0];
+  }
+
+  private async validateReviewerChangeRequest(
+    db: any,
+    request: { targetType?: string | null; targetId?: string | null; proposedChangesJson?: unknown },
+  ): Promise<void> {
+    if (!Array.isArray(request.proposedChangesJson)) return;
+    const changes = request.proposedChangesJson.filter(change =>
+      typeof change?.field === 'string' && isOfficeReviewerField(change.field),
+    );
+    if (!changes.length) return;
+    if (request.targetType !== 'job' || !request.targetId) {
+      throw new ValidationError('Office Reviewer configuration must target a Job');
+    }
+    const job = (await db.select().from(jobs).where(and(
+      or(eq(jobs.juuid, request.targetId), eq(jobs.id, request.targetId)),
+      or(eq(jobs.isDeleted, false), isNull(jobs.isDeleted)),
+    )).limit(1))[0];
+    if (!job) throw new ValidationError('Office Reviewer target Job not found');
+    for (const change of changes) {
+      await this.validateJobReviewerSelection(db, change.newValue, job.officeReviewerRoleRuids);
+    }
   }
 
   async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
@@ -6043,6 +6115,14 @@ export class PostgresStorage {
   // vessel_id log row is silently dropped and NEVER syncs (the historic
   // null-vessel trap). Every approval-step log below must stamp the PARENT's
   // vessel_id, resolved via these best-effort lookups.
+
+  /** The change request's UUID for a local id — stamped on comments/attachments so sync can find the right parent. */
+  private async crUuid(changeRequestId: number): Promise<string | null> {
+    const db = await getDb();
+    const r = await db.select({ u: changeRequest.cruuid }).from(changeRequest)
+      .where(eq(changeRequest.id, changeRequestId)).limit(1);
+    return r[0]?.u ?? null;
+  }
 
   private async crVesselId(changeRequestId: number): Promise<string | null> {
     try {
@@ -6124,7 +6204,7 @@ export class PostgresStorage {
 
   // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
 
-  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string, overriddenChanges?: ApprovalFieldOverride[]): Promise<ChangeRequest> {
     return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, new Date(), overriddenChanges);
   }
 
@@ -6138,7 +6218,7 @@ export class PostgresStorage {
     reviewerId: string,
     comment: string,
     now: Date,
-    overriddenChanges?: Array<{ field: string; approverNewValue: string }>
+    overriddenChanges?: ApprovalFieldOverride[]
   ): Promise<ChangeRequest> {
     const db = await getDb();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
@@ -6191,11 +6271,11 @@ export class PostgresStorage {
 
         // Map from field -> { approverNewValue, modifiedBy, modifiedAt }
         // Earlier levels go in first so that higher levels can override them.
-        const accumulatedOverrideMap = new Map<string, { approverNewValue: string; modifiedBy: string; modifiedAt: string }>();
+        const accumulatedOverrideMap = new Map<string, { approverNewValue: string | string[]; modifiedBy: string; modifiedAt: string }>();
         for (const partial of partialApprovals) {
           for (const ov of (partial.overriddenFields || [])) {
             accumulatedOverrideMap.set(String(ov.field), {
-              approverNewValue: String(ov.approverNewValue ?? ''),
+              approverNewValue: normalizeApprovalOverride(String(ov.field), ov.approverNewValue),
               modifiedBy: String(ov.modifiedBy ?? partial.approvedBy ?? ''),
               modifiedAt: String(ov.modifiedAt ?? partial.approvedAt ?? now.toISOString())
             });
@@ -6204,7 +6284,7 @@ export class PostgresStorage {
         // Final approver's overrides take precedence over all previous levels
         for (const ov of (overriddenChanges || [])) {
           accumulatedOverrideMap.set(ov.field, {
-            approverNewValue: ov.approverNewValue,
+            approverNewValue: normalizeApprovalOverride(ov.field, ov.approverNewValue),
             modifiedBy: reviewerId,
             modifiedAt: now.toISOString()
           });
@@ -6230,7 +6310,7 @@ export class PostgresStorage {
         const overriddenFields: Array<{
           field: string;
           originalNewValue: any;
-          approverNewValue: string;
+          approverNewValue: string | string[];
           modifiedBy: string;
           modifiedAt: string;
         }> = [];
@@ -6239,7 +6319,7 @@ export class PostgresStorage {
             (c: any) => (c.field ?? c.columnName) === field
           );
           const originalNewValue = original?.newValue ?? null;
-          if (String(originalNewValue ?? '') !== overrideData.approverNewValue) {
+          if (!approvalValuesEqual(field, originalNewValue, overrideData.approverNewValue)) {
             overriddenFields.push({
               field,
               originalNewValue,
@@ -6260,7 +6340,7 @@ export class PostgresStorage {
           appliedFieldCount?: number;
           appliedError?: string;
           comments?: string;
-          overriddenFields?: Array<{ field: string; originalNewValue: any; approverNewValue: string; modifiedBy: string; modifiedAt: string }>;
+          overriddenFields?: Array<{ field: string; originalNewValue: any; approverNewValue: string | string[]; modifiedBy: string; modifiedAt: string }>;
         } = {
           revisionNumber: newRevisionNumber,
           approvedBy: reviewerId,
@@ -6302,9 +6382,36 @@ export class PostgresStorage {
     }
   }
 
-  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: Array<{ field: string; approverNewValue: string }>): Promise<ChangeRequest> {
+  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string, overriddenChanges?: ApprovalFieldOverride[]): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
+    if (overriddenChanges) {
+      if (!Array.isArray(overriddenChanges)) throw new ValidationError('Invalid approval overrides');
+      try {
+        overriddenChanges = overriddenChanges.map(override => {
+          if (!override || typeof override.field !== 'string') throw new Error('Invalid approval override field');
+          return {
+            field: override.field,
+            approverNewValue: normalizeApprovalOverride(override.field, override.approverNewValue),
+          };
+        });
+      } catch (error) {
+        throw new ValidationError(error instanceof Error ? error.message : 'Invalid approval overrides');
+      }
+      const reviewerOverrides = overriddenChanges.filter(override => isOfficeReviewerField(override.field));
+      if (reviewerOverrides.length) {
+        const proposed = Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson as any[] : [];
+        for (const override of reviewerOverrides) {
+          if (!proposed.some(change => change.field === override.field)) {
+            throw new ValidationError('Office Reviewer override must match a proposed field');
+          }
+        }
+        await this.validateReviewerChangeRequest(await getDb(), {
+          ...existing,
+          proposedChangesJson: reviewerOverrides.map(override => ({ field: override.field, newValue: override.approverNewValue })),
+        });
+      }
+    }
 
     // Load approval steps for this CR
     const steps = await this.getChangeRequestApprovalSteps(id);
@@ -6596,6 +6703,12 @@ export class PostgresStorage {
     delete safeUpdateData.id;
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
+    delete safeUpdateData.level2ReviewerRankId;
+    if (Object.prototype.hasOwnProperty.call(safeUpdateData, 'officeReviewerRoleRuids')) {
+      safeUpdateData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
+        tx, safeUpdateData.officeReviewerRoleRuids, beforeState.officeReviewerRoleRuids,
+      );
+    }
 
     // Legacy field translations for jobs - UI uses different field names than schema
     // woTitle -> jobTitle (UI uses woTitle for display, schema uses jobTitle)
@@ -6988,7 +7101,8 @@ export class PostgresStorage {
 
   async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
     const db = await getDb();
-    const result = await db.insert(changeRequestAttachment).values(attachment).returning();
+    const changeRequestUuid = attachment.changeRequestUuid ?? await this.crUuid(attachment.changeRequestId);
+    const result = await db.insert(changeRequestAttachment).values({ ...attachment, changeRequestUuid }).returning();
     const created = result[0];
     // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
     try {
@@ -7013,7 +7127,8 @@ export class PostgresStorage {
 
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
     const db = await getDb();
-    const result = await db.insert(changeRequestComment).values(comment).returning();
+    const changeRequestUuid = comment.changeRequestUuid ?? await this.crUuid(comment.changeRequestId);
+    const result = await db.insert(changeRequestComment).values({ ...comment, changeRequestUuid }).returning();
     // Sync field logging — INSERT (parent-resolved vessel_id via change_request)
     try {
       const vId = await this.crVesselId(result[0].changeRequestId);
@@ -9508,6 +9623,7 @@ export class PostgresStorage {
     // First try to match by jobId directly
     let results = await db.select().from(componentMaintenanceHistory)
       .where(and(
+        visibleMaintenanceHistory,
         eq(componentMaintenanceHistory.jobId, jobId),
         eq(componentMaintenanceHistory.componentCode, componentCode)
       ))
@@ -9528,7 +9644,9 @@ export class PostgresStorage {
     
     // Get all maintenance history for this component, then filter by jobNo match
     const allRecords = await db.select().from(componentMaintenanceHistory)
-      .where(eq(componentMaintenanceHistory.componentCode, componentCode))
+      .where(and(visibleMaintenanceHistory, eq(componentMaintenanceHistory.componentCode, componentCode),
+        or(eq(componentMaintenanceHistory.vesselCode, job[0].vesselId ?? ''),
+          eq(componentMaintenanceHistory.vesselCode, vesselCode ?? ''))))
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
     
     // Legacy and vessel-prefixed work order numbers both resolve to the

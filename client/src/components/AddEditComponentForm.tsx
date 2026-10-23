@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import {
   Dialog,
   DialogContent,
@@ -389,6 +390,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
   const { data: maintenanceHistory = [], isLoading: isLoadingHistory, error: historyError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-maintenance-history/${componentId}`],
+    select: rows => rows.filter(isVisibleMaintenanceHistory),
     enabled: isEditMode && !!componentId,
   });
 

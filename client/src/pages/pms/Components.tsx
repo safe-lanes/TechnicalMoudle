@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2, GripVertical, Trash2, Eye, Loader2, Paperclip, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Marker } from "@/components/Marker";
@@ -1411,6 +1412,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   const componentDbId = selectedComponent?.actualId;
   const { data: maintenanceHistory = [], isLoading, error: historyLoadError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-maintenance-history/${componentDbId}`],
+    select: rows => rows.filter(isVisibleMaintenanceHistory),
     enabled: !!componentDbId,
   });
   

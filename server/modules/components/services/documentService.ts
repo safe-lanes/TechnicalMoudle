@@ -121,7 +121,7 @@ export async function createDocument(body: any, file: Express.Multer.File, user:
     // Queue file for sync (best-effort — never blocks upload)
     try {
       await FileSyncProcessor.queueFileForSync(
-        'component_documents', String(createdDoc.id), createdDoc.fileKey,
+        'component_documents', String(createdDoc.cduuid ?? createdDoc.id), createdDoc.fileKey,
         createdDoc.fileName, createdDoc.fileSize ?? null, createdDoc.vesselCode
       );
     } catch (syncErr) {

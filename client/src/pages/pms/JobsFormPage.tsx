@@ -1,4 +1,5 @@
 import { useState, useEffect, Fragment } from "react";
+import { isVisibleMaintenanceHistory } from "@shared/workOrders/maintenanceHistoryVisibility";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 import JobSafetyRequirementsEditor from "@/components/pms/JobSafetyRequirementsEditor";
 import { buildJobSafetyUpdate, type JobSafetyDraft } from "@/lib/jobSafetyRequirements";
+import { OfficeReviewerRoleSelect, normalizeOfficeReviewerRoleRuids, sameOfficeReviewerRoles } from "@/components/OfficeReviewerRoleSelect";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "select" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
   <div className="space-y-2">
@@ -231,7 +233,7 @@ const JobsFormPage: React.FC = () => {
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
-    level2ReviewerRankId: "",
+    officeReviewerRoleRuids: [] as string[],
     jobPriority: "Medium",
     classRelated: "No",
     department: "",
@@ -277,8 +279,11 @@ const JobsFormPage: React.FC = () => {
         // This ensures clicking a job from component X always binds to component X
         const effectiveComponentCode = activeComponentCode || context.templateData.componentCode || context.templateData.sfiCode || '';
         
+        const templateDataFromContext = Object.fromEntries(
+          Object.entries(context.templateData).filter(([key]) => key !== "level2ReviewerRankId"),
+        );
         const newTemplateData = {
-          ...context.templateData,
+          ...templateDataFromContext,
           woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
           woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
           componentName: context.templateData.componentName || '',
@@ -289,7 +294,7 @@ const JobsFormPage: React.FC = () => {
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           nextDueReading: context.templateData.nextDueRH || '',
           briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || '',
-          level2ReviewerRankId: context.templateData.level2ReviewerRankId || ''
+          officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(context.templateData.officeReviewerRoleRuids)
         };
         
         setTemplateData(prev => ({
@@ -309,14 +314,21 @@ const JobsFormPage: React.FC = () => {
     }));
   };
 
+  const handleOfficeReviewerChange = (ruids: string[]) => {
+    setTemplateData(prev => ({ ...prev, officeReviewerRoleRuids: normalizeOfficeReviewerRoleRuids(ruids) }));
+  };
+
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
+    const fieldsToCheck = ['woTitle', 'woTemplateCode', 'assignedTo', 'approver', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
         changedFields.push(field);
       }
+    }
+    if (!sameOfficeReviewerRoles(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)) {
+      changedFields.push('officeReviewerRoleRuids');
     }
     return changedFields;
   };
@@ -465,8 +477,8 @@ const JobsFormPage: React.FC = () => {
       if (templateData.approver !== originalData.approver) {
         updatePayload.approver = templateData.approver;
       }
-      if (templateData.level2ReviewerRankId !== originalData.level2ReviewerRankId) {
-        updatePayload.level2ReviewerRankId = templateData.level2ReviewerRankId || null;
+      if (!sameOfficeReviewerRoles(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)) {
+        updatePayload.officeReviewerRoleRuids = normalizeOfficeReviewerRoleRuids(templateData.officeReviewerRoleRuids);
       }
       if (templateData.jobPriority !== originalData.jobPriority) {
         updatePayload.jobPriority = templateData.jobPriority;
@@ -641,7 +653,7 @@ const JobsFormPage: React.FC = () => {
   };
 
   const buildWorkHistoryForExport = () => {
-    const raw = templateData.workHistory || [];
+    const raw = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
     return raw
       .filter((h: any) => {
         const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
@@ -1315,19 +1327,15 @@ const JobsFormPage: React.FC = () => {
                     labelMarker="JF.A1.19"
                     valueMarker="JF.A1.20"
                   />
-                  <EditableField 
-                    label="Level 2 Reviewer (Rank)" 
-                    field="level2ReviewerRankId"
-                    value={templateData.level2ReviewerRankId} 
-                    originalValue={originalData.level2ReviewerRankId}
-                    onChange={handleFieldChange}
-                    isModifyMode={isModifyMode}
-                    isEditMode={isEditMode}
-                    type="select"
-                    options={ensureRankInOptions([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId)}
-                    displayValue={getRankLabel([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId) || templateData.level2ReviewerRankId || '— None —'}
+                  <OfficeReviewerRoleSelect
+                    label="Office Reviewer"
+                    value={templateData.officeReviewerRoleRuids}
+                    onChange={handleOfficeReviewerChange}
+                    disabled={!isModifyMode && !isEditMode}
+                    changed={!sameOfficeReviewerRoles(templateData.officeReviewerRoleRuids, originalData.officeReviewerRoleRuids)}
                     labelMarker="JF.A1.L2R.1"
                     valueMarker="JF.A1.L2R.2"
+                    testId="jobs-office-reviewer-select"
                   />
                   <EditableField 
                     label="Job Priority" 
@@ -1606,7 +1614,7 @@ const JobsFormPage: React.FC = () => {
                     size="sm"
                     variant="outline"
                     onClick={handleExportWorkHistoryExcel}
-                    disabled={isExportingHistoryExcel || (templateData.workHistory || []).length === 0}
+                    disabled={isExportingHistoryExcel || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                     data-testid="button-export-history-excel"
                     className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-40"
                   >
@@ -1618,7 +1626,7 @@ const JobsFormPage: React.FC = () => {
                     size="sm"
                     variant="outline"
                     onClick={handleExportWorkHistoryPDF}
-                    disabled={isExportingHistoryPDF || (templateData.workHistory || []).length === 0}
+                    disabled={isExportingHistoryPDF || (templateData.workHistory || []).filter(isVisibleMaintenanceHistory).length === 0}
                     data-testid="button-export-history-pdf"
                     className="h-7 text-xs border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-40"
                   >
@@ -1630,7 +1638,7 @@ const JobsFormPage: React.FC = () => {
               }
             >
               {(() => {
-                const rawHistory = templateData.workHistory || [];
+                const rawHistory = (templateData.workHistory || []).filter(isVisibleMaintenanceHistory);
 
                 const filteredHistory = rawHistory.filter((h: any) => {
                   const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';

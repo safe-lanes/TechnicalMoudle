@@ -599,6 +599,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This handles work orders that were completed before the auto-population feature was added
   (async () => {
     try {
+      // Keep the historical startup check unfiltered. Hiding skipped rows must
+      // not turn this existing routine into automatic repair of skipped-only sources.
+      const { findMaintenanceHistoryForSource } = await import('./modules/work-orders/repositories/workOrderRepository');
       // Get all completed work orders
       const allVessels = await storage.getVessels();
       let backfilledCount = 0;
@@ -611,7 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const wo of completedWOs) {
           const woAny = wo as any;
           // Check if maintenance history already exists for this work order
-          const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(woAny.wouuid);
+          const existingHistory = (await findMaintenanceHistoryForSource(woAny.wouuid)).length > 0;
           if (existingHistory) {
             skippedCount++;
             continue;

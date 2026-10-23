@@ -263,9 +263,60 @@ export async function generateProvisioningBundle(
         `(safe, just slower) until this is resolved.`
       );
     }
+    // The bundle carries document/attachment ROWS, not their files. A file is queued for the ship only once, at
+    // upload, and marked done when the vessel's (previous) ship downloaded it — so a ship provisioned later (new
+    // server, reinstall) got the rows without the files. Re-offer this vessel's files to the ship being provisioned.
+    try {
+      const fq = await requeueVesselFilesForProvision(bundle, vesselId);
+      console.warn(`[Provisioning] files re-offered for ${convInstanceId}: queued=${fq.queued}, alreadyPending=${fq.alreadyPending}, notLocal=${fq.notLocal}`);
+    } catch (fileErr: any) {
+      console.error(`[Provisioning] ⚠️ file re-queue FAILED for ${convInstanceId}: ${fileErr.message} — rows are in the bundle; files can be re-offered later.`);
+    }
   }
 
   return bundle;
+}
+
+/** Tables whose rows reference a file the ship needs, with the columns that locate it. */
+const PROVISION_FILE_TABLES: Array<{ table: string; idCol: string; keyCol: string; nameCol: string; sizeCol: string | null; localUrlOnly: boolean }> = [
+  { table: 'work_order_documents', idCol: 'id', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
+  { table: 'component_documents', idCol: 'cduuid', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
+  // base64 data URIs travel inside the row; only stored files (local:// / .private/) need a transfer
+  { table: 'defect_attachments', idCol: 'datuuid', keyCol: 'url', nameCol: 'filename', sizeCol: null, localUrlOnly: true },
+  { table: 'change_request_attachment', idCol: 'crauuid', keyCol: 'url', nameCol: 'filename', sizeCol: null, localUrlOnly: true },
+];
+
+/**
+ * Queue (shore → ship) every file referenced by the bundle's rows that is not already pending for this vessel.
+ * Idempotent per (table, file, vessel): re-running a provision does not queue duplicates.
+ */
+export async function requeueVesselFilesForProvision(
+  bundle: ProvisioningBundle,
+  vesselId: string
+): Promise<{ queued: number; alreadyPending: number; notLocal: number }> {
+  const pool = await getPool();
+  const { FileSyncProcessor } = await import('./fileSyncProcessor');
+  const out = { queued: 0, alreadyPending: 0, notLocal: 0 };
+  for (const ft of PROVISION_FILE_TABLES) {
+    const rows = bundle.data.find((d) => d.tableName === ft.table)?.rows || [];
+    for (const row of rows) {
+      const key = row[ft.keyCol];
+      if (typeof key !== 'string' || !key) continue;
+      if (ft.localUrlOnly && !(key.startsWith('local://') || key.startsWith('.private/'))) { out.notLocal++; continue; }
+      const pending = await pool.query(
+        `SELECT 1 FROM sync_file_queue WHERE table_name = $1 AND file_key = $2 AND vessel_id = $3
+           AND direction = 'shore_to_ship' AND status IN ('pending', 'in_progress') LIMIT 1`,
+        [ft.table, key, vesselId]
+      );
+      if (pending.rows.length > 0) { out.alreadyPending++; continue; }
+      await FileSyncProcessor.queueFileForSync(
+        ft.table, String(row[ft.idCol] ?? row.id), key, row[ft.nameCol] ?? null,
+        ft.sizeCol && row[ft.sizeCol] != null ? Number(row[ft.sizeCol]) : null, vesselId
+      );
+      out.queued++;
+    }
+  }
+  return out;
 }
 
 /**
@@ -306,11 +357,11 @@ export async function verifyBundleExportIntegrity(
         const res = await pool.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
         dbCount = res.rows[0]?.c ?? 0;
       } else {
-        const scopeValue = tc.vesselScopeColumn === 'vessel_code' ? vesselCode : vesselId;
-        if (!scopeValue) continue;
+        const scopeValues = vesselScopeValues(tc.vesselScopeColumn, vesselId, vesselCode);
+        if (scopeValues.length === 0) continue;
         const res = await pool.query(
-          `SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE "${tc.vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false`,
-          [scopeValue]
+          `SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE "${tc.vesselScopeColumn}" = ANY($1) AND COALESCE(is_deleted, false) = false`,
+          [scopeValues]
         );
         dbCount = res.rows[0]?.c ?? 0;
       }
@@ -894,6 +945,17 @@ export async function verifyProvisioning(
 
 // ── Internal helpers ──
 
+/**
+ * Values a vessel-scoped table may hold for THIS vessel. `vessel_code` columns are written with the vessel UUID
+ * (e.g. componentService: vesselCode = c.vesselId), but provisioning used to filter them by vessels.id (e.g. 'WKFV'),
+ * so component_documents, component_maintenance_history, component_requisitions, component_running_hours_log and
+ * component_class_regulatory were exported with 0 rows (proven on the pilot, 14-Oct-2026). Match either value.
+ */
+export function vesselScopeValues(scopeColumn: string | null, vesselId: string | null, vesselCode: string | null): string[] {
+  const values = scopeColumn === 'vessel_code' ? [vesselId, vesselCode] : [vesselId];
+  return Array.from(new Set(values.filter((v): v is string => typeof v === 'string' && v.length > 0)));
+}
+
 async function exportAndAdd(
   pool: any,
   bundle: ProvisioningBundle,
@@ -980,13 +1042,12 @@ async function exportAndAdd(
         )
         .then((r: any) => r.rows);
     } else if (vesselScopeColumn && (vesselId || vesselCode)) {
-      // Determine correct scope value
-      const scopeValue =
-        vesselScopeColumn === 'vessel_code' ? vesselCode : vesselId;
+      // Determine correct scope value(s) — vessel_code columns hold the vessel UUID (see vesselScopeValues)
+      const scopeValues = vesselScopeValues(vesselScopeColumn, vesselId, vesselCode);
       rows = await pool
         .query(
-          `SELECT * FROM "${tc.tableName}" WHERE "${vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`,
-          [scopeValue]
+          `SELECT * FROM "${tc.tableName}" WHERE "${vesselScopeColumn}" = ANY($1) AND COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`,
+          [scopeValues]
         )
         .then((r: any) => r.rows);
     } else {

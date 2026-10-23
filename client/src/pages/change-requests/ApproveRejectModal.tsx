@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { CheckCircle, X, RotateCcw, GitPullRequest, AlertTriangle, Info, Pencil } from "lucide-react";
 import type { ChangeRequest } from "@shared/schema";
 import { useResolvedUserName } from "@/hooks/useResolvedUserName";
+import { OfficeReviewerRoleSelect, normalizeOfficeReviewerRoleRuids, officeReviewerRoleLabel, sameOfficeReviewerRoles, useOfficeReviewerRoles } from "@/components/OfficeReviewerRoleSelect";
 
 interface ApproveRejectModalProps {
   open: boolean;
@@ -33,7 +34,9 @@ export default function ApproveRejectModal({
   const { resolvedUserName } = useResolvedUserName();
   const [comment, setComment] = useState("");
   // Per-field override state: key = field name, value = approver-edited text
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [overrides, setOverrides] = useState<Record<string, unknown>>({});
+  const rolesQuery = useOfficeReviewerRoles();
+  const roles = rolesQuery.data ?? [];
 
   // Fetch change request details
   const { data: changeRequest, isLoading } = useQuery<ChangeRequest>({
@@ -56,8 +59,33 @@ export default function ApproveRejectModal({
     return raw;
   }, [changeRequest]);
 
+  const reviewerPriorState = useMemo(() => {
+    const proposed = proposedChanges.find((change) => change.field === "officeReviewerRoleRuids");
+    const originalValue = normalizeOfficeReviewerRoleRuids(proposed?.newValue);
+    let effectivePriorValue = originalValue;
+    let hasPriorOverride = false;
+    const revisionHistory = (changeRequest as any)?.revisionHistory;
+
+    if (Array.isArray(revisionHistory)) {
+      for (const entry of revisionHistory) {
+        if (entry?.type !== "partial_approval" || !Array.isArray(entry.overriddenFields)) continue;
+        for (const overriddenField of entry.overriddenFields) {
+          if (overriddenField?.field !== "officeReviewerRoleRuids" || !Array.isArray(overriddenField.approverNewValue)) continue;
+          try {
+            effectivePriorValue = normalizeOfficeReviewerRoleRuids(overriddenField.approverNewValue);
+            hasPriorOverride = true;
+          } catch {
+            // Ignore malformed historical values; only validated native arrays are eligible.
+          }
+        }
+      }
+    }
+
+    return { originalValue, effectivePriorValue, hasPriorOverride };
+  }, [changeRequest, proposedChanges]);
+
   const approveMutation = useMutation({
-    mutationFn: async (overriddenChanges: Array<{ field: string; approverNewValue: string }>) => {
+    mutationFn: async (overriddenChanges: Array<{ field: string; approverNewValue: string | string[] }>) => {
       return apiRequest('PUT', `/technical/api/change-requests/${requestId}/approve`, {
         comment,
         reviewerId: resolvedUserName,
@@ -157,12 +185,17 @@ export default function ApproveRejectModal({
         const overriddenChanges = proposedChanges
           .filter(change => {
             const key = change.field;
+            if (key === "officeReviewerRoleRuids") {
+              return overrides[key] !== undefined && !sameOfficeReviewerRoles(overrides[key], reviewerPriorState.effectivePriorValue);
+            }
             const originalStr = String(change.newValue ?? '');
             return overrides[key] !== undefined && overrides[key] !== originalStr;
           })
           .map(change => ({
             field: change.field,
-            approverNewValue: overrides[change.field],
+            approverNewValue: change.field === "officeReviewerRoleRuids"
+              ? normalizeOfficeReviewerRoleRuids(overrides[change.field])
+              : String(overrides[change.field]),
           }));
         approveMutation.mutate(overriddenChanges);
         break;
@@ -233,8 +266,17 @@ export default function ApproveRejectModal({
   // Determine how many fields the approver has modified from the original
   const modifiedCount = proposedChanges.filter(change => {
     const key = change.field;
+    if (key === "officeReviewerRoleRuids") {
+      return overrides[key] !== undefined && !sameOfficeReviewerRoles(overrides[key], reviewerPriorState.effectivePriorValue);
+    }
     return overrides[key] !== undefined && overrides[key] !== String(change.newValue ?? '');
   }).length;
+
+  const formatReviewerRoles = (value: unknown) => {
+    const ruids = normalizeOfficeReviewerRoleRuids(value);
+    if (ruids.length === 0) return "— None —";
+    return ruids.map((ruid) => officeReviewerRoleLabel(ruid, roles)).join(", ");
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -310,32 +352,55 @@ export default function ApproveRejectModal({
                     {proposedChanges.map((change, idx) => {
                       const fieldKey = change.field;
                       const originalNewValue = String(change.newValue ?? '');
-                      const currentValue = overrides[fieldKey] ?? originalNewValue;
-                      const isModified = overrides[fieldKey] !== undefined && overrides[fieldKey] !== originalNewValue;
+                      const isReviewerRoles = fieldKey === "officeReviewerRoleRuids";
+                      const currentValue = isReviewerRoles
+                        ? normalizeOfficeReviewerRoleRuids(overrides[fieldKey] ?? reviewerPriorState.effectivePriorValue)
+                        : String(overrides[fieldKey] ?? originalNewValue);
+                      const isModified = overrides[fieldKey] !== undefined && (
+                        isReviewerRoles
+                          ? !sameOfficeReviewerRoles(overrides[fieldKey], reviewerPriorState.effectivePriorValue)
+                          : overrides[fieldKey] !== originalNewValue
+                      );
 
                       return (
                         <tr key={idx} className={`border-b last:border-0 ${isModified ? 'bg-amber-50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                           {/* Field name */}
                           <td className="px-3 py-2 font-medium text-gray-700 text-xs uppercase tracking-wide">
-                            {change.field}
+                            {isReviewerRoles ? "Office Reviewer" : change.field}
                           </td>
 
                           {/* Previous (old) value — always read-only */}
                           <td className="px-3 py-2">
                             <span
                               className="inline-block bg-gray-100 text-gray-700 rounded px-2 py-0.5 text-xs max-w-full truncate"
-                              title={String(change.oldValue ?? '—')}
+                              title={isReviewerRoles ? formatReviewerRoles(change.oldValue) : String(change.oldValue ?? '—')}
                             >
-                              {String(change.oldValue ?? '—')}
+                              {isReviewerRoles ? formatReviewerRoles(change.oldValue) : String(change.oldValue ?? '—')}
                             </span>
                           </td>
 
                           {/* New value — editable input when action === 'approve' */}
                           <td className="px-3 py-2">
-                            {action === 'approve' ? (
+                            {isReviewerRoles ? (
+                              <div>
+                                <OfficeReviewerRoleSelect
+                                  label=""
+                                  value={currentValue}
+                                  onChange={(ruids) => setOverrides(prev => ({ ...prev, [fieldKey]: ruids }))}
+                                  disabled={action !== 'approve'}
+                                  testId={`override-${fieldKey}`}
+                                />
+                                <div className="mt-1 space-y-0.5 text-[11px] text-gray-500">
+                                  <p>Original proposal: {formatReviewerRoles(reviewerPriorState.originalValue)}</p>
+                                  {reviewerPriorState.hasPriorOverride && (
+                                    <p>Prior approval override: {formatReviewerRoles(reviewerPriorState.effectivePriorValue)}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ) : action === 'approve' ? (
                               <div className="flex items-center gap-1.5">
                                 <Input
-                                  value={currentValue}
+                                  value={String(currentValue)}
                                   onChange={(e) =>
                                     setOverrides(prev => ({ ...prev, [fieldKey]: e.target.value }))
                                   }
@@ -354,9 +419,9 @@ export default function ApproveRejectModal({
                             ) : (
                               <span
                                 className="inline-block bg-green-50 text-green-800 border border-green-200 rounded px-2 py-0.5 text-xs max-w-full truncate"
-                                title={originalNewValue}
+                                title={isReviewerRoles ? formatReviewerRoles(change.newValue) : originalNewValue}
                               >
-                                {originalNewValue || '—'}
+                                {isReviewerRoles ? formatReviewerRoles(change.newValue) : originalNewValue || '—'}
                               </span>
                             )}
                           </td>

@@ -1,5 +1,33 @@
 # PMS Test Suite Documentation
 
+## Focused AuthContext metadata regression checks
+
+```bash
+npx vitest run server/__tests__/authContextMetadata.test.ts
+```
+
+These offline tests execute the actual provider source with deterministic hook
+fakes, real encrypted-storage handling, and mocked identity/query/API side
+effects. They do not make login requests, write to a database, or synchronize.
+See [`docs/auth-context-metadata-verification.md`](../docs/auth-context-metadata-verification.md)
+for the bounded change and compiler comparison.
+
+## Focused dormant-integration regression checks
+
+The batch, image, chat-storage and Access Control validator checks run without
+live AI requests or database writes using the existing Vitest configuration:
+
+```bash
+npx vitest run \
+  server/replit_integrations/batch/__tests__/utils.test.ts \
+  server/replit_integrations/image/__tests__/image.test.ts \
+  server/replit_integrations/chat/__tests__/storage.test.ts \
+  server/__tests__/lowImpactIntegrationContracts.test.ts
+```
+
+See [`docs/low-impact-typescript-verification.md`](../docs/low-impact-typescript-verification.md)
+for compiler comparison results, remaining diagnostics and preserved behavior contracts.
+
 ## Overview
 Comprehensive end-to-end test suite for the Maritime Planned Maintenance System (PMS) web application. The suite includes 215+ test cases covering all modules, database verification, and cross-cutting concerns.
 

@@ -99,6 +99,11 @@ const DEFAULT_USER: PublicUser = {
   userUuid: "b808b560-26c4-4c4b-8c0f-8c785e49770c",
   createdAt: new Date(),
   updatedAt: new Date(),
+  isSync: null,
+  createdByUuid: null,
+  updatedByUuid: null,
+  isDeleted: null,
+  sortOrder: null,
 };
 
 export interface MyVesselAssignment {
@@ -346,6 +351,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         userUuid: resolved.userUuid || undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
+        isSync: null,
+        createdByUuid: null,
+        updatedByUuid: null,
+        isDeleted: null,
+        sortOrder: null,
       };
       resolvedMyVessels = normalizeMyVessels(encryptedProfile);
     }
@@ -434,6 +444,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       userUuid: user.userUuid,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      isSync: user.isSync ?? null,
+      createdByUuid: user.createdByUuid ?? null,
+      updatedByUuid: user.updatedByUuid ?? null,
+      isDeleted: user.isDeleted ?? null,
+      sortOrder: user.sortOrder ?? null,
     };
     // A real login supersedes any prior logout — clear the marker so the
     // next hydration trusts the freshly stored profile (and, in Replit,

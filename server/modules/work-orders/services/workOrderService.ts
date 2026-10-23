@@ -1,4 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
+import { requiresOfficeReview } from '@shared/officeReviewer';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
@@ -881,6 +882,7 @@ export async function createWorkOrder(body: any) {
       code: 'VESSEL_ID_REQUIRED_FOR_WO_NUMBER'
     });
   }
+  const validatedVesselId = workOrderData.vesselId;
 
   // AUTO-CORRECT: Fetch correct componentCode from database
   if (workOrderData.vesselId && (workOrderData.component || workOrderData.componentCode)) {
@@ -1000,10 +1002,10 @@ export async function createWorkOrder(body: any) {
         throw new ValidationError('Component code is required for planned work order numbering');
       }
       workOrderData.workOrderNo = await generatePlannedWorkOrderNumber(
-        storage, jobCode, componentCode, workOrderData.vesselId || undefined
+        storage, jobCode, componentCode, validatedVesselId
       );
     } else {
-      const vesselId = workOrderData.vesselId;
+      const vesselId = validatedVesselId;
       let unplannedComponentCode = workOrderData.componentCode || '';
       if (!unplannedComponentCode && workOrderData.component) {
         const components = await repo.findComponents(vesselId);
@@ -1941,11 +1943,11 @@ export async function updateWorkOrder(id: string, body: any) {
   if (isApprovalTransition && existingWO.jobId) {
     try {
       const linkedJob = await repo.findJob(existingWO.jobId);
-      if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
+      if (linkedJob && requiresOfficeReview(linkedJob.officeReviewerRoleRuids)) {
         interceptedForL2Review = true;
         updateData.status = 'Pending Office Review';
         updateData.approvalDate = new Date().toISOString();
-        console.log(`🔒 [L2 Review] WO ${existingWO.workOrderNo} intercepted — job requires Level 2 reviewer rank "${(linkedJob as any).level2ReviewerRankId}"`);
+        console.log(`[Office Review] WO ${existingWO.workOrderNo} intercepted — configured role IDs: ${JSON.stringify(linkedJob.officeReviewerRoleRuids)}`);
       }
     } catch (err) {
       console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check — proceeding without interception:`, err);
@@ -2454,26 +2456,11 @@ export async function updateWorkOrder(id: string, body: any) {
         }
         const originalDueDate = freshWorkOrder.nextDueDate || freshWorkOrder.dueDate || null;
         await repo.update(id, { missedCycles, originalDueDate });
-
-        if (missedCycles >= 1 && (freshWorkOrder.maintenanceBasis === 'Calendar' || freshWorkOrder.maintenanceBasis === 'Dual Frequency')) {
-          try {
-            const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
-            await createSkippedCycleRecords({
-              workOrderId: freshWorkOrder.wouuid || freshWorkOrder.id,
-              componentId: component.cuuid,
-              componentCode: freshWorkOrder.componentCode || component.componentCode || null,
-              vesselCode: freshWorkOrder.vesselId || component.vesselId || null,
-              jobId: freshWorkOrder.jobId || null,
-              jobCode: freshWorkOrder.jobCode || null,
-              jobTitle: freshWorkOrder.jobTitle || null,
-              originalDueDate,
-              missedCycles,
-              frequencyValue: freshWorkOrder.frequencyValue,
-              frequencyUnit: freshWorkOrder.frequencyUnit
-            });
-          } catch (err) {
-            console.error('[BACKFILL ERROR] Failed to create skipped cycle records:', err);
-          }
+        try {
+          const { recordSkippedCyclesForWorkOrder } = await import('../utils/skippedCycleBackfill');
+          await recordSkippedCyclesForWorkOrder(freshWorkOrder.wouuid, missedCycles, originalDueDate, existingWO.nextDueReading);
+        } catch (err) {
+          console.error('[BACKFILL ERROR] Approval skipped cycle records:', err);
         }
 
         // Create maintenance history record

@@ -1034,13 +1034,15 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     tableName: 'component_documents',
     category: 'BOTH_EDITABLE',
     direction: 'bidirectional',
-    identityColumn: null,
+    // 13-Oct-2026 (mig 182): was null (matched by the per-instance integer id — office and ship uploads collided
+    // on id 1 and silently stayed one-sided). Old id-keyed senders are translated by oneWayApplier LEGACY_ID_KEYED.
+    identityColumn: 'cduuid',
     vesselScopeColumn: 'vessel_code',
     vesselScopeJoinPath: null,
     isGlobal: false,
     isConfigurable: true,
     businessRules: null,
-    notes: 'Component-attached documents. Uses vessel_code. Integer PK, no UUID.',
+    notes: 'Component-attached documents. Uses vessel_code. Integer PK is per instance; sync identity cduuid (mig 182).',
   },
   component_requisitions: {
     tableName: 'component_requisitions',
