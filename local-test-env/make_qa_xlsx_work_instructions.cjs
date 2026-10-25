@@ -94,6 +94,10 @@ const AREAS = [
 ];
 const HIGH = /^(SET-0[1-5]|WI-0[1-2]|WI-0[5-9]|WI-1[0-4]|WO-0[1-3]|SH-0[1-7]|MU-0[1-5]|BI-0[1-5]|VS-01)$/;
 
+// Shared with the Word version (make_qa_docx_work_instructions.cjs): same cases, same texts. QA packs are kept OUTSIDE the repo.
+module.exports = { AREAS, TITLE, SCOPE, INTENTIONAL, KNOWN, HIGH, BUILD, BRANCH };
+if (require.main !== module) return;
+
 const wb = new ExcelJS.Workbook();
 const readme = wb.addWorksheet('Read Me');
 readme.getColumn(1).width = 118;
