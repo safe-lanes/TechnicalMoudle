@@ -103,6 +103,12 @@ import {
   componentDocuments,
   type ComponentDocument,
   insertComponentDocumentSchema,
+  jobWorkInstructionFiles,
+  jobWorkInstructionLinks,
+  type JobWorkInstructionFile,
+  type JobWorkInstructionLink,
+  type InsertJobWorkInstructionFile,
+  type InsertJobWorkInstructionLink,
   componentClassRegulatory,
   type ComponentClassRegulatory,
   insertComponentClassRegulatorySchema,
@@ -552,6 +558,17 @@ export interface IStorage {
   createComponentDocument(doc: any): Promise<any>;
   updateComponentDocument(id: number, data: any): Promise<any>;
   deleteComponentDocument(id: number): Promise<void>;
+
+  // Job Work Instructions (mig 183). Office-managed; links are soft-deleted/restored, files never hard-deleted here.
+  getJobWorkInstructionFiles(vesselId: string): Promise<JobWorkInstructionFile[]>;
+  getJobWorkInstructionFile(jwfuuid: string): Promise<JobWorkInstructionFile | undefined>;
+  findJobWorkInstructionFileByName(vesselId: string, fileName: string): Promise<JobWorkInstructionFile | undefined>;
+  createJobWorkInstructionFile(data: InsertJobWorkInstructionFile): Promise<JobWorkInstructionFile>;
+  getJobWorkInstructionLinks(jobId: string, includeRemoved?: boolean): Promise<Array<JobWorkInstructionLink & { file: JobWorkInstructionFile | null }>>;
+  getJobWorkInstructionLink(jwluuid: string): Promise<JobWorkInstructionLink | undefined>;
+  findActiveJobWorkInstructionLink(jobId: string, fileUuid: string): Promise<JobWorkInstructionLink | undefined>;
+  createJobWorkInstructionLink(data: InsertJobWorkInstructionLink): Promise<JobWorkInstructionLink>;
+  setJobWorkInstructionLinkDeleted(jwluuid: string, isDeleted: boolean, actorUuid: string | null): Promise<JobWorkInstructionLink>;
   
   // Component Class Regulatory methods
   getComponentClassRegulatory(componentId: string): Promise<any[]>;

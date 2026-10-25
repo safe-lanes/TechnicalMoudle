@@ -1081,6 +1081,31 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     businessRules: null,
     notes: 'Component-attached documents. Uses vessel_code. Integer PK is per instance; sync identity cduuid (mig 182).',
   },
+  // Job Work Instructions (mig 183, 25-Oct-2026): office writes, ships read. UUID identity from day one.
+  job_work_instruction_files: {
+    tableName: 'job_work_instruction_files',
+    category: 'ONE_WAY_SHORE_TO_SHIP',
+    direction: 'shore_to_ship',
+    identityColumn: 'jwfuuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: true,
+    businessRules: null,
+    notes: 'Job Work Instruction PDFs — one physical file per vessel (file bytes via the file sync queue). Office-managed; vessel users read-only.',
+  },
+  job_work_instruction_links: {
+    tableName: 'job_work_instruction_links',
+    category: 'ONE_WAY_SHORE_TO_SHIP',
+    direction: 'shore_to_ship',
+    identityColumn: 'jwluuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: true,
+    businessRules: null,
+    notes: 'Job ↔ Work Instruction file links. Removing from a Job soft-deletes the link only; the file stays for other Jobs.',
+  },
   component_requisitions: {
     tableName: 'component_requisitions',
     category: 'BOTH_EDITABLE',
@@ -1848,6 +1873,8 @@ export function getSyncPhaseOrder(): string[][] {
      // rotation_history references rotational_items (riuuid) + components — Phase 4 after Phase 3 parents.
      'rotation_history',
      'ihm_maintenance_log', 'component_documents', 'component_requisitions',
+     // 183: Work Instruction files, then the Job links that reference them (jobs are in an earlier phase).
+     'job_work_instruction_files', 'job_work_instruction_links',
      'superintendent_notifications'],
     // Phase 5: SHIP_ONLY tables
     getTablesByCategory('SHIP_ONLY').map(t => t.tableName),

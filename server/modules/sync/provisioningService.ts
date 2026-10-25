@@ -292,6 +292,7 @@ export async function generateProvisioningBundle(
 const PROVISION_FILE_TABLES: Array<{ table: string; idCol: string; keyCol: string; nameCol: string; sizeCol: string | null; localUrlOnly: boolean }> = [
   { table: 'work_order_documents', idCol: 'id', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
   { table: 'component_documents', idCol: 'cduuid', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
+  { table: 'job_work_instruction_files', idCol: 'jwfuuid', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
   // base64 data URIs travel inside the row; only stored files (local:// / .private/) need a transfer
   { table: 'defect_attachments', idCol: 'datuuid', keyCol: 'url', nameCol: 'filename', sizeCol: null, localUrlOnly: true },
   { table: 'change_request_attachment', idCol: 'crauuid', keyCol: 'url', nameCol: 'filename', sizeCol: null, localUrlOnly: true },

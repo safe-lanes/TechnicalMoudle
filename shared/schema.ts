@@ -2252,6 +2252,60 @@ export const insertComponentDocumentSchema = createInsertSchema(componentDocumen
 export type InsertComponentDocument = z.infer<typeof insertComponentDocumentSchema>;
 export type ComponentDocument = typeof componentDocuments.$inferSelect;
 
+// Job Form "Work Instructions" — PDF attachments on Vessel Jobs (mig 183, 25-Oct-2026).
+// One physical PDF per vessel; linked to many Jobs through jobWorkInstructionLinks. UUID-keyed, synced office → ship.
+export const jobWorkInstructionFiles = pgTable("job_work_instruction_files", {
+  jwfuuid: text("jwfuuid").primaryKey().default(sql`gen_random_uuid()::text`),
+  vesselId: text("vessel_id").notNull(), // vessels.vuuid
+  fileName: text("file_name").notNull(),
+  fileKey: text("file_key").notNull(), // private storage key — never a public URL
+  storageBackend: text("storage_backend").notNull().default("local"), // 'local' | 'object'
+  contentType: text("content_type").notNull().default("application/pdf"),
+  fileSize: integer("file_size"),
+  revisionRemarks: text("revision_remarks"),
+  uploadedByUuid: text("uploaded_by_uuid"),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => ({
+  vesselIdx: index("idx_jwi_files_vessel").on(table.vesselId, table.isDeleted),
+}));
+export const insertJobWorkInstructionFileSchema = createInsertSchema(jobWorkInstructionFiles).omit({
+  jwfuuid: true, createdAt: true, updatedAt: true, uploadedAt: true,
+});
+export type InsertJobWorkInstructionFile = z.infer<typeof insertJobWorkInstructionFileSchema>;
+export type JobWorkInstructionFile = typeof jobWorkInstructionFiles.$inferSelect;
+
+// One Job ↔ file link. "Remove" soft-deletes THIS row only; the file stays for other Jobs. No FKs on purpose:
+// a ship may receive a link before its Job / file in the same sync batch.
+export const jobWorkInstructionLinks = pgTable("job_work_instruction_links", {
+  jwluuid: text("jwluuid").primaryKey().default(sql`gen_random_uuid()::text`),
+  jobId: text("job_id").notNull(), // jobs.juuid
+  fileUuid: text("file_uuid").notNull(), // jobWorkInstructionFiles.jwfuuid
+  vesselId: text("vessel_id").notNull(),
+  attachedByUuid: text("attached_by_uuid"),
+  attachedAt: timestamp("attached_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => ({
+  jobIdx: index("idx_jwi_links_job").on(table.jobId, table.isDeleted),
+  fileIdx: index("idx_jwi_links_file").on(table.fileUuid),
+  vesselIdx: index("idx_jwi_links_vessel").on(table.vesselId),
+}));
+export const insertJobWorkInstructionLinkSchema = createInsertSchema(jobWorkInstructionLinks).omit({
+  jwluuid: true, createdAt: true, updatedAt: true, attachedAt: true,
+});
+export type InsertJobWorkInstructionLink = z.infer<typeof insertJobWorkInstructionLinkSchema>;
+export type JobWorkInstructionLink = typeof jobWorkInstructionLinks.$inferSelect;
+
 // Component Class Regulatory Table - Classification and regulatory survey data (multiple rows per component)
 export const componentClassRegulatory = pgTable("component_class_regulatory", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

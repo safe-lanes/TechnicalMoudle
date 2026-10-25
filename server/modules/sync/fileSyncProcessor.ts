@@ -16,6 +16,7 @@
  * Tables with real binary files:
  * - work_order_documents  — fileKey + storageBackend ('local' | 'object')
  * - component_documents   — fileKey + storageBackend ('local' | 'object')
+ * - job_work_instruction_files — fileKey + storageBackend ('local' | 'object'), dir .private/job-docs (mig 183)
  *
  * Tables with URL references (synced via field logging, binary sync if local://):
  * - defect_attachments    — url column (base64 data URI or local:// path)
@@ -61,11 +62,13 @@ const WO_DOCS_DIR = path.resolve(process.cwd(), '.private', 'wo-docs');
 const COMPONENT_DOCS_DIR = path.resolve(process.cwd(), '.private', 'component-docs');
 const DEFECT_DOCS_DIR = path.resolve(process.cwd(), '.private', 'defect-docs');
 const CR_DOCS_DIR = path.resolve(process.cwd(), '.private', 'cr-docs');
+const JOB_DOCS_DIR = path.resolve(process.cwd(), '.private', 'job-docs'); // Job Work Instructions (mig 183)
 
 /** Resolve table name to its local file storage directory */
 function getStorageDir(tableName: string): string {
   switch (tableName) {
     case 'component_documents': return COMPONENT_DOCS_DIR;
+    case 'job_work_instruction_files': return JOB_DOCS_DIR;
     case 'defect_attachments':  return DEFECT_DOCS_DIR;
     case 'change_request_attachment': return CR_DOCS_DIR;
     default: return WO_DOCS_DIR; // work_order_documents and fallback

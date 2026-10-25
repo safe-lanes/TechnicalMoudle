@@ -39,6 +39,12 @@ import {
   components,
   rotationalItems,
   componentDocuments,
+  jobWorkInstructionFiles,
+  jobWorkInstructionLinks,
+  type JobWorkInstructionFile,
+  type JobWorkInstructionLink,
+  type InsertJobWorkInstructionFile,
+  type InsertJobWorkInstructionLink,
   componentClassRegulatory,
   componentMaintenanceHistory,
   componentRequisitions,
@@ -2317,6 +2323,80 @@ export class PostgresStorage {
   async deleteComponentDocument(id: number): Promise<void> {
     const db = await getDb();
     await db.delete(componentDocuments).where(eq(componentDocuments.id, id));
+  }
+
+  // ── Job Work Instructions (mig 183) ─────────────────────────────────────────────────────────────
+  // Every write is field-logged so it reaches the ships (ONE_WAY_SHORE_TO_SHIP, identity = the uuid).
+
+  async getJobWorkInstructionFiles(vesselId: string): Promise<JobWorkInstructionFile[]> {
+    const db = await getDb();
+    return db.select().from(jobWorkInstructionFiles)
+      .where(and(eq(jobWorkInstructionFiles.vesselId, vesselId), eq(jobWorkInstructionFiles.isDeleted, false)))
+      .orderBy(asc(jobWorkInstructionFiles.fileName));
+  }
+
+  async getJobWorkInstructionFile(jwfuuid: string): Promise<JobWorkInstructionFile | undefined> {
+    const db = await getDb();
+    return (await db.select().from(jobWorkInstructionFiles).where(eq(jobWorkInstructionFiles.jwfuuid, jwfuuid)).limit(1))[0];
+  }
+
+  async findJobWorkInstructionFileByName(vesselId: string, fileName: string): Promise<JobWorkInstructionFile | undefined> {
+    const db = await getDb();
+    return (await db.select().from(jobWorkInstructionFiles)
+      .where(and(eq(jobWorkInstructionFiles.vesselId, vesselId), eq(jobWorkInstructionFiles.isDeleted, false),
+        sql`lower(${jobWorkInstructionFiles.fileName}) = lower(${fileName})`))
+      .limit(1))[0];
+  }
+
+  async createJobWorkInstructionFile(data: InsertJobWorkInstructionFile): Promise<JobWorkInstructionFile> {
+    const db = await getDb();
+    const [row] = await db.insert(jobWorkInstructionFiles).values(data).returning();
+    try { await logFieldChanges('job_work_instruction_files', row.jwfuuid, row.vesselId, null, row, data.createdByUuid || 'system'); }
+    catch (e) { console.error('[FieldLogger] jwi file create:', e); }
+    return row;
+  }
+
+  async getJobWorkInstructionLinks(jobId: string, includeRemoved = false) {
+    const db = await getDb();
+    const rows = await db.select({ link: jobWorkInstructionLinks, file: jobWorkInstructionFiles })
+      .from(jobWorkInstructionLinks)
+      .leftJoin(jobWorkInstructionFiles, eq(jobWorkInstructionFiles.jwfuuid, jobWorkInstructionLinks.fileUuid))
+      .where(includeRemoved ? eq(jobWorkInstructionLinks.jobId, jobId)
+        : and(eq(jobWorkInstructionLinks.jobId, jobId), eq(jobWorkInstructionLinks.isDeleted, false)))
+      .orderBy(asc(jobWorkInstructionLinks.attachedAt));
+    return rows.map((r) => ({ ...r.link, file: r.file }));
+  }
+
+  async getJobWorkInstructionLink(jwluuid: string): Promise<JobWorkInstructionLink | undefined> {
+    const db = await getDb();
+    return (await db.select().from(jobWorkInstructionLinks).where(eq(jobWorkInstructionLinks.jwluuid, jwluuid)).limit(1))[0];
+  }
+
+  async findActiveJobWorkInstructionLink(jobId: string, fileUuid: string): Promise<JobWorkInstructionLink | undefined> {
+    const db = await getDb();
+    return (await db.select().from(jobWorkInstructionLinks)
+      .where(and(eq(jobWorkInstructionLinks.jobId, jobId), eq(jobWorkInstructionLinks.fileUuid, fileUuid), eq(jobWorkInstructionLinks.isDeleted, false)))
+      .limit(1))[0];
+  }
+
+  async createJobWorkInstructionLink(data: InsertJobWorkInstructionLink): Promise<JobWorkInstructionLink> {
+    const db = await getDb();
+    const [row] = await db.insert(jobWorkInstructionLinks).values(data).returning();
+    try { await logFieldChanges('job_work_instruction_links', row.jwluuid, row.vesselId, null, row, data.createdByUuid || 'system'); }
+    catch (e) { console.error('[FieldLogger] jwi link create:', e); }
+    return row;
+  }
+
+  async setJobWorkInstructionLinkDeleted(jwluuid: string, isDeleted: boolean, actorUuid: string | null): Promise<JobWorkInstructionLink> {
+    const db = await getDb();
+    const before = await this.getJobWorkInstructionLink(jwluuid);
+    if (!before) throw new Error(`Work Instruction link ${jwluuid} not found`);
+    const [row] = await db.update(jobWorkInstructionLinks)
+      .set({ isDeleted, updatedAt: new Date(), updatedByUuid: actorUuid })
+      .where(eq(jobWorkInstructionLinks.jwluuid, jwluuid)).returning();
+    try { await logFieldChanges('job_work_instruction_links', row.jwluuid, row.vesselId, before, row, actorUuid || 'system'); }
+    catch (e) { console.error('[FieldLogger] jwi link delete/restore:', e); }
+    return row;
   }
 
   // ============= MODULE 3: COMPONENT CLASS REGULATORY =============
