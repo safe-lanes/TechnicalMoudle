@@ -21,7 +21,7 @@ process.chdir(tmp);
 afterAll(() => { process.chdir(cwd); fs.rmSync(tmp, { recursive: true, force: true }); });
 
 import { FileSyncProcessor } from '../../sync/fileSyncProcessor';
-import { attach, download, listForJob, listForWorkOrder, remove, restore, sanitizeFileName, upload, validatePdf, MAX_PDF_BYTES } from '../services/jobWorkInstructionService';
+import { attach, download, listForJob, listForWorkOrder, remove, restore, sanitizeFileName, upload, uploadVesselFiles, validatePdf, MAX_PDF_BYTES } from '../services/jobWorkInstructionService';
 
 const V = 'vessel-A';
 const job = { juuid: 'job-1', vesselId: V, dataScope: 'vessel' };
@@ -144,5 +144,30 @@ describe('reads', () => {
   });
   it('download says when the bytes have not arrived yet (ship before file sync)', async () => {
     await expect(download('f-1', office)).rejects.toThrow(/not available on this server yet/);
+  });
+});
+
+describe('multi-file upload for a vessel (Bulk Upload screen; files stored without a Job link)', () => {
+  it('judges each file on its own: uploaded / skipped (name exists) / refused (not a PDF)', async () => {
+    repo.findFileByName.mockImplementation(async (_v: string, name: string) => (name === 'Existing.pdf' ? storedFile : undefined));
+    const out = await uploadVesselFiles(V, [pdf('New_One.pdf'), pdf('Existing.pdf'), pdf('notes.txt', 'hello', 'text/plain'), pdf('New_Two.pdf')], office, 'Batch 1');
+    expect(out.uploaded.map((f) => f.fileName)).toEqual(['New_One.pdf', 'New_Two.pdf']);
+    expect(out.skipped).toEqual([{ fileName: 'Existing.pdf', reason: expect.stringMatching(/already exists/) }]);
+    expect(out.refused).toEqual([{ fileName: 'notes.txt', reason: expect.stringMatching(/PDF/) }]);
+    expect(repo.createFile).toHaveBeenCalledTimes(2);
+    expect(repo.createFile.mock.calls[0][0]).toMatchObject({ vesselId: V, revisionRemarks: 'Batch 1', uploadedByUuid: 'u-off' });
+    expect(repo.createLink).not.toHaveBeenCalled(); // no Job link — the Jobs import names them later
+    expect(FileSyncProcessor.queueFileForSync).toHaveBeenCalledTimes(2);
+  });
+  it('ship instance and other-vessel ship user are refused', async () => {
+    role.ship = true;
+    await expect(uploadVesselFiles(V, [pdf()], office)).rejects.toMatchObject({ statusCode: 403 });
+    role.ship = false;
+    await expect(uploadVesselFiles(V, [pdf()], { ...shipUser, vesselId: 'vessel-B' })).rejects.toMatchObject({ statusCode: 403 });
+    expect(repo.createFile).not.toHaveBeenCalled();
+  });
+  it('a database failure is not swallowed as "refused"', async () => {
+    repo.createFile.mockRejectedValue(new Error('db down'));
+    await expect(uploadVesselFiles(V, [pdf()], office)).rejects.toThrow('db down');
   });
 });

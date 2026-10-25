@@ -30,6 +30,15 @@ router.post('/jobs/:id/work-instructions/attach', jwiWrite, asyncHandler(jwiCtrl
 router.post('/jobs/:id/work-instructions/:jwluuid/restore', jwiWrite, asyncHandler(jwiCtrl.restore));
 router.delete('/jobs/:id/work-instructions/:jwluuid', jwiWrite, asyncHandler(jwiCtrl.remove));
 router.get('/vessels/:vesselId/work-instruction-files', asyncHandler(jwiCtrl.listVesselFiles));
+// Many PDFs for a vessel in one go (Bulk Upload screen). multer rejects the whole request on an oversize file, so
+// say which limit was hit instead of a bare 500.
+const pdfMultiUpload = (req: any, res: any, next: any) => pdfUpload.array('files', 100)(req, res, (err: any) => {
+  if (!err) return next();
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: `One of the files is larger than ${Math.round(MAX_PDF_BYTES / 1024 / 1024)} MB. Remove it and upload again.` });
+  if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({ error: 'Too many files in one upload (maximum 100). Upload in batches.' });
+  return next(err);
+});
+router.post('/vessels/:vesselId/work-instruction-files/upload', jwiWrite, pdfMultiUpload, asyncHandler(jwiCtrl.uploadVesselFiles));
 router.get('/work-instruction-files/:jwfuuid/download', asyncHandler(jwiCtrl.download));
 
 // GET  /jobs/:id — get single job

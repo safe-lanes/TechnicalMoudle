@@ -63,4 +63,7 @@ WHERE h.actor_position = 'Chief Engineer' AND u.user_type = 'Office';
   `;`-separated, of PDFs already uploaded for that vessel). The hidden template-version cell moved from column 28 to 29.
   Old templates without the column keep working.
 - **Permission:** uses the existing Job-edit permission (`pms-modify-pms` edit). Nothing to configure.
+- **Multi-file upload:** Admin → Bulk Upload → Jobs has a "Work Instruction PDFs" box that stores many PDFs for the
+  vessel in one request (up to 100 files, 25 MB each) without attaching them to Jobs — the Jobs sheet then names them.
+  Same storage, same sync; nothing extra to configure.
 - **Fresh provisioning** of a ship carries the rows in the bundle and queues the PDFs; they arrive on the first sync.

@@ -123,15 +123,14 @@ export async function download(jwfuuid: string, actor: Actor): Promise<{ buffer:
 // ── writes (office only) ───────────────────────────────────────────────────────────────────────
 
 /** Upload a new PDF to the Job's vessel and link it to the Job (§5, §6). */
-export async function upload(jobId: string, file: Express.Multer.File, actor: Actor, revisionRemarks?: string | null) {
-  await assertOffice();
-  const job = await loadVesselJob(jobId);
+/** Store one PDF for a vessel (no Job link): validation, one-active-name rule, bytes, row, file-sync queue. */
+async function storeVesselFile(vesselId: string, file: Express.Multer.File, actor: Actor, revisionRemarks?: string | null) {
   const fileName = validatePdf(file);
-  const existing = await repo.findFileByName(job.vesselId, fileName);
+  const existing = await repo.findFileByName(vesselId, fileName);
   if (existing) {
     throw new ConflictError(`"${fileName}" already exists for this vessel. Use "Attach existing" to link it, or upload it under a new name (e.g. a revision).`, { code: 'WORK_INSTRUCTION_NAME_EXISTS', fileUuid: existing.jwfuuid });
   }
-  const fileKey = `${job.vesselId}/${Date.now()}_${fileName.replace(/[^A-Za-z0-9.\-]/g, '_')}`;
+  const fileKey = `${vesselId}/${Date.now()}_${fileName.replace(/[^A-Za-z0-9.\-]/g, '_')}`;
   const storageBackend: 'object' | 'local' = useObjectStorage() ? 'object' : 'local';
   if (storageBackend === 'object') {
     const bucket = objectStorageClient.bucket(process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!);
@@ -142,7 +141,7 @@ export async function upload(jobId: string, file: Express.Multer.File, actor: Ac
   let created;
   try {
     created = await repo.createFile(insertJobWorkInstructionFileSchema.parse({
-      vesselId: job.vesselId, fileName, fileKey, storageBackend, contentType: 'application/pdf', fileSize: file.size,
+      vesselId, fileName, fileKey, storageBackend, contentType: 'application/pdf', fileSize: file.size,
       revisionRemarks: revisionRemarks?.trim() || null, uploadedByUuid: actor.userUuid, createdByUuid: actor.userUuid, updatedByUuid: actor.userUuid,
     }));
   } catch (e) {
@@ -154,8 +153,44 @@ export async function upload(jobId: string, file: Express.Multer.File, actor: Ac
   // file bytes reach the ships through the existing file sync queue (best effort — never blocks the upload)
   try { await FileSyncProcessor.queueFileForSync(TABLE, created.jwfuuid, created.fileKey, created.fileName, created.fileSize ?? null, created.vesselId); }
   catch (e) { console.error('[JobWorkInstructions] file sync queue failed (non-fatal):', e); }
+  return created;
+}
+
+/** Upload a new PDF and attach it to the Job (§2 "upload"). */
+export async function upload(jobId: string, file: Express.Multer.File, actor: Actor, revisionRemarks?: string | null) {
+  await assertOffice();
+  const job = await loadVesselJob(jobId);
+  const created = await storeVesselFile(job.vesselId, file, actor, revisionRemarks);
   const link = await attachFileToJob(job, created.jwfuuid, actor);
   return { file: created, link };
+}
+
+/**
+ * Multi-file upload for a vessel (Admin → Bulk Upload → "Work Instruction PDFs"): stores many PDFs for the vessel
+ * WITHOUT attaching them to Jobs, so the Jobs import can then name them in "Job attachments" (D3 without the
+ * one-by-one pain). Each file is judged on its own: uploaded / skipped (name already exists) / refused (not a PDF,
+ * too big). Never a server folder, never a path.
+ */
+export async function uploadVesselFiles(vesselId: string, files: Express.Multer.File[], actor: Actor, revisionRemarks?: string | null) {
+  await assertOffice();
+  assertVesselAccess(actor, vesselId);
+  const out = {
+    uploaded: [] as Array<{ fileName: string; jwfuuid: string; fileSize: number | null }>,
+    skipped: [] as Array<{ fileName: string; reason: string }>,
+    refused: [] as Array<{ fileName: string; reason: string }>,
+  };
+  for (const file of files) {
+    try {
+      const created = await storeVesselFile(vesselId, file, actor, revisionRemarks);
+      out.uploaded.push({ fileName: created.fileName, jwfuuid: created.jwfuuid, fileSize: created.fileSize ?? null });
+    } catch (e: any) {
+      const name = String(file.originalname || '').split(/[\/]/).pop() || '(unnamed)';
+      if (e instanceof ConflictError) out.skipped.push({ fileName: name, reason: 'A Work Instruction with this name already exists for the vessel.' });
+      else if (e instanceof ValidationError) out.refused.push({ fileName: name, reason: e.message });
+      else throw e;
+    }
+  }
+  return out;
 }
 
 /** Link an existing file of the same vessel to the Job (§2 "attach existing", §17). */

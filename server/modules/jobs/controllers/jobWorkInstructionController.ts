@@ -34,6 +34,14 @@ export async function upload(req: Request, res: Response) {
   res.status(201).json(result);
 }
 
+// POST /vessels/:vesselId/work-instruction-files/upload  multipart "files" (many PDFs; no Job link)
+export async function uploadVesselFiles(req: Request, res: Response) {
+  const files = (req as Request & { files?: Express.Multer.File[] }).files || [];
+  if (!Array.isArray(files) || files.length === 0) return res.status(400).json({ error: 'No files received. Choose one or more PDFs to upload.' });
+  const result = await svc.uploadVesselFiles(req.params.vesselId, files, actor(req), typeof req.body?.revisionRemarks === 'string' ? req.body.revisionRemarks : null);
+  res.status(201).json(result);
+}
+
 // POST /jobs/:id/work-instructions/attach { fileUuid }
 export async function attach(req: Request, res: Response) {
   const fileUuid = typeof req.body?.fileUuid === 'string' ? req.body.fileUuid : '';

@@ -13,12 +13,14 @@ const SCOPE = [
   'Work Orders show the Work Instructions of their Job (read-only, always the current list).',
   'Ships receive the PDFs by sync and can open them; ships cannot upload, attach or remove (office-managed).',
   'Jobs bulk import: new last column "Job attachments" in the Vessel_Job sheet — PDF file names (;-separated) of PDFs already uploaded for the vessel.',
+  'Admin → Bulk Upload → Jobs: a "Work Instruction PDFs" box uploads many PDFs for the vessel in one go (not attached to any Job yet) so the Jobs sheet can name them.',
 ];
 const INTENTIONAL = [
   'Ship installation: Upload / Attach existing / Remove / Restore are not offered; a note says Work Instructions are managed in the office. This is by design.',
   'Removed Work Instructions are never deleted — "Show removed" lists them and they can be restored. By design (no purge).',
   'One active PDF NAME per vessel: uploading a file with the same name again is refused with a message offering "Attach existing". Upload a revision under a new name (e.g. "…_Rev2.pdf").',
-  'Bulk import takes file NAMES only — never file paths and never the PDF itself. The PDF must be uploaded first through the Job form.',
+  'Bulk import takes file NAMES only — never file paths and never the PDF itself. The PDF must be uploaded first — through the Job form or the multi-file box on the Bulk Upload → Jobs page.',
+  'Multi-file upload judges every file on its own: uploaded / skipped (name already exists for the vessel) / refused (not a PDF). One file over 25 MB stops the whole batch with a message — remove it and upload the rest again.',
   'Fleet Jobs (Fleet → Jobs) have no Work Instructions — the requirement covers Vessel Jobs only.',
   'Maximum PDF size 25 MB; only real PDF files (a Word file renamed to .pdf is refused).',
 ];
@@ -66,7 +68,15 @@ const AREAS = [
     ['SH-06', 'Office restore reaches the ship', 'Office: Show removed → Restore it on Job B. Sync. Vessel: open Job B.', 'Pump_Overhaul.pdf is back on Job B on the vessel.'],
     ['SH-07', 'Fresh provisioning carries the PDFs (BACKEND-ASSISTED)', 'Developer: re-provision the test vessel installation from the office server (fresh database), then Sync Now once.', 'After the first sync the vessel lists the Work Instructions on Job A / Job B and can OPEN the PDFs.'],
   ]},
-  { name: '5. Jobs bulk import — "Job attachments" column', pre: 'Section 2 done (Pump_Overhaul.pdf, Valve_Check.pdf exist for the vessel); office EDIT user', cases: [
+  { name: '5. Bulk Upload → Jobs — "Work Instruction PDFs" multi-file box', pre: 'SET-01…SET-04 done; office EDIT user; vessel selected on the Bulk Upload page', cases: [
+    ['MU-01', 'Box is on the Jobs bulk upload page', 'Admin → Bulk Upload → select the test vessel → Jobs.', 'Above the Jobs upload a box "Work Instruction PDFs (for the Jobs import)" with a file chooser (multiple), an optional remarks field and an Upload button. Without a vessel selected it says "Select a vessel first".'],
+    ['MU-02', 'Upload several PDFs at once', 'Pick 3 new PDFs (e.g. Gen_Overhaul.pdf, Purifier_Clean.pdf, Boiler_Survey.pdf), remarks "Batch 1", Upload.', 'Result "Uploaded 3 · Skipped 0 · Refused 0" with the three names. Job form → Attach existing on any Job of the vessel now offers the three files (not attached to any Job yet).'],
+    ['MU-03', 'Mixed batch: existing name and a non-PDF', 'Pick Gen_Overhaul.pdf again, a Word/text file and one new PDF; Upload.', 'Result: Uploaded 1; Skipped Gen_Overhaul.pdf — "already exists for the vessel"; Refused the Word/text file — not a PDF. The new PDF is stored.'],
+    ['MU-04', 'Oversize file in the batch', 'Pick one PDF over 25 MB together with a small PDF; Upload.', 'Red message: one of the files is larger than 25 MB — remove it and upload again. Nothing from this batch is stored.'],
+    ['MU-05', 'Then attach by sheet', 'Download the Jobs template; for Job A put "Gen_Overhaul.pdf; Boiler_Survey.pdf" in Job attachments; preview, import.', 'Both PDFs attached to Job A (Job form → Work Instructions lists them).'],
+    ['MU-06', 'View-only user / ship', 'Open the Bulk Upload → Jobs page as the VIEW-only office user; then on the vessel installation.', 'Office VIEW-only: Upload is refused with a permission message. Vessel: the box says Work Instructions are managed in the office.'],
+  ]},
+  { name: '6. Jobs bulk import — "Job attachments" column', pre: 'Sections 2 and 5 done (PDFs exist for the vessel); office EDIT user', cases: [
     ['BI-01', 'Template has the column', 'Admin → Bulk Upload → Jobs → download the Jobs template for the test vessel.', 'The Vessel_Job sheet has a last column "Job attachments" (after the Part A columns). Old templates without it still import.'],
     ['BI-02', 'Attach by name through import', 'Fill one row for Job A (its Job Code / Component Code / title etc.) with Job attachments = "Valve_Check.pdf". Mode Update. Preview, then Import.', 'Preview: row OK. Import: Job A updated; result line says "Work Instructions attached: Valve_Check.pdf" (if it was not already attached). Job A → Work Instructions lists it.'],
     ['BI-03', 'Two names', 'Row for Job B with Job attachments = "Pump_Overhaul.pdf; Valve_Check.pdf". Preview, Import.', 'Both PDFs are listed on Job B after import (ones already attached are not duplicated).'],
@@ -76,13 +86,13 @@ const AREAS = [
     ['BI-07', 'Path or non-PDF name refused', 'Row with Job attachments = "C:\\\\docs\\\\Pump_Overhaul.pdf" and another with "notes.txt". Preview.', 'Both rows are errors: "must be a file name, not a path" / "is not a PDF". Nothing imported for them.'],
     ['BI-08', 'Another vessel\'s file', 'Upload a PDF on a Job of a DIFFERENT vessel (e.g. Other_Vessel.pdf). Import a row for Job A of the test vessel with Job attachments = "Other_Vessel.pdf".', 'Row error: not found for this vessel. Work Instructions never cross vessels.'],
   ]},
-  { name: '6. Vessel isolation and scope', pre: 'Two vessels with Work Instructions', cases: [
+  { name: '7. Vessel isolation and scope', pre: 'Two vessels with Work Instructions', cases: [
     ['VS-01', 'Picker is vessel-scoped', 'On a Job of vessel 2 click "Attach existing".', 'Only vessel 2\'s PDFs are offered — none of the test vessel\'s files.'],
     ['VS-02', 'Fleet Jobs out of scope', 'Open Fleet → Jobs → a fleet Job.', 'No Work Instructions button (Vessel Jobs only).'],
     ['VS-03', 'Audit information', 'Open Job A → Work Instructions; tick Show removed.', 'Every row shows who uploaded / attached and when; removed rows show who removed and when.'],
   ]},
 ];
-const HIGH = /^(SET-0[1-5]|WI-0[1-2]|WI-0[5-9]|WI-1[0-4]|WO-0[1-3]|SH-0[1-7]|BI-0[1-5]|VS-01)$/;
+const HIGH = /^(SET-0[1-5]|WI-0[1-2]|WI-0[5-9]|WI-1[0-4]|WO-0[1-3]|SH-0[1-7]|MU-0[1-5]|BI-0[1-5]|VS-01)$/;
 
 const wb = new ExcelJS.Workbook();
 const readme = wb.addWorksheet('Read Me');
@@ -97,7 +107,7 @@ const lines = [
   ['SETUP REQUIRED BEFORE TESTING (Setup section in the Test Cases sheet):', true],
   [`1. Office server and a vessel installation on build ${BUILD}; vessel provisioned from the office and synced once.`],
   ['2. Users: office user with Modify PMS EDIT; office user with VIEW only; one vessel user on the vessel installation.'],
-  ['3. Test files: two small PDFs, a Word/text file, a Word file renamed to .pdf, a PDF over 25 MB.'],
+  ['3. Test files: five small PDFs, a Word/text file, a Word file renamed to .pdf, a PDF over 25 MB.'],
   [''],
   ['KNOWN INTENTIONAL BEHAVIOUR — DO NOT LOG AS A DEFECT:', true],
   ...INTENTIONAL.map((t) => [t]),

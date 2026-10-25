@@ -1,5 +1,6 @@
 import { Wrench } from "lucide-react";
 import UniformBulkUpload from "@/components/admin/UniformBulkUpload";
+import WorkInstructionFilesUpload from "@/components/admin/WorkInstructionFilesUpload";
 import { queryClient } from "@/lib/queryClient";
 import { PageMarkers } from "./BulkDataImport";
 
@@ -45,6 +46,9 @@ export default function JobUpload({ vesselId, markers }: JobUploadProps) {
   };
 
   return (
+    <>
+    {/* Work Instruction PDFs for the "Job attachments" column (mig 183) — stored per vessel, named in the sheet */}
+    <WorkInstructionFilesUpload vesselId={vesselId} />
     <UniformBulkUpload
       title="Jobs Bulk Upload"
       description="Upload jobs via Excel. Download template to get dropdown of all system components. Job codes auto-generated as JOB-XXXXXXX."
@@ -72,5 +76,6 @@ export default function JobUpload({ vesselId, markers }: JobUploadProps) {
         dropZone: markers.dropZone,
       } : undefined}
     />
+    </>
   );
 }
