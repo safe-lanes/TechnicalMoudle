@@ -7515,9 +7515,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       </div>
 
       {/* Work Instructions Dialog */}
+      {/* Work Instructions (mig 183): the linked Job's CURRENT PDFs, read-only on the Work Order (§15/§16) */}
       <WorkInstructionsDialog
         isOpen={isWorkInstructionsOpen}
         onClose={() => setIsWorkInstructionsOpen(false)}
+        workOrderId={resolvedMode !== 'template' ? workOrderId : null}
+        jobId={resolvedMode === 'template' ? workOrderId : null}
+        readOnly
       />
 
       {/* Task #240: RH rate-cap override prompt (MASTER component over the per-day cap) */}

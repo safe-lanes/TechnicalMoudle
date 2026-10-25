@@ -1939,10 +1939,15 @@ const JobsFormPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Work Instructions Dialog */}
+      {/* Work Instructions Dialog — PDF attachments on this Vessel Job (mig 183). Managed here (office, Job edit
+          rights); the Job's OWN vessel is used for "attach existing", never the currently selected one. */}
       <WorkInstructionsDialog
         isOpen={isWorkInstructionsOpen}
         onClose={() => setIsWorkInstructionsOpen(false)}
+        jobId={(jobContext as any)?.job?.juuid || jobId || null}
+        vesselId={(jobContext as any)?.job?.vesselId || null}
+        readOnly={!(isModifyMode || isEditMode)}
+        jobUnsaved={!jobId}
       />
 
       <Dialog open={showRebaselineConfirm} onOpenChange={setShowRebaselineConfirm}>
