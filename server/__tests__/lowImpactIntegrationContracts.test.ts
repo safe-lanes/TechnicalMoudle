@@ -178,11 +178,13 @@ describe("dormant integrations stay outside startup, migration discovery and pro
       .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
     // feature/approval-engine-phase2 adds 12 tables: approval_withdrawals, approval_history (BOTH_EDITABLE),
     // defect_closure_history (ONE_WAY_SHORE_TO_SHIP) and the NO_SYNC apprv_* engine / defect approval settings tables.
-    expect(membership).toHaveLength(135);
+    // feature/job-work-instructions (mig 183) adds 2 ONE_WAY_SHORE_TO_SHIP tables: job_work_instruction_files
+    // (jwfuuid) and job_work_instruction_links (jwluuid).
+    expect(membership).toHaveLength(137);
     expect(createHash("sha256").update(JSON.stringify(membership)).digest("hex"))
       // Updated 23-Oct-2026 for the approved sync fix 43c895faf (component_documents id → cduuid, mig 182) and the
-      // approval branch tables above.
-      .toBe("32c6871553dc97e845221d056ebc774f6ff86b0b991b5ac61e4b8ded1d833270");
+      // approval branch tables above; 25-Oct-2026 for the Work Instructions tables.
+      .toBe("f6248a2c427033e46f7c822db0e858cdf502c7d8ef2fa92461acf93c0b6e1ab2");
   });
   it("leaves Access Control saves mapping flags directly and omitting generated ids", () => {
     const storage = source("server/postgresStorage.ts");
