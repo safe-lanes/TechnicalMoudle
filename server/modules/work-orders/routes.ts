@@ -4,6 +4,7 @@ import { asyncHandler } from '../shared/middleware';
 import { requireRole, requireApproverOrRole } from '../../middleware/auth';
 import * as woCtrl from './controllers/workOrderController';
 import * as woDocCtrl from './controllers/woDocumentController';
+import * as jwiCtrl from '../jobs/controllers/jobWorkInstructionController';
 
 const router = Router();
 
@@ -256,6 +257,10 @@ router.post('/work-order-executions', asyncHandler(woCtrl.createExecution));
 router.patch('/work-order-executions/:id', asyncHandler(woCtrl.updateExecution));
 
 // ── Work Order Documents ──
+
+// GET /work-orders/:workOrderId/work-instructions — the linked Job's CURRENT Work Instruction PDFs, read-only
+// (requirement §15/§16: never a copy on the WO). Lives in the jobs module; registered here for the WO URL.
+router.get('/work-orders/:workOrderId/work-instructions', asyncHandler(jwiCtrl.listForWorkOrder));
 
 // GET  /work-orders/:workOrderId/documents — list documents for a work order
 router.get('/work-orders/:workOrderId/documents', asyncHandler(woDocCtrl.listDocuments));

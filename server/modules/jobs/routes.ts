@@ -3,6 +3,9 @@ import { asyncHandler } from '../shared/middleware';
 import { requireAuth } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import * as jobCtrl from './controllers/jobController';
+import * as jwiCtrl from './controllers/jobWorkInstructionController';
+import multer from 'multer';
+import { MAX_PDF_BYTES } from './services/jobWorkInstructionService';
 
 const router = Router();
 
@@ -15,6 +18,19 @@ const router = Router();
 
 // GET  /jobs — list all (optional ?vesselId= &componentId= filters)
 router.get('/jobs', asyncHandler(jobCtrl.listJobs));
+
+// ── Work Instructions (mig 183, 25-Oct-2026) — PDF attachments on Vessel Jobs ──
+// Writes = office only (the service refuses on a ship) + the Job-edit permission (D4). Reads open (vessel access
+// checked in the service). Registered BEFORE GET /jobs/:id; the sub-paths cannot collide with it.
+const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PDF_BYTES } });
+const jwiWrite = requirePermission('pms-modify-pms', 'edit');
+router.get('/jobs/:id/work-instructions', asyncHandler(jwiCtrl.list));
+router.post('/jobs/:id/work-instructions/upload', jwiWrite, pdfUpload.single('file'), asyncHandler(jwiCtrl.upload));
+router.post('/jobs/:id/work-instructions/attach', jwiWrite, asyncHandler(jwiCtrl.attach));
+router.post('/jobs/:id/work-instructions/:jwluuid/restore', jwiWrite, asyncHandler(jwiCtrl.restore));
+router.delete('/jobs/:id/work-instructions/:jwluuid', jwiWrite, asyncHandler(jwiCtrl.remove));
+router.get('/vessels/:vesselId/work-instruction-files', asyncHandler(jwiCtrl.listVesselFiles));
+router.get('/work-instruction-files/:jwfuuid/download', asyncHandler(jwiCtrl.download));
 
 // GET  /jobs/:id — get single job
 router.get('/jobs/:id', asyncHandler(jobCtrl.getJob));
