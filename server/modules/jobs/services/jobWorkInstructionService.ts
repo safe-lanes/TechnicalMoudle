@@ -24,14 +24,15 @@ import { isShipInstance } from '../../sync/syncRole';
 
 export const MAX_PDF_BYTES = 25 * 1024 * 1024; // D1
 const TABLE = 'job_work_instruction_files';
-const LOCAL_DIR = path.resolve(process.cwd(), '.private', 'job-docs');
 
 export interface Actor { userUuid: string | null; role: string; userType?: string | null; vesselId?: string | null }
 
 function useObjectStorage(): boolean {
   return !!process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID && !!process.env.REPL_ID;
 }
-function localPath(fileKey: string): string { return path.join(LOCAL_DIR, fileKey); }
+/** Resolved per call (not at import), the same way fileSyncProcessor.getStorageDir does — the two must agree. */
+function localDir(): string { return path.resolve(process.cwd(), '.private', 'job-docs'); }
+function localPath(fileKey: string): string { return path.join(localDir(), fileKey); }
 function saveLocal(buffer: Buffer, fileKey: string): void {
   const p = localPath(fileKey); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, buffer);
 }
