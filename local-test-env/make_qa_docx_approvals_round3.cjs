@@ -8,7 +8,7 @@ const {
 const fs = require('fs');
 // The build under test: the commit the pack is generated from (override with QA_BUILD).
 const BUILD = process.env.QA_BUILD || require('child_process').execSync('git rev-parse --short HEAD').toString().trim();
-const DATE = '23-Oct-2026';
+const DATE = '25-Oct-2026';
 
 const FONT = 'Arial';
 const run = (t, o = {}) => new TextRun({ text: t, font: FONT, size: 20, ...o });
@@ -127,7 +127,7 @@ if (require.main !== module) return;
 const total = AREAS.reduce((n, a) => n + a.cases.length, 0);
 const children = [
   new Paragraph({ heading: HeadingLevel.TITLE, children: [run(TITLE, { size: 32, bold: true })], spacing: { after: 120 } }),
-  para(`Branch: feature/approval-engine-phase2   ·   Build: ${BUILD}   ·   Date: ${DATE}   ·   ${total} test cases`, { run: { italics: true, size: 20 } }),
+  para(`Branch: replit_dev   ·   Build: ${BUILD}   ·   Date: ${DATE}   ·   ${total} test cases`, { run: { italics: true, size: 20 } }),
   h1('Scope of this round'),
   ...SCOPE.map((t) => para(t)),
   h1('Known intentional behaviour — do NOT log as a defect'),

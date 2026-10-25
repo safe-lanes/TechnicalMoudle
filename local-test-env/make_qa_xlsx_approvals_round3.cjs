@@ -23,7 +23,7 @@ const readme = wb.addWorksheet('Read Me');
 readme.getColumn(1).width = 118;
 const lines = [
   [TEXTS.TITLE, true],
-  [`Branch: feature/approval-engine-phase2  ·  Build: ${BUILD}  ·  Date: ${TEXTS.DATE}`],
+  [`Branch: replit_dev  ·  Build: ${BUILD}  ·  Date: ${TEXTS.DATE}`],
   [''],
   ['SCOPE OF THIS ROUND:', true],
   ...TEXTS.SCOPE.map((t) => [t]),
