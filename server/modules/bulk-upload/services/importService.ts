@@ -20,7 +20,7 @@ import { createRecordSnapshot } from './undoService';
 import { saveImportHistory } from '../../../services/fileBasedImportHistory';
 import { applyAssignmentSync } from '../../work-orders/services/workOrderService';
 import * as woRepo from '../../work-orders/repositories/workOrderRepository';
-import * as jwiRepo from '../../jobs/repositories/jobWorkInstructionRepository';
+import { attachResolvedFiles, resolveJobAttachmentNames } from '../../jobs/services/jobWorkInstructionService';
 import { logFieldChangesBatch, logFieldChanges } from '../../sync';
 import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 import { ensureCompletedWorkOrderDate } from '../../work-orders/utils/completedWorkOrderDate';
@@ -246,38 +246,6 @@ export type ProgressCallback = (info: {
   status: string;
   errors: number;
 }) => void;
-
-// ── Job Work Instructions in the Jobs import (mig 183; requirement §12/§13; decisions D2 + D3) ───────────────
-// "Job attachments" holds PDF file NAMES (never paths), ';' separated, of files ALREADY uploaded for the vessel
-// (D3). A name that is missing / not a PDF / not this vessel's rejects the WHOLE Job row (D2) — resolved BEFORE the
-// Job is written so nothing partial exists for that row. Re-importing the same row creates no duplicate link (§13).
-export function parseJobAttachmentNames(raw: unknown): string[] {
-  if (raw == null) return [];
-  const names = String(raw).split(/[;\r\n]+/).map((s) => s.trim()).filter(Boolean);
-  return Array.from(new Set(names.map((n) => n.toLowerCase()))).map((lower) => names.find((n) => n.toLowerCase() === lower)!);
-}
-export async function resolveJobAttachments(vesselId: string, raw: unknown): Promise<{ files: Array<{ jwfuuid: string; fileName: string }>; error: string | null }> {
-  const names = parseJobAttachmentNames(raw);
-  const files: Array<{ jwfuuid: string; fileName: string }> = [];
-  for (const name of names) {
-    if (/[\\/]|\.\./.test(name)) return { files, error: `Job attachment "${name}" must be a file name, not a path.` };
-    if (!name.toLowerCase().endsWith('.pdf')) return { files, error: `Job attachment "${name}" is not a PDF.` };
-    const file = await jwiRepo.findFileByName(vesselId, name);
-    if (!file) return { files, error: `Job attachment "${name}" was not found among this vessel's Work Instruction files. Upload it first (Job form → Work Instructions), then import.` };
-    files.push({ jwfuuid: file.jwfuuid, fileName: file.fileName });
-  }
-  return { files, error: null };
-}
-async function attachResolvedFilesToJob(job: { juuid: string; vesselId: string | null }, files: Array<{ jwfuuid: string; fileName: string }>, actorUuid: string | null): Promise<string[]> {
-  const attached: string[] = [];
-  if (!job.vesselId) return attached;
-  for (const f of files) {
-    if (await jwiRepo.findActiveLink(job.juuid, f.jwfuuid)) continue; // idempotent re-import (§13)
-    await jwiRepo.createLink({ jobId: job.juuid, fileUuid: f.jwfuuid, vesselId: job.vesselId, attachedByUuid: actorUuid, createdByUuid: actorUuid, updatedByUuid: actorUuid });
-    attached.push(f.fileName);
-  }
-  return attached;
-}
 
 // Perform actual import
 export async function performImport(
@@ -2278,7 +2246,7 @@ export async function performImport(
       const existingJob = jobsByCompositeKey.get(compositeKey);
 
       // Job attachments (D2): a bad name rejects the whole row BEFORE anything is written.
-      const jobAttachments = await resolveJobAttachments(canonicalVesselId, row['Job attachments']);
+      const jobAttachments = await resolveJobAttachmentNames(canonicalVesselId, row['Job attachments']);
       if (jobAttachments.error) {
         result.skipped++;
         result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'failed', error: jobAttachments.error });
@@ -2309,7 +2277,7 @@ export async function performImport(
           const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
           jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
-          const attachedNew = await attachResolvedFilesToJob(createdJob, jobAttachments.files, userId ?? null);
+          const attachedNew = await attachResolvedFiles(createdJob, jobAttachments.files, userId ?? null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created', ...(attachedNew.length ? { info: `Work Instructions attached: ${attachedNew.join(', ')}` } : {}) });
           
           if (importHistoryId) {
@@ -2328,7 +2296,7 @@ export async function performImport(
           const updateKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
           jobsByCompositeKey.set(updateKey, updatedJob);
           result.updated++;
-          const attachedUpd = await attachResolvedFilesToJob(updatedJob, jobAttachments.files, userId ?? null);
+          const attachedUpd = await attachResolvedFiles(updatedJob, jobAttachments.files, userId ?? null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated', ...(attachedUpd.length ? { info: `Work Instructions attached: ${attachedUpd.join(', ')}` } : {}) });
           
           if (importHistoryId) {
@@ -2346,7 +2314,7 @@ export async function performImport(
           const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
           jobsByCompositeKey.set(upsertKey, updatedJob);
           result.updated++;
-          const attachedUpd = await attachResolvedFilesToJob(updatedJob, jobAttachments.files, userId ?? null);
+          const attachedUpd = await attachResolvedFiles(updatedJob, jobAttachments.files, userId ?? null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated', ...(attachedUpd.length ? { info: `Work Instructions attached: ${attachedUpd.join(', ')}` } : {}) });
           
           if (importHistoryId) {
@@ -2361,7 +2329,7 @@ export async function performImport(
           const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
           jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
-          const attachedNew = await attachResolvedFilesToJob(createdJob, jobAttachments.files, userId ?? null);
+          const attachedNew = await attachResolvedFiles(createdJob, jobAttachments.files, userId ?? null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created', ...(attachedNew.length ? { info: `Work Instructions attached: ${attachedNew.join(', ')}` } : {}) });
           
           if (importHistoryId) {

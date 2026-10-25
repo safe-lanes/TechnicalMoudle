@@ -21,6 +21,7 @@ import {
 } from './helpers';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '@shared/dateUtils';
 import { getAllRanks } from '../../ranks/service';
+import { resolveJobAttachmentNames } from '../../jobs/services/jobWorkInstructionService';
 
 /**
  * Validate a row's Maker Code / Maker Name reference against the Maker List master.
@@ -2132,6 +2133,19 @@ export async function validateData(type: string, data: any[], mode: string, vess
           errors.push(`Row ${rowNum}: Reviewer '${rr}' not found in the rank list. Allowed values: ${RESPONSIBLE_RANKS.join(', ')}`);
         } else {
           normalized['Reviewer Rank'] = rr;
+        }
+      }
+
+      // Job attachments (Work Instructions, mig 183) - optional; PDF NAMES already uploaded for the vessel (D3).
+      // A bad name fails the row here, in the preview (D2); the importer re-checks before writing.
+      const jobAttachmentsVal = row['Job attachments'];
+      if (jobAttachmentsVal !== undefined && jobAttachmentsVal !== null && String(jobAttachmentsVal).trim() !== '') {
+        const attachVessel = vesselId || (row['Vessel Code'] ? String(row['Vessel Code']).trim() : '');
+        const resolved = attachVessel ? await resolveJobAttachmentNames(attachVessel, jobAttachmentsVal) : { error: null };
+        if (resolved.error) {
+          errors.push(`Row ${rowNum}: ${resolved.error}`);
+        } else {
+          normalized['Job attachments'] = String(jobAttachmentsVal).trim();
         }
       }
       

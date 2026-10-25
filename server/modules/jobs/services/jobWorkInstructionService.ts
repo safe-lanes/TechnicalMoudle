@@ -176,6 +176,46 @@ async function attachFileToJob(job: { juuid: string; vesselId: string }, fileUui
   }));
 }
 
+// ── Bulk import by file NAME (requirement §12/§13; decisions D2 + D3) ─────────────────────────────────────────
+// The Jobs sheet's "Job attachments" cell holds NAMES (never paths), ';' separated, of PDFs ALREADY uploaded for the
+// vessel (D3). One bad name rejects the whole Job row (D2) — the bulk importer calls resolveJobAttachmentNames BEFORE
+// writing the Job and attachResolvedFiles after; re-importing the same sheet creates no duplicate link (§13).
+export type ResolvedJobAttachment = { jwfuuid: string; fileName: string };
+
+export function parseJobAttachmentNames(raw: unknown): string[] {
+  if (raw == null) return [];
+  const names = String(raw).split(/[;\r\n]+/).map((s) => s.trim()).filter(Boolean);
+  const seen = new Set<string>();
+  return names.filter((n) => { const k = n.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+export async function resolveJobAttachmentNames(vesselId: string, raw: unknown): Promise<{ files: ResolvedJobAttachment[]; error: string | null }> {
+  const files: ResolvedJobAttachment[] = [];
+  for (const name of parseJobAttachmentNames(raw)) {
+    if (/[\\/]|\.\./.test(name)) return { files, error: `Job attachment "${name}" must be a file name, not a path.` };
+    if (!name.toLowerCase().endsWith('.pdf')) return { files, error: `Job attachment "${name}" is not a PDF.` };
+    const file = await repo.findFileByName(vesselId, name);
+    if (!file) return { files, error: `Job attachment "${name}" was not found among this vessel's Work Instruction files. Upload it first (Job form → Work Instructions), then import.` };
+    files.push({ jwfuuid: file.jwfuuid, fileName: file.fileName });
+  }
+  return { files, error: null };
+}
+
+/** Links already-resolved files to a Job the importer has just written. Returns the names newly attached. */
+export async function attachResolvedFiles(job: { juuid: string; vesselId: string | null }, files: ResolvedJobAttachment[], actorUuid: string | null): Promise<string[]> {
+  const attached: string[] = [];
+  if (!job.vesselId || files.length === 0) return attached;
+  await assertOffice();
+  for (const f of files) {
+    if (await repo.findActiveLink(job.juuid, f.jwfuuid)) continue;
+    await repo.createLink(insertJobWorkInstructionLinkSchema.parse({
+      jobId: job.juuid, fileUuid: f.jwfuuid, vesselId: job.vesselId, attachedByUuid: actorUuid, createdByUuid: actorUuid, updatedByUuid: actorUuid,
+    }));
+    attached.push(f.fileName);
+  }
+  return attached;
+}
+
 /** Remove = soft-delete the link only (§7). Other Jobs using the same file are untouched. */
 export async function remove(jobId: string, jwluuid: string, actor: Actor) {
   await assertOffice();
