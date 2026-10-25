@@ -47,3 +47,20 @@ WHERE h.actor_position = 'Chief Engineer' AND u.user_type = 'Office';
 - **Defect numbers:** vessels with a V-code number new defects as `<VCODE>-YY-NNNN` (office `…-ONNNN`); vessels
   without a V-code keep the old format; existing defects keep their numbers.
 - **Part A:** locked after the first save; only Sail Admin can unlock (one edit, reason recorded).
+
+## 5. Job Work Instructions (PDF attachments on Jobs) — added 25-Oct-2026 (feature/job-work-instructions → replit_dev)
+
+- **Migration:** `183_job_work_instructions.sql` — two new tables (`job_work_instruction_files`,
+  `job_work_instruction_links`), additive, idempotent. No existing table is changed.
+- **Office server and ships must run the same build.** Both tables sync shore → ship, and the PDF bytes travel by the
+  existing file sync into `.private/job-docs/` on the ship (same mechanism as component documents). Deploy the
+  office first, then the ships; a ship on the old build receiving the new tables was not tested.
+- **Storage on the office server:** PDFs are written under `.private/job-docs/<vessel uuid>/`. Make sure that folder
+  is on the same disk/backup as `.private/` today (PM2 cwd). On Replit the object store is used instead.
+- **Ships are read-only** for Work Instructions by design: upload / attach / remove / restore are refused on a ship
+  (HTTP 403 "managed in the office"). Not a bug.
+- **Bulk import (Jobs):** the Vessel_Job template has a new last column **"Job attachments"** (PDF file names,
+  `;`-separated, of PDFs already uploaded for that vessel). The hidden template-version cell moved from column 28 to 29.
+  Old templates without the column keep working.
+- **Permission:** uses the existing Job-edit permission (`pms-modify-pms` edit). Nothing to configure.
+- **Fresh provisioning** of a ship carries the rows in the bundle and queues the PDFs; they arrive on the first sync.
