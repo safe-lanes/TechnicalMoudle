@@ -947,7 +947,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   });
   
   // Version info at col AB (28) — col AA (27) is now occupied by "Other Safety Requirements"
-  addVersionInfoToSheet(jobsSheet, 28);
+  addVersionInfoToSheet(jobsSheet, 29); // col 28 is 'Job attachments' (Work Instructions)
   
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();

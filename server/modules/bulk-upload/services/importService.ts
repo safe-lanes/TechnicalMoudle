@@ -2277,7 +2277,7 @@ export async function performImport(
           const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
           jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
-          const attachedNew = await attachResolvedFiles(createdJob, jobAttachments.files, userId ?? null);
+          const attachedNew = await attachResolvedFiles(createdJob, jobAttachments.files, userId != null ? String(userId) : null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created', ...(attachedNew.length ? { info: `Work Instructions attached: ${attachedNew.join(', ')}` } : {}) });
           
           if (importHistoryId) {
@@ -2296,7 +2296,7 @@ export async function performImport(
           const updateKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
           jobsByCompositeKey.set(updateKey, updatedJob);
           result.updated++;
-          const attachedUpd = await attachResolvedFiles(updatedJob, jobAttachments.files, userId ?? null);
+          const attachedUpd = await attachResolvedFiles(updatedJob, jobAttachments.files, userId != null ? String(userId) : null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated', ...(attachedUpd.length ? { info: `Work Instructions attached: ${attachedUpd.join(', ')}` } : {}) });
           
           if (importHistoryId) {
@@ -2314,7 +2314,7 @@ export async function performImport(
           const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
           jobsByCompositeKey.set(upsertKey, updatedJob);
           result.updated++;
-          const attachedUpd = await attachResolvedFiles(updatedJob, jobAttachments.files, userId ?? null);
+          const attachedUpd = await attachResolvedFiles(updatedJob, jobAttachments.files, userId != null ? String(userId) : null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated', ...(attachedUpd.length ? { info: `Work Instructions attached: ${attachedUpd.join(', ')}` } : {}) });
           
           if (importHistoryId) {
@@ -2329,7 +2329,7 @@ export async function performImport(
           const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
           jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
-          const attachedNew = await attachResolvedFiles(createdJob, jobAttachments.files, userId ?? null);
+          const attachedNew = await attachResolvedFiles(createdJob, jobAttachments.files, userId != null ? String(userId) : null);
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created', ...(attachedNew.length ? { info: `Work Instructions attached: ${attachedNew.join(', ')}` } : {}) });
           
           if (importHistoryId) {
