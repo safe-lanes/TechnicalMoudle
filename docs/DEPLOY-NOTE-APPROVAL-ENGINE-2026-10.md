@@ -1,6 +1,27 @@
-# Deploy note — Approval Workflow (feature/approval-engine-phase2), October 2026
+# Deploy note — replit_dev release of 25-Oct-2026 (Approval Workflow + Office Reviewer + Job Work Instructions)
 
-**Tell Nilesh and Jeevan at deployment time.** Written 23-Oct-2026 by support (Ghazi's decisions).
+**For Nilesh (deployment) and Jeevan.** Written 23-Oct-2026 by support, updated 25-Oct-2026 (Ghazi's decisions).
+
+## 0. Release at a glance
+
+- **Branch to deploy: `replit_dev`, build `08b6035a9`** (application code = `d01218668`; the two commits after it
+  are QA-pack generator scripts only).
+- **All branches are now the same code:** `replit_dev` = `feature/replit-work` = `feature/approval-engine-phase2`
+  = `feature/job-work-instructions` = `08b6035a9`. The approval branch is fully merged — **track `replit_dev` only**
+  from now; nothing needs to be taken from the approval branch any more.
+- **Replit forks (Nilesh, Jeevan) are already updated** with this code by Ghazi.
+- **What is in it (since the 15-Oct release 4e93a5245):** Approval Workflow phase 2 (combined Admin → Approval
+  Workflow screen, chains per classification, withdraw a pending request, approval history "who + when", multi-step
+  approver edits, defects extension / verification / closure approvals, Round-2 QA fixes + Jeevan's points) ·
+  Nilesh's Office Reviewer roles on Jobs · Jeevan's defect exports (browser PDF, CSV/xlsx), DD-MM-YYYY dates, admin
+  URL state · **NEW: Job "Work Instructions" — PDF attachments on Jobs** (section 5).
+- **Deploy order: office server first, then every ship, same build.** Reason: `approval_history` /
+  `approval_withdrawals` sync both ways and the new Work Instructions tables sync office → ship.
+- **Migrations (all additive, idempotent, run automatically on start):** 178, 179, 180, 183.
+- **QA on this build:** Suman runs "Approval Workflow Round 3" (47 cases) and "Job Work Instructions" (49 cases)
+  on dev once it is up. Both packs name build `d01218668`.
+- **Rollback:** previous replit_dev release = `4e93a5245` (15-Oct). Migrations 178–183 are additive, so rolling the
+  code back leaves the new tables/columns in place harmlessly.
 
 ## 1. Old approval history rows that say "(Chief Engineer)" for office users — NOT corrected
 
@@ -32,7 +53,7 @@ WHERE h.actor_position = 'Chief Engineer' AND u.user_type = 'Office';
   `attached_assets/jobs_template_(37)_1790855295976.xlsx`. `attached_assets/` is git-ignored, so the file exists
   only in Jeevan's Replit workspace; elsewhere the test is skipped (with the reason). Left as is (Ghazi).
 
-## 4. Things to watch on deploy
+## 4. Things to watch on deploy (Approval Workflow / Office Reviewer / defects)
 
 - **Migrations in this release:** `178_approval_withdrawals.sql`, `179_approval_history.sql` (approval branch) and
   `180_jobs_office_reviewer_role_ruids.sql` (from replit_dev). All idempotent.
@@ -48,7 +69,7 @@ WHERE h.actor_position = 'Chief Engineer' AND u.user_type = 'Office';
   without a V-code keep the old format; existing defects keep their numbers.
 - **Part A:** locked after the first save; only Sail Admin can unlock (one edit, reason recorded).
 
-## 5. Job Work Instructions (PDF attachments on Jobs) — added 25-Oct-2026 (feature/job-work-instructions → replit_dev)
+## 5. Job Work Instructions (PDF attachments on Jobs) — NEW in this release
 
 - **Migration:** `183_job_work_instructions.sql` — two new tables (`job_work_instruction_files`,
   `job_work_instruction_links`), additive, idempotent. No existing table is changed.
