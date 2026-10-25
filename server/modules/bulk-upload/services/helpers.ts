@@ -421,7 +421,15 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'level_2_reviewer': 'Reviewer Rank',
     'level 2 reviewer': 'Reviewer Rank',
     'l2reviewer': 'Reviewer Rank',
-    'l2 reviewer': 'Reviewer Rank'
+    'l2 reviewer': 'Reviewer Rank',
+    // Work Instructions (mig 183): PDF names already uploaded for the vessel
+    'job attachments': 'Job attachments',
+    'jobattachments': 'Job attachments',
+    'job_attachments': 'Job attachments',
+    'attachments': 'Job attachments',
+    'work instructions': 'Job attachments',
+    'work instruction': 'Job attachments',
+    'workinstructions': 'Job attachments'
   },
   'fleet-jobs': {
     'jobcode': 'Job Code',

@@ -217,7 +217,8 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Vessel Code', key: 'vesselCode', width: 12 },
     { header: 'Maker Code', key: 'makerCode', width: 15 },
     { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 },
-    { header: 'Reviewer Rank', key: 'reviewerRank', width: 20 }
+    { header: 'Reviewer Rank', key: 'reviewerRank', width: 20 },
+    { header: 'Job attachments', key: 'jobAttachments', width: 30 } // Work Instruction PDF names (';' separated), already uploaded for the vessel
   ];
   
   // Headers only - no sample data
@@ -787,7 +788,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Required Tools', key: 'requiredTools', width: 40 },
     { header: 'PPE Requirements', key: 'ppeRequirements', width: 35 },
     { header: 'Permit Requirements', key: 'permitRequirements', width: 35 },
-    { header: 'Other Safety Requirements', key: 'otherSafetyRequirements', width: 35 }
+    { header: 'Other Safety Requirements', key: 'otherSafetyRequirements', width: 35 },
+    // Work Instructions (mig 183): PDF file NAMES already uploaded for this vessel, ';' separated (no paths)
+    { header: 'Job attachments', key: 'jobAttachments', width: 30 }
   ];
   
   // Pre-populate ALL components (all levels) in the template - sorted by code for hierarchical display
@@ -820,7 +823,8 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       requiredTools: '',
       ppeRequirements: '',
       permitRequirements: '',
-      otherSafetyRequirements: ''
+      otherSafetyRequirements: '',
+      jobAttachments: ''
     });
   });
   
