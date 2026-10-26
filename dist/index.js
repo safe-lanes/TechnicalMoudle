@@ -5924,7 +5924,6 @@ function getSyncPhaseOrder() {
       "component_running_hours_log",
       "component_maintenance_history",
       "ihm_items",
-      "defect_sequences",
       "planner_dates",
       "locations",
       "rotational_items"
@@ -6690,15 +6689,15 @@ var init_syncConfig = __esm({
       },
       defect_sequences: {
         tableName: "defect_sequences",
-        category: "BOTH_EDITABLE",
-        direction: "bidirectional",
+        category: "NO_SYNC",
+        direction: "none",
         identityColumn: null,
         vesselScopeColumn: "vessel_id",
         vesselScopeJoinPath: null,
         isGlobal: false,
-        isConfigurable: true,
-        businessRules: "Both sides generate sequences. Use instance_id prefix to avoid collision (ship: V-prefix, shore: O-prefix)",
-        notes: "DOMAIN EXPERT CORRECTION: Changed from SHIP_ONLY to BOTH_EDITABLE. Office can also generate defect reports. Integer PK, no UUID."
+        isConfigurable: false,
+        businessRules: "Per-side defect-number counter. Each side numbers its OWN series (ship {VCODE}-yy-nnnn, office {VCODE}-yy-Onnnn \u2014 server/utils/defectNumberSeries.ts) from the highest number already used; the counter is a local floor only.",
+        notes: '26-Oct-2026: was BOTH_EDITABLE matched by its per-instance integer id \u2014 office row 16 vs ship row 1 for the same vessel/year could never be applied ("recovery group \u2026 missing NOT-NULL [year]", Testvessel 9-Oct, dev vessel 74481b72 26-Oct). The office stopped writing it on 15-Oct; now it never travels. Stale pre-15-Oct logs are retired at pull time (service.ts partitionNonSyncedTableLogs).'
       },
       // ── Spares & Inventory ──
       spares: {
@@ -13812,6 +13811,7 @@ __export(service_exports, {
   getVesselProvisioningState: () => getVesselProvisioningState,
   holdBackForOldShip: () => holdBackForOldShip,
   initiateSyncSession: () => initiateSyncSession,
+  partitionNonSyncedTableLogs: () => partitionNonSyncedTableLogs,
   preparePullData: () => preparePullData,
   receivePushData: () => receivePushData,
   refreshRhEstimatesSafely: () => refreshRhEstimatesSafely,
@@ -14509,6 +14509,12 @@ function holdBackForOldShip(logs, capabilities) {
   const kept = logs.filter((l) => !(l.tableName === "component_documents" && !/^\d+$/.test(String(l.rowUuid))));
   return { logs: kept, heldBack: logs.length - kept.length };
 }
+function partitionNonSyncedTableLogs(logs) {
+  const kept = [];
+  const retired = [];
+  for (const l of logs) (requiresFieldLogging(l.tableName) ? kept : retired).push(l);
+  return { kept, retired };
+}
 async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoint, tableCheckpoints, capabilities) {
   const batch = await getBatch(batchUuid);
   if (!batch) {
@@ -14542,6 +14548,16 @@ async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoi
       syncDiag(`PREPARE-PULL HOLD-BACK: ${held.heldBack} UUID-keyed change(s) (component_documents) kept pending \u2014 ship ${shipInstanceId} has not updated yet`);
     }
     shoreFieldLogs = held.logs;
+  }
+  {
+    const part = partitionNonSyncedTableLogs(shoreFieldLogs);
+    if (part.retired.length > 0) {
+      const byTable = {};
+      for (const l of part.retired) byTable[l.tableName] = (byTable[l.tableName] || 0) + 1;
+      await markFieldLogsSynced(part.retired.map((l) => l.logUuid).filter(Boolean), batchUuid);
+      syncDiag(`PREPARE-PULL RETIRED: ${part.retired.length} log(s) of non-synced table(s) ${JSON.stringify(byTable)} marked synced \u2014 never applicable on the ship`);
+      shoreFieldLogs = part.kept;
+    }
   }
   syncDiag(`PREPARE-PULL FIELD LOGS: ${shoreFieldLogs.length} shore logs for vessel=${vesselId} (excluded instance=${shipInstanceId})`);
   if (shoreFieldLogs.length > 0) {
@@ -19718,6 +19734,7 @@ var init_syncEngine = __esm({
   "server/modules/sync/syncEngine.ts"() {
     "use strict";
     init_repository();
+    init_service();
     init_oneWayApplier();
     init_fileSyncProcessor();
     init_syncConfig();
@@ -20178,7 +20195,15 @@ var init_syncEngine = __esm({
         const isShip2 = isShipInstanceId(this.instanceId);
         const vesselCode = await this.getVesselCode(vesselId);
         syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-        const fieldLogs = isShip2 ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize) : [];
+        let fieldLogs = isShip2 ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize) : [];
+        if (fieldLogs.length > 0) {
+          const part = partitionNonSyncedTableLogs(fieldLogs.map((l) => ({ ...l, tableName: l.tableName ?? l.table_name })));
+          if (part.retired.length > 0) {
+            await markFieldLogsSynced(part.retired.map((l) => l.logUuid ?? l.log_uuid).filter(Boolean), "retired-non-synced-table");
+            syncDiag(`PUSH RETIRED: ${part.retired.length} log(s) of non-synced table(s) marked synced \u2014 never applicable ashore`);
+            fieldLogs = part.kept;
+          }
+        }
         syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip2 ? " (shore skips field log push)" : ""}`);
         const pushTables = {};
         fieldLogs.forEach((l) => {
