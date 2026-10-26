@@ -230,6 +230,7 @@ export async function createFleetSpare(req: Request, res: Response) {
     const spare = await fleetService.createFleetSpare(req.body);
     res.status(201).json(spare);
   } catch (error: any) {
+    if (error.statusCode === 400) return res.status(400).json({ error: error.message });
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid spare data", details: error.errors });
     }
@@ -250,6 +251,7 @@ export async function updateFleetSpare(req: Request, res: Response) {
     console.log(`[FleetSpare] Successfully updated spare id=${id}, partCode=${spare.partCode}`);
     res.json(spare);
   } catch (error: any) {
+    if (error.statusCode === 400) return res.status(400).json({ error: error.message });
     if (error.name === 'ZodError') {
       console.error(`[FleetSpare] Zod validation failed:`, error.errors);
       return res.status(400).json({ error: "Invalid spare data", details: error.errors });

@@ -1,4 +1,3 @@
-import { applyClassificationEvent } from './spareClassificationSync';
 /**
  * Sync Engine — Orchestrates a complete ship-shore sync cycle.
  *
@@ -91,6 +90,7 @@ export interface SyncResult {
 
 export class SyncEngine {
   private instanceId: string;
+  private remoteSupportsSparePair = false;
   private shoreBaseUrl: string;
   private syncApiKey: string;
   // Phase 4a: per-instance tunables, resolved DB-then-env in loadSettings().
@@ -272,6 +272,8 @@ export class SyncEngine {
         lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null,
       });
       batchUuid = initResult.batchUuid;
+      this.remoteSupportsSparePair = Array.isArray(initResult.capabilities) &&
+        initResult.capabilities.includes('spare_classification_pair');
       console.log(`[SyncEngine] Batch initiated: ${batchUuid}`);
 
       // Create local batch row so error persistence works on ship.
@@ -679,6 +681,10 @@ export class SyncEngine {
     let fieldLogs = isShip
       ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize)
       : [];
+    if (!this.remoteSupportsSparePair && fieldLogs.some(log => log.tableName === 'spares' &&
+      ['spareCategory', 'optimumQty', 'spare_category', 'optimum_qty'].includes(log.fieldName))) {
+      throw new Error('Spare classification sync is pending: upgrade and migrate shore before retrying. Local changes remain unsynced.');
+    }
     if (fieldLogs.length > 0) {
       // Retire logs of tables that no longer sync (defect_sequences, NO_SYNC since 26-Oct-2026) — never applicable ashore.
       const part = partitionNonSyncedTableLogs(fieldLogs.map((l: any) => ({ ...l, tableName: l.tableName ?? l.table_name })));
@@ -946,7 +952,7 @@ export class SyncEngine {
       instanceId: this.instanceId,
       lastCheckpoint: floor ? floor.toISOString() : null,
       // 13-Oct-2026: this ship matches component_documents on cduuid (mig 182) — the shore may send UUID-keyed changes.
-      capabilities: ['component_documents_uuid'],
+      capabilities: ['component_documents_uuid', 'spare_classification_pair'],
       ...(havePerTable
         ? {
             tableCheckpoints: Object.fromEntries(
@@ -1054,7 +1060,14 @@ export class SyncEngine {
         let updateApplied = 0;
         let updateErrors = 0;
         let updSpIdx = 0;
+        const { applySparePairLogs, isSparePairLog } = await import('./spareClassificationSync');
+        const pairResult = await applySparePairLogs(client, insertResult.updateLogs, this.instanceId, batchUuid);
+        pairResult.failedRows.forEach(uuid => failedRowUuids.add(uuid));
+        allErrors.push(...pairResult.errors);
+        totalApplyErrors += pairResult.errors.length;
+        totalPulled += pairResult.applied;
         for (const log of insertResult.updateLogs) {
+          if (isSparePairLog(log)) continue;
           // Part A: per-row savepoint so one poison UPDATE (e.g. an immutable-table reject) can no
           // longer 25P02-abort its siblings in this pull batch. Mirrors the INSERT-path savepoints
           // (d8e88c679): RELEASE on success, ROLLBACK TO SAVEPOINT on failure.
@@ -1074,13 +1087,6 @@ export class SyncEngine {
             // CURRENT local completion episode. Resolution logs force-apply and close the
             // local mirror conflict. Same shared helper as the shore receive path.
             const logChangedAtPull = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
-            if (await applyClassificationEvent(client, log, insertResult.updateLogs,
-                this.instanceId, batchUuid, evaluateStaleSkipGuard)) {
-              await client.query(`RELEASE SAVEPOINT ${updSp}`);
-              totalPulled++;
-              updateApplied++;
-              continue;
-            }
             const dual = await evalDualPull(client, { ...log, changedAt: logChangedAtPull } as any, dualCtxPull);
             let dualBypassGuardsPull = false;
             if (dual.remoteResolution) {

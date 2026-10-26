@@ -41,7 +41,8 @@ test('push/pull event applies companion fields once in one SQL update with no sy
   const calls: Array<{ text: string; values?: any[] }> = [];
   const conn = { query: async (text: string, values?: any[]) => {
     calls.push({ text, values });
-    if (text.startsWith('SELECT spare')) return { rows: [{ spare_category: 'general', optimum_qty: null }] };
+    if (text.includes('FROM spares')) return { rows: [{ spare_category: 'general', optimum_qty: null }] };
+    if (text.includes('FROM master_lists')) return { rows: [{ list_key: 'optimum' }] };
     if (text.includes('FROM sync_field_log')) return { rows: [] };
     return { rows: [], rowCount: 1 };
   } };

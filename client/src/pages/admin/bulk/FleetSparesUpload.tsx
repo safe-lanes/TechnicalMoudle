@@ -18,6 +18,8 @@ const FLEET_SPARES_FIELD_MAPPINGS = [
   { field: 'Manual Name', required: false, description: 'Reference manual name' },
   { field: 'Page Number', required: false, description: 'Reference page number' },
   { field: 'Criticality', required: false, description: 'Yes/No criticality flag' },
+  { field: 'Spare Category', required: true, description: 'Required category key from the Spare Category master list (essential, optimum or general)' },
+  { field: 'Optimum Qty', required: false, description: 'Positive whole number (1–2147483647), required only for category key optimum' },
   { field: 'Is Active', required: true, description: 'Active status (Yes/No)' },
   { field: 'IHM (Inventory of Hazardous Materials)', required: false, description: 'Hazardous materials flag' },
   { field: 'Evidence Type', required: false, description: 'Evidence type classification' },
@@ -36,7 +38,7 @@ export default function FleetSparesUpload() {
       templateType="fleet-spares"
       templateFileName="fleet_spares_template.xlsx"
       fieldMappings={FLEET_SPARES_FIELD_MAPPINGS}
-      previewColumns={["Part Code", "Part Name", "Fleet Equipment Code"]}
+      previewColumns={["Part Code", "Part Name", "Fleet Equipment Code", "Spare Category", "Optimum Qty"]}
       onRefreshData={handleRefreshData}
     />
   );

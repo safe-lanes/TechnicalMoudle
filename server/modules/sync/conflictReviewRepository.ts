@@ -1,4 +1,3 @@
-import { isSpareClassificationLog, resolveClassificationConflict, resolveLegacyClassification } from './spareClassificationSync';
 /**
  * Conflict Review Repository
  *
@@ -14,6 +13,7 @@ import { SYNC_CONFIG, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { isShipInstanceId } from './syncRole';
 import { RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, findWouuidsWithOpenDualConflicts } from './dualCompletionResolver';
+import { isSpareClassificationConflict, resolveSparePairConflict } from './spareClassificationConflict';
 
 /**
  * Task #399: after a dual-completion conflict on a work order is resolved locally,
@@ -723,6 +723,12 @@ export async function applyIncomingConflict(
   userId: string
 ): Promise<EnrichedConflict | null> {
   const pool = await getPool();
+  const classificationSource = source === 'log' ? 'sync_conflict_log' : 'sync_conflicts';
+  const classificationRow = await pool.query(`SELECT * FROM ${classificationSource} WHERE id=$1`, [id]);
+  if (classificationRow.rows[0] && isSpareClassificationConflict(classificationRow.rows[0])) {
+    await resolveSparePairConflict(pool, classificationRow.rows[0], source, userId, true);
+    return getConflict(id, source);
+  }
 
   if (source === 'log') {
     // Read the conflict
@@ -735,10 +741,6 @@ export async function applyIncomingConflict(
 
     if (conflict.is_resolved) {
       throw Object.assign(new Error('Conflict is already resolved'), { statusCode: 409 });
-    }
-    if (isSpareClassificationLog({ tableName: conflict.table_name, fieldName: conflict.field_name })) {
-      await resolveClassificationConflict(pool, conflict, userId, true);
-      return getConflict(id, source);
     }
 
     // Task #399: a dual-completion conflict is ONE WO-level decision — applying the
@@ -833,10 +835,6 @@ export async function applyIncomingConflict(
     const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
 
     // For old conflicts, the "rejected" side is ship_value
-    if (isSpareClassificationLog({ tableName: conflict.table_name, fieldName: conflict.field_name })) {
-      await resolveLegacyClassification(pool, conflict, conflict.ship_value, 'ship_wins', userId);
-      return getConflict(id, source);
-    }
     await pool.query(
       `UPDATE "${conflict.table_name}"
        SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
@@ -885,6 +883,12 @@ export async function dismissConflict(
   userId: string
 ): Promise<EnrichedConflict | null> {
   const pool = await getPool();
+  const classificationSource = source === 'log' ? 'sync_conflict_log' : 'sync_conflicts';
+  const classificationRow = await pool.query(`SELECT * FROM ${classificationSource} WHERE id=$1`, [id]);
+  if (classificationRow.rows[0] && isSpareClassificationConflict(classificationRow.rows[0])) {
+    await resolveSparePairConflict(pool, classificationRow.rows[0], source, userId, false);
+    return getConflict(id, source);
+  }
 
   if (source === 'log') {
     const conflictResult = await pool.query(
@@ -898,10 +902,6 @@ export async function dismissConflict(
     }
 
     // Task #399: dismissing a dual-completion conflict means "keep THIS side's completion" —
-    if (isSpareClassificationLog({ tableName: conflict.table_name, fieldName: conflict.field_name })) {
-      await resolveClassificationConflict(pool, conflict, userId, false);
-      return getConflict(id, source);
-    }
     // one WO-level decision. All open dual-completion fields of the work order are resolved
     // atomically and the kept values are re-asserted as RESOLUTION_ACTOR field logs so the
     // other side force-applies them and closes its mirror conflicts (otherwise the two

@@ -703,6 +703,13 @@ export function normalizeColumnNames(data: any[], type: string): any[] {
   for (const col of originalColumns) {
     // Normalize the column name for lookup (lowercase, trim)
     const normalizedLookup = col.toLowerCase().trim();
+    if (type === 'spares' || type === 'fleet-spares') {
+      const compact = normalizedLookup.replace(/[\s_-]+/g, '');
+      if (compact === 'sparecategory' || compact === 'optimumqty' || compact === 'optimumquantity') {
+        columnMap[col] = compact === 'sparecategory' ? 'Spare Category' : 'Optimum Qty';
+        continue;
+      }
+    }
     
     // Check if we have a mapping for this column
     if (mappings[normalizedLookup]) {

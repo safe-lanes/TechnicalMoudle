@@ -117,7 +117,8 @@ function fixture(vessel = 'vessel-A', id = 10, uuid = 'spare-A', deleted = false
   isolated.storage.receiveSpareToLocation.mockImplementation(instance.receiveSpareToLocation.bind(instance));
   return {
     instance, tables, writes,
-    snapshot: () => structuredClone({ tables, writes, logs: isolated.log.mock.calls }),
+    // Transaction handles are intentionally non-serializable; compare audit data only.
+    snapshot: () => structuredClone({ tables, writes, logs: isolated.log.mock.calls.map(args => args.slice(0, 6)) }),
   };
 }
 

@@ -104,7 +104,8 @@ export async function createSpare(req: Request, res: Response) {
     const spare = await sparesService.createSpare(req.params.vesselId, sanitizedBody);
     res.status(201).json(spare);
   } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message || "Failed to create spare" });
+    if (error.statusCode === 400) return res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message || "Failed to create spare" });
   }
 }
 

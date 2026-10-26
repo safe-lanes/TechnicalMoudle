@@ -639,9 +639,9 @@ export const spares = pgTable("spares", {
   componentCode: text("component_code"),
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"), // Format: SP-<ComponentCode>-<NNN>
+  critical: text("critical").notNull(), // 'Critical' | 'Non-Critical' | 'Yes' | 'No'
   spareCategory: text("spare_category"),
   optimumQty: integer("optimum_qty"),
-  critical: text("critical").notNull(), // 'Critical' | 'Non-Critical' | 'Yes' | 'No'
   rob: integer("rob").notNull().default(0), // Remaining on Board (total = robLocationA + robLocationB)
   robLocationA: integer("rob_location_a").notNull().default(0), // ROB in Location A
   robLocationB: integer("rob_location_b").notNull().default(0), // ROB in Location B
@@ -694,6 +694,7 @@ export const spares = pgTable("spares", {
   sortOrder: integer("sort_order"),
 }, (table) => ({
   componentIdIdx: index("idx_spare_component").on(table.componentId),
+  classificationCheck: check("spares_category_optimum_check", sql`CASE WHEN ${table.spareCategory} = 'optimum' THEN ${table.optimumQty} IS NOT NULL AND ${table.optimumQty} > 0 ELSE ${table.optimumQty} IS NULL END`),
   vesselIdIdx: index("idx_spare_vessel").on(table.vesselId),
   componentSpareCodeIdx: index("idx_spare_code").on(table.vesselId, table.componentSpareCode),
   dataScopeIdx: index("idx_spare_data_scope").on(table.dataScope),
@@ -2781,8 +2782,6 @@ export const fleetSpares = pgTable("fleet_spares", {
   fleetEquipmentCode: text("fleet_equipment_code").notNull(),
   fleetEquipmentName: text("fleet_equipment_name").notNull(),
   partName: text("part_name").notNull(),
-  spareCategory: text("spare_category"),
-  optimumQty: integer("optimum_qty"),
   partNumber: text("part_number"),
   unitOfMeasurement: text("unit_of_measurement").notNull(),
   drawingNumber: text("drawing_number"),
@@ -2794,6 +2793,8 @@ export const fleetSpares = pgTable("fleet_spares", {
   manualName: text("manual_name"),
   pageNumber: text("page_number"),
   criticality: text("criticality"),
+  spareCategory: text("spare_category"),
+  optimumQty: integer("optimum_qty"),
   isActive: boolean("is_active").notNull().default(true),
   ihm: text("ihm"),
   evidenceType: text("evidence_type"),
@@ -2806,6 +2807,7 @@ export const fleetSpares = pgTable("fleet_spares", {
   isSync: boolean("is_sync").default(false),
 }, (table) => ({
   partCodeIdx: index("idx_fleet_spares_part_code").on(table.partCode),
+  classificationCheck: check("fleet_spares_category_optimum_check", sql`CASE WHEN ${table.spareCategory} = 'optimum' THEN ${table.optimumQty} IS NOT NULL AND ${table.optimumQty} > 0 ELSE ${table.optimumQty} IS NULL END`),
   fleetEquipmentCodeIdx: index("idx_fleet_spares_equipment").on(table.fleetEquipmentCode),
   fleetSparesUuidIdx: uniqueIndex("idx_fleet_spares_uuid").on(table.fleetSparesUuid),
   fleetComponentsUuidIdx: index("idx_fleet_spares_component_uuid").on(table.fleetComponentsUuid),

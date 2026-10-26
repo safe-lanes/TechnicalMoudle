@@ -1,4 +1,3 @@
-import { validateClassification, categoryOptions } from '../../spares/services/spareClassificationService';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import {
@@ -229,17 +228,18 @@ export async function getFleetSpare(id: number) {
 }
 
 export async function createFleetSpare(body: any) {
+  const { classificationForWrite } = await import('../../spares/classification');
+  Object.assign(body, await classificationForWrite(body, undefined, true));
   const validatedData = insertFleetSparesSchema.parse(body);
-  Object.assign(validatedData, await validateClassification({}, body, true));
   return repo.createFleetSpare(validatedData);
 }
 
 export async function updateFleetSpare(id: number, body: any) {
+  const { classificationForWrite } = await import('../../spares/classification');
+  const saved = await getFleetSpare(id);
+  Object.assign(body, await classificationForWrite(body, saved, true));
   const partialSchema = insertFleetSparesSchema.partial();
   const validatedData = partialSchema.parse(body);
-  const existing = await repo.getFleetSpare(id);
-  if (!existing) throw Object.assign(new Error('Fleet spare not found'), { statusCode: 404 });
-  Object.assign(validatedData, await validateClassification(existing, body, true));
   return repo.updateFleetSpare(id, validatedData);
 }
 
@@ -249,7 +249,6 @@ export async function deleteFleetSpare(id: number) {
 }
 
 export async function exportFleetSpares(fleetEquipmentCode?: string) {
-  const categoryLabels = new Map((await categoryOptions()).map(option => [option.listKey, option.listValue]));
   let sparesList = await repo.getFleetSpares();
   if (fleetEquipmentCode && typeof fleetEquipmentCode === 'string') {
     sparesList = sparesList.filter((s: any) => s.fleetEquipmentCode === fleetEquipmentCode);
@@ -282,7 +281,7 @@ export async function exportFleetSpares(fleetEquipmentCode?: string) {
     s.isActive === false ? 'No' : 'Yes',
     s.ihm || '',
     s.evidenceType || '',
-    categoryLabels.get(s.spareCategory) || s.spareCategory || '',
+    s.spareCategory ?? '',
     s.optimumQty ?? '',
   ]);
 
@@ -406,12 +405,6 @@ export async function createMasterList(body: any) {
 export async function updateMasterList(id: number, body: any) {
   const partialMasterListSchema = insertMasterListSchema.partial();
   const validatedData = partialMasterListSchema.parse(body);
-  const existingItem = await repo.getMasterListById(id);
-  if (existingItem?.listType === 'spareCategory' &&
-      ((body.listKey !== undefined && body.listKey !== existingItem.listKey) ||
-       (body.listType !== undefined && body.listType !== existingItem.listType))) {
-    throw Object.assign(new Error('Spare Category keys are permanent. Edit the display label or add a new category instead.'), { statusCode: 400 });
-  }
   // If listType is being changed, validate the new value exists + is active.
   if (validatedData.listType !== undefined) {
     const type = await repo.getMasterListTypeByKey(validatedData.listType);

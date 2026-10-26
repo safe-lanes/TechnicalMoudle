@@ -26,7 +26,7 @@ export default function SparesUpload({ vesselId, markers }: SparesUploadProps) {
       templateFileName="spares_template.xlsx"
       fieldMappings={FIELD_MAPPINGS}
       vesselId={vesselId}
-      previewColumns={["Part Code", "Part Name", "Component Code"]}
+      previewColumns={["Part Code", "Part Name", "Component Code", "Spare Category", "Optimum Qty"]}
       onRefreshData={handleRefreshData}
       markers={markers ? {
         header: markers.uploadHeader,

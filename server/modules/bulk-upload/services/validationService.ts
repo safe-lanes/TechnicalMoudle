@@ -1,5 +1,3 @@
-import { importSpareClassification } from '../../../../shared/spareClassification';
-import { categoryOptions } from '../../spares/services/spareClassificationService';
 import { storage } from '../../../storage';
 import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 import { getSFIName } from '../../../utils/sfiLookup';
@@ -341,6 +339,8 @@ export async function validateData(type: string, data: any[], mode: string, vess
   // The same Part Code can legitimately appear under different Fleet Equipment Codes
   const fleetSpareCompositeOccurrences = new Map<string, number[]>();
   const existingDbFleetSpareCompositeKeys = new Set<string>();
+  const existingSpareClassifications = new Map<string, any>();
+  const fileSpareClassifications = new Map<string, string>();
   
   if (type === 'fleet-spares') {
     try {
@@ -349,6 +349,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
         if (fs.partCode && fs.fleetEquipmentCode) {
           const compositeKey = `${fs.partCode.toUpperCase()}|${fs.fleetEquipmentCode.toUpperCase()}`;
           existingDbFleetSpareCompositeKeys.add(compositeKey);
+          existingSpareClassifications.set(compositeKey, fs);
         }
       });
       console.log(`📋 Loaded ${existingDbFleetSpareCompositeKeys.size} existing fleet spare composite keys from database`);
@@ -385,6 +386,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       try {
         const existingSparesList = await storage.getSpares(vesselId);
         existingSparesList.forEach((s: any) => {
+          if (s.partCode) existingSpareClassifications.set(String(s.partCode).trim().toUpperCase(), s);
           if (s.partCode && s.componentCode) {
             const vessel = (s.vesselId ?? vesselId ?? '').toUpperCase();
             const ck = `${String(s.partCode).trim().toUpperCase()}|${String(s.componentCode).trim().toUpperCase()}|${vessel}`;
@@ -647,7 +649,6 @@ export async function validateData(type: string, data: any[], mode: string, vess
   }
   
   // Validate each row based on type (use filtered data)
-  const classificationOptions = ['spares', 'fleet-spares'].includes(type) ? await categoryOptions() : [];
   for (let i = 0; i < filteredData.length; i++) {
     const row = filteredData[i];
     const rowNum = i + 2; // Excel rows start at 1, plus header
@@ -656,10 +657,24 @@ export async function validateData(type: string, data: any[], mode: string, vess
     const normalized: any = {};
     if (type === 'spares' || type === 'fleet-spares') {
       try {
-        const pair = importSpareClassification(row, classificationOptions);
-        if (Object.keys(pair).length) {
+        const { spareClassificationImport } = await import('./spareClassificationImport');
+        const pair = await spareClassificationImport(row, results.columns);
+        if ('spareCategory' in pair && 'optimumQty' in pair) {
           normalized['Spare Category'] = pair.spareCategory;
           normalized['Optimum Qty'] = pair.optimumQty;
+          const part = String(row['Part Code'] || '').trim().toUpperCase();
+          const key = type === 'fleet-spares' ? `${part}|${String(row['Fleet Equipment Code'] || '').trim().toUpperCase()}` : part;
+          const fingerprint = JSON.stringify(pair);
+          if (fileSpareClassifications.has(key) && fileSpareClassifications.get(key) !== fingerprint) {
+            errors.push(`Row ${rowNum}: linked rows for Part Code '${part}' must use the same Spare Category and Optimum Qty.`);
+          }
+          fileSpareClassifications.set(key, fingerprint);
+          const saved = existingSpareClassifications.get(key);
+          if (saved && (saved.spareCategory !== pair.spareCategory || (saved.optimumQty ?? null) !== pair.optimumQty)) {
+            warnings.push(`Row ${rowNum}: Spare Category ${saved.spareCategory || '(unclassified)'} → ${pair.spareCategory}; Optimum Qty ${saved.optimumQty ?? '(blank)'} → ${pair.optimumQty ?? '(blank)'}. These values will be overwritten on import.`);
+          }
+        } else {
+          warnings.push(`Row ${rowNum}: Legacy template — existing Spare Category/Optimum Qty are preserved; a newly created spare remains unclassified.`);
         }
       } catch (error: any) {
         errors.push(`Row ${rowNum}: ${error.message}`);

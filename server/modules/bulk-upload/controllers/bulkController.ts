@@ -201,7 +201,7 @@ export async function getTemplate(req: Request, res: Response) {
         'Text (Notes)', 'Text (Specs)', 'Text (Manufacturer)', 'Text (Maker ID)', 'Text (Manual name)', 'Text (Page #)',
         'Yes/No', 'Number >= 0', 'Text (Location A)', 'Number >= 0',
         'Text (Location B)', 'Number >= 0', 'Number >= 0', 'Yes/No',
-        'Yes/No', 'Text (Evidence type)', 'Yes/No'
+        'Yes/No', 'Text (Evidence type)', 'Yes/No', 'Required Master List category key or label', 'Whole number 1–2147483647 for Optimum only; otherwise blank'
       ];
 
       example = [];
@@ -315,7 +315,7 @@ export async function getTemplate(req: Request, res: Response) {
         'Text (Drawing number)', 'Text (Position number)',
         'Text (Notes)', 'Text (Specification)', 'Text (Maker name)', 'Text (Maker code)',
         'Text (Manual name)', 'Text (Page number)', 'Text (Yes/No)', 'Required (Yes/No, defaults to Yes)',
-        'Text (Yes/No)', 'Text (Evidence type)'
+        'Text (Yes/No)', 'Text (Evidence type)', 'Required Master List category key or label', 'Whole number 1–2147483647 for Optimum only; otherwise blank'
       ];
 
       example = [];

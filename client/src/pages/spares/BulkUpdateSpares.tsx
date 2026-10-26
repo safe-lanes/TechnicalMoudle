@@ -13,6 +13,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import { useSpareCategories } from "@/components/spares/SpareCategoryFields";
 
 interface Spare {
   id: number;
@@ -22,6 +23,8 @@ interface Spare {
   component?: string;
   rob: number;
   min: number;
+  spareCategory?: string | null;
+  optimumQty?: number | null;
   robLocationA?: number;
   robLocationB?: number;
   location?: string;
@@ -42,6 +45,8 @@ export default function BulkUpdateSpares() {
   const { toast } = useToast();
   const { canEdit: canEditPerm } = usePermissions();
   const canEditSpare = canEditPerm("pms-spares");
+  const { data: spareCategories = [] } = useSpareCategories();
+  const spareCategoryLabels = useMemo(() => new Map(spareCategories.map(item => [item.listKey, item.listValue])), [spareCategories]);
   
   const [transactionMode, setTransactionMode] = useState<TransactionMode>("");
   const [bulkSearchQuery, setBulkSearchQuery] = useState("");
@@ -292,6 +297,20 @@ export default function BulkUpdateSpares() {
         ),
       },
       {
+        field: 'spareCategory',
+        headerName: 'Spare Category',
+        flex: 0.8,
+        minWidth: 120,
+        valueFormatter: params => spareCategoryLabels.get(params.value) || params.value || '—',
+      },
+      {
+        field: 'optimumQty',
+        headerName: 'Optimum Qty',
+        width: 115,
+        minWidth: 100,
+        valueFormatter: params => params.value == null ? '—' : String(params.value),
+      },
+      {
         headerName: `Current Stock (${locationNames.locationA})`,
         colId: 'currentRobA',
         flex: 0.9,
@@ -485,7 +504,7 @@ export default function BulkUpdateSpares() {
     });
 
     return cols;
-  }, [transactionMode, locationNames.locationA, locationNames.locationB, bulkUpdateData, paginatedSpares.length]);
+  }, [transactionMode, locationNames.locationA, locationNames.locationB, bulkUpdateData, paginatedSpares.length, spareCategoryLabels]);
 
   if (isLoading) {
     return (

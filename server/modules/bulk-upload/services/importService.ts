@@ -1,6 +1,5 @@
-import { importSpareClassification } from '../../../../shared/spareClassification';
-import { categoryOptions } from '../../spares/services/spareClassificationService';
 import { storage } from '../../../storage';
+import { spareClassificationImport } from './spareClassificationImport';
 import { v4 as uuidv4 } from 'uuid';
 import { getSFIName } from '../../../utils/sfiLookup';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '@shared/dateUtils';
@@ -594,7 +593,7 @@ export async function performImport(
       const row = data[_spareIdx];
       const _spareRowNum = row['__meta']?.rowNumber || (_spareIdx + 1);
       try {
-        const classification = importSpareClassification(row, await categoryOptions());
+        const classification = await spareClassificationImport(row);
         const componentCode = String(row['Component Code']).trim();
         const component = componentsByCode.get(componentCode);
         
@@ -2809,7 +2808,6 @@ export async function performImport(
       const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
       
       const fleetSpareData = {
-        ...importSpareClassification(row, await categoryOptions()),
         partCode: String(partCode).trim(),
         fleetComponentsUuid,
         fleetEquipmentCode: String(fleetEquipmentCode).trim(),
@@ -2841,6 +2839,7 @@ export async function performImport(
             result.skipped++;
             result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Fleet spare already exists' });
           } else {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
             fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
             result.created++;
@@ -2849,6 +2848,7 @@ export async function performImport(
           }
         } else if (mode === 'update') {
           if (existingFleetSpare) {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
             result.updated++;
             result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'updated' });
@@ -2860,11 +2860,13 @@ export async function performImport(
           }
         } else if (mode === 'upsert') {
           if (existingFleetSpare) {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
             result.updated++;
             result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: 'updated' });
             console.log(`🔄 Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
           } else {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
             fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
             result.created++;

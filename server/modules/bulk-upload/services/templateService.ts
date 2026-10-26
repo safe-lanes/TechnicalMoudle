@@ -248,8 +248,8 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Critical Yes/No', key: 'critical', width: 15 },
     { header: 'IS Active', key: 'isActive', width: 12 },
     { header: 'Remarks', key: 'remarks', width: 40 },
-    { header: 'Spare Category', key: 'spareCategory', width: 18 },
-    { header: 'Optimum Qty', key: 'optimumQty', width: 16 }
+    { header: 'Spare Category', key: 'spareCategory', width: 22 },
+    { header: 'Optimum Qty', key: 'optimumQty', width: 18 }
   ];
   
   // Headers only - no sample data

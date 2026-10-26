@@ -1,4 +1,3 @@
-import { validateFullRowClassification } from './spareClassificationSync';
 /**
  * One-Way Sync Applier — Upserts rows by UUID for one-way sync tables.
  *
@@ -63,10 +62,10 @@ const columnMetaCache = new Map<string, ColumnMeta>();
  * Exported for reuse in syncEngine.ts (applyFieldLog JSON coercion).
  */
 export async function getColumnMeta(pool: any, tableName: string): Promise<ColumnMeta> {
-  // A receiver can migrate while its sync worker remains alive.
-  if (['spares', 'fleet_spares'].includes(tableName) &&
-      !columnMetaCache.get(tableName)?.allCols.has('optimum_qty')) columnMetaCache.delete(tableName);
-  if (columnMetaCache.has(tableName)) return columnMetaCache.get(tableName)!;
+  const cached = columnMetaCache.get(tableName);
+  // A pre-upgrade cache must not strip the new fields after schema-first rollout.
+  if (cached && (!(tableName === 'spares' || tableName === 'fleet_spares') ||
+      (cached.allCols.has('spare_category') && cached.allCols.has('optimum_qty')))) return cached;
 
   let identityAlwaysCols = new Set<string>();
   let jsonCols = new Set<string>();
@@ -326,6 +325,11 @@ export async function applyOneWayRows(
 
   // Schema-aware column metadata (GENERATED ALWAYS + JSON detection)
   const meta = await getColumnMeta(pool, tableName);
+  if ((tableName === 'spares' || tableName === 'fleet_spares') &&
+      rows.some(r => ['spareCategory', 'optimumQty', 'spare_category', 'optimum_qty'].some(k => Object.hasOwn(r, k))) &&
+      (!meta.allCols.has('spare_category') || !meta.allCols.has('optimum_qty'))) {
+    throw new Error(`Retryable ${tableName} classification schema missing; apply the file-based migration first.`);
+  }
 
   // Detect composite-key tables: no UUID identity + integer GENERATED PKs that differ
   // between shore and ship. We match by their natural unique key instead of mismatched id.
@@ -435,7 +439,12 @@ export async function applyOneWayRows(
           );
           result.softDeleted++;
         } else {
-          let rowToApply = row;
+        let rowToApply = row;
+        if (tableName === 'fleet_spares' || tableName === 'spares') {
+          const local = await pool.query(`SELECT * FROM "${tableName}" WHERE ${whereClause} LIMIT 1`, whereValues);
+          const { validateIncomingSparePair } = await import('./spareClassificationSync');
+          await validateIncomingSparePair(pool, row, local.rows[0]);
+        }
           // ── Job tracking-column guard (migration 161) ─────────────────────
           // jobs are ONE_WAY shore→ship full-row applies with no
           // protected columns: any shore job edit would overwrite the SHIP's fresher
@@ -534,10 +543,6 @@ export async function applyOneWayRows(
             }
           }
           // Update all columns (excluding PK and generated columns)
-          if (tableName === 'fleet_spares' || tableName === 'spares') {
-            const saved = await pool.query(`SELECT * FROM "${tableName}" WHERE ${whereClause}`, whereValues);
-            await validateFullRowClassification(pool, tableName, rowToApply, saved.rows[0] || {});
-          }
           const updatePairs = buildUpdatePairs(rowToApply, lookupColumn, meta);
           if (updatePairs.setClauses.length > 0) {
             // Re-parameterize WHERE clause to follow UPDATE SET params
@@ -556,7 +561,10 @@ export async function applyOneWayRows(
         }
         // Insert new row — skip the integer PK for composite-key tables so the
         // ship DB generates its own sequence value (avoids PK collisions)
-        await validateFullRowClassification(pool, tableName, row);
+        if (tableName === 'fleet_spares' || tableName === 'spares') {
+          const { validateIncomingSparePair } = await import('./spareClassificationSync');
+          await validateIncomingSparePair(pool, row);
+        }
         const insertParts = buildInsertParts(row, meta, useCompositeKey);
         if (insertParts.columns.length > 0) {
           const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(', ')}) VALUES (${insertParts.placeholders.join(', ')}) ON CONFLICT DO NOTHING`;
@@ -1104,12 +1112,6 @@ export async function applyFieldLogInserts(
       // LATEST value for each field — a subsequent UPDATE log may have a newer value
       // than the initial INSERT log for the same field.
       meta = await getColumnMeta(pool, tableName);
-      if (tableName === 'spares') {
-        const incomingClassification = Object.fromEntries(logs
-          .filter(log => ['spare_category', 'optimum_qty'].includes(fieldNameToColumn(log.fieldName)))
-          .map(log => [fieldNameToColumn(log.fieldName), log.newValue]));
-        await validateFullRowClassification(pool, tableName, incomingClassification);
-      }
       rowData = {};
 
       // Set identity column
@@ -1137,6 +1139,9 @@ export async function applyFieldLogInserts(
         // Defense-in-depth: skip columns that don't exist on this table so an unmapped/absent
         // field can never abort the pull transaction. Fail-open when allCols is unknown (empty).
         if (meta.allCols.size > 0 && !meta.allCols.has(snakeField)) {
+          if (tableName === 'spares' && ['spare_category', 'optimum_qty'].includes(snakeField)) {
+            throw new Error('Retryable spare classification column missing; migrate receiver first.');
+          }
           syncDiag(`FIELD-LOG-INSERT SKIP unknown column ${tableName}.${snakeField} (row ${rowUuid})`);
           continue;
         }
@@ -1160,6 +1165,10 @@ export async function applyFieldLogInserts(
       }
 
       // Add timestamps
+      if (tableName === 'spares') {
+        const { validateIncomingSparePair } = await import('./spareClassificationSync');
+        await validateIncomingSparePair(pool, rowData);
+      }
       if (!rowData['created_at']) rowData['created_at'] = new Date();
       if (!rowData['updated_at']) rowData['updated_at'] = new Date();
 
@@ -1434,12 +1443,6 @@ export async function applyFieldLogInserts(
             errors.push(msg);
             failedRowUuids.push(rowUuid);
           } else if (existingIdentity) {
-            if (tableName === 'spares' && logs.some(log =>
-                ['spare_category', 'optimum_qty'].includes(fieldNameToColumn(log.fieldName)))) {
-              if (existingIdentity !== rowUuid) throw new Error('Spare identity collision requires review; classification not applied.');
-              updateLogs.push(...logs);
-              continue;
-            }
             // Apply field-level updates to the existing row
             let fieldsApplied = 0;
             for (const log of logs) {
@@ -1688,6 +1691,10 @@ export async function applyFullRowsIfAbsent(
         syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
         continue;
       }
+      if (tableName === 'spares') {
+        const { validateIncomingSparePair } = await import('./spareClassificationSync');
+        await validateIncomingSparePair(pool, row);
+      }
       if (tableName === 'work_orders' && isCompletedWorkOrderStatus(row.status)) {
         if (!isValidCompletedWorkOrderDate(row.date_completed ?? row.dateCompleted)) {
           const executionDate = row.completion_date_time ?? row.completionDateTime;
@@ -1713,7 +1720,6 @@ export async function applyFullRowsIfAbsent(
       // the receiver assigns its own (buildInsertParts also coerces json/array values).
       const parts = buildInsertParts(row, meta, /*skipIntegerPK*/ true);
       if (parts.columns.length === 0) { out.errors.push(`${tableName}.${identity}: no insertable columns`); continue; }
-      await validateFullRowClassification(pool, tableName, row);
       const sqlText = `INSERT INTO "${tableName}" (${parts.columns.join(', ')}) VALUES (${parts.placeholders.join(', ')}) ON CONFLICT DO NOTHING`;
       try {
         await pool.query(sqlText, parts.values);

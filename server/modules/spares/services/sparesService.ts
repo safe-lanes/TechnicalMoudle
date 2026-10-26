@@ -1,6 +1,4 @@
 import * as repo from '../repositories/sparesRepository';
-import { validateClassification } from './spareClassificationService';
-import { hasClassification } from '../../../../shared/spareClassification';
 import type { Spare, InsertSpare, SpareHistory } from '@shared/schema';
 import {
   adjustmentPayloadSchema,
@@ -36,7 +34,8 @@ export async function getSpare(id: string): Promise<Spare | undefined> {
 }
 
 export async function createSpare(vesselId: string, body: any): Promise<Spare> {
-  const classification = await validateClassification({}, body, true);
+  const { classificationForWrite } = await import('../classification');
+  const classification = await classificationForWrite(body, undefined, true);
   return repo.createSpare({
     ...body,
     ...classification,
@@ -63,10 +62,12 @@ export async function updateSpare(
   }
 
   const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = body;
-  // Operational stock/location patches remain compatible with unclassified legacy rows.
-  // Full form edits and explicit classification edits must satisfy normal-entry rules.
-  if (hasClassification(body) || Object.prototype.hasOwnProperty.call(body, 'partName')) {
-    Object.assign(otherUpdates, await validateClassification(existingSpare, body, true));
+  // Classify on ordinary form saves; inventory-only patches preserve legacy state.
+  const { classificationForWrite } = await import('../classification');
+  const classification = await classificationForWrite(body, existingSpare,
+    body.partName !== undefined || body.spareCategory !== undefined || body.optimumQty !== undefined);
+  if (body.partName !== undefined || body.spareCategory !== undefined || body.optimumQty !== undefined) {
+    Object.assign(otherUpdates, classification);
   }
 
   // Check if location ROB values are being changed - route to transfer/adjustment method

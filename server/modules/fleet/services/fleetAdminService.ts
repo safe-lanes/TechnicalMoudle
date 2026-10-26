@@ -968,8 +968,8 @@ export async function copyVessel(body: any) {
       const newComponentId = componentIdMap.get(spare.componentId || '') || spare.componentId;
 
       try {
-        const [inserted] = await db.insert(spares).values({
-          suuid: randomUUID(),
+        const { storage } = await import('../../../storage');
+        const inserted = await storage.createSpare({
           partCode: spare.partCode,
           partName: spare.partName,
           componentId: newComponentId,
@@ -999,7 +999,7 @@ export async function copyVessel(body: any) {
           drawingNo: spare.drawingNo,
           location2: null,
           remarks: spare.remarks,
-        }).returning({ id: spares.id, suuid: spares.suuid });
+        }, true);
         spareIdMap.set(spare.id, inserted.id);
         spareUuidMap.set(spare.id, inserted.suuid);
         copyResults.spares++;
@@ -1312,7 +1312,7 @@ export async function resyncSpares(vesselCode: string, fleetEquipmentCode?: stri
   const result: ResyncResult = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
 
   for (const m of mappings) {
-    const fleetSpare = await repo.getFleetSpareByPartCode(m.partCode);
+    const fleetSpare = await repo.getFleetSpareByIdentity(m.partCode, m.fleetEquipmentCode);
     if (!fleetSpare) {
       result.skipped++;
       result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: 'skipped', changedFields: [], error: 'Fleet spare not found or inactive' });

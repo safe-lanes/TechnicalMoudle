@@ -1,4 +1,3 @@
-import { applyClassificationEvent, isSpareClassificationLog, resolveLegacyClassification } from './spareClassificationSync';
 /**
  * Sync Service — Business logic for the ship-shore sync protocol.
  *
@@ -89,6 +88,7 @@ export async function initiateSyncSession(
   return {
     batchUuid: batch.batchUuid,
     serverTimestamp: new Date().toISOString(),
+    capabilities: ['spare_classification_pair'],
   };
 }
 
@@ -390,7 +390,12 @@ export async function receivePushData(
         const dualConflictWouuids = new Set<string>();
 
         let pushUpdIdx = 0;
+        const { applySparePairLogs, isSparePairLog } = await import('./spareClassificationSync');
+        const pairResult = await applySparePairLogs(client, insertResult.updateLogs, receiverInstanceId, batchUuid);
+        pairResult.failedRows.forEach(uuid => droppedRowUuids.add(uuid));
+        applyErrorMessages.push(...pairResult.errors);
         for (const log of insertResult.updateLogs) {
+          if (isSparePairLog(log)) continue;
           const config = getTableSyncConfig(log.tableName);
           if (!config) continue;
           const identityCol = config.identityColumn || 'id';
@@ -403,11 +408,6 @@ export async function receivePushData(
           try { await client.query(`SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
           try {
             const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
-            if (await applyClassificationEvent(client, log, insertResult.updateLogs,
-                receiverInstanceId, batchUuid, evaluateStaleSkipGuard)) {
-              await client.query(`RELEASE SAVEPOINT ${pushSp}`);
-              continue;
-            }
             const isInsertLog = log.oldValue === null || log.oldValue === undefined;
 
             // ── Task #399: dual-completion collision (same WO completed on BOTH sides) ──
@@ -1108,6 +1108,14 @@ export async function preparePullData(
     vesselCode
   );
   let shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
+  if (!capabilities?.includes('spare_classification_pair') &&
+      (shoreFieldLogs.some(log => log.tableName === 'spares' &&
+        ['spareCategory', 'optimumQty', 'spare_category', 'optimum_qty'].includes(log.fieldName)) ||
+       oneWayRows.some(batch => batch.tableName === 'fleet_spares' && batch.rows.length > 0))) {
+    // Stop before delivering or acknowledging anything. Old peers cannot promise
+    // omission-preserving, atomic pair handling; a silent strip would lose changes.
+    throw Object.assign(new Error('Spare classification synchronization is pending: upgrade and migrate this vessel before retrying. No classification changes have been acknowledged.'), { statusCode: 409 });
+  }
   {
     const held = holdBackForOldShip(shoreFieldLogs, capabilities);
     if (held.heldBack > 0) {
@@ -1162,12 +1170,6 @@ export async function preparePullData(
   const nonConflictingLogs = [];
 
   for (const shoreLog of shoreFieldLogs) {
-    // Do not split a classification event into independent old-style conflicts.
-    // The receiver applies/holds the pair atomically and records pair-level collisions.
-    if (isSpareClassificationLog(shoreLog)) {
-      nonConflictingLogs.push(shoreLog);
-      continue;
-    }
     const key = `${shoreLog.tableName}:${shoreLog.rowUuid}:${shoreLog.fieldName}`;
     const shipLog = shipChangeMap.get(key);
 
@@ -1271,9 +1273,39 @@ export async function resolveConflictAction(
   }
 
   // Apply the winning value to the actual data table
-  if (isSpareClassificationLog(conflict)) {
-    await resolveLegacyClassification(await getPool(), conflict, winningValue, resolution, resolvedBy);
-    return { resolved: true, resolution, resolvedValue: winningValue };
+  if (conflict.tableName === 'spares' &&
+      ['spareCategory', 'optimumQty', 'spare_category', 'optimum_qty'].includes(conflict.fieldName)) {
+    const pool = await getPool();
+    if (resolution !== 'manual') {
+      const raw = await pool.query('SELECT * FROM sync_conflicts WHERE conflict_uuid=$1', [conflictUuid]);
+      const { resolveSparePairConflict } = await import('./spareClassificationConflict');
+      await resolveSparePairConflict(pool, raw.rows[0], 'old', resolvedBy, true, resolution === 'ship_wins' ? 'ship' : 'shore');
+      return repo.getConflict(conflictUuid);
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const saved = await client.query('SELECT * FROM spares WHERE suuid=$1 FOR UPDATE', [conflict.rowUuid]);
+      if (!saved.rows[0]) throw new Error('Spare not found');
+      const { validateIncomingSparePair } = await import('./spareClassificationSync');
+      const col = /category/i.test(conflict.fieldName) ? 'spare_category' : 'optimum_qty';
+      const pair = await validateIncomingSparePair(client, { [col]: winningValue }, saved.rows[0]);
+      await client.query('UPDATE spares SET spare_category=$1,optimum_qty=$2,updated_at=NOW() WHERE suuid=$3',
+        [pair.spareCategory, pair.optimumQty, conflict.rowUuid]);
+      const { initFieldLoggerInstanceId } = await import('./fieldLogger');
+      await client.query(`INSERT INTO sync_field_log
+        (table_name,row_uuid,field_name,old_value,new_value,vessel_id,changed_by_user_id,instance_id,is_synced,is_sync)
+        VALUES('spares',$1,$2,$3,$4,$5,$6,$7,false,false)`,
+        [conflict.rowUuid, conflict.fieldName, saved.rows[0][col] == null ? null : String(saved.rows[0][col]),
+          winningValue, saved.rows[0].vessel_id, resolvedBy, await initFieldLoggerInstanceId()]);
+      await client.query(`UPDATE sync_conflicts SET resolution=$1,resolved_value=$2,resolved_at=NOW(),resolved_by=$3 WHERE conflict_uuid=$4`,
+        [resolution, winningValue, resolvedBy, conflictUuid]);
+      await client.query('COMMIT');
+      return repo.getConflict(conflictUuid);
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      throw Object.assign(error, { statusCode: 400 });
+    } finally { client.release(); }
   }
   const config = getTableSyncConfig(conflict.tableName);
   if (config) {

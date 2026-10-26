@@ -54,8 +54,8 @@ export const SPARES_TEMPLATE_FIELDS: SparesTemplateField[] = [
   { header: 'IHM (Inventory of Hazardous Materials)', key: 'ihm', width: 35, required: false, description: 'Yes or No' },
   { header: 'Evidence Type', key: 'evidenceType', width: 16, required: false, description: 'Type of evidence/remarks' },
   { header: 'Rotation Item', key: 'isRotationItem', width: 14, required: false, description: 'Yes or No - Rotation spare flag' },
-  { header: 'Spare Category', key: 'spareCategory', width: 18, required: true, description: 'Select an active Spares Master List category' },
-  { header: 'Optimum Qty', key: 'optimumQty', width: 16, required: false, description: 'Positive whole number for Optimum only; otherwise blank' },
+  { header: 'Spare Category', key: 'spareCategory', width: 20, required: true, description: 'Required Master List category key or label (Essential, Optimum, General). Legacy templates must omit BOTH new columns.' },
+  { header: 'Optimum Qty', key: 'optimumQty', width: 18, required: false, description: 'Required only for Optimum: whole number 1–2147483647. Leave blank for other categories.' },
 ];
 
 /**

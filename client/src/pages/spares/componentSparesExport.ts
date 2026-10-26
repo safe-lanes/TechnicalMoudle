@@ -309,10 +309,13 @@ export function buildComponentSparesWorkbook(data: ComponentSparesData) {
   lists.getCell("B3").value = "No";
   data.rows.forEach(({ spare, component }) => {
     const row = sheet.addRow(componentSpareValues(spare, component, data.spareCategoryLabels));
-    for (const column of [9, 18, 25, 26, 28]) {
+    const columnFor = (key: string) => SPARES_TEMPLATE_FIELDS.findIndex(field => field.key === key) + 1;
+    for (const key of ["uom", "criticality", "isActive", "ihm", "isRotationItem"]) {
+      const column = columnFor(key);
+      if (column < 1) continue;
       row.getCell(column).dataValidation = {
         type: "list", allowBlank: true,
-        formulae: [column === 9 ? "=Lists!$A$2:$A$11" : "=Lists!$B$2:$B$3"],
+        formulae: [key === "uom" ? "=Lists!$A$2:$A$11" : "=Lists!$B$2:$B$3"],
       };
     }
   });

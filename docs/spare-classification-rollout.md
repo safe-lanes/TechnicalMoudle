@@ -1,5 +1,11 @@
 # Spare Category and Optimum Qty rollout
 
+The consolidated migration also honors the task branch's
+`184_spare_category_optimum_qty_backfill` marker. Either existing data guard
+prevents backfill replay; both aliases are maintained for compatibility.
+For capability-gated mixed-version sync and failure recovery, see
+[`migrations/184_spare_category_optimum_qty.md`](../migrations/184_spare_category_optimum_qty.md).
+
 ## Database changes
 
 Use the existing file migration runner with
