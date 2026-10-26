@@ -16,6 +16,7 @@ import {
   getTableSyncConfig,
   getTablesByCategory,
   type SyncCategory,
+  requiresFieldLogging,
 } from '../../../shared/syncConfig';
 import { getPool } from '../../db';
 import { getTableStats } from './healthMonitor';
@@ -1038,6 +1039,17 @@ export function holdBackForOldShip<T extends { tableName: string; rowUuid: strin
   return { logs: kept, heldBack: logs.length - kept.length };
 }
 
+/**
+ * Logs of a table that is no longer BOTH_EDITABLE (e.g. defect_sequences, NO_SYNC since 26-Oct-2026) can never be
+ * applied on the other side — they would be re-offered on every pull forever ("Still to receive: N", drain
+ * no-progress). Split them out so the caller can mark them synced (retire) and offer only the rest.
+ */
+export function partitionNonSyncedTableLogs<T extends { tableName: string }>(logs: T[]): { kept: T[]; retired: T[] } {
+  const kept: T[] = []; const retired: T[] = [];
+  for (const l of logs) (requiresFieldLogging(l.tableName) ? kept : retired).push(l);
+  return { kept, retired };
+}
+
 export async function preparePullData(
   batchUuid: string,
   vesselId: string,
@@ -1096,6 +1108,17 @@ export async function preparePullData(
       syncDiag(`PREPARE-PULL HOLD-BACK: ${held.heldBack} UUID-keyed change(s) (component_documents) kept pending — ship ${shipInstanceId} has not updated yet`);
     }
     shoreFieldLogs = held.logs;
+  }
+  {
+    // Retire logs of tables that no longer sync (defect_sequences): mark them synced so they stop being offered.
+    const part = partitionNonSyncedTableLogs(shoreFieldLogs);
+    if (part.retired.length > 0) {
+      const byTable: Record<string, number> = {};
+      for (const l of part.retired) byTable[l.tableName] = (byTable[l.tableName] || 0) + 1;
+      await repo.markFieldLogsSynced(part.retired.map((l) => l.logUuid).filter(Boolean), batchUuid);
+      syncDiag(`PREPARE-PULL RETIRED: ${part.retired.length} log(s) of non-synced table(s) ${JSON.stringify(byTable)} marked synced — never applicable on the ship`);
+      shoreFieldLogs = part.kept;
+    }
   }
   syncDiag(`PREPARE-PULL FIELD LOGS: ${shoreFieldLogs.length} shore logs for vessel=${vesselId} (excluded instance=${shipInstanceId})`);
   if (shoreFieldLogs.length > 0) {

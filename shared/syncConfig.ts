@@ -800,15 +800,15 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
   },
   defect_sequences: {
     tableName: 'defect_sequences',
-    category: 'BOTH_EDITABLE',
-    direction: 'bidirectional',
+    category: 'NO_SYNC',
+    direction: 'none',
     identityColumn: null,
     vesselScopeColumn: 'vessel_id',
     vesselScopeJoinPath: null,
     isGlobal: false,
-    isConfigurable: true,
-    businessRules: 'Both sides generate sequences. Use instance_id prefix to avoid collision (ship: V-prefix, shore: O-prefix)',
-    notes: 'DOMAIN EXPERT CORRECTION: Changed from SHIP_ONLY to BOTH_EDITABLE. Office can also generate defect reports. Integer PK, no UUID.',
+    isConfigurable: false,
+    businessRules: 'Per-side defect-number counter. Each side numbers its OWN series (ship {VCODE}-yy-nnnn, office {VCODE}-yy-Onnnn — server/utils/defectNumberSeries.ts) from the highest number already used; the counter is a local floor only.',
+    notes: '26-Oct-2026: was BOTH_EDITABLE matched by its per-instance integer id — office row 16 vs ship row 1 for the same vessel/year could never be applied ("recovery group … missing NOT-NULL [year]", Testvessel 9-Oct, dev vessel 74481b72 26-Oct). The office stopped writing it on 15-Oct; now it never travels. Stale pre-15-Oct logs are retired at pull time (service.ts partitionNonSyncedTableLogs).',
   },
 
   // ── Spares & Inventory ──
@@ -1855,7 +1855,7 @@ export function getSyncPhaseOrder(): string[][] {
     ['work_orders', 'defects', 'spares', 'stores_items', 'change_request',
      'certificates', 'surveys', 'vessel_certificate_data', 'vessel_survey_data',
      'running_hours_audit', 'component_running_hours_log',
-     'component_maintenance_history', 'ihm_items', 'defect_sequences',
+     'component_maintenance_history', 'ihm_items',
      'planner_dates', 'locations', 'rotational_items'],
     // Phase 4: Child entities (FK to parent rows in Phase 3)
     ['work_order_executions', 'work_order_execution_details', 'work_order_postponements',

@@ -183,8 +183,9 @@ describe("dormant integrations stay outside startup, migration discovery and pro
     expect(membership).toHaveLength(137);
     expect(createHash("sha256").update(JSON.stringify(membership)).digest("hex"))
       // Updated 23-Oct-2026 for the approved sync fix 43c895faf (component_documents id → cduuid, mig 182) and the
-      // approval branch tables above; 25-Oct-2026 for the Work Instructions tables.
-      .toBe("f6248a2c427033e46f7c822db0e858cdf502c7d8ef2fa92461acf93c0b6e1ab2");
+      // approval branch tables above; 25-Oct-2026 for the Work Instructions tables; 26-Oct-2026 defect_sequences
+      // BOTH_EDITABLE → NO_SYNC (per-side counter, never travels — see shared/syncConfig.ts notes).
+      .toBe("6a95605367b72b5187754e44048688e646fefedd0e1e739c4be5b26b008bcbd0");
   });
   it("leaves Access Control saves mapping flags directly and omitting generated ids", () => {
     const storage = source("server/postgresStorage.ts");

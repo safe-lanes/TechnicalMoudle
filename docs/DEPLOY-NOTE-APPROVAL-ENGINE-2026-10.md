@@ -88,3 +88,20 @@ WHERE h.actor_position = 'Chief Engineer' AND u.user_type = 'Office';
   vessel in one request (up to 100 files, 25 MB each) without attaching them to Jobs — the Jobs sheet then names them.
   Same storage, same sync; nothing extra to configure.
 - **Fresh provisioning** of a ship carries the rows in the bundle and queues the PDFs; they arrive on the first sync.
+
+## 6. Sync — "defect_sequences … missing NOT-NULL column(s) [year]" / "Still to receive: 22" (dev vessel 74481b72, 26-Oct-2026)
+
+- **What it was:** the per-vessel defect-number counter (`defect_sequences`) was still marked as a two-way sync table and
+  matched by its local integer id (office row 16 ≠ ship row 1 for the same vessel/year), so old office updates of that
+  counter could never be applied on the ship and were re-offered on every sync. Since 15-Oct each side numbers its own
+  defect series and the office no longer writes this counter — these were leftover logs from before 15-Oct.
+- **Fix in this build:** `defect_sequences` is now `NO_SYNC` (never travels). Any leftover logs for it are **retired
+  automatically** on the next sync of each vessel (office log line `PREPARE-PULL RETIRED: … defect_sequences …`) —
+  no SQL needed. "Still to receive" drops to 0 on that sync.
+- **Check (read-only, office DB) if you want to see what will be retired:**
+
+```sql
+SELECT vessel_id, count(*), min(changed_at), max(changed_at)
+FROM sync_field_log WHERE table_name = 'defect_sequences' AND is_synced = false
+GROUP BY vessel_id;
+```

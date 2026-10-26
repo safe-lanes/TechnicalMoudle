@@ -23,6 +23,7 @@
  */
 
 import * as syncRepo from './repository';
+import { partitionNonSyncedTableLogs } from './service';
 import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue, evaluateInsertOriginGuard, evaluateStaleSkipGuard, getLatestRotationDate, isReadingPreRotation } from './oneWayApplier';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
@@ -674,9 +675,18 @@ export class SyncEngine {
     const isShip = isShipInstanceId(this.instanceId);
     const vesselCode = await this.getVesselCode(vesselId);
     syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-    const fieldLogs = isShip
+    let fieldLogs = isShip
       ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize)
       : [];
+    if (fieldLogs.length > 0) {
+      // Retire logs of tables that no longer sync (defect_sequences, NO_SYNC since 26-Oct-2026) — never applicable ashore.
+      const part = partitionNonSyncedTableLogs(fieldLogs.map((l: any) => ({ ...l, tableName: l.tableName ?? l.table_name })));
+      if (part.retired.length > 0) {
+        await syncRepo.markFieldLogsSynced(part.retired.map((l: any) => l.logUuid ?? l.log_uuid).filter(Boolean), 'retired-non-synced-table');
+        syncDiag(`PUSH RETIRED: ${part.retired.length} log(s) of non-synced table(s) marked synced — never applicable ashore`);
+        fieldLogs = part.kept as typeof fieldLogs;
+      }
+    }
     syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? ' (shore skips field log push)' : ''}`);
     // Table breakdown
     const pushTables: Record<string, number> = {};
