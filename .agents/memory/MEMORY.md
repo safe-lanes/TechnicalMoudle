@@ -12,3 +12,4 @@
 - [Defect PDF preservation](defect-log-pdf-preservation.md) — keep legacy layouts; individual report exports use current form values without saving.
 - [Spare classification policy](spare-classification-policy.md) — approved category/quantity scope, fleet inheritance, and unresolved legacy-import exception.
 - [Stores pagination scope](stores-pagination-scope.md) — change loading only; preserve full-dataset behavior through APIs, never page-only actions or hidden full downloads.
+- [Spares pagination direction](spares-pagination-scope.md) — follow the Stores pagination structure while retaining Spares-specific business behavior.
