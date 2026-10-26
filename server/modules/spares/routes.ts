@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import * as sparesCtrl from './controllers/sparesController';
 import * as invCtrl from './controllers/inventoryController';
+import * as pagingCtrl from './controllers/sparesPagingController';
+import { exportFile } from './controllers/sparesExportController';
 import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 
@@ -16,6 +18,10 @@ const router = Router();
 // ── Spares: No-param / specific-first routes ──
 
 // GET  /spares — get all spares (no vesselId)
+router.get('/spares/:vesselId/paged', requireAuth, asyncHandler(pagingCtrl.page));
+router.get('/spares/:vesselId/export', requireAuth, asyncHandler(exportFile));
+router.get('/spares/:vesselId/values', requireAuth, asyncHandler(pagingCtrl.values));
+router.get('/spares/:vesselId/locations/paged', requireAuth, asyncHandler(pagingCtrl.locations));
 router.get('/spares', requireAuth, asyncHandler(sparesCtrl.getAllSpares));
 
 // GET  /spares/history/:vesselId — spare history (MUST be before /:vesselId)

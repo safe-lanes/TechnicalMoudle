@@ -39,7 +39,7 @@ import { FEATURES } from '@/config/features';
 import { useVessels } from "@/hooks/useVessels";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 import { resolveSpareMakerDefault } from "./spareMakerDefault";
-import { SpareCategoryFields, useSpareCategories, validateSpareClassification, OPTIMUM_CATEGORY_KEY } from "@/components/spares/SpareCategoryFields";
+import { useSparePage, useSpareSearch, spareUrl, downloadSpareExport, SpareLocationPager } from "./sparesPaging";
 
 interface Spare {
   id: number;
@@ -77,8 +77,6 @@ interface Spare {
   fleetEquipmentCode?: string;
   evidenceType?: string;
   isRotationItem?: boolean;
-  spareCategory?: string | null;
-  optimumQty?: number | null;
   linkedComponents?: Array<{ componentId: string; componentCode: string; componentName: string }>;
 }
 
@@ -158,14 +156,22 @@ const Spares: React.FC = () => {
   const [locationSearchTerm, setLocationSearchTerm] = useState("");
   const [locationPage, setLocationPage] = useState(1);
   const [locationItemsPerPage, setLocationItemsPerPage] = useState(10);
+  const [locationNavPage, setLocationNavPage] = useState(1);
+  const [inventoryGrid, setInventoryGrid] = useState({ sort: [] as any[], filters: {} as Record<string, any> });
+  const [locationGrid, setLocationGrid] = useState({ sort: [] as any[], filters: {} as Record<string, any> });
+  const [historyGrid, setHistoryGrid] = useState({ sort: [] as any[], filters: {} as Record<string, any> });
+  const historySearchEffective = useSpareSearch(historySearch);
+  const locationSearchEffective = useSpareSearch(locationSearchTerm);
+  const locationOriginals = useRef(new Map<number, any>());
   const { data: vessels = [] } = useVessels();
-  const { data: spareCategoryOptions = [] } = useSpareCategories();
-  const spareCategoryLabel = (key?: string | null) => spareCategoryOptions.find(option => option.listKey === key)?.listValue || key || "—";
   
   useEffect(() => {
     setSelectedLocationId(null);
     setLocationSearchTerm("");
     setLocationPage(1);
+    setLocationNavPage(1);
+    setEditingLocRob({});
+    locationOriginals.current.clear();
   }, [vesselId]);
   
   // Modify mode state - use proper hook for reactivity
@@ -264,9 +270,7 @@ const Spares: React.FC = () => {
     ihm: "No",
     remarks: "",
     note: "",
-    isRotationItem: false,
-    spareCategory: "",
-    optimumQty: ""
+    isRotationItem: false
   });
   const [addMakerOverridden, setAddMakerOverridden] = useState(false);
   
@@ -302,9 +306,7 @@ const Spares: React.FC = () => {
     ihm: "No",
     remarks: "",
     note: "",
-    isRotationItem: false,
-    spareCategory: "",
-    optimumQty: ""
+    isRotationItem: false
   });
   
   const { toast } = useToast();
@@ -357,7 +359,7 @@ const Spares: React.FC = () => {
     if (!locations) return false;
 
     // Find the spare to check current names
-    const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
+    const spare = locationDialogSpare?.id === spareId ? locationDialogSpare : (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
     if (!spare) return false;
     
     const newRobA = parseInt(locations.locationA) || 0;
@@ -495,14 +497,24 @@ const Spares: React.FC = () => {
   };
 
   const [isSavingLocRob, setIsSavingLocRob] = useState(false);
+  useEffect(() => {
+    const beforeChange = (event: Event) => {
+      if (isSavingLocRob || (Object.keys(editingLocRob).length && !window.confirm("Discard unsaved location ROB changes?"))) event.preventDefault();
+    };
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (Object.keys(editingLocRob).length) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("before-vessel-change", beforeChange);
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => { window.removeEventListener("before-vessel-change", beforeChange); window.removeEventListener("beforeunload", beforeUnload); };
+  }, [editingLocRob, isSavingLocRob]);
 
   const handleSaveAllLocRob = async () => {
+    if (isSavingLocRob) return;
     if (!selectedLocationId) {
       toast({ title: "Error", description: "No location selected.", variant: "destructive" });
       return;
     }
 
-    const sparesToSave = (locationSpares as any[]).filter((spare: any) => {
+    const sparesToSave = Array.from(locationOriginals.current.values()).filter((spare: any) => {
       const editedVal = editingLocRob[spare.id];
       if (editedVal === undefined) return false;
       const currentQty = spare.locationQty ?? 0;
@@ -515,7 +527,7 @@ const Spares: React.FC = () => {
       return;
     }
 
-    for (const spare of locationSpares as any[]) {
+    for (const spare of Array.from(locationOriginals.current.values())) {
       const editedVal = editingLocRob[spare.id];
       if (editedVal === undefined) continue;
       if (editedVal === '' || isNaN(parseInt(editedVal))) {
@@ -565,6 +577,8 @@ const Spares: React.FC = () => {
           errors.push(`${spare.partCode}: ${err.error?.message || err.error || 'Failed'}`);
         } else {
           successCount++;
+          setEditingLocRob(prev => { const next = { ...prev }; delete next[spare.id]; return next; });
+          locationOriginals.current.delete(spare.id);
         }
       } catch (e: any) {
         errors.push(`${spare.partCode}: ${e.message || 'Network error'}`);
@@ -583,6 +597,7 @@ const Spares: React.FC = () => {
     }
 
     queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
+    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
     invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
     invalidateByUrlPrefix('/technical/api/spares/history');
   };
@@ -907,9 +922,7 @@ const Spares: React.FC = () => {
       ihm: spare.ihm || "",
       remarks: spare.remarks || "",
       note: spare.note || "",
-      isRotationItem: spare.isRotationItem ?? false,
-      spareCategory: spare.spareCategory || "",
-      optimumQty: spare.optimumQty == null ? "" : String(spare.optimumQty)
+      isRotationItem: spare.isRotationItem ?? false
     });
     
     // In modify mode, store original data for change tracking
@@ -1249,67 +1262,25 @@ const Spares: React.FC = () => {
     uniqueSparesExportScopeRef.current = { key: uniqueSparesExportScope };
   }
 
-  const { data: sparesResponse, isLoading, refetch } = useQuery<{ items: any[]; total: number }>({
-    queryKey: [
-      '/technical/api/inventory/spares-with-inventory',
-      sparesScopeKey,
-      'paged',
-      currentPage,
-      itemsPerPage,
-      debouncedSearchTerm,
-      criticalityFilter,
-      rotationItemFilter,
-      stockFilter,
-      activeOnlyForRole,
-      selectedComponentId ?? '',
-    ],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set('page', String(currentPage));
-      params.set('pageSize', String(itemsPerPage));
-      if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
-      if (criticalityFilter && criticalityFilter !== 'All') params.set('criticality', criticalityFilter);
-      if (rotationItemFilter && rotationItemFilter !== 'All') params.set('rotation', rotationItemFilter);
-      if (stockFilter && stockFilter !== 'All') params.set('stockStatus', stockFilter);
-      if (activeOnlyForRole) params.set('activeOnly', 'true');
-      if (selectedComponentId) params.set('componentId', selectedComponentId);
-      if (isMyVessels) params.set('vesselIds', assignedVesselIds.join(','));
-      const response = await fetch(
-        `/technical/api/inventory/spares-with-inventory/${sparesScopeSegment}?${params.toString()}`
-      );
-      if (!response.ok) throw new Error('Failed to fetch spares');
-      const json = await response.json();
-      const payload = json.data || {};
-      return {
-        items: (payload.items || []).map((item: any) => ({
-          ...item.spare,
-          linkedComponents: item.linkedComponents || [],
-          robTotal: item.robTotal,
-          stockStatus: item.stockStatus,
-        })),
-        total: typeof payload.total === 'number' ? payload.total : 0,
-      };
-    },
-    placeholderData: keepPreviousData,
-    enabled: sparesScopeReady,
-  });
+  const scopeParams = { scope: isMyVessels ? "my" : undefined, vesselIds: isMyVessels ? assignedVesselIds.join(",") : undefined };
+  const applicationParams = { ...scopeParams, search: debouncedSearchTerm, criticality: criticalityFilter,
+    rotation: rotationItemFilter, stockStatus: stockFilter, activeOnly: String(activeOnlyForRole) };
+  const inventoryUrl = spareUrl(sparesScopeSegment, { ...applicationParams, kind: "inventory",
+    page: currentPage, pageSize: itemsPerPage, componentId: selectedComponentId, ...inventoryGrid });
+  const inventoryQuery = useSparePage(inventoryUrl, sparesScopeReady);
+  const { data: sparesResponse, isLoading, refetch } = inventoryQuery;
 
   const sparesData = sparesResponse?.items ?? [];
   const serverTotal = sparesResponse?.total ?? 0;
 
   // Fetch history data
-  const { data: historyData = [] } = useQuery({
-    queryKey: ['/technical/api/spares/history', sparesScopeKey],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (isMyVessels) params.set('vesselIds', assignedVesselIds.join(','));
-      const qs = params.toString();
-      const response = await fetch(`/technical/api/spares/history/${sparesScopeSegment}${qs ? `?${qs}` : ''}`);
-      if (!response.ok) throw new Error('Failed to fetch history');
-      return response.json();
-    },
-    enabled: activeTab === 'history' && sparesScopeReady
-  });
+  const historyRange = periodFilterToDateRange(historyPeriodFilter);
+  const historyParams = { ...scopeParams, kind: "history", search: historySearchEffective,
+    eventType: historyEventFilter, dateFrom: historyRange ? format(historyRange.from, "yyyy-MM-dd") : undefined,
+    dateTo: historyRange ? format(historyRange.to, "yyyy-MM-dd") : undefined };
+  const historyUrl = spareUrl(sparesScopeSegment, { ...historyParams, page: historyPage, pageSize: historyItemsPerPage, ...historyGrid });
+  const historyQuery = useSparePage(historyUrl, activeTab === "history" && sparesScopeReady, "/technical/api/spares/history");
+  const historyData = historyQuery.data?.items ?? [];
 
   // Fetch components for tree display.
   // The component-filter tree relies on SFI codes that are only unique WITHIN a
@@ -1503,14 +1474,15 @@ const Spares: React.FC = () => {
     enabled: !!vesselId
   });
   
-  const { data: vesselLocationsResponse, isLoading: isLocationsLoading } = useQuery({
-    queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`],
-    enabled: vesselId !== 'all' && vesselId !== 'my' && vesselId !== '' && activeTab === 'by-location',
-  });
-
-  const vesselLocations = useMemo(() => {
-    return (vesselLocationsResponse as any)?.data || [];
-  }, [vesselLocationsResponse]);
+  const singleLocationScope = vesselId !== "all" && vesselId !== "my" && !!vesselId && activeTab === "by-location";
+  const locationsQuery = useSparePage(spareUrl(vesselId, { ...scopeParams, page: locationNavPage, pageSize: 25, locationSearch: locationSearchEffective }, "locations/paged"),
+    singleLocationScope, `/technical/api/inventory/stock/locations-with-stock/${vesselId}`);
+  const vesselLocations = locationsQuery.data?.items ?? [];
+  const isLocationsLoading = locationsQuery.isLoading;
+  useEffect(() => {
+    if (locationsQuery.data && locationNavPage > Math.max(1, locationsQuery.data.totalPages))
+      setLocationNavPage(Math.max(1, locationsQuery.data.totalPages));
+  }, [locationsQuery.data, locationNavPage]);
 
   const { data: allVesselLocationsResponse } = useQuery({
     queryKey: [`/technical/api/inventory/locations/${vesselId}`],
@@ -1521,50 +1493,18 @@ const Spares: React.FC = () => {
     return (allVesselLocationsResponse as any)?.data || [];
   }, [allVesselLocationsResponse]);
 
-  const { data: locationSparesResponse, isLoading: isLocationSparesLoading } = useQuery({
-    queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`],
-    enabled: !!selectedLocationId && !!vesselId && vesselId !== 'all' && vesselId !== 'my' && activeTab === 'by-location',
-  });
-
-  const locationSpares: Spare[] = useMemo(() => {
-    const raw = (locationSparesResponse as any)?.data || [];
-    return raw;
-  }, [locationSparesResponse]);
-
-  const filteredLocationSpares = useMemo(() => {
-    let result = locationSpares;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter((s: any) => 
-        s.partCode?.toLowerCase().includes(term) || 
-        s.partName?.toLowerCase().includes(term) || 
-        s.componentName?.toLowerCase().includes(term)
-      );
-    }
-    if (criticalityFilter && criticalityFilter !== 'All') {
-      result = result.filter((s: any) => s.critical === criticalityFilter || s.criticality === criticalityFilter);
-    }
-    if (rotationItemFilter && rotationItemFilter !== 'All') {
-      if (rotationItemFilter === 'Rotation Items') {
-        result = result.filter((s: any) => s.isRotationItem === true);
-      } else if (rotationItemFilter === 'Non-Rotation Items') {
-        result = result.filter((s: any) => !s.isRotationItem);
-      }
-    }
-    if (stockFilter && stockFilter !== 'All') {
-      result = result.filter((s: any) => {
-        const status = getStockStatus(s.rob, s.min);
-        return status.label === stockFilter;
-      });
-    }
-    return result;
-  }, [locationSpares, searchTerm, criticalityFilter, rotationItemFilter, stockFilter]);
-
-  const locationTotalPages = Math.max(1, Math.ceil(filteredLocationSpares.length / locationItemsPerPage));
-  const paginatedLocationSpares = filteredLocationSpares.slice(
-    (locationPage - 1) * locationItemsPerPage,
-    locationPage * locationItemsPerPage
-  );
+  const locationUrl = spareUrl(vesselId, { ...applicationParams, activeOnly: "false", kind: "location",
+    locationId: selectedLocationId, page: locationPage, pageSize: locationItemsPerPage, ...locationGrid });
+  const locationQuery = useSparePage(locationUrl, singleLocationScope && !!selectedLocationId,
+    `/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`);
+  const locationSpares: Spare[] = locationQuery.data?.items ?? [];
+  const isLocationSparesLoading = locationQuery.isLoading;
+  const locationTotal = locationQuery.data?.total ?? 0;
+  const locationTotalPages = Math.max(1, Math.ceil(locationTotal / locationItemsPerPage));
+  const paginatedLocationSpares = locationSpares;
+  useEffect(() => { setLocationPage(1); }, [debouncedSearchTerm, criticalityFilter, rotationItemFilter, stockFilter, locationGrid]);
+  useEffect(() => { setLocationNavPage(1); }, [locationSearchEffective]);
+  useEffect(() => { if (locationQuery.data && locationPage > locationTotalPages) setLocationPage(locationTotalPages); }, [locationQuery.data, locationPage, locationTotalPages]);
 
   const goToLocationPage = (page: number) => {
     const p = Math.max(1, Math.min(page, locationTotalPages));
@@ -1573,9 +1513,7 @@ const Spares: React.FC = () => {
 
   const allLocations = useMemo(() => {
     const locs = Array.isArray(vesselLocations) ? vesselLocations : [];
-    if (!locationSearchTerm) return locs;
-    const term = locationSearchTerm.toLowerCase();
-    return locs.filter((l: any) => l.locationName?.toLowerCase().includes(term));
+    return locs;
   }, [vesselLocations, locationSearchTerm]);
 
   // Get default location labels from vessel settings (only used as column headers, NOT for value binding)
@@ -1734,9 +1672,7 @@ const Spares: React.FC = () => {
         ihm: "No",
         remarks: "",
         note: "",
-        isRotationItem: false,
-        spareCategory: "",
-        optimumQty: ""
+        isRotationItem: false
       });
     },
     onError: (error: any) => {
@@ -1772,13 +1708,6 @@ const Spares: React.FC = () => {
   // Handle edit spare submit
   const handleEditSpareSubmit = () => {
     if (!selectedSpare) return;
-    const classificationError = validateSpareClassification(editSpareForm.spareCategory, editSpareForm.optimumQty);
-    if (classificationError) {
-      toast({ title: "Validation Error", description: classificationError, variant: "destructive" });
-      return;
-    }
-    if (selectedSpare.spareCategory === OPTIMUM_CATEGORY_KEY && editSpareForm.spareCategory !== OPTIMUM_CATEGORY_KEY &&
-      !window.confirm("Changing this spare away from Optimum will clear its saved Optimum Qty when the update succeeds. Continue?")) return;
 
     if (editSpareForm.maker && !makerListData.some(m => m.makerName.toLowerCase() === editSpareForm.maker.trim().toLowerCase())) {
       toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
@@ -1811,8 +1740,6 @@ const Spares: React.FC = () => {
       robLocationA: robA,
       robLocationB: robB,
       min: parseInt(editSpareForm.min) || 0,
-      spareCategory: editSpareForm.spareCategory,
-      optimumQty: editSpareForm.spareCategory === OPTIMUM_CATEGORY_KEY ? Number(editSpareForm.optimumQty) : null,
       location: editSpareForm.location || null,
       location2: editSpareForm.location2 || null,
       critical: editSpareForm.critical,
@@ -2018,14 +1945,15 @@ const Spares: React.FC = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, criticalityFilter, rotationItemFilter, stockFilter, selectedComponentId]);
+  }, [sparesScopeKey, debouncedSearchTerm, criticalityFilter, rotationItemFilter, stockFilter, selectedComponentId, inventoryGrid]);
 
   // Clamp currentPage when totalPages shrinks (e.g., after deletion)
   useEffect(() => {
+    if (!inventoryQuery.data) return;
     if (totalPages > 0 && currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [totalPages, currentPage]);
+  }, [totalPages, currentPage, inventoryQuery.data]);
 
   const collectAllNodeIds = (nodes: ComponentNode[]): string[] => {
     const ids: string[] = [];
@@ -2050,80 +1978,23 @@ const Spares: React.FC = () => {
     setExpandedNodes(new Set());
   };
 
-  // History filtering
-  const filteredHistoryData = useMemo(() => {
-    const parseHistoryDate = (dateStr: string): Date | null => {
-      if (!dateStr) return null;
-      const months: Record<string, number> = {
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      };
-      const parts = dateStr.split('-');
-      if (parts.length !== 3) return null;
-      const day = parseInt(parts[0], 10);
-      const month = months[parts[1]];
-      const year = parseInt(parts[2], 10);
-      if (isNaN(day) || month === undefined || isNaN(year)) return null;
-      return new Date(year, month, day);
-    };
-
-    const historyDateRange = periodFilterToDateRange(historyPeriodFilter);
-    const fromDate = historyDateRange ? historyDateRange.from : null;
-    const toDate = historyDateRange ? historyDateRange.to : null;
-
-    return historyData.filter((item: SpareHistory) => {
-      if (historySearch) {
-        const term = historySearch.toLowerCase();
-        if (!item.partCode?.toLowerCase().includes(term) &&
-            !item.partName?.toLowerCase().includes(term) &&
-            !item.componentName?.toLowerCase().includes(term)) {
-          return false;
-        }
-      }
-      if (historyEventFilter !== "all" && item.eventType !== historyEventFilter) {
-        return false;
-      }
-      if (fromDate || toDate) {
-        let itemDate: Date | null = null;
-        if (item.dateLocal) {
-          const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(item.dateLocal.trim());
-          if (isDateOnly) {
-            itemDate = new Date(item.dateLocal.trim() + 'T00:00:00');
-          } else {
-            const parsed = parseHistoryDate(item.dateLocal);
-            if (parsed) itemDate = parsed;
-          }
-        }
-        if (!itemDate && item.timestampUTC) {
-          itemDate = new Date(item.timestampUTC);
-        }
-        if (itemDate && !isNaN(itemDate.getTime())) {
-          if (fromDate && itemDate < fromDate) return false;
-          if (toDate && itemDate > toDate) return false;
-        }
-      }
-      return true;
-    });
-  }, [historyData, historySearch, historyEventFilter, historyPeriodFilter]);
-
-  // History pagination calculations
-  const historyTotalPages = Math.ceil(filteredHistoryData.length / historyItemsPerPage);
-  const paginatedHistory = useMemo(() => {
-    const startIndex = (historyPage - 1) * historyItemsPerPage;
-    return filteredHistoryData.slice(startIndex, startIndex + historyItemsPerPage);
-  }, [filteredHistoryData, historyPage, historyItemsPerPage]);
+  const filteredHistoryData = historyData;
+  const historyTotal = historyQuery.data?.total ?? 0;
+  const historyTotalPages = Math.ceil(historyTotal / historyItemsPerPage);
+  const paginatedHistory = historyData;
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [vesselId, historyItemsPerPage, historySearch, historyEventFilter, historyPeriodFilter]);
+  }, [sparesScopeKey, historyItemsPerPage, historySearchEffective, historyEventFilter, historyPeriodFilter, historyGrid]);
 
   useEffect(() => {
+    if (!historyQuery.data) return;
     if (historyTotalPages > 0 && historyPage > historyTotalPages) {
       setHistoryPage(historyTotalPages);
     } else if (historyTotalPages === 0 && filteredHistoryData.length === 0) {
       setHistoryPage(1);
     }
-  }, [historyTotalPages, historyPage, filteredHistoryData.length]);
+  }, [historyTotalPages, historyPage, historyQuery.data]);
 
   useEffect(() => {
     if (activeTab !== 'history') {
@@ -2171,53 +2042,21 @@ const Spares: React.FC = () => {
     setSelectedComponentId(null);
   };
 
-  const exportHistoryToExcel = () => {
+  const exportHistoryToExcel = async () => {
+    if (exportingType) return;
     const now = new Date();
     const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
     const filename = `spares_history_${vesselId}_${timestamp}.xlsx`;
-    
-    const data = filteredHistoryData.map((history: SpareHistory) => {
-      let dateDisplay = '-';
-      try {
-        const isDateOnly = history.dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(history.dateLocal.trim());
-        if (history.dateLocal) {
-          const dateStr = isDateOnly ? `${history.dateLocal.trim()}T00:00:00` : history.dateLocal;
-          const date = new Date(dateStr);
-          if (!isNaN(date.getTime())) {
-            dateDisplay = format(date, 'dd-MMM-yyyy');
-          }
-        } else if (history.timestampUTC) {
-          const date = new Date(history.timestampUTC);
-          if (!isNaN(date.getTime())) {
-            dateDisplay = format(date, 'dd-MMM-yyyy');
-          }
-        }
-      } catch {
-        dateDisplay = '-';
-      }
-      
-      return {
-        'Date': dateDisplay,
-        'Part Code': history.partCode,
-        'Part Name': history.partName,
-        'Component': history.componentName,
-        'Part Number': history.partNumber || '-',
-        'Event': history.eventType,
-        'Qty Change': history.qtyChange,
-        'ROB After': history.robAfter,
-        'Reference': history.reference || '-'
-      };
-    });
-    
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Spares History');
-    XLSX.writeFile(wb, filename);
-    
-    toast({ 
-      title: "Export Successful", 
-      description: `Exported ${data.length} history records to ${filename}` 
-    });
+    const token = uniqueSparesExportScopeRef.current;
+    setExportingType("history");
+    try {
+      if (!sparesScopeReady) throw new Error("No vessels available in the selected scope.");
+      const result = await downloadSpareExport(spareUrl(sparesScopeSegment, { ...historyParams, type: "history" }, "export"), filename,
+        () => { if (uniqueSparesExportScopeRef.current !== token) throw new Error("Vessel scope changed during export. Please try again."); });
+      toast({ title: result.rowCount ? "Export Successful" : "No Data", description: result.rowCount ? `Exported ${result.rowCount} history records to ${filename}` : "No history records available to export." });
+    } catch (error: any) {
+      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    } finally { setExportingType(null); }
   };
 
   const exportUniqueSparesToExcel = async () => {
@@ -2231,8 +2070,7 @@ const Spares: React.FC = () => {
         }
       };
       const {
-        uniqueSparesVesselIds, fetchUniqueSparesData, uniqueSparesFilename,
-        buildUniqueSparesWorkbook, downloadUniqueSparesWorkbook,
+        uniqueSparesVesselIds, uniqueSparesFilename,
       } = await import("./uniqueSparesExport");
       assertCurrent();
       const vesselIds = uniqueSparesVesselIds(
@@ -2242,22 +2080,12 @@ const Spares: React.FC = () => {
         toast({ title: "No Data", description: "No vessels available in the selected scope." });
         return;
       }
-      // Validate the display name before fetching; timestamp the finished export.
-      uniqueSparesFilename(vesselId, contextVessels);
-      const data = await fetchUniqueSparesData(vesselIds, activeOnlyForRole, async url => {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Failed to fetch complete unique-spare data. Export was not downloaded.");
-        return response.json();
-      }, assertCurrent);
-      if (!data.rows.length) {
-        toast({ title: "No Data", description: "No eligible unique spares available to export." });
-        return;
-      }
       const fname = uniqueSparesFilename(vesselId, contextVessels);
-      await downloadUniqueSparesWorkbook(buildUniqueSparesWorkbook(data), fname, assertCurrent);
+      const result = await downloadSpareExport(spareUrl(sparesScopeSegment, { ...scopeParams, vesselIds: vesselIds.join(","),
+        activeOnly: String(activeOnlyForRole), type: "unique" }, "export"), fname, assertCurrent);
       toast({
-        title: "Export Successful",
-        description: `Exported ${data.rows.length} unique spare master entries to ${fname}`
+        title: result.rowCount ? "Export Successful" : "No Data",
+        description: result.rowCount ? `Exported ${result.rowCount} unique spare master entries to ${fname}` : "No eligible unique spares available to export."
       });
       setExportDialogOpen(false);
     } catch (err: any) {
@@ -2273,6 +2101,7 @@ const Spares: React.FC = () => {
   };
 
   const exportComponentSparesToExcel = async () => {
+    if (exportingType) return;
     setExportingType('component');
     try {
       const assertCurrent = () => {
@@ -2281,8 +2110,7 @@ const Spares: React.FC = () => {
         }
       };
       const {
-        componentSparesVesselIds, fetchComponentSparesData,
-        buildComponentSparesWorkbook, downloadComponentSparesWorkbook, componentSparesFilename,
+        componentSparesVesselIds, componentSparesFilename,
       } = await import("./componentSparesExport");
       assertCurrent();
       const vesselIds = componentSparesVesselIds(
@@ -2292,31 +2120,14 @@ const Spares: React.FC = () => {
         toast({ title: "No Data", description: "No vessels available in the selected scope." });
         return;
       }
-      const data = await fetchComponentSparesData(vesselIds, activeOnlyForRole, async url => {
-        const response = await fetch(url);
-        if (!response.ok) throw Object.assign(
-          new Error("Failed to fetch complete component-spare data. Export was not downloaded."),
-          { status: response.status },
-        );
-        return response.json();
-      }, assertCurrent);
-      if (!data.rows.length) {
-        toast({
-          title: "No Data",
-          description: "No eligible component-spare links available to export." +
-            (data.excludedUnavailableSpareLinks
-              ? ` Excluded ${data.excludedUnavailableSpareLinks} retained links to unavailable spares; these are not in the current inventory.`
-              : ""),
-        });
-        return;
-      }
       const fname = componentSparesFilename(vesselId, contextVessels);
-      await downloadComponentSparesWorkbook(buildComponentSparesWorkbook(data), fname, assertCurrent);
+      const { excluded, rowCount } = await downloadSpareExport(spareUrl(sparesScopeSegment, { ...scopeParams, vesselIds: vesselIds.join(","),
+        activeOnly: String(activeOnlyForRole), type: "component" }, "export"), fname, assertCurrent);
       toast({
-        title: "Export Successful",
-        description: `Exported ${data.rows.length} component-spare entries to ${fname}` +
-          (data.excludedUnavailableSpareLinks
-            ? `. Excluded ${data.excludedUnavailableSpareLinks} retained links to unavailable spares; these are not in the current inventory.`
+        title: rowCount ? "Export Successful" : "No Data",
+        description: (rowCount ? `Exported ${rowCount} component-spare entries to ${fname}` : "No eligible component-spare links available to export.") +
+          (excluded
+            ? `. Excluded ${excluded} retained links to unavailable spares; these are not in the current inventory.`
             : "")
       });
       setExportDialogOpen(false);
@@ -2690,11 +2501,6 @@ const Spares: React.FC = () => {
       toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
       return;
     }
-    const classificationError = validateSpareClassification(addSpareForm.spareCategory, addSpareForm.optimumQty);
-    if (classificationError) {
-      toast({ title: "Validation Error", description: classificationError, variant: "destructive" });
-      return;
-    }
 
     if (addSpareForm.maker && !makerListData.some(m => m.makerName.toLowerCase() === addSpareForm.maker.trim().toLowerCase())) {
       toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
@@ -2749,8 +2555,6 @@ const Spares: React.FC = () => {
       robLocationA: robA,
       robLocationB: robB,
       min,
-      spareCategory: addSpareForm.spareCategory,
-      optimumQty: addSpareForm.spareCategory === OPTIMUM_CATEGORY_KEY ? Number(addSpareForm.optimumQty) : null,
       location: addSpareForm.location || undefined,
       location2: addSpareForm.location2 || undefined,
       maker: addSpareForm.maker || undefined,
@@ -3018,13 +2822,6 @@ const Spares: React.FC = () => {
         },
       },
       {
-        field: 'spareCategory',
-        headerName: 'Spare Category',
-        width: 140,
-        minWidth: 120,
-        valueFormatter: params => spareCategoryLabel(params.value),
-      },
-      {
         field: 'rob',
         headerName: 'ROB',
         width: 80,
@@ -3051,15 +2848,6 @@ const Spares: React.FC = () => {
             {params.value}
           </span>
         ),
-      },
-      {
-        field: 'optimumQty',
-        headerName: 'Optimum Qty',
-        width: 115,
-        minWidth: 100,
-        filter: 'agNumberColumnFilter',
-        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-        valueFormatter: params => params.value == null ? "—" : String(params.value),
       },
       {
         headerName: 'Stock',
@@ -3293,13 +3081,6 @@ const Spares: React.FC = () => {
         },
       },
       {
-        field: 'spareCategory',
-        headerName: 'Spare Category',
-        width: 140,
-        minWidth: 120,
-        valueFormatter: params => spareCategoryLabel(params.value),
-      },
-      {
         field: 'rob',
         headerName: 'ROB',
         width: 80,
@@ -3314,15 +3095,6 @@ const Spares: React.FC = () => {
         minWidth: 70,
         filter: 'agNumberColumnFilter',
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-      },
-      {
-        field: 'optimumQty',
-        headerName: 'Optimum Qty',
-        width: 115,
-        minWidth: 100,
-        filter: 'agNumberColumnFilter',
-        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-        valueFormatter: params => params.value == null ? "—" : String(params.value),
       },
       {
         headerName: 'Stock',
@@ -3384,17 +3156,18 @@ const Spares: React.FC = () => {
             <Input
               type="number"
               min="0"
+              disabled={isSavingLocRob || !canEditSpare}
               value={locRobValue}
               onChange={(e) => {
                 const val = e.target.value;
                 if (val === '' || (/^\d+$/.test(val) && parseInt(val) >= 0)) {
+                  if (!locationOriginals.current.has(spare.id)) locationOriginals.current.set(spare.id, spare);
                   setEditingLocRob(prev => ({ ...prev, [spare.id]: val }));
                 }
               }}
               onClick={(e) => e.stopPropagation()}
               className="h-7 text-sm text-center w-full"
               placeholder="0"
-              disabled={!canEditSpare}
               data-testid={`input-loc-rob-${spare.id}`}
             />
           );
@@ -3433,6 +3206,7 @@ const Spares: React.FC = () => {
     vesselId,
     allVesselLocations,
     editingLocRob,
+    isSavingLocRob,
     isChangingLocation,
     canEditSpare,
   ]);
@@ -3824,6 +3598,8 @@ const Spares: React.FC = () => {
         </div>
       )}
 
+      {(activeTab === "inventory" ? inventoryQuery.error : activeTab === "history" ? historyQuery.error : locationQuery.error || locationsQuery.error) &&
+        <div role="alert" className="text-red-600 p-2">{String((activeTab === "inventory" ? inventoryQuery.error : activeTab === "history" ? historyQuery.error : locationQuery.error || locationsQuery.error)?.message)}</div>}
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto flex gap-4 min-h-0">
         {/* Left Panel - Component Tree (only shown in inventory tab) */}
@@ -3875,7 +3651,7 @@ const Spares: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="overflow-y-auto h-[calc(100%-80px)]">
+            <div className="overflow-y-auto h-[calc(100%-120px)]">
               {isLocationsLoading ? (
                 <div className="p-4 text-center text-gray-500 text-sm">Loading locations...</div>
               ) : allLocations.length === 0 ? (
@@ -3889,7 +3665,13 @@ const Spares: React.FC = () => {
                   return (
                     <button
                       key={locId}
-                      onClick={() => { setSelectedLocationId(locId); setLocationPage(1); }}
+                      onClick={() => {
+                        if (isSavingLocRob) return;
+                        if (locId !== selectedLocationId && Object.keys(editingLocRob).length &&
+                          !window.confirm("Discard unsaved location ROB changes?")) return;
+                        if (locId !== selectedLocationId) { setEditingLocRob({}); locationOriginals.current.clear(); }
+                        setSelectedLocationId(locId); setLocationPage(1);
+                      }}
                       className={`w-full text-left px-4 py-2.5 text-sm border-b border-gray-100 transition-colors ${
                         selectedLocationId === locId ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
                       }`}
@@ -3911,6 +3693,7 @@ const Spares: React.FC = () => {
                 })
               )}
             </div>
+            <SpareLocationPager page={locationNavPage} total={locationsQuery.data?.total ?? 0} size={25} onPage={setLocationNavPage} />
           </div>
         )}
 
@@ -3935,12 +3718,13 @@ const Spares: React.FC = () => {
               </div>
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex-1 min-h-0">
-                  {isLoading ? (
-                    <div className="p-8 text-center text-gray-500">Loading...</div>
-                  ) : (
+                  {(
                     <WOAgGridTable
                       columnDefs={inventoryColumnDefs}
                       rowData={paginatedSpares}
+                      loading={inventoryQuery.isFetching}
+                      serverQueryUrl={inventoryUrl}
+                      onServerQueryChanged={next => setInventoryGrid(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next)}
                       getRowClass={inventoryGetRowClass}
                       noRowsMessage={myVesselsEmpty ? "No vessels are assigned to you yet." : "No spares found. Try adjusting your filters."}
                       testId="spares-inventory-grid"
@@ -4025,19 +3809,20 @@ const Spares: React.FC = () => {
                 <div className="flex-1 min-h-0">
                   {!selectedLocationId ? (
                     <div className="p-8 text-center text-gray-500">Select a location from the left panel to view spares.</div>
-                  ) : isLocationSparesLoading ? (
-                    <div className="p-8 text-center text-gray-500">Loading...</div>
                   ) : (
                     <WOAgGridTable
                       columnDefs={byLocationColumnDefs}
                       rowData={paginatedLocationSpares}
+                      loading={locationQuery.isFetching}
+                      serverQueryUrl={locationUrl}
+                      onServerQueryChanged={next => setLocationGrid(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next)}
                       noRowsMessage="No spares found at this location."
                       testId="spares-by-location-grid"
                     />
                   )}
                 </div>
               {/* Pagination Footer */}
-              {filteredLocationSpares.length > 0 && (
+              {selectedLocationId && (
                 <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="location-pagination-footer">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <span>Show</span>
@@ -4057,7 +3842,7 @@ const Spares: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="location-pagination-info">
                     <span>
-                      Showing {((locationPage - 1) * locationItemsPerPage) + 1} - {Math.min(locationPage * locationItemsPerPage, filteredLocationSpares.length)} of {filteredLocationSpares.length} spares
+                      Showing {locationTotal ? ((locationPage - 1) * locationItemsPerPage) + 1 : 0} - {Math.min(locationPage * locationItemsPerPage, locationTotal)} of {locationTotal} spares
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -4098,13 +3883,16 @@ const Spares: React.FC = () => {
                 <WOAgGridTable
                   columnDefs={historyColumnDefs}
                   rowData={paginatedHistory}
+                  loading={historyQuery.isFetching}
+                  serverQueryUrl={historyUrl}
+                  onServerQueryChanged={next => setHistoryGrid(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next)}
                   noRowsMessage="No history records found."
                   testId="spares-history-grid"
                 />
               </div>
 
               {/* History Pagination Footer */}
-              {filteredHistoryData.length > 0 && (
+              {(
                 <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="history-pagination-footer">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <span>Show</span>
@@ -4124,7 +3912,7 @@ const Spares: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="history-pagination-info">
                     <span>
-                      Showing {((historyPage - 1) * historyItemsPerPage) + 1} - {Math.min(historyPage * historyItemsPerPage, filteredHistoryData.length)} of {filteredHistoryData.length} transactions
+                      Showing {historyTotal ? ((historyPage - 1) * historyItemsPerPage) + 1 : 0} - {Math.min(historyPage * historyItemsPerPage, historyTotal)} of {historyTotal} transactions
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -4487,15 +4275,6 @@ const Spares: React.FC = () => {
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <SpareCategoryFields
-                    idPrefix="add-spare"
-                    category={addSpareForm.spareCategory}
-                    quantity={addSpareForm.optimumQty}
-                    onCategoryChange={value => setAddSpareForm(prev => ({ ...prev, spareCategory: value }))}
-                    onQuantityChange={value => setAddSpareForm(prev => ({ ...prev, optimumQty: value }))}
-                  />
-                </div>
                 <div>
                   <Label htmlFor="add-part-code">Part Code *</Label>
                   <Input
@@ -5005,15 +4784,6 @@ const Spares: React.FC = () => {
             <div className="bg-blue-50 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <SpareCategoryFields
-                    idPrefix="edit-spare"
-                    category={editSpareForm.spareCategory}
-                    quantity={editSpareForm.optimumQty}
-                    onCategoryChange={value => setEditSpareForm(prev => ({ ...prev, spareCategory: value }))}
-                    onQuantityChange={value => setEditSpareForm(prev => ({ ...prev, optimumQty: value }))}
-                  />
-                </div>
                 <div>
                   <Label htmlFor="edit-min">Minimum Stock</Label>
                   <Input
@@ -5961,14 +5731,6 @@ const Spares: React.FC = () => {
               <div className="bg-blue-50 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Spare Category:</span>
-                    <span className="ml-2 font-medium text-gray-900">{spareCategoryLabel(selectedSpare.spareCategory)}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Optimum Qty:</span>
-                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.optimumQty ?? '—'}</span>
-                  </div>
                   <div>
                     <span className="text-gray-500">ROB (Total):</span>
                     <span className="ml-2 font-medium text-gray-900">{selectedSpare.rob}</span>

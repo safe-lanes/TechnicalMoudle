@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { Search, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
+import { useSparePage, useSpareSearch, spareUrl } from "./sparesPaging";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useSpareCategories } from "@/components/spares/SpareCategoryFields";
@@ -29,6 +30,7 @@ interface Spare {
   robLocationB?: number;
   location?: string;
   location2?: string;
+  vesselId?: string;
 }
 
 type TransactionMode = "consume" | "receive" | "";
@@ -41,7 +43,7 @@ const EMPTY_SPARES: Spare[] = [];
 
 export default function BulkUpdateSpares() {
   const [, setLocation] = useLocation();
-  const { vesselId } = useVessel();
+  const { vesselId, isMyVessels, assignedVesselIds } = useVessel();
   const { toast } = useToast();
   const { canEdit: canEditPerm } = usePermissions();
   const canEditSpare = canEditPerm("pms-spares");
@@ -52,31 +54,22 @@ export default function BulkUpdateSpares() {
   const [bulkSearchQuery, setBulkSearchQuery] = useState("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
+  const [bulkDefaults, setBulkDefaults] = useState({ receivedDate: "", receivedPlace: "", comments: "" });
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-
-  const { data: sparesData = EMPTY_SPARES, isLoading } = useQuery({
-    queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId],
-    queryFn: async () => {
-      const response = await fetch(`/technical/api/inventory/spares-with-inventory/${vesselId}`);
-      if (!response.ok) return [];
-      const json = await response.json();
-      // The endpoint returns the envelope { success, data: SpareWithInventory[] },
-      // where each item is { spare, robTotal, stockStatus, locations, linkedComponents }.
-      // Flatten to the spare object (carrying stock fields) — same shape the main
-      // Spares screen consumes — so the grid, search, and inputs read flat fields.
-      const list = Array.isArray(json) ? json : (json?.data ?? []);
-      return (Array.isArray(list) ? list : []).map((item: any) => ({
-        ...item.spare,
-        robTotal: item.robTotal,
-        stockStatus: item.stockStatus,
-        locations: item.locations || [],
-        linkedComponents: item.linkedComponents || [],
-      }));
-    },
-    enabled: !!vesselId
-  });
+  const originals = useRef(new Map<number, Spare>());
+  const scopeKey = `${vesselId}:${isMyVessels ? assignedVesselIds.join(",") : ""}`;
+  const scopeToken = useRef({ key: scopeKey });
+  if (scopeToken.current.key !== scopeKey) scopeToken.current = { key: scopeKey };
+  const scopeSegment = isMyVessels ? "all" : vesselId;
+  const search = useSpareSearch(bulkSearchQuery);
+  const [gridModel, setGridModel] = useState({ sort: [] as any[], filters: {} as Record<string, any> });
+  const pageUrl = spareUrl(scopeSegment, { kind: "bulk", page: currentPage, pageSize: itemsPerPage,
+    search, scope: isMyVessels ? "my" : undefined, vesselIds: isMyVessels ? assignedVesselIds.join(",") : undefined, ...gridModel });
+  const pageQuery = useSparePage(pageUrl, !!vesselId && (!isMyVessels || assignedVesselIds.length > 0));
+  const sparesData = (pageQuery.data?.items ?? EMPTY_SPARES) as Spare[];
+  const isLoading = pageQuery.isLoading;
 
   const { data: locationNamesData } = useQuery({
     queryKey: [`/technical/api/vessel-location-names/${vesselId}`],
@@ -93,61 +86,41 @@ export default function BulkUpdateSpares() {
     locationB: locationNamesData?.locationBName || 'Location B'
   };
 
-  const filteredSpares = useMemo(() => {
-    if (!sparesData || !Array.isArray(sparesData)) return [];
-    const spares = sparesData as Spare[];
-    if (!bulkSearchQuery) return spares;
-    
-    const query = bulkSearchQuery.toLowerCase();
-    return spares.filter(spare => 
-      spare.partCode?.toLowerCase().includes(query) ||
-      spare.partName?.toLowerCase().includes(query) ||
-      spare.component?.toLowerCase().includes(query)
-    );
-  }, [sparesData, bulkSearchQuery]);
-
-  const totalPages = Math.ceil(filteredSpares.length / itemsPerPage);
-  
-  const paginatedSpares = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredSpares.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredSpares, currentPage, itemsPerPage]);
-
+  const serverTotal = pageQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(serverTotal / itemsPerPage));
+  const paginatedSpares = sparesData;
   useEffect(() => {
-    const initialData: {[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number}} = {};
-    const spares = Array.isArray(sparesData) ? sparesData : [];
-    spares.forEach((spare: Spare) => {
-      initialData[spare.id] = { consumedA: 0, consumedB: 0, receivedA: 0, receivedB: 0 };
-    });
-    setBulkUpdateData(initialData);
-  }, [sparesData]);
+    originals.current.clear(); setBulkUpdateData({}); setBulkDefaults({ receivedDate: "", receivedPlace: "", comments: "" });
+    setShowConfirmDialog(false); setCurrentPage(1);
+  }, [scopeKey]);
+  useEffect(() => { if (pageQuery.data && currentPage > totalPages) setCurrentPage(totalPages); }, [pageQuery.data, currentPage, totalPages]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [bulkSearchQuery, itemsPerPage]);
+  }, [search, itemsPerPage, gridModel]);
 
   const handleBulkUpdateChange = (spareId: number, field: 'consumedA' | 'consumedB' | 'receivedA' | 'receivedB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string | number) => {
-    if (field === 'receivedDate' || field === 'receivedPlace' || field === 'comments') {
-      setBulkUpdateData(prev => ({
-        ...prev,
-        [spareId]: { ...prev[spareId], [field]: value }
-      }));
-    } else {
-      const numValue = parseInt(String(value)) || 0;
-      setBulkUpdateData(prev => ({
-        ...prev,
-        [spareId]: { ...prev[spareId], [field]: numValue }
-      }));
-    }
+    const spare = sparesData.find(s => s.id === spareId);
+    if (spare && !originals.current.has(spareId)) originals.current.set(spareId, spare);
+    const parsed = field === "receivedDate" || field === "receivedPlace" || field === "comments"
+      ? value : parseInt(String(value)) || 0;
+    setBulkUpdateData(prev => ({
+      ...prev,
+      [spareId]: { ...(prev[spareId] ?? { consumedA: 0, consumedB: 0, receivedA: 0, receivedB: 0, ...bulkDefaults }), [field]: parsed },
+    }));
   };
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async (payload: { vesselId: string, tz: string, rows: any[] }) => {
-      const response = await apiRequest('POST', '/technical/api/spares/bulk-update', payload);
+    mutationFn: async ({ token, my, vesselIds, ...payload }: { vesselId: string; tz: string; rows: any[]; token: object; my: boolean; vesselIds: string }) => {
+      const params = new URLSearchParams({ paged: "true", ...(my ? { scope: "my", vesselIds } : {}) });
+      const response = await apiRequest('POST', `/technical/api/spares/bulk-update?${params}`, payload);
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      invalidateByUrlPrefix("/technical/api/inventory/spares-with-inventory");
+      invalidateByUrlPrefix("/technical/api/spares/history");
+      if (variables.token !== scopeToken.current) return;
       toast({ title: "Success", description: "Bulk update completed successfully" });
       setLocation("/spares");
     },
@@ -157,12 +130,13 @@ export default function BulkUpdateSpares() {
   });
 
   const handleSaveBulkUpdates = async () => {
+    if (bulkUpdateMutation.isPending) return;
     if (!transactionMode) {
       toast({ title: "Error", description: "Please select a transaction mode", variant: "destructive" });
       return;
     }
 
-    const sparesArray = Array.isArray(sparesData) ? sparesData : [];
+    const sparesArray = Array.from(originals.current.values());
     const hasErrors = Object.entries(bulkUpdateData).some(([id, data]) => {
       const spare = sparesArray.find((s: Spare) => s.id === Number(id));
       if (!spare) return false;
@@ -194,7 +168,7 @@ export default function BulkUpdateSpares() {
         }
       })
       .map(([id, data]) => {
-        const spare = (sparesData as Spare[]).find(s => s.id === Number(id));
+        const spare = originals.current.get(Number(id));
         return {
           componentSpareId: Number(id),
           spareId: spare?.id,
@@ -215,7 +189,8 @@ export default function BulkUpdateSpares() {
       return;
     }
 
-    bulkUpdateMutation.mutate({ vesselId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, rows });
+    bulkUpdateMutation.mutate({ vesselId: scopeSegment, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, rows,
+      token: scopeToken.current, my: isMyVessels, vesselIds: assignedVesselIds.join(",") });
   };
 
   const hasAnyChanges = Object.values(bulkUpdateData).some(data => {
@@ -246,6 +221,16 @@ export default function BulkUpdateSpares() {
   }, [bulkUpdateData, transactionMode]);
 
   const transactionLabel = transactionMode === "consume" ? "Consumed" : "Received";
+  useEffect(() => {
+    const beforeChange = (event: Event) => {
+      if (bulkUpdateMutation.isPending) { event.preventDefault(); return; }
+      if (hasAnyChanges && !window.confirm("You have unsaved updates. Discard them and change vessel?")) event.preventDefault();
+    };
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (hasAnyChanges) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("before-vessel-change", beforeChange);
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => { window.removeEventListener("before-vessel-change", beforeChange); window.removeEventListener("beforeunload", beforeUnload); };
+  }, [hasAnyChanges, bulkUpdateMutation.isPending]);
 
   // ============================================================
   // AG Grid: Bulk Update Spares column definitions
@@ -506,14 +491,6 @@ export default function BulkUpdateSpares() {
     return cols;
   }, [transactionMode, locationNames.locationA, locationNames.locationB, bulkUpdateData, paginatedSpares.length, spareCategoryLabels]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">Loading spares...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       <div className="bg-white dark:bg-gray-800 border-b px-6 py-4">
@@ -532,7 +509,7 @@ export default function BulkUpdateSpares() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Bulk Update Spares</h1>
           </div>
           <div className="text-sm text-gray-500">
-            Updating {filteredSpares.length} spare(s) {bulkSearchQuery && `(filtered)`}
+            Updating {serverTotal} spare(s) {bulkSearchQuery && `(filtered)`}
           </div>
         </div>
       </div>
@@ -597,8 +574,10 @@ export default function BulkUpdateSpares() {
                     id="bulk-received-date"
                     type="date"
                     data-testid="input-bulk-transaction-date"
+                    value={bulkDefaults.receivedDate}
                     onChange={(e) => {
                       const date = e.target.value;
+                      setBulkDefaults(prev => ({ ...prev, receivedDate: date }));
                       setBulkUpdateData(prev => {
                         const updated = { ...prev };
                         Object.keys(updated).forEach(id => {
@@ -616,8 +595,10 @@ export default function BulkUpdateSpares() {
                     type="text"
                     placeholder="e.g., Singapore Port"
                     data-testid="input-bulk-received-place"
+                    value={bulkDefaults.receivedPlace}
                     onChange={(e) => {
                       const place = e.target.value;
+                      setBulkDefaults(prev => ({ ...prev, receivedPlace: place }));
                       setBulkUpdateData(prev => {
                         const updated = { ...prev };
                         Object.keys(updated).forEach(id => {
@@ -635,8 +616,10 @@ export default function BulkUpdateSpares() {
                     type="text"
                     placeholder="Enter comments"
                     data-testid="input-bulk-comments"
+                    value={bulkDefaults.comments}
                     onChange={(e) => {
                       const comments = e.target.value;
+                      setBulkDefaults(prev => ({ ...prev, comments }));
                       setBulkUpdateData(prev => {
                         const updated = { ...prev };
                         Object.keys(updated).forEach(id => {
@@ -658,6 +641,7 @@ export default function BulkUpdateSpares() {
             </div>
           )}
 
+          {pageQuery.isError && <div role="alert" className="text-red-600 p-2">{pageQuery.error.message}</div>}
           {!transactionMode ? (
             <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0 items-center justify-center">
               <div className="text-center p-8">
@@ -677,6 +661,9 @@ export default function BulkUpdateSpares() {
               <WOAgGridTable
                 columnDefs={bulkColumnDefs}
                 rowData={paginatedSpares}
+                loading={pageQuery.isFetching}
+                serverQueryUrl={pageUrl}
+                onServerQueryChanged={next => setGridModel(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next)}
                 getRowClass={bulkGetRowClass}
                 noRowsMessage="No spares match your filters."
                 testId="bulk-update-spares-grid"
@@ -704,7 +691,7 @@ export default function BulkUpdateSpares() {
               
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600 dark:text-gray-300">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredSpares.length)} of {filteredSpares.length}
+                  Showing {serverTotal ? ((currentPage - 1) * itemsPerPage) + 1 : 0} - {Math.min(currentPage * itemsPerPage, serverTotal)} of {serverTotal}
                 </span>
               </div>
 

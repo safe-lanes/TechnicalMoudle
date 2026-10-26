@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as sparesService from '../services/sparesService';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
+import { validatePagedBulk } from './sparesPagingController';
 
 const ROTATION_ITEM_ALLOWED_ROLES = ["Sail Admin", "Office"]; // "Office" maps to "Client Admin" in UI role model
 
@@ -57,13 +58,14 @@ export async function bulkUpdate(req: Request, res: Response) {
       });
     }
 
+    await validatePagedBulk(req);
     console.log('[BULK UPDATE] Processing', rows.length, 'rows for vessel', vesselId);
     const results = await sparesService.bulkUpdate(vesselId, rows);
     console.log('[BULK UPDATE] Completed successfully:', results.length, 'items processed');
     res.json(results);
   } catch (error: any) {
     console.error("Error in bulk update:", error);
-    res.status(500).json({
+    res.status(error.statusCode || (error.name === "ZodError" ? 400 : 500)).json({
       success: false,
       error: error.message || 'Failed to perform bulk update'
     });
