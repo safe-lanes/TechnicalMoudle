@@ -1,3 +1,4 @@
+import { applyClassificationEvent } from './spareClassificationSync';
 /**
  * Sync Engine — Orchestrates a complete ship-shore sync cycle.
  *
@@ -1073,6 +1074,13 @@ export class SyncEngine {
             // CURRENT local completion episode. Resolution logs force-apply and close the
             // local mirror conflict. Same shared helper as the shore receive path.
             const logChangedAtPull = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
+            if (await applyClassificationEvent(client, log, insertResult.updateLogs,
+                this.instanceId, batchUuid, evaluateStaleSkipGuard)) {
+              await client.query(`RELEASE SAVEPOINT ${updSp}`);
+              totalPulled++;
+              updateApplied++;
+              continue;
+            }
             const dual = await evalDualPull(client, { ...log, changedAt: logChangedAtPull } as any, dualCtxPull);
             let dualBypassGuardsPull = false;
             if (dual.remoteResolution) {

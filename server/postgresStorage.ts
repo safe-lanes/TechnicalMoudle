@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { hasClassification, mergeSpareClassification } from '../shared/spareClassification';
 import { persistMaintenanceHistory, visibleMaintenanceHistory } from './modules/work-orders/utils/maintenanceHistoryPersistence';
 import {
   type ApprovalFieldOverride,
@@ -3431,11 +3432,13 @@ export class PostgresStorage {
   }
 
   async createSpare(spare: InsertSpare, skipSiblingSync: boolean = false): Promise<Spare> {
+    spare = { ...spare, ...mergeSpareClassification({}, spare) };
     const db = await getDb();
     const robA = spare.robLocationA ?? 0;
     const robB = spare.robLocationB ?? 0;
     const ihmSynced = spare.ihm === 'Yes' ? 'YES' : spare.ihm === 'No' ? 'NO' : spare.ihmPresence;
-    const result = await db.insert(spares).values({
+    const result = await db.transaction(async tx => {
+      const rows = await tx.insert(spares).values({
       ...spare,
       suuid: randomUUID(),
       dataScope: spare.dataScope || 'vessel',
@@ -3445,11 +3448,14 @@ export class PostgresStorage {
       min: spare.min ?? 0,
       ihmPresence: ihmSynced || 'UNKNOWN',
     }).returning();
+      await logFieldChanges('spares', rows[0].suuid, rows[0].vesselId || null, null, rows[0], 'system', tx);
+      return rows;
+    });
 
     const createdSpare = result[0];
 
     // Sync field logging — INSERT
-    try { await logFieldChanges('spares', createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, 'system'); } catch (e) { console.error('[FieldLogger] spare create:', e); }
+    // Written atomically with the row above; never silently lose classification events.
 
     // SYNC: Create spare_component_links entry when componentId is present
     // When skipSiblingSync=true (bulk import), skip entirely — processSpareInventory() handles link creation
@@ -3501,6 +3507,7 @@ export class PostgresStorage {
 
     // Fetch-before-update for sync field logging
     const existingSpare = await this.getSpare(id);
+    if (hasClassification(data)) data = { ...data, ...mergeSpareClassification(existingSpare || {}, data) };
 
     // Filter out undefined/null partCode to prevent NOT NULL constraint violation
     const { partCode, ...restData } = data;
@@ -3547,6 +3554,11 @@ export class PostgresStorage {
     }
 
     const updatedSpare = await db.transaction(async (tx) => {
+      // Classification-only writes and their outgoing events must commit together.
+      const beforeClassification = hasClassification(data)
+        ? (await tx.select().from(spares).where(eq(spares.suuid, existingSpare!.suuid)).for('update'))[0]
+        : null;
+      if (beforeClassification) Object.assign(updateData, mergeSpareClassification(beforeClassification, data));
       const result = await tx.update(spares)
         .set(updateData)
         .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])))
@@ -3594,11 +3606,15 @@ export class PostgresStorage {
         }
       }
 
+      if (beforeClassification) {
+        await logFieldChanges('spares', updated.suuid, updated.vesselId || null,
+          beforeClassification, updated, (data as any).updatedBy || 'system', tx);
+      }
       return updated;
     });
 
     // Sync field logging — spare UPDATE
-    if (existingSpare) {
+    if (existingSpare && !hasClassification(data)) {
       try {
         await logFieldChanges('spares', existingSpare.suuid, existingSpare.vesselId || null, existingSpare, updatedSpare, (data as any).updatedBy || 'system');
       } catch (err) { console.error('[FieldLogger] Spare update:', err); }
@@ -4343,6 +4359,7 @@ export class PostgresStorage {
   }
 
   async createFleetSpareInTable(spare: InsertFleetSpares): Promise<FleetSpares> {
+    spare = { ...spare, ...mergeSpareClassification({}, spare) };
     const db = await getDb();
     const result = await db.insert(fleetSpares).values({
       ...spare,
@@ -4352,6 +4369,10 @@ export class PostgresStorage {
 
   async updateFleetSpareInTable(id: number, data: Partial<FleetSpares>): Promise<FleetSpares> {
     const db = await getDb();
+    if (hasClassification(data)) {
+      const saved = (await db.select().from(fleetSpares).where(eq(fleetSpares.id, id)))[0];
+      data = { ...data, ...mergeSpareClassification(saved || {}, data) };
+    }
     const result = await db.update(fleetSpares)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(fleetSpares.id, id))
@@ -4426,8 +4447,10 @@ export class PostgresStorage {
     for (const spare of sparesList) {
       const robA = spare.robLocationA ?? 0;
       const robB = spare.robLocationB ?? 0;
-      const result = await db.insert(spares).values({
+      const result = await db.transaction(async tx => {
+        const rows = await tx.insert(spares).values({
         ...spare,
+        ...mergeSpareClassification({}, spare),
         suuid: randomUUID(),
         dataScope: spare.dataScope || 'vessel',
         rob: spare.rob ?? 0,
@@ -4435,11 +4458,14 @@ export class PostgresStorage {
         robLocationB: robB,
         min: spare.min ?? 0,
       }).returning();
+        await logFieldChanges('spares', rows[0].suuid, rows[0].vesselId || null, null, rows[0], 'system', tx);
+        return rows;
+      });
       const createdSpare = result[0];
       results.push(createdSpare);
 
       // Sync field logging — INSERT
-      try { await logFieldChanges('spares', createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, 'system'); } catch (e) { console.error('[FieldLogger] spare bulk create:', e); }
+      // Outgoing fields already committed with the row.
 
       // SYNC: Create spare_location_stock entries independently for each assigned location
       if (createdSpare.vesselId) {
@@ -4488,17 +4514,14 @@ export class PostgresStorage {
         const { partCode, ...restSpare } = spare;
         const updateData = partCode != null ? { ...restSpare, partCode, updatedAt: new Date() } : { ...restSpare, updatedAt: new Date() };
 
-        const oldSpare = { ...existing };
-        await db.update(spares)
-          .set(updateData)
-          .where(eq(spares.suuid, existing.suuid));
+        await db.transaction(async tx => {
+          const [oldSpare] = await tx.select().from(spares).where(eq(spares.suuid, existing.suuid)).for('update');
+          const [saved] = await tx.update(spares)
+            .set({ ...updateData, ...mergeSpareClassification(oldSpare, spare) })
+            .where(eq(spares.suuid, existing.suuid)).returning();
+          await logFieldChanges('spares', existing.suuid, existing.vesselId || null, oldSpare, saved, 'system', tx);
+        });
         updated++;
-
-        // Sync field logging — UPDATE
-        try {
-          const updatedSpare = await db.select().from(spares).where(eq(spares.suuid, existing.suuid)).then(r => r[0]);
-          if (updatedSpare) await logFieldChanges('spares', existing.suuid, existing.vesselId || null, oldSpare, updatedSpare, 'system');
-        } catch (e) { console.error('[FieldLogger] spare bulk upsert update:', e); }
 
         // SYNC: Update spare_location_stock independently per location if ROB values changed
         const newRobA = spare.robLocationA ?? existing.robLocationA ?? 0;
@@ -4531,8 +4554,10 @@ export class PostgresStorage {
         }
         const robA = spare.robLocationA ?? 0;
         const robB = spare.robLocationB ?? 0;
-        const result = await db.insert(spares).values({
+        const result = await db.transaction(async tx => {
+        const rows = await tx.insert(spares).values({
           ...spare,
+          ...mergeSpareClassification({}, spare),
           suuid: randomUUID(),
           dataScope: spare.dataScope || 'vessel',
           rob: spare.rob ?? 0,
@@ -4540,15 +4565,16 @@ export class PostgresStorage {
           robLocationB: robB,
           min: spare.min ?? 0,
         }).returning();
+        await logFieldChanges('spares', rows[0].suuid, rows[0].vesselId || null, null, rows[0], 'system', tx);
+        return rows;
+        });
         created++;
 
         // SYNC: Create spare_location_stock entries independently for each assigned location
         const createdSpare = result[0];
 
         // Sync field logging — INSERT
-        if (createdSpare) {
-          try { await logFieldChanges('spares', createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, 'system'); } catch (e) { console.error('[FieldLogger] spare bulk upsert create:', e); }
-        }
+        // Incoming classification events already logged atomically above.
         if (createdSpare?.vesselId) {
           const vesselId = createdSpare.vesselId;
 
@@ -7624,7 +7650,18 @@ export class PostgresStorage {
 
   async createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping> {
     const db = await getDb();
-    const result = await db.insert(fleetSpareVesselMapping).values({
+    return db.transaction(async tx => {
+    // Initial inheritance is authoritative from Fleet, never from client-supplied labels.
+    const [source] = await tx.select().from(fleetSpares).where(and(
+      eq(fleetSpares.partCode, mapping.partCode),
+      eq(fleetSpares.fleetEquipmentCode, mapping.fleetEquipmentCode),
+    )).limit(1);
+    const [target] = mapping.spareId ? await tx.select().from(spares).where(and(
+      eq(spares.suuid, mapping.spareId), eq(spares.vesselId, mapping.vesselCode),
+    )).for('update') : [];
+    if (!source || !target) throw Object.assign(new Error('Select valid Fleet and vessel spares for mapping.'), { statusCode: 400 });
+    const pair = mergeSpareClassification({}, source);
+    const result = await tx.insert(fleetSpareVesselMapping).values({
       fleetEquipmentCode: mapping.fleetEquipmentCode,
       partCode: mapping.partCode,
       spareId: mapping.spareId ?? null,
@@ -7633,7 +7670,11 @@ export class PostgresStorage {
       mappedBy: mapping.mappedBy,
       isActive: mapping.isActive ?? true,
     }).returning();
+    const [updated] = await tx.update(spares).set({ ...pair, updatedAt: new Date() })
+      .where(eq(spares.suuid, target.suuid)).returning();
+    await logFieldChanges('spares', target.suuid, target.vesselId, target, updated, mapping.mappedBy || 'system', tx);
     return result[0];
+    });
   }
 
   async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string, spareId?: string): Promise<void> {
@@ -10157,6 +10198,8 @@ export class PostgresStorage {
     const result = await db.select({
       id: spares.id,
       partCode: spares.partCode,
+      spareCategory: spares.spareCategory,
+      optimumQty: spares.optimumQty,
       partName: spares.partName,
       componentId: spares.componentId,
       componentName: spares.componentName,

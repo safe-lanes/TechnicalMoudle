@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, Check, X, GitMerge, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useOffline } from '@/contexts/OfflineContext';
 import { SyncQueueItem } from '@/lib/offlineStorage';
+import { useMasterListOptions } from '@/hooks/useDepartments';
 
 interface SyncConflictDialogProps {
   open: boolean;
@@ -18,6 +19,7 @@ export function SyncConflictDialog({ open, onOpenChange }: SyncConflictDialogPro
   const [conflicts, setConflicts] = useState<SyncQueueItem[]>([]);
   const [selectedConflict, setSelectedConflict] = useState<SyncQueueItem | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const { options: spareCategoryOptions } = useMasterListOptions('spareCategory');
 
   useEffect(() => {
     if (open) {
@@ -58,6 +60,32 @@ export function SyncConflictDialog({ open, onOpenChange }: SyncConflictDialogPro
     return String(value);
   };
 
+  const getFieldLabel = (field: string): string => {
+    const normalized = field.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normalized.endsWith('sparecategory')) return 'Spare Category';
+    if (normalized.endsWith('optimumqty')) return 'Optimum Qty';
+    return field;
+  };
+
+  const formatFieldValue = (field: string, value: any): string => {
+    if (field.toLowerCase().replace(/[^a-z0-9]/g, '').endsWith('sparecategory')) {
+      return spareCategoryOptions.find(option => option.value === String(value))?.label || formatValue(value);
+    }
+    return formatValue(value);
+  };
+
+  const formatConflictData = (data: Record<string, any> | null | undefined): string => {
+    if (!data) return formatValue(data);
+    return JSON.stringify(
+      Object.fromEntries(Object.entries(data).map(([field, value]) => [
+        getFieldLabel(field),
+        formatFieldValue(field, value),
+      ])),
+      null,
+      2
+    );
+  };
+
   const getChangedFields = (): string[] => {
     if (!selectedConflict?.data || !selectedConflict?.serverVersion) return [];
     
@@ -94,7 +122,7 @@ export function SyncConflictDialog({ open, onOpenChange }: SyncConflictDialogPro
             Sync Conflicts ({conflicts.length})
           </DialogTitle>
           <DialogDescription>
-            These changes conflict with updates made on the server. Please review and resolve each conflict.
+            These changes conflict with updates made on the server. Please review and resolve each conflict. Spare Category and Optimum Qty decisions are resolved together.
           </DialogDescription>
         </DialogHeader>
         
@@ -149,17 +177,17 @@ export function SyncConflictDialog({ open, onOpenChange }: SyncConflictDialogPro
                         <div className="space-y-3">
                           {getChangedFields().map((field) => (
                             <div key={field} className="grid grid-cols-3 gap-2 p-2 bg-muted/50 rounded-md">
-                              <div className="font-medium text-sm">{field}</div>
+                              <div className="font-medium text-sm">{getFieldLabel(field)}</div>
                               <div className="text-sm">
                                 <Badge variant="outline" className="mb-1 text-xs">Local</Badge>
                                 <pre className="text-xs bg-blue-50 dark:bg-blue-950 p-1 rounded overflow-auto max-h-20">
-                                  {formatValue(selectedConflict.data?.[field])}
+                                  {formatFieldValue(field, selectedConflict.data?.[field])}
                                 </pre>
                               </div>
                               <div className="text-sm">
                                 <Badge variant="outline" className="mb-1 text-xs">Server</Badge>
                                 <pre className="text-xs bg-green-50 dark:bg-green-950 p-1 rounded overflow-auto max-h-20">
-                                  {formatValue(selectedConflict.serverVersion?.[field])}
+                                  {formatFieldValue(field, selectedConflict.serverVersion?.[field])}
                                 </pre>
                               </div>
                             </div>
@@ -176,7 +204,7 @@ export function SyncConflictDialog({ open, onOpenChange }: SyncConflictDialogPro
                           </h4>
                           <ScrollArea className="h-[300px] bg-blue-50 dark:bg-blue-950 rounded-md p-2">
                             <pre className="text-xs">
-                              {JSON.stringify(selectedConflict.data, null, 2)}
+                              {formatConflictData(selectedConflict.data)}
                             </pre>
                           </ScrollArea>
                         </div>
@@ -186,7 +214,7 @@ export function SyncConflictDialog({ open, onOpenChange }: SyncConflictDialogPro
                           </h4>
                           <ScrollArea className="h-[300px] bg-green-50 dark:bg-green-950 rounded-md p-2">
                             <pre className="text-xs">
-                              {JSON.stringify(selectedConflict.serverVersion, null, 2)}
+                              {formatConflictData(selectedConflict.serverVersion)}
                             </pre>
                           </ScrollArea>
                         </div>

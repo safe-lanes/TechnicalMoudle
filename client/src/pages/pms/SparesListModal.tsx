@@ -18,6 +18,7 @@ import { Eye, Download } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import type { TableColumn } from "@/lib/pdfReportGenerator";
+import { useMasterListOptions } from "@/hooks/useDepartments";
 
 interface SpareItem {
   id: number;
@@ -26,6 +27,8 @@ interface SpareItem {
   partCode?: string;
   rob: number;
   min: number;
+  spareCategory?: string | null;
+  optimumQty?: number | null;
   critical: string;
   componentName?: string;
   vesselId?: string;
@@ -42,6 +45,7 @@ interface SparesListModalProps {
 
 export function SparesListModal({ open, onClose, title, spares, vessels = [], getStockStatus }: SparesListModalProps) {
   const [detailSpare, setDetailSpare] = useState<SpareItem | null>(null);
+  const { options: spareCategoryOptions } = useMasterListOptions("spareCategory");
 
   const vesselMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -70,8 +74,10 @@ export function SparesListModal({ open, onClose, title, spares, vessels = [], ge
       { header: 'Part Code', field: 'partCode', width: 20 },
       { header: 'Part Name', field: 'partName', width: 40 },
       { header: 'Component', field: 'component', width: 30 },
+      { header: 'Spare Category', field: 'spareCategory', width: 18 },
       { header: 'ROB', field: 'rob', width: 12 },
       { header: 'Min', field: 'min', width: 12 },
+      { header: 'Optimum Qty', field: 'optimumQty', width: 14 },
       { header: 'Stock Status', field: 'stockStatus', width: 15 },
       { header: 'Criticality', field: 'criticality', width: 15 },
     ];
@@ -83,6 +89,8 @@ export function SparesListModal({ open, onClose, title, spares, vessels = [], ge
       component: spare.componentName || '-',
       rob: spare.rob?.toString() || '0',
       min: spare.min?.toString() || '0',
+      spareCategory: spareCategoryOptions.find(option => option.value === spare.spareCategory)?.label || spare.spareCategory || '',
+      optimumQty: spare.optimumQty?.toString() || '',
       stockStatus: getStockStatus(spare.rob, spare.min).label,
       criticality: String(spare.critical ?? '-'),
     }));
@@ -126,8 +134,10 @@ export function SparesListModal({ open, onClose, title, spares, vessels = [], ge
                   <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">Part Code</TableHead>
                   <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81]">Part Name</TableHead>
                   <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81]">Component</TableHead>
+                  <TableHead className="font-medium w-[130px] bg-[#eff6ff] text-[#0e4c81]">Spare Category</TableHead>
                   <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81]">ROB</TableHead>
                   <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81]">Min</TableHead>
+                  <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Optimum Qty</TableHead>
                   <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Stock Status</TableHead>
                   <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Criticality</TableHead>
                   <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81]">Actions</TableHead>
@@ -136,7 +146,7 @@ export function SparesListModal({ open, onClose, title, spares, vessels = [], ge
               <TableBody>
                 {spares.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                       No spares found
                     </TableCell>
                   </TableRow>
@@ -151,8 +161,10 @@ export function SparesListModal({ open, onClose, title, spares, vessels = [], ge
                           {spare.partName || '-'}
                         </TableCell>
                         <TableCell>{spare.componentName || '-'}</TableCell>
+                        <TableCell>{spareCategoryOptions.find(option => option.value === spare.spareCategory)?.label || spare.spareCategory || ""}</TableCell>
                         <TableCell>{spare.rob}</TableCell>
                         <TableCell>{spare.min}</TableCell>
+                        <TableCell>{spare.optimumQty ?? ""}</TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${getStockBadgeColor(stockStatus.label)}`}>
                             {stockStatus.label}
@@ -233,6 +245,14 @@ export function SparesListModal({ open, onClose, title, spares, vessels = [], ge
               <div>
                 <span className="text-gray-500 text-xs">Min</span>
                 <p className="font-medium" data-testid="text-detail-min">{detailSpare.min}</p>
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Spare Category</span>
+                <p className="font-medium" data-testid="text-detail-spare-category">{spareCategoryOptions.find(option => option.value === detailSpare.spareCategory)?.label || detailSpare.spareCategory || ""}</p>
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Optimum Qty</span>
+                <p className="font-medium" data-testid="text-detail-optimum-qty">{detailSpare.optimumQty ?? ""}</p>
               </div>
               <div>
                 <span className="text-gray-500 text-xs">Stock Status</span>

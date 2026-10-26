@@ -977,6 +977,8 @@ export async function copyVessel(body: any) {
           componentName: spare.componentName,
           componentSpareCode: spare.componentSpareCode,
           critical: spare.critical,
+          spareCategory: spare.spareCategory,
+          optimumQty: spare.optimumQty,
           rob: 0,
           robLocationA: 0,
           robLocationB: 0,
@@ -1291,6 +1293,8 @@ export async function resyncJobs(vesselCode: string, fleetEquipmentCode?: string
 // --- Spares Re-Sync ---
 
 const SPARE_FIELD_MAP: Array<{ fleetKey: string; vesselKey: string; label: string }> = [
+  { fleetKey: 'spareCategory', vesselKey: 'spareCategory', label: 'Spare Category' },
+  { fleetKey: 'optimumQty', vesselKey: 'optimumQty', label: 'Optimum Qty' },
   { fleetKey: 'partName',           vesselKey: 'partName',       label: 'part_name' },
   { fleetKey: 'partNumber',         vesselKey: 'partNumber',     label: 'part_number' },
   { fleetKey: 'unitOfMeasurement',  vesselKey: 'uom',            label: 'uom' },

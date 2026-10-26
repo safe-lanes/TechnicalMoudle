@@ -234,7 +234,7 @@ export async function createFleetSpare(req: Request, res: Response) {
       return res.status(400).json({ error: "Invalid spare data", details: error.errors });
     }
     console.error("Error creating fleet spare:", error);
-    res.status(500).json({ error: error.message || "Failed to create fleet spare" });
+    res.status(error.statusCode || 500).json({ error: error.message || "Failed to create fleet spare" });
   }
 }
 
@@ -258,7 +258,7 @@ export async function updateFleetSpare(req: Request, res: Response) {
       return res.status(404).json({ error: error.message });
     }
     console.error("[FleetSpare] Error updating fleet spare:", error);
-    res.status(500).json({ error: "Failed to update fleet spare" });
+    res.status(error.statusCode || 500).json({ error: error.message || "Failed to update fleet spare" });
   }
 }
 

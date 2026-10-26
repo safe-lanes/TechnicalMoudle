@@ -12,6 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useMasterListOptions } from "@/hooks/useDepartments";
 import { resultState, reviewEmptyTitle } from "./syncConflictStates";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -112,12 +113,31 @@ function truncateValue(value: string | null, max = 120): string {
   return value.substring(0, max) + "...";
 }
 
+function isField(fieldName: string, target: "spareCategory" | "optimumQty"): boolean {
+  return fieldName.toLowerCase().replace(/[^a-z0-9]/g, "").endsWith(target.toLowerCase());
+}
+
+function conflictFieldLabel(conflict: EnrichedConflict): string {
+  if (isField(conflict.fieldName, "spareCategory")) return "Spare Category";
+  if (isField(conflict.fieldName, "optimumQty")) return "Optimum Qty";
+  return conflict.fieldDisplayName;
+}
+
 // ── Component ──
 
 export default function SyncConflictReview() {
   const { toast } = useToast();
   const { canEdit } = usePermissions();
   const canEditConflicts = canEdit("admin-sync-conflicts");
+  const { options: spareCategoryOptions } = useMasterListOptions("spareCategory");
+
+  const formatConflictValue = (fieldName: string, value: string | null, max = 120): string => {
+    if (value === null || value === undefined) return "(null)";
+    if (isField(fieldName, "spareCategory")) {
+      return spareCategoryOptions.find(option => option.value === value)?.label || truncateValue(value, max);
+    }
+    return truncateValue(value, max);
+  };
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string>("unresolved");
@@ -252,7 +272,7 @@ export default function SyncConflictReview() {
           Sync Conflict Review
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Review and resolve field-level sync conflicts between ship and shore. By default this review covers the full fleet.
+          Review and resolve field-level sync conflicts between ship and shore. By default this review covers the full fleet. Spare Category and Optimum Qty decisions are resolved together.
         </p>
       </div>
 
@@ -383,7 +403,7 @@ export default function SyncConflictReview() {
                 <div className="mb-3">
                   <span className="text-xs text-muted-foreground">Field: </span>
                   <code className="text-sm font-semibold bg-gray-100 px-2 py-0.5 rounded">
-                    {conflict.fieldDisplayName}
+                    {conflictFieldLabel(conflict)}
                   </code>
                 </div>
 
@@ -401,7 +421,7 @@ export default function SyncConflictReview() {
                       className="text-sm font-mono bg-white rounded border px-2 py-1.5 mb-2 break-all min-h-[32px]"
                       title={conflict.winner.value ?? ""}
                     >
-                      {truncateValue(conflict.winner.value)}
+                      {formatConflictValue(conflict.fieldName, conflict.winner.value)}
                     </div>
                     <div className="text-xs text-gray-600 space-y-0.5">
                       <div>
@@ -435,7 +455,7 @@ export default function SyncConflictReview() {
                       className="text-sm font-mono bg-white rounded border px-2 py-1.5 mb-2 break-all min-h-[32px]"
                       title={conflict.rejected.value ?? ""}
                     >
-                      {truncateValue(conflict.rejected.value)}
+                      {formatConflictValue(conflict.fieldName, conflict.rejected.value)}
                     </div>
                     <div className="text-xs text-gray-600 space-y-0.5">
                       <div>
@@ -567,7 +587,7 @@ export default function SyncConflictReview() {
                     <p>
                       This will change{" "}
                       <strong>
-                        {confirmDialog.conflict.fieldDisplayName}
+                        {conflictFieldLabel(confirmDialog.conflict)}
                       </strong>{" "}
                       for{" "}
                       <strong>{confirmDialog.conflict.recordDisplay}</strong>
@@ -579,7 +599,7 @@ export default function SyncConflictReview() {
                         </div>
                         <code className="text-xs break-all">
                           {truncateValue(
-                            confirmDialog.conflict.winner.value,
+                            formatConflictValue(confirmDialog.conflict.fieldName, confirmDialog.conflict.winner.value, 80),
                             80
                           )}
                         </code>
@@ -590,7 +610,7 @@ export default function SyncConflictReview() {
                         </div>
                         <code className="text-xs break-all">
                           {truncateValue(
-                            confirmDialog.conflict.rejected.value,
+                            formatConflictValue(confirmDialog.conflict.fieldName, confirmDialog.conflict.rejected.value, 80),
                             80
                           )}
                         </code>
@@ -600,6 +620,12 @@ export default function SyncConflictReview() {
                       The change will sync to the other side on the next sync
                       cycle. A new field log will be recorded under your name.
                     </p>
+                    {(isField(confirmDialog.conflict.fieldName, "spareCategory") ||
+                      isField(confirmDialog.conflict.fieldName, "optimumQty")) && (
+                      <p className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+                        Spare Category and Optimum Qty are resolved together; applying this conflict applies the paired classification decision.
+                      </p>
+                    )}
                   </div>
                 </DialogDescription>
               </DialogHeader>
@@ -645,7 +671,7 @@ export default function SyncConflictReview() {
                       Your current value (
                       <code className="text-xs">
                         {truncateValue(
-                          confirmDialog.conflict.winner.value,
+                          formatConflictValue(confirmDialog.conflict.fieldName, confirmDialog.conflict.winner.value, 60),
                           60
                         )}
                       </code>

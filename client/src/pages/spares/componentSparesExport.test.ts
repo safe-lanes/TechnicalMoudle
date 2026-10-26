@@ -32,6 +32,19 @@ test("aggregate filenames describe All and My Vessels rather than a single vesse
     "My_Vessels_Component_Spares_03-02-2026_04-05-06.xlsx");
 });
 
+test("component spare export includes readable spare classification and optimum quantity", () => {
+  const values = componentSpareValues(
+    { partCode: "PT-4821", partName: "Seal kit", spareCategory: "essential", optimumQty: 17 },
+    { componentCode: "ME-01", name: "Main engine" },
+    { essential: "Essential" },
+  );
+  const categoryIndex = SPARES_TEMPLATE_FIELDS.findIndex(field => field.key === "spareCategory");
+  const optimumIndex = SPARES_TEMPLATE_FIELDS.findIndex(field => field.key === "optimumQty");
+  assert.equal(values[categoryIndex >= 0 ? categoryIndex : SPARES_TEMPLATE_FIELDS.length], "Essential");
+  const optimumExtraIndex = SPARES_TEMPLATE_FIELDS.length + (categoryIndex < 0 ? 1 : 0);
+  assert.equal(values[optimumIndex >= 0 ? optimumIndex : optimumExtraIndex], 17);
+});
+
 test("filename uses browser-local date and time across a UTC date boundary", () => {
   const previousTimezone = process.env.TZ;
   try {
@@ -261,14 +274,24 @@ test("XLSX read-back matches uploaded template sheets, headers, widths, style, l
   for (const name of ["Spares", "Components", "Lists"]) {
     const sheet = actual.getWorksheet(name)!;
     const expected = reference.getWorksheet(name)!;
-    assert.deepEqual(sheet.getRow(1).values, expected.getRow(1).values);
+    if (name === "Spares") {
+      assert.deepEqual(
+        sheet.getRow(1).values.slice(1, 29),
+        expected.getRow(1).values.slice(1, 29),
+      );
+      const exportedHeaders = sheet.getRow(1).values.map(String);
+      assert.ok(exportedHeaders.includes("Spare Category"));
+      assert.ok(exportedHeaders.includes("Optimum Qty"));
+    } else {
+      assert.deepEqual(sheet.getRow(1).values, expected.getRow(1).values);
+    }
     for (let column = 1; column <= (name === "Spares" ? 28 : expected.columnCount); column++) {
       assert.equal(sheet.getColumn(column).width, expected.getColumn(column).width);
       assert.deepEqual(sheet.getCell(1, column).font, expected.getCell(1, column).font);
     }
   }
   const sheet = actual.getWorksheet("Spares")!;
-  assert.equal(sheet.getCell("AC1").value, "_TEMPLATE_VERSION_2.0.0");
+  assert.equal(sheet.getCell(1, SPARES_TEMPLATE_FIELDS.length + 1).value, "_TEMPLATE_VERSION_2.0.0");
   assert.equal(sheet.rowCount, 1002);
   assert.equal(sheet.getCell("S2").value, 0);
   for (const column of ["I", "R", "Y", "Z", "AB"]) {

@@ -1,3 +1,4 @@
+import { isSpareClassificationLog, resolveClassificationConflict, resolveLegacyClassification } from './spareClassificationSync';
 /**
  * Conflict Review Repository
  *
@@ -735,6 +736,10 @@ export async function applyIncomingConflict(
     if (conflict.is_resolved) {
       throw Object.assign(new Error('Conflict is already resolved'), { statusCode: 409 });
     }
+    if (isSpareClassificationLog({ tableName: conflict.table_name, fieldName: conflict.field_name })) {
+      await resolveClassificationConflict(pool, conflict, userId, true);
+      return getConflict(id, source);
+    }
 
     // Task #399: a dual-completion conflict is ONE WO-level decision — applying the
     // incoming side resolves EVERY open dual-completion field of this work order
@@ -828,6 +833,10 @@ export async function applyIncomingConflict(
     const vesselIdOld = currentOldRow.rows[0]?.vessel_id ?? null;
 
     // For old conflicts, the "rejected" side is ship_value
+    if (isSpareClassificationLog({ tableName: conflict.table_name, fieldName: conflict.field_name })) {
+      await resolveLegacyClassification(pool, conflict, conflict.ship_value, 'ship_wins', userId);
+      return getConflict(id, source);
+    }
     await pool.query(
       `UPDATE "${conflict.table_name}"
        SET "${fieldNameSnake}" = $1, "updated_at" = NOW()
@@ -889,6 +898,10 @@ export async function dismissConflict(
     }
 
     // Task #399: dismissing a dual-completion conflict means "keep THIS side's completion" —
+    if (isSpareClassificationLog({ tableName: conflict.table_name, fieldName: conflict.field_name })) {
+      await resolveClassificationConflict(pool, conflict, userId, false);
+      return getConflict(id, source);
+    }
     // one WO-level decision. All open dual-completion fields of the work order are resolved
     // atomically and the kept values are re-asserted as RESOLUTION_ACTOR field logs so the
     // other side force-applies them and closes its mirror conflicts (otherwise the two

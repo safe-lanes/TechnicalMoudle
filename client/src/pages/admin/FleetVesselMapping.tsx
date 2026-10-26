@@ -17,6 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Component, FleetComponents, FleetJobs, FleetSpares, FleetSpareVesselMapping } from "@shared/schema";
+import { useMasterListOptions } from "@/hooks/useDepartments";
+import { normalizeOptimumQty } from "@/components/spares/SpareClassificationFields";
 
 type MappingTab = "components" | "jobs" | "spares";
 
@@ -75,6 +77,8 @@ interface SpareAutoMatchEntry {
   componentName: string;
   partCode: string;
   partName: string;
+  spareCategory: string | null;
+  optimumQty: number | null;
   vesselSpareId: string;
   vesselSpareIds: string[];
   matched: boolean;
@@ -94,6 +98,7 @@ interface FleetJobMapping {
 
 export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
+  const { options: spareCategoryOptions } = useMasterListOptions("spareCategory");
   const { canCreate, canEdit, canDelete } = usePermissions();
   const canCreateMasters = canCreate("admin-masters");
   const canEditMasters = canEdit("admin-masters");
@@ -669,6 +674,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         componentName: fs.fleetEquipmentName || "",
         partCode: fs.partCode,
         partName: fs.partName || "",
+        spareCategory: (fs as any).spareCategory ?? null,
+        optimumQty: normalizeOptimumQty((fs as any).spareCategory, (fs as any).optimumQty),
         vesselSpareId: matched ? String(vesselSpares[0].suuid) : "",
         vesselSpareIds: vesselSpares.map((vs: any) => String(vs.suuid)),
         matched,
@@ -908,6 +915,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           vesselCode: selectedVessel,
           mappedBy: "admin",
           isActive: true,
+          spareCategory: (selectedFleetSpareObj as any).spareCategory ?? null,
+          optimumQty: normalizeOptimumQty((selectedFleetSpareObj as any).spareCategory, (selectedFleetSpareObj as any).optimumQty),
         });
         successCount++;
       } catch (err: any) {
@@ -940,12 +949,18 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const handleCreateSpareAutoMappings = async () => {
     const matchedEntries = spareAutoMatchEntries.filter((e) => e.matched);
     const alreadyMapped = new Set(spareMappedCompositeKeys);
-    const postItems: { fleetEquipmentCode: string; partCode: string; spareId: string }[] = [];
+    const postItems: { fleetEquipmentCode: string; partCode: string; spareId: string; spareCategory: string | null; optimumQty: number | null }[] = [];
     for (const entry of matchedEntries) {
       for (const sid of entry.vesselSpareIds) {
         const compositeKey = `${entry.fleetEquipmentCode}|${entry.partCode}|${sid}`;
         if (!alreadyMapped.has(compositeKey)) {
-          postItems.push({ fleetEquipmentCode: entry.fleetEquipmentCode, partCode: entry.partCode, spareId: sid });
+          postItems.push({
+            fleetEquipmentCode: entry.fleetEquipmentCode,
+            partCode: entry.partCode,
+            spareId: sid,
+            spareCategory: entry.spareCategory,
+            optimumQty: entry.optimumQty,
+          });
         }
       }
     }
@@ -969,6 +984,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           vesselCode: selectedVessel,
           mappedBy: "auto-match",
           isActive: true,
+          spareCategory: item.spareCategory,
+          optimumQty: item.optimumQty,
         });
         linked++;
         alreadyMapped.add(`${item.fleetEquipmentCode}|${item.partCode}|${item.spareId}`);
@@ -1140,6 +1157,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       toast({ title: "Error", description: "Please select a vessel first", variant: "destructive" });
       return;
     }
+    const confirmed = window.confirm(
+      "Re-syncing fleet spares can overwrite vessel Spare Category and Optimum Qty with fleet values. If the category is not Optimum, any existing Optimum Qty may be cleared. Continue?"
+    );
+    if (!confirmed) return;
     try {
       toast({ title: "Re-syncing", description: "Syncing spare fields from fleet..." });
       const res = await apiRequest("POST", "/technical/api/fleet-admin/resync/spares", { vesselCode: selectedVessel });
@@ -2011,6 +2032,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Fleet Equipment Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Spare Category</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-right px-3 py-2 text-xs font-medium text-gray-500">Optimum Qty</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2028,6 +2051,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.fleetEquipmentCode}</td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.partCode}</td>
                                 <td className="px-3 py-2 text-gray-600">{spare.partName}</td>
+                                <td className="px-3 py-2 text-gray-600">{spareCategoryOptions.find(option => option.value === (spare as any).spareCategory)?.label || (spare as any).spareCategory || ""}</td>
+                                <td className="px-3 py-2 text-right text-gray-600">{(spare as any).optimumQty ?? ""}</td>
                               </tr>
                             );
                           })}
@@ -2058,6 +2083,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         <div className="font-medium text-sm">{selectedFleetSpareData?.partCode}</div>
                         <div className="text-xs text-gray-600 truncate">{selectedFleetSpareData?.partName}</div>
                         <div className="text-xs text-gray-400 mt-1 font-mono">{selectedFleetSpareData?.fleetEquipmentCode}</div>
+                        <div className="text-xs text-gray-600 mt-1">Spare Category: {spareCategoryOptions.find(option => option.value === (selectedFleetSpareData as any)?.spareCategory)?.label || (selectedFleetSpareData as any)?.spareCategory || ""}</div>
+                        <div className="text-xs text-gray-600">Optimum Qty: {(selectedFleetSpareData as any)?.optimumQty ?? ""}</div>
                       </div>
 
                       {selectedFleetSpareLinkedDetails.length > 0 ? (
@@ -2197,6 +2224,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
                             <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Spare Category</th>
+                            <th className="sticky top-0 bg-gray-50 z-10 text-right px-3 py-2 text-xs font-medium text-gray-500">Optimum Qty</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2230,6 +2259,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.componentCode || "-"}</td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.partCode}</td>
                                 <td className="px-3 py-2 text-gray-600">{spare.partName}</td>
+                                <td className="px-3 py-2 text-gray-600">{spareCategoryOptions.find(option => option.value === spare.spareCategory)?.label || spare.spareCategory || ""}</td>
+                                <td className="px-3 py-2 text-right text-gray-600">{spare.optimumQty ?? ""}</td>
                               </tr>
                             );
                           })}
@@ -2264,6 +2295,9 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
               Create Mapping
             </Button>
           </div>
+          <p className="px-4 py-2 text-[11px] text-gray-600 border-b bg-amber-50">
+            Spare Category and Optimum Qty are reviewed and resolved together. Optimum Qty is retained only for the Optimum category.
+          </p>
           {autoMatchProgress && (
             <div className="px-4 py-3 border-b bg-blue-50/50" data-testid="auto-match-progress">
               <div className="flex items-center justify-between mb-2">
@@ -2448,6 +2482,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                   <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Component Name</th>
                   <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Code</th>
                   <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Part Name</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-left px-3 py-2 text-xs font-medium text-gray-500">Spare Category</th>
+                  <th className="sticky top-0 bg-gray-50 z-10 text-right px-3 py-2 text-xs font-medium text-gray-500">Optimum Qty</th>
                   <th className="sticky top-0 bg-gray-50 z-10 text-center px-3 py-2 text-xs font-medium text-gray-500">Status</th>
                 </tr>
               </thead>
@@ -2459,6 +2495,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                     <td className="px-3 py-2 truncate max-w-[180px]">{entry.componentName || "-"}</td>
                     <td className="px-3 py-2 font-mono">{entry.partCode || "-"}</td>
                     <td className="px-3 py-2 truncate max-w-[200px]">{entry.partName || "-"}</td>
+                    <td className="px-3 py-2">{spareCategoryOptions.find(option => option.value === entry.spareCategory)?.label || entry.spareCategory || ""}</td>
+                    <td className="px-3 py-2 text-right">{entry.optimumQty ?? ""}</td>
                     <td className="px-3 py-2 text-center">
                       {entry.matched ? (
                         <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px]">Matched</Badge>
@@ -2470,7 +2508,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                 ))}
                 {spareAutoMatchEntries.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500 text-xs">No fleet spares to match</td>
+                    <td colSpan={8} className="text-center py-8 text-gray-500 text-xs">No fleet spares to match</td>
                   </tr>
                 )}
               </tbody>

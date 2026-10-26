@@ -1,3 +1,4 @@
+import { mergeSpareClassification } from '../../../../shared/spareClassification';
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { eq, and, like, or } from 'drizzle-orm';
@@ -368,13 +369,12 @@ export async function getSpareBySuuid(suuid: string) {
 
 export async function updateSpareResyncFields(suuid: string, fields: Record<string, any>) {
   const db = await getDb();
-  const existingSpare = await getSpareBySuuid(suuid);
-  const [updated] = await db.update(spares)
-    .set({ ...fields, updatedAt: new Date() })
-    .where(eq(spares.suuid, suuid))
-    .returning();
-  // Sync field logging — updateSpareResyncFields
-  if (existingSpare && updated) {
-    try { await logFieldChanges('spares', suuid, existingSpare.vesselId || null, existingSpare, updated, 'system'); } catch (e) { console.error('[FieldLogger] spare resync:', e); }
-  }
+  await db.transaction(async tx => {
+    const [existingSpare] = await tx.select().from(spares).where(eq(spares.suuid, suuid)).for('update');
+    if (!existingSpare) throw new Error('Vessel spare not found for Fleet resync.');
+    const pair = mergeSpareClassification(existingSpare, fields);
+    const [updated] = await tx.update(spares)
+      .set({ ...fields, ...pair, updatedAt: new Date() }).where(eq(spares.suuid, suuid)).returning();
+    await logFieldChanges('spares', suuid, existingSpare.vesselId || null, existingSpare, updated, 'system', tx);
+  });
 }

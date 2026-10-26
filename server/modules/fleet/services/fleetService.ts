@@ -1,3 +1,4 @@
+import { validateClassification, categoryOptions } from '../../spares/services/spareClassificationService';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import {
@@ -229,12 +230,16 @@ export async function getFleetSpare(id: number) {
 
 export async function createFleetSpare(body: any) {
   const validatedData = insertFleetSparesSchema.parse(body);
+  Object.assign(validatedData, await validateClassification({}, body, true));
   return repo.createFleetSpare(validatedData);
 }
 
 export async function updateFleetSpare(id: number, body: any) {
   const partialSchema = insertFleetSparesSchema.partial();
   const validatedData = partialSchema.parse(body);
+  const existing = await repo.getFleetSpare(id);
+  if (!existing) throw Object.assign(new Error('Fleet spare not found'), { statusCode: 404 });
+  Object.assign(validatedData, await validateClassification(existing, body, true));
   return repo.updateFleetSpare(id, validatedData);
 }
 
@@ -244,6 +249,7 @@ export async function deleteFleetSpare(id: number) {
 }
 
 export async function exportFleetSpares(fleetEquipmentCode?: string) {
+  const categoryLabels = new Map((await categoryOptions()).map(option => [option.listKey, option.listValue]));
   let sparesList = await repo.getFleetSpares();
   if (fleetEquipmentCode && typeof fleetEquipmentCode === 'string') {
     sparesList = sparesList.filter((s: any) => s.fleetEquipmentCode === fleetEquipmentCode);
@@ -254,7 +260,7 @@ export async function exportFleetSpares(fleetEquipmentCode?: string) {
     'Part Number', 'Unit Of Measurement', 'Drawing Number', 'Position Number',
     'Note', 'Specification', 'Maker', 'Maker Code',
     'Manual Name', 'Page Number', 'Criticality', 'Is Active',
-    'IHM (Inventory of Hazardous Materials)', 'Evidence Type'
+    'IHM (Inventory of Hazardous Materials)', 'Evidence Type', 'Spare Category', 'Optimum Qty'
   ];
 
   const rows = sparesList.map((s: any) => [
@@ -276,6 +282,8 @@ export async function exportFleetSpares(fleetEquipmentCode?: string) {
     s.isActive === false ? 'No' : 'Yes',
     s.ihm || '',
     s.evidenceType || '',
+    categoryLabels.get(s.spareCategory) || s.spareCategory || '',
+    s.optimumQty ?? '',
   ]);
 
   const wsData = [headers, ...rows];
@@ -398,6 +406,12 @@ export async function createMasterList(body: any) {
 export async function updateMasterList(id: number, body: any) {
   const partialMasterListSchema = insertMasterListSchema.partial();
   const validatedData = partialMasterListSchema.parse(body);
+  const existingItem = await repo.getMasterListById(id);
+  if (existingItem?.listType === 'spareCategory' &&
+      ((body.listKey !== undefined && body.listKey !== existingItem.listKey) ||
+       (body.listType !== undefined && body.listType !== existingItem.listType))) {
+    throw Object.assign(new Error('Spare Category keys are permanent. Edit the display label or add a new category instead.'), { statusCode: 400 });
+  }
   // If listType is being changed, validate the new value exists + is active.
   if (validatedData.listType !== undefined) {
     const type = await repo.getMasterListTypeByKey(validatedData.listType);

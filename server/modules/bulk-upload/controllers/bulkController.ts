@@ -192,7 +192,7 @@ export async function getTemplate(req: Request, res: Response) {
         'Note', 'Specification', 'Maker', 'Maker Code', 'Manual Name', 'Page Number',
         'Criticality', 'Total ROB', 'Location A', 'Location A - ROB',
         'Location B', 'Location B - ROB', 'Minimum Stock', 'Is Active',
-        'IHM (Inventory of Hazardous Materials)', 'Evidence Type', 'Rotation Item'
+        'IHM (Inventory of Hazardous Materials)', 'Evidence Type', 'Rotation Item', 'Spare Category', 'Optimum Qty'
       ];
 
       validValues = [
@@ -306,7 +306,7 @@ export async function getTemplate(req: Request, res: Response) {
         'Part Number', 'Unit Of Measurement', 'Drawing Number', 'Position Number',
         'Note', 'Specification', 'Maker', 'Maker Code',
         'Manual Name', 'Page Number', 'Criticality', 'Is Active',
-        'IHM (Inventory of Hazardous Materials)', 'Evidence Type'
+        'IHM (Inventory of Hazardous Materials)', 'Evidence Type', 'Spare Category', 'Optimum Qty'
       ];
 
       validValues = [

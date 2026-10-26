@@ -1,3 +1,4 @@
+import { applyClassificationEvent, isSpareClassificationLog, resolveLegacyClassification } from './spareClassificationSync';
 /**
  * Sync Service — Business logic for the ship-shore sync protocol.
  *
@@ -402,6 +403,11 @@ export async function receivePushData(
           try { await client.query(`SAVEPOINT ${pushSp}`); } catch { /* non-fatal */ }
           try {
             const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
+            if (await applyClassificationEvent(client, log, insertResult.updateLogs,
+                receiverInstanceId, batchUuid, evaluateStaleSkipGuard)) {
+              await client.query(`RELEASE SAVEPOINT ${pushSp}`);
+              continue;
+            }
             const isInsertLog = log.oldValue === null || log.oldValue === undefined;
 
             // ── Task #399: dual-completion collision (same WO completed on BOTH sides) ──
@@ -1156,6 +1162,12 @@ export async function preparePullData(
   const nonConflictingLogs = [];
 
   for (const shoreLog of shoreFieldLogs) {
+    // Do not split a classification event into independent old-style conflicts.
+    // The receiver applies/holds the pair atomically and records pair-level collisions.
+    if (isSpareClassificationLog(shoreLog)) {
+      nonConflictingLogs.push(shoreLog);
+      continue;
+    }
     const key = `${shoreLog.tableName}:${shoreLog.rowUuid}:${shoreLog.fieldName}`;
     const shipLog = shipChangeMap.get(key);
 
@@ -1259,6 +1271,10 @@ export async function resolveConflictAction(
   }
 
   // Apply the winning value to the actual data table
+  if (isSpareClassificationLog(conflict)) {
+    await resolveLegacyClassification(await getPool(), conflict, winningValue, resolution, resolvedBy);
+    return { resolved: true, resolution, resolvedValue: winningValue };
+  }
   const config = getTableSyncConfig(conflict.tableName);
   if (config) {
     const identityCol = config.identityColumn || 'id';

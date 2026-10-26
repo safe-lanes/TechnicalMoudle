@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
 import { SectionBlock } from "@/components/SectionBlock";
+import { SpareClassificationFields, isValidSpareClassification, normalizeOptimumQty } from "@/components/spares/SpareClassificationFields";
+import { useMasterListOptions } from "@/hooks/useDepartments";
 
 export default function FleetSparesManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
@@ -35,6 +37,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
   const [equipSearchText, setEquipSearchText] = useState("");
   const [showEquipSuggestions, setShowEquipSuggestions] = useState(false);
+  const { options: spareCategoryOptions } = useMasterListOptions("spareCategory");
 
   const { data: spares, isLoading, error } = useQuery<FleetSpares[]>({
     queryKey: ['/technical/api/fleet/spares'],
@@ -217,6 +220,10 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
 
   const handleSaveEdit = () => {
     if (!detailSpare) return;
+    if (!isValidSpareClassification((spareFormData as any).spareCategory, (spareFormData as any).optimumQty)) {
+      toast({ title: "Validation Error", description: "Select a Spare Category; Optimum Qty must be a positive whole number no greater than 2147483647 for Optimum spares.", variant: "destructive" });
+      return;
+    }
     if (spareFormData.maker && spareFormData.maker.trim()) {
       const validMaker = makers.find(m => m.makerName?.toLowerCase() === spareFormData.maker?.trim().toLowerCase());
       if (!validMaker) {
@@ -229,17 +236,18 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       if (typeof val === 'string' && val.trim() === '') return null;
       return val;
     };
-    const EDITABLE_FIELDS: (keyof FleetSpares)[] = [
+    const EDITABLE_FIELDS = [
       'partCode', 'partName', 'partNumber', 'unitOfMeasurement',
       'fleetEquipmentCode', 'fleetEquipmentName', 'drawingNumber',
       'positionNumber', 'specification', 'maker', 'makerCode',
       'manualName', 'pageNumber', 'note', 'criticality', 'isActive',
       'ihm', 'evidenceType',
+      'spareCategory', 'optimumQty',
     ];
     const changedFields: Record<string, any> = {};
     for (const field of EDITABLE_FIELDS) {
-      const oldVal = normalize(detailSpare[field]);
-      const newVal = normalize(spareFormData[field]);
+      const oldVal = normalize((detailSpare as any)[field]);
+      const newVal = normalize((spareFormData as any)[field]);
       if (field === 'isActive') {
         const oldBool = detailSpare.isActive ?? true;
         const newBool = spareFormData.isActive ?? true;
@@ -247,7 +255,9 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
           changedFields[field] = newBool;
         }
       } else if (newVal !== oldVal) {
-        changedFields[field] = spareFormData[field] ?? null;
+        changedFields[field] = field === 'optimumQty'
+          ? normalizeOptimumQty((spareFormData as any).spareCategory, (spareFormData as any).optimumQty)
+          : (spareFormData as any)[field] ?? null;
       }
     }
     if (changedFields.fleetEquipmentCode && !changedFields.fleetEquipmentName) {
@@ -261,6 +271,10 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   };
 
   const handleSaveAdd = () => {
+    if (!isValidSpareClassification((spareFormData as any).spareCategory, (spareFormData as any).optimumQty)) {
+      toast({ title: "Validation Error", description: "Select a Spare Category; Optimum Qty must be a positive whole number no greater than 2147483647 for Optimum spares.", variant: "destructive" });
+      return;
+    }
     if (!spareFormData.partCode?.trim()) {
       toast({ title: "Validation Error", description: "Part Code is required", variant: "destructive" });
       return;
@@ -290,6 +304,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
         payload[key] = value;
       }
     });
+    payload.spareCategory = (spareFormData as any).spareCategory;
+    payload.optimumQty = normalizeOptimumQty((spareFormData as any).spareCategory, (spareFormData as any).optimumQty);
     createSpareMutation.mutate(payload as Partial<FleetSpares>);
   };
 
@@ -429,6 +445,16 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
             </div>
           </div>
         </div>
+      </SectionBlock>
+
+      <SectionBlock id="spare-classification" number="A1.1" title="Spare Classification" description="Category and optimum stock target">
+        <SpareClassificationFields
+          idPrefix="fleet"
+          spareCategory={String((formData as any).spareCategory || "")}
+          optimumQty={(formData as any).optimumQty == null ? "" : String((formData as any).optimumQty)}
+          onCategoryChange={value => setFormData(prev => ({ ...prev, spareCategory: value } as any))}
+          onOptimumQtyChange={value => setFormData(prev => ({ ...prev, optimumQty: value === "" ? null : Number(value) } as any))}
+        />
       </SectionBlock>
 
       <SectionBlock id="spare-status" number="A2" title="Status & Classification" description="Status flags and classification details">
@@ -750,6 +776,21 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </div>
             </SectionBlock>
 
+            <SectionBlock id="detail-spare-classification" number="A1.1" title="Spare Classification" description="Category and optimum stock target">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Spare Category</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-spare-category">
+                    {spareCategoryOptions.find(option => option.value === (detailSpare as any).spareCategory)?.label || ""}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm text-[#8798ad]">Optimum Qty</Label>
+                  <div className="text-sm font-medium text-gray-900" data-testid="detail-optimum-qty">{(detailSpare as any).optimumQty ?? ""}</div>
+                </div>
+              </div>
+            </SectionBlock>
+
             <SectionBlock id="detail-status" number="A2" title="Status & Classification" description="Status flags and classification details">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
@@ -956,6 +997,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                     <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.18"><Marker id="I4.QL5.5.18" />Maker Reference</th>
                     <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.19"><Marker id="I4.QL5.5.19" />Unit</th>
                     <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.20"><Marker id="I4.QL5.5.20" />Location</th>
+                    <th className="text-left text-white py-3 px-4 font-medium">Spare Category</th>
+                    <th className="text-right text-white py-3 px-4 font-medium">Optimum Qty</th>
                     <th className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.21"><Marker id="I4.QL5.5.21" />Actions</th>
                   </tr>
                 </thead>
@@ -997,6 +1040,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                           {isFirstRow && <Marker id="I4.QL5.5.27" />}
                           -
                         </td>
+                        <td className="py-3 px-4">{spareCategoryOptions.find(option => option.value === (spare as any).spareCategory)?.label || ""}</td>
+                        <td className="py-3 px-4 text-right">{(spare as any).optimumQty ?? ""}</td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex justify-end gap-1">
                             {canEditMasters && (

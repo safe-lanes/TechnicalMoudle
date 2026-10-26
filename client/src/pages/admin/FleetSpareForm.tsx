@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Marker } from "@/components/Marker";
 import { X } from "lucide-react";
+import { SpareClassificationFields, isValidSpareClassification, normalizeOptimumQty } from "@/components/spares/SpareClassificationFields";
 
 const fleetSpareFormSchema = z.object({
   partName: z.string().min(1, "Part name is required"),
@@ -34,6 +35,8 @@ const fleetSpareFormSchema = z.object({
   manualName: z.string().optional(),
   pageNumber: z.string().optional(),
   isActive: z.boolean().default(true),
+  spareCategory: z.string().min(1, "Spare category is required"),
+  optimumQty: z.string().optional(),
 });
 
 type FleetSpareFormData = z.infer<typeof fleetSpareFormSchema>;
@@ -98,6 +101,8 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
       manualName: "",
       pageNumber: "",
       isActive: true,
+      spareCategory: "",
+      optimumQty: "",
     },
   });
 
@@ -122,6 +127,8 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
         manualName: spare.manualName || "",
         pageNumber: spare.pageNumber || "",
         isActive: spare.isActive ?? true,
+        spareCategory: (spare as any).spareCategory || "",
+        optimumQty: (spare as any).optimumQty == null ? "" : String((spare as any).optimumQty),
       });
       setEquipSearchText(spare.fleetEquipmentCode || "");
       setMakerSearchText(spare.maker || "");
@@ -144,6 +151,8 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
         manualName: "",
         pageNumber: "",
         isActive: true,
+        spareCategory: "",
+        optimumQty: "",
       });
       setEquipSearchText("");
       setMakerSearchText("");
@@ -247,6 +256,14 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   });
 
   const onSubmit = (data: FleetSpareFormData) => {
+    if (!isValidSpareClassification(data.spareCategory, data.optimumQty)) {
+      toast({ title: "Validation Error", description: "Optimum Qty must be a positive whole number no greater than 2147483647 for Optimum spares.", variant: "destructive" });
+      return;
+    }
+    const classifiedData = {
+      ...data,
+      optimumQty: normalizeOptimumQty(data.spareCategory, data.optimumQty),
+    };
     if (data.maker && data.maker.trim()) {
       const validMaker = makers.find(m => m.makerName?.toLowerCase() === data.maker?.trim().toLowerCase());
       if (!validMaker) {
@@ -255,9 +272,9 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
       }
     }
     if (spare?.id) {
-      updateMutation.mutate({ ...data, id: spare.id });
+      updateMutation.mutate({ ...classifiedData, id: spare.id } as any);
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(classifiedData as any);
     }
   };
 
@@ -278,6 +295,14 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <SpareClassificationFields
+            idPrefix="fleet-form"
+            spareCategory={form.watch("spareCategory") || ""}
+            optimumQty={form.watch("optimumQty") || ""}
+            onCategoryChange={value => form.setValue("spareCategory", value, { shouldValidate: true })}
+            onOptimumQtyChange={value => form.setValue("optimumQty", value, { shouldValidate: true })}
+          />
+          {form.formState.errors.spareCategory && <p className="text-sm text-red-500">{form.formState.errors.spareCategory.message}</p>}
           {/* Part Name */}
           <div className="space-y-2">
             <Label htmlFor="partName" data-testid={m("I4.QL5.5.14.3", "I4.QL5.5.28.3")}>

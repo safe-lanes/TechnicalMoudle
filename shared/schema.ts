@@ -639,6 +639,8 @@ export const spares = pgTable("spares", {
   componentCode: text("component_code"),
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"), // Format: SP-<ComponentCode>-<NNN>
+  spareCategory: text("spare_category"),
+  optimumQty: integer("optimum_qty"),
   critical: text("critical").notNull(), // 'Critical' | 'Non-Critical' | 'Yes' | 'No'
   rob: integer("rob").notNull().default(0), // Remaining on Board (total = robLocationA + robLocationB)
   robLocationA: integer("rob_location_a").notNull().default(0), // ROB in Location A
@@ -2779,6 +2781,8 @@ export const fleetSpares = pgTable("fleet_spares", {
   fleetEquipmentCode: text("fleet_equipment_code").notNull(),
   fleetEquipmentName: text("fleet_equipment_name").notNull(),
   partName: text("part_name").notNull(),
+  spareCategory: text("spare_category"),
+  optimumQty: integer("optimum_qty"),
   partNumber: text("part_number"),
   unitOfMeasurement: text("unit_of_measurement").notNull(),
   drawingNumber: text("drawing_number"),

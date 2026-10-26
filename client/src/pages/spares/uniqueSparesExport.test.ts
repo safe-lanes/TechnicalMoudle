@@ -203,7 +203,14 @@ test("XLSX read-back matches the existing template and retains data and dropdown
   for (const name of ["Spares", "Components", "Lists"]) {
     const sheet = workbook.getWorksheet(name)!;
     const expected = template.getWorksheet(name)!;
-    assert.deepEqual(sheet.getRow(1).values, expected.getRow(1).values);
+    if (name === "Spares") {
+      assert.deepEqual(sheet.getRow(1).values.slice(1, 29), expected.getRow(1).values.slice(1, 29));
+      const headers = sheet.getRow(1).values.map(String);
+      assert.ok(headers.includes("Spare Category"));
+      assert.ok(headers.includes("Optimum Qty"));
+    } else {
+      assert.deepEqual(sheet.getRow(1).values, expected.getRow(1).values);
+    }
     for (let column = 1; column <= (name === "Spares" ? 28 : expected.columnCount); column++) {
       assert.equal(sheet.getColumn(column).width, expected.getColumn(column).width);
       assert.deepEqual(sheet.getCell(1, column).font, expected.getCell(1, column).font);
@@ -212,7 +219,7 @@ test("XLSX read-back matches the existing template and retains data and dropdown
   const sheet = workbook.getWorksheet("Spares")!;
   assert.equal(sheet.rowCount, 1002);
   assert.equal(sheet.getCell("A1002").value, "PT-1001");
-  assert.equal(sheet.getCell("AC1").value, "_TEMPLATE_VERSION_2.0.0");
+  assert.equal(sheet.getCell(1, SPARES_TEMPLATE_FIELDS.length + 1).value, "_TEMPLATE_VERSION_2.0.0");
   assert.equal(sheet.getCell("D2").value, "Fleet engine a");
   assert.equal(sheet.getCell("S1002").value, 0);
   for (const column of ["I", "R", "Y", "Z", "AB"]) {

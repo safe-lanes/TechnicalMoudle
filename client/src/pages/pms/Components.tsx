@@ -1634,6 +1634,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const { isModifyMode } = useModifyMode();
   const [spareDetailsOpen, setSpareDetailsOpen] = useState(false);
   const [selectedSpareDetails, setSelectedSpareDetails] = useState<SpareWithInventoryData | null>(null);
+  const { options: spareCategoryOptions } = useMasterListOptions('spareCategory');
   
   // Pagination state
   const [isTableExpanded, setIsTableExpanded] = useState(false);
@@ -1777,6 +1778,16 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
         },
       },
       {
+        headerName: 'Spare Category',
+        minWidth: 150,
+        flex: 0.9,
+        headerComponent: header('Spare Category'),
+        valueGetter: ({ data }) => {
+          const category = data?.spare?.spareCategory || '';
+          return spareCategoryOptions.find(option => option.value === category)?.label || category || '—';
+        },
+      },
+      {
         headerName: 'ROB',
         minWidth: 100,
         flex: 0.65,
@@ -1795,6 +1806,13 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
         cellRenderer: ({ value, node }: any) => (
           <span>{firstRowMarker(node.rowIndex, 'B7.E.14')}{value}</span>
         ),
+      },
+      {
+        headerName: 'Optimum Qty',
+        minWidth: 115,
+        flex: 0.7,
+        headerComponent: header('Optimum Qty'),
+        valueGetter: ({ data }) => data?.spare?.optimumQty ?? '—',
       },
       {
         headerName: 'Stock',
@@ -1922,7 +1940,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     });
 
     return columns;
-  }, []);
+  }, [spareCategoryOptions]);
   
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view associated spares</div>;
@@ -2032,6 +2050,18 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                   <div>
                     <Label className="text-xs text-gray-500">Part Number</Label>
                     <p className="text-sm font-medium" data-testid="spare-details-part-number">{selectedSpareDetails.spare.partNumber || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Spare Category</Label>
+                    <p className="text-sm font-medium" data-testid="spare-details-category">
+                      {spareCategoryOptions.find(option => option.value === selectedSpareDetails.spare.spareCategory)?.label || selectedSpareDetails.spare.spareCategory || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Optimum Qty</Label>
+                    <p className="text-sm font-medium" data-testid="spare-details-optimum-qty">
+                      {selectedSpareDetails.spare.optimumQty ?? '-'}
+                    </p>
                   </div>
                   <div>
                     <Label className="text-xs text-gray-500">Unit</Label>

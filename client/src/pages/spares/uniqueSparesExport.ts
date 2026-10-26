@@ -1,11 +1,12 @@
 import {
-  buildComponentSparesWorkbook, downloadComponentSparesWorkbook,
+  buildComponentSparesWorkbook, downloadComponentSparesWorkbook, fetchSpareCategoryLabels,
 } from "./componentSparesExport";
 
 type ExportRecord = Record<string, any>;
 export interface UniqueSparesData {
   rows: { spare: ExportRecord; component: ExportRecord }[];
   components: ExportRecord[];
+  spareCategoryLabels?: Record<string, string>;
 }
 
 const deleted = (record: ExportRecord) => record.deleted === true || record.isDeleted === true;
@@ -50,8 +51,11 @@ export async function fetchUniqueSparesData(
   vesselIds: string[], activeOnly: boolean, readJson: (url: string) => Promise<any>,
   assertCurrent: () => void = () => {},
 ): Promise<UniqueSparesData> {
+  assertCurrent();
   const rows: UniqueSparesData["rows"] = [];
   const components: ExportRecord[] = [];
+  const spareCategoryLabels = await fetchSpareCategoryLabels(readJson);
+  assertCurrent();
   for (const vesselId of Array.from(new Set(vesselIds))) {
     if (!vesselId || vesselId === "all" || vesselId === "my") {
       throw new Error("A concrete vessel is required to fetch unique spares.");
@@ -127,7 +131,7 @@ export async function fetchUniqueSparesData(
     }
   }
   assertCurrent();
-  return { rows, components };
+  return { rows, components, spareCategoryLabels };
 }
 
 // Reuse only the unchanged pure template builder and browser download mechanism.

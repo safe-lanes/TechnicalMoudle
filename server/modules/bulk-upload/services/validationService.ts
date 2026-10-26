@@ -1,3 +1,5 @@
+import { importSpareClassification } from '../../../../shared/spareClassification';
+import { categoryOptions } from '../../spares/services/spareClassificationService';
 import { storage } from '../../../storage';
 import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage'; // TEMP-TRACE
 import { getSFIName } from '../../../utils/sfiLookup';
@@ -645,12 +647,24 @@ export async function validateData(type: string, data: any[], mode: string, vess
   }
   
   // Validate each row based on type (use filtered data)
+  const classificationOptions = ['spares', 'fleet-spares'].includes(type) ? await categoryOptions() : [];
   for (let i = 0; i < filteredData.length; i++) {
     const row = filteredData[i];
     const rowNum = i + 2; // Excel rows start at 1, plus header
     const errors: string[] = [];
     const warnings: string[] = [];
     const normalized: any = {};
+    if (type === 'spares' || type === 'fleet-spares') {
+      try {
+        const pair = importSpareClassification(row, classificationOptions);
+        if (Object.keys(pair).length) {
+          normalized['Spare Category'] = pair.spareCategory;
+          normalized['Optimum Qty'] = pair.optimumQty;
+        }
+      } catch (error: any) {
+        errors.push(`Row ${rowNum}: ${error.message}`);
+      }
+    }
 
     // Validate Vessel Code matches selected vesselId (only for types that have Vessel Code)
     // Note: work-orders template does NOT have Vessel Code column, so exclude it from validation

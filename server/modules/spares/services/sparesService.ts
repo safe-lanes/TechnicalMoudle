@@ -1,4 +1,6 @@
 import * as repo from '../repositories/sparesRepository';
+import { validateClassification } from './spareClassificationService';
+import { hasClassification } from '../../../../shared/spareClassification';
 import type { Spare, InsertSpare, SpareHistory } from '@shared/schema';
 import {
   adjustmentPayloadSchema,
@@ -34,8 +36,10 @@ export async function getSpare(id: string): Promise<Spare | undefined> {
 }
 
 export async function createSpare(vesselId: string, body: any): Promise<Spare> {
+  const classification = await validateClassification({}, body, true);
   return repo.createSpare({
     ...body,
+    ...classification,
     vesselId
   });
 }
@@ -59,6 +63,11 @@ export async function updateSpare(
   }
 
   const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = body;
+  // Operational stock/location patches remain compatible with unclassified legacy rows.
+  // Full form edits and explicit classification edits must satisfy normal-entry rules.
+  if (hasClassification(body) || Object.prototype.hasOwnProperty.call(body, 'partName')) {
+    Object.assign(otherUpdates, await validateClassification(existingSpare, body, true));
+  }
 
   // Check if location ROB values are being changed - route to transfer/adjustment method
   if (robLocationA !== undefined || robLocationB !== undefined) {

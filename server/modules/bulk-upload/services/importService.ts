@@ -1,3 +1,5 @@
+import { importSpareClassification } from '../../../../shared/spareClassification';
+import { categoryOptions } from '../../spares/services/spareClassificationService';
 import { storage } from '../../../storage';
 import { v4 as uuidv4 } from 'uuid';
 import { getSFIName } from '../../../utils/sfiLookup';
@@ -592,6 +594,7 @@ export async function performImport(
       const row = data[_spareIdx];
       const _spareRowNum = row['__meta']?.rowNumber || (_spareIdx + 1);
       try {
+        const classification = importSpareClassification(row, await categoryOptions());
         const componentCode = String(row['Component Code']).trim();
         const component = componentsByCode.get(componentCode);
         
@@ -688,6 +691,7 @@ export async function performImport(
           const robLocationBVal = parseRowRob(row['Location B - ROB']);
           
           const newSpare = await storage.createSpare({
+            ...classification,
             partCode: partCode,
             partName: String(row['Part Name']).trim(),
             componentId: component.cuuid,
@@ -815,6 +819,7 @@ export async function performImport(
           const robLocationBUpdate = parseRowRob(row['Location B - ROB']) ?? existingSpare.robLocationB ?? null;
           
           const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
+            ...classification,
             partName: String(row['Part Name']).trim(),
             componentId: component.cuuid,
             componentCode: componentCode,
@@ -955,6 +960,7 @@ export async function performImport(
               // Always update the spare with latest data (upsert behavior)
               // Same component - update existing spare
               const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
+                ...classification,
                 partName: String(row['Part Name']).trim(),
                 componentId: component.cuuid,
                 componentCode: componentCode,
@@ -1021,6 +1027,7 @@ export async function performImport(
           } else {
             // Create new - use criticalValUpsert from parent scope
             const newSpare = await storage.createSpare({
+              ...classification,
               partCode: partCode,
               partName: String(row['Part Name']).trim(),
               componentId: component.cuuid,
@@ -2802,6 +2809,7 @@ export async function performImport(
       const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
       
       const fleetSpareData = {
+        ...importSpareClassification(row, await categoryOptions()),
         partCode: String(partCode).trim(),
         fleetComponentsUuid,
         fleetEquipmentCode: String(fleetEquipmentCode).trim(),

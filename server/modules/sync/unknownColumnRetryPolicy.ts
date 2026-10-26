@@ -7,5 +7,7 @@
  * receiver applies migration 175, then normal field-log retry delivers it.
  */
 export function shouldRetryUnknownSyncColumn(tableName: string, columnName: string): boolean {
-  return tableName === 'vessel_certificate_data' && columnName === 'certificate_number';
+  return (tableName === 'vessel_certificate_data' && columnName === 'certificate_number') ||
+    (['spares', 'fleet_spares'].includes(tableName) &&
+      ['spare_category', 'optimum_qty'].includes(columnName));
 }
