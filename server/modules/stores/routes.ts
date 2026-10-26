@@ -1,9 +1,20 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import * as storesCtrl from './controllers/storesController';
+import * as paging from './controllers/storesPagingController';
 import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
 
 const router = Router();
+router.get('/stores/item/:id/history/paged', requireAuth, asyncHandler(paging.itemHistory));
+router.get('/stores/:vesselId/paged', requireAuth, asyncHandler(paging.page));
+router.get('/stores/:vesselId/locations/paged', requireAuth, asyncHandler(paging.locations));
+router.get('/stores/:vesselId/values', requireAuth, asyncHandler(paging.values));
+router.get('/stores/:vesselId/export', requireAuth, asyncHandler(paging.exportFile));
+router.post('/stores/:vesselId/targets', requireAuth, asyncHandler(paging.capture));
+router.post('/stores/:vesselId/targets/membership', requireAuth, asyncHandler(paging.targetMembership));
+router.post('/stores/:vesselId/targets/inactivate', requirePMSAdmin, asyncHandler(paging.inactivateTargets));
+router.post('/stores/:vesselId/chemicals/update', requirePMSAdmin, asyncHandler(paging.updateChemicals));
+router.post('/stores/:vesselId/bulk-quantities', requirePMSAdmin, asyncHandler(paging.bulkQuantities));
 
 // ══════════════════════════════════════════════════════════
 // Stores Routes

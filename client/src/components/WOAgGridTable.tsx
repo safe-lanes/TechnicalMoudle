@@ -77,6 +77,8 @@ interface WOAgGridTableProps {
   onGridReady?: (event: GridReadyEvent) => void;
   pagination?: boolean;
   paginationPageSize?: number;
+  serverQueryUrl?: string;
+  onServerQueryChanged?: (model: { sort: any[]; filters: Record<string, any> }) => void;
 }
 
 const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
@@ -101,10 +103,51 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   onGridReady: onGridReadyProp,
   pagination = false,
   paginationPageSize,
+  serverQueryUrl,
+  onServerQueryChanged,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
+  // Infinite row model delegates filter/sort to the API. Its cache contains only
+  // the externally requested page, so AG Grid never filters page rows again.
+  const datasource = useMemo(() => ({
+    getRows: (params: any) => params.successCallback(rowData, rowData.length),
+  }), [rowData]);
 
-  const useExternalSort = !!onSortChanged;
+  const useExternalSort = !!onSortChanged || !!onServerQueryChanged;
+  const publishServerQuery = useCallback((event: any) => {
+    onServerQueryChanged?.({
+      sort: event.api.getColumnState().filter((col: any) => col.sort)
+        .sort((a: any, b: any) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
+        .map((col: any) => ({ colId: col.colId, sort: col.sort })),
+      filters: event.api.getFilterModel(),
+    });
+  }, [onServerQueryChanged]);
+  const serverColumns = useMemo(() => !serverQueryUrl ? columnDefs : columnDefs.map(col => {
+    const getValues = async (params: any) => {
+      try {
+        const url = new URL(serverQueryUrl, window.location.origin);
+        url.pathname = url.pathname.replace(/\/paged$/, '/values');
+        url.searchParams.set('column', col.field || col.colId || '');
+        const response = await fetch(url.pathname + url.search);
+        if (!response.ok) throw new Error('Could not load filter values');
+        params.success((await response.json()).data);
+      } catch { params.success([]); }
+    };
+    const filter = col.filter ?? true;
+    return {
+      ...col,
+      // Infinite row models render loading placeholders before data arrives.
+      ...(typeof col.cellRenderer === 'function' ? {
+        cellRenderer: (params: any) => params.data ? col.cellRenderer(params) : null,
+      } : {}),
+      ...(typeof col.valueGetter === 'function' ? {
+        valueGetter: (params: any) => params.data ? (col.valueGetter as Function)(params) : '',
+      } : {}),
+      // Explicit set filters and implicit enterprise set filters need full-scope values.
+      ...(filter === 'agSetColumnFilter' || filter === true
+        ? { filter: 'agSetColumnFilter', filterParams: { ...col.filterParams, values: getValues, refreshValuesOnOpen: true } } : {}),
+    };
+  }), [columnDefs, serverQueryUrl]);
 
   const defaultColDef: ColDef = useMemo(() => ({
     sortable: true,
@@ -150,13 +193,19 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
       data-testid={testId}
     >
       <AgGridReact
-        rowData={rowData}
-        columnDefs={columnDefs}
+        rowData={onServerQueryChanged ? undefined : rowData}
+        rowModelType={onServerQueryChanged ? 'infinite' : 'clientSide'}
+        datasource={onServerQueryChanged ? datasource : undefined}
+        cacheBlockSize={200}
+        maxBlocksInCache={1}
+        infiniteInitialRowCount={1}
+        columnDefs={serverColumns}
         defaultColDef={defaultColDef}
         loading={loading}
         onGridReady={onGridReady}
         onRowClicked={onRowClicked}
-        onSortChanged={useExternalSort ? handleSortChanged : undefined}
+        onSortChanged={onServerQueryChanged ? publishServerQuery : useExternalSort ? handleSortChanged : undefined}
+        onFilterChanged={onServerQueryChanged ? publishServerQuery : undefined}
         postSortRows={useExternalSort ? (params) => {
           if (params.nodes) {
             params.nodes.sort((a: any, b: any) => {

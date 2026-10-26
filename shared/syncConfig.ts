@@ -1238,6 +1238,12 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
 
   // ══════════════════════════════════════════════════════════════════════════════
   // NO_SYNC — Never synced, instance-local only
+  stores_operation_targets: {
+    tableName: 'stores_operation_targets', category: 'NO_SYNC', direction: 'none',
+    identityColumn: 'token', vesselScopeColumn: null, vesselScopeJoinPath: null,
+    isGlobal: true, isConfigurable: false, businessRules: null,
+    notes: 'Transient per-user Stores selection snapshots; tenant database-local, never vessel inventory or sync data.',
+  },
   // ══════════════════════════════════════════════════════════════════════════════
 
   // ── Platform-provisioned (managed by SAILERP, not PMS sync engine) ──

@@ -4946,4 +4946,12 @@ export type InsertMocApprover = z.infer<typeof insertMocApproverSchema>;
 export type MocApprover = typeof mocApprovers.$inferSelect;
 
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
+export const storesOperationTargets = pgTable("stores_operation_targets", {
+  token: text("token").primaryKey(),
+  ownerUuid: text("owner_uuid").notNull(),
+  itemType: text("item_type").notNull(),
+  targets: jsonb("targets").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ ownerIdx: index("stores_operation_targets_owner_idx").on(table.ownerUuid) }));
+
 export * from './schema-noon-report';

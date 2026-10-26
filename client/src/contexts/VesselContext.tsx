@@ -138,6 +138,7 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   }, [vesselId]);
 
   const setVesselId = (id: string) => {
+    if (id !== vesselId && !window.dispatchEvent(new CustomEvent("before-vessel-change", { cancelable: true, detail: { vesselId: id } }))) return;
     userTouchedRef.current = true;
     setVesselIdState(id);
   };

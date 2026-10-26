@@ -1,5 +1,6 @@
 import { apiErrorMessage } from "@/lib/apiErrorMessage";
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useStorePage, useStoreSearch, storeUrl, storesJson, StoresPager, downloadStoreExport } from "./storesPaging";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -54,6 +55,7 @@ const IHM_EVIDENCE_TYPES = ["None", "MD", "SDoC", "Test"] as const;
 
 interface StoreItem {
   id: number;
+  vesselId?: string;
   itemCode: string;
   itemName: string;
   storesCategory: string;
@@ -196,12 +198,6 @@ const Stores: React.FC = () => {
     }
     return "stores";
   });
-  const storesInventoryUrl = isMyVessels
-    ? `/technical/api/stores/all?itemType=${activeTab}&vesselIds=${assignedVesselIds.join(',')}`
-    : `/technical/api/stores/${vesselId}?itemType=${activeTab}`;
-  const storesHistoryUrl = isMyVessels
-    ? `/technical/api/stores/all/history?itemType=${activeTab}&vesselIds=${assignedVesselIds.join(',')}`
-    : `/technical/api/stores/${vesselId}/history?itemType=${activeTab}`;
   const [viewMode, setViewMode] = useState<"inventory" | "location" | "history">("inventory");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -212,6 +208,25 @@ const Stores: React.FC = () => {
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
   const [items, setItems] = useState<StoreItem[]>([]);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [inventorySize, setInventorySize] = useState(25);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historySize, setHistorySize] = useState(25);
+  const [locationListPage, setLocationListPage] = useState(1);
+  const [gridModels, setGridModels] = useState<Record<string, { sort: any[]; filters: any }>>({});
+  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<PeriodFilterValue | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyEventFilter, setHistoryEventFilter] = useState("all");
+  const [locationPage, setLocationPage] = useState(1);
+  const [locationItemsPerPage, setLocationItemsPerPage] = useState(10);
+  const effectiveSearch = useStoreSearch(searchTerm);
+  const effectiveHistorySearch = useStoreSearch(historySearch);
+  const [targetSelection, setTargetSelection] = useState<{token: string; total: number} | null>(null);
+  const [excludedStoreIds, setExcludedStoreIds] = useState<Set<number>>(new Set());
+  const [pageSelectionIds, setPageSelectionIds] = useState<Set<number>>(new Set());
+  const editedLocationRows = useRef(new Map<number, StoreItem>());
+  const exportAbort = useRef<AbortController>();
+  const [exporting, setExporting] = useState(false);
   
   // Modify mode state - use proper hook for reactivity
   const { isModifyMode } = useModifyMode();
@@ -256,6 +271,7 @@ const Stores: React.FC = () => {
     if (viewMode !== 'inventory') {
       setIsDeleteSelectionMode(false);
       setSelectedStoreIds(new Set());
+      setTargetSelection(null); setExcludedStoreIds(new Set());
     }
     if (viewMode !== 'history') {
       setHistoryPeriodFilter(null);
@@ -268,10 +284,61 @@ const Stores: React.FC = () => {
 
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
-  const { data: storesData = [], isLoading: storesLoading } = useQuery<StoresApiItem[]>({
-    queryKey: storesScopeReady ? [storesInventoryUrl] : ['stores-disabled'],
-    enabled: storesScopeReady,
-  });
+  const scopeSegment = isMyVessels ? "all" : vesselId;
+  const scopeKey = `${vesselId}|${assignedVesselIds.join(",")}|${activeTab}`;
+  const currentScope = useRef(scopeKey); currentScope.current = scopeKey;
+  const scopeParams = { itemType: activeTab, ...(isMyVessels ? { scope: "my", vesselIds: assignedVesselIds.join(",") } : {}) };
+  const inventoryParams = { ...scopeParams, search: effectiveSearch, category: categoryFilter,
+    stockStatus: stockFilter, activeOnly: String(isVessel || isHeadOfDept) };
+  const activeModel = gridModels[viewMode] ?? { sort: [], filters: {} };
+  const inventoryPageUrl = storeUrl(scopeSegment, { ...inventoryParams, ...activeModel,
+    page: viewMode === "location" ? locationPage : inventoryPage,
+    pageSize: viewMode === "location" ? locationItemsPerPage : inventorySize,
+    ...(viewMode === "location" ? { location: selectedLocationName } : {}) });
+  const inventoryQuery = useStorePage(inventoryPageUrl, storesScopeReady && (viewMode === "inventory" || (viewMode === "location" && !!selectedLocationName)));
+  const storesData: StoresApiItem[] = useMemo(() => inventoryQuery.data?.items ?? [], [inventoryQuery.data]);
+  const storesLoading = inventoryQuery.isFetching;
+  const inventoryTotal = inventoryQuery.data?.total ?? 0;
+  const locationListUrl = storeUrl(scopeSegment, { ...inventoryParams, page: locationListPage, pageSize: 25, locationSearch: locationTabSearch }, "locations/paged");
+  const locationListQuery = useStorePage(locationListUrl, storesScopeReady && viewMode === "location");
+  const periodRange = periodFilterToDateRange(historyPeriodFilter);
+  const historyParams = { ...scopeParams, kind: "history", search: effectiveHistorySearch, eventType: historyEventFilter,
+    dateFrom: periodRange?.from ? format(periodRange.from, "yyyy-MM-dd") : undefined,
+    dateTo: periodRange?.to ? format(periodRange.to, "yyyy-MM-dd") : undefined };
+  const historyPageUrl = storeUrl(scopeSegment, { ...historyParams, ...(gridModels.history ?? {}), page: historyPage, pageSize: historySize });
+  const historyQuery = useStorePage(historyPageUrl, storesScopeReady && viewMode === "history");
+  const historyData = historyQuery.data?.items ?? [];
+  const historyTotal = historyQuery.data?.total ?? 0;
+  const historyLoading = historyQuery.isFetching;
+  const publishGridModel = (model: { sort: any[]; filters: any }) =>
+    setGridModels(prev => JSON.stringify(prev[viewMode] ?? { sort: [], filters: {} }) === JSON.stringify(model) ? prev : { ...prev, [viewMode]: model });
+  useEffect(() => {
+    setInventoryPage(1); setLocationPage(1); setLocationListPage(1);
+  }, [scopeKey, effectiveSearch, categoryFilter, stockFilter, isVessel, isHeadOfDept, JSON.stringify(gridModels.inventory), JSON.stringify(gridModels.location)]);
+  useEffect(() => { setLocationListPage(1); }, [locationTabSearch]);
+  useEffect(() => { setHistoryPage(1); }, [scopeKey, effectiveHistorySearch, historyEventFilter, historyPeriodFilter, JSON.stringify(gridModels.history)]);
+  useEffect(() => {
+    setTargetSelection(null); setExcludedStoreIds(new Set()); editedLocationRows.current.clear();
+    setSelectedStoreIds(new Set()); setIsDeleteSelectionMode(false);
+    setEditingLocRobValues({});
+    return () => exportAbort.current?.abort();
+  }, [scopeKey]);
+  useEffect(() => {
+    if (inventoryQuery.data) {
+      const max = Math.max(1, inventoryQuery.data.totalPages);
+      if (viewMode === "inventory" && inventoryPage > max) setInventoryPage(max);
+      if (viewMode === "location" && locationPage > max) setLocationPage(max);
+    }
+    if (historyQuery.data && historyPage > Math.max(1, historyQuery.data.totalPages)) setHistoryPage(Math.max(1, historyQuery.data.totalPages));
+  }, [inventoryQuery.data, historyQuery.data, inventoryPage, locationPage, historyPage, viewMode]);
+  useEffect(() => {
+    if (!targetSelection || !inventoryQuery.data) { setPageSelectionIds(new Set()); return; }
+    let cancelled = false;
+    storesJson(storeUrl(scopeSegment, scopeParams, "targets/membership"), { token: targetSelection.token, ids: inventoryQuery.data.items.map(i => i.id) })
+      .then(json => { if (!cancelled) setPageSelectionIds(new Set(json.data)); })
+      .catch(e => { if (!cancelled) toast({ title: "Selection unavailable", description: e.message, variant: "destructive" }); });
+    return () => { cancelled = true; };
+  }, [targetSelection, inventoryQuery.data, scopeKey]);
   
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
@@ -305,11 +372,12 @@ const Stores: React.FC = () => {
     setIsChangingStoreLocation(true);
     try {
       const fieldKey = side === 'A' ? 'locationA' : 'locationB';
-      await fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
+      const response = await fetch(`/technical/api/stores/${item.vesselId || vesselId}/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [fieldKey]: newLocName }),
       });
+      if (!response.ok) throw new Error("Failed to update location");
       invalidateByUrlPrefix('/technical/api/stores');
       toast({ title: "Location Updated", description: `Location changed to "${newLocName}"` });
     } catch (e: any) {
@@ -332,16 +400,17 @@ const Stores: React.FC = () => {
         const [itemIdStr, side] = key.split('-');
         const itemId = Number(itemIdStr);
         const newVal = Number(val);
-        const item = items.find(i => i.id === itemId);
+        const item = editedLocationRows.current.get(itemId) ?? items.find(i => i.id === itemId);
         if (!item || isNaN(newVal) || newVal < 0) continue;
         const currentVal = side === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
         if (newVal === currentVal) continue;
         const fieldKey = side === 'A' ? 'robLocationA' : 'robLocationB';
-        await fetch(`/technical/api/stores/${vesselId}/${itemId}`, {
+        const response = await fetch(`/technical/api/stores/${(item as any).vesselId || vesselId}/${itemId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ [fieldKey]: newVal }),
         });
+        if (!response.ok) throw new Error("Failed to save location ROB");
       }
       invalidateByUrlPrefix('/technical/api/stores');
       setEditingLocRobValues({});
@@ -366,6 +435,7 @@ const Stores: React.FC = () => {
         
         return {
           id: item.id,
+          vesselId: item.vesselId,
           itemCode: item.itemCode || '',
           itemName: item.itemName || '',
           storesCategory: item.category || '',
@@ -417,15 +487,6 @@ const Stores: React.FC = () => {
   }, [storesData, activeTab]);
   
   // Fetch stores history from API
-  const { data: historyData = [], isLoading: historyLoading } = useQuery<any[]>({
-    queryKey: storesScopeReady ? [`/technical/api/stores/${vesselId}/history`, activeTab, isMyVessels ? assignedVesselIds.join(',') : ''] : ['history-disabled'],
-    queryFn: async () => {
-      const response = await fetch(storesHistoryUrl);
-      if (!response.ok) throw new Error('Failed to fetch history');
-      return response.json();
-    },
-    enabled: storesScopeReady && viewMode === 'history',
-  });
 
   // Map history API data to StoresHistoryItem format
   // Uses storesLedger schema fields: itemId, eventType, timestampUTC, qtyChangeBase, robAfterBase, userId, remarks, ref, itemName, partCode
@@ -474,17 +535,12 @@ const Stores: React.FC = () => {
         remarks: entry.remarks || '',
         ref: entry.ref || '',
       };
-    }).sort((a: StoresHistoryItem, b: StoresHistoryItem) => b.id - a.id);
+    });
   }, [historyData]);
 
   // History filters
-  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<PeriodFilterValue | null>(null);
-  const [historySearch, setHistorySearch] = useState("");
-  const [historyEventFilter, setHistoryEventFilter] = useState("all");
 
   // Pagination state
-  const [locationPage, setLocationPage] = useState(1);
-  const [locationItemsPerPage, setLocationItemsPerPage] = useState(10);
   
   const handleOpenLocationDialog = (item: StoreItem) => {
     setLocationDialogItem(item);
@@ -819,26 +875,8 @@ const Stores: React.FC = () => {
   };
 
   const filteredItems = useMemo(() => {
-    const updatedItems = updateItemsStock(items);
-    const filtered = updatedItems.filter(item => {
-      if (item.isArchived) return false;
-      if ((isVessel || isHeadOfDept) && item.isActive === false) return false;
-      const matchesTab = item.category === activeTab;
-      const matchesSearch = item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           item.itemCode.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = !categoryFilter || categoryFilter === "all" || item.storesCategory.includes(categoryFilter);
-      const matchesStock = !stockFilter || stockFilter === "all" || item.stock.toLowerCase() === stockFilter.toLowerCase();
-      
-      return matchesTab && matchesSearch && matchesCategory && matchesStock;
-    });
-    filtered.sort((a, b) => {
-      const aInactive = a.isActive === false ? 1 : 0;
-      const bInactive = b.isActive === false ? 1 : 0;
-      if (aInactive !== bInactive) return aInactive - bInactive;
-      return (a.itemCode || '').localeCompare(b.itemCode || '', undefined, { numeric: true });
-    });
-    return filtered;
-  }, [activeTab, searchTerm, categoryFilter, stockFilter, items, isVessel, isHeadOfDept]);
+    return updateItemsStock(items);
+  }, [items]);
 
   // Filter items for bulk update modal search
   const bulkModalFilteredItems = useMemo(() => {
@@ -860,103 +898,24 @@ const Stores: React.FC = () => {
   };
   
   // Export to Excel functions
-  const exportInventoryToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-    const filename = `stores_${activeTab}_inventory_${timestamp}.xlsx`;
-    
-    const data = filteredItems.map(item => ({
-      'Item Name': item.itemName,
-      'Part Code': item.itemCode,
-      'UOM': item.uom || '-',
-      'ROB': item.rob,
-      'Min': item.min,
-      'Stock': item.stock,
-      'Location': item.location,
-      'Category': item.storesCategory
-    }));
-    
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
-    XLSX.writeFile(wb, filename);
-    
-    toast({ title: "Export Successful", description: `Exported ${data.length} items to ${filename}` });
+  const exportStores = async (kind: "inventory" | "history") => {
+    if (exporting || !storesScopeReady) return;
+    const abort = new AbortController(); exportAbort.current = abort; setExporting(true);
+    try {
+      await downloadStoreExport(storeUrl(scopeSegment, kind === "history" ? historyParams : inventoryParams, "export"),
+        `stores_${activeTab}_${kind}_${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}.xlsx`, abort.signal);
+      toast({ title: "Export Successful", description: "Exported all matching records." });
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } finally { setExporting(false); }
   };
-  
-  const exportHistoryToExcel = () => {
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
-    const filename = `stores_${activeTab}_history_${timestamp}.xlsx`;
-    
-    const data = filteredHistoryItems.map(item => ({
-      'Date': item.dateLocal,
-      'Event': item.eventType,
-      'Item Name': item.itemName,
-      'Part Code': item.partCode,
-      'UOM': item.uom || '-',
-      'Qty Change': item.qtyChange > 0 ? `+${item.qtyChange}` : item.qtyChange.toString(),
-      'ROB After': item.robAfter,
-      'Place': item.place || '-',
-      'User': item.userId,
-      'Remarks/Ref': item.remarks || item.ref || '-'
-    }));
-    
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'History');
-    XLSX.writeFile(wb, filename);
-    
-    toast({ title: "Export Successful", description: `Exported ${data.length} entries to ${filename}` });
-  };
+  const exportInventoryToExcel = () => exportStores("inventory");
+  const exportHistoryToExcel = () => exportStores("history");
   
   // Filter history items
   const filteredHistoryItems = useMemo(() => {
-    // Helper to parse DD-Mon-YYYY format (e.g., "27-Jan-2026") to Date object
-    const parseHistoryDate = (dateStr: string): Date | null => {
-      if (!dateStr) return null;
-      const months: Record<string, number> = {
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      };
-      const parts = dateStr.split('-');
-      if (parts.length !== 3) return null;
-      const day = parseInt(parts[0], 10);
-      const month = months[parts[1]];
-      const year = parseInt(parts[2], 10);
-      if (isNaN(day) || month === undefined || isNaN(year)) return null;
-      return new Date(year, month, day);
-    };
-
-    // Parse date picker values (YYYY-MM-DD format)
-    const historyDateRange = periodFilterToDateRange(historyPeriodFilter);
-    const fromDate = historyDateRange ? historyDateRange.from : null;
-    const toDate = historyDateRange ? historyDateRange.to : null;
-
-    return historyItems.filter(item => {
-      // Filter by search
-      if (historySearch && !item.itemName.toLowerCase().includes(historySearch.toLowerCase()) &&
-          !item.partCode.toLowerCase().includes(historySearch.toLowerCase())) {
-        return false;
-      }
-      
-      // Filter by event type
-      if (historyEventFilter !== "all" && item.eventType !== historyEventFilter) {
-        return false;
-      }
-      
-      // Filter by date range
-      if (fromDate || toDate) {
-        const itemDate = parseHistoryDate(item.dateLocal);
-        if (!itemDate) return true; // Keep items with unparseable dates
-        
-        if (fromDate && itemDate < fromDate) return false;
-        if (toDate && itemDate > toDate) return false;
-      }
-      
-      return true;
-    });
-  }, [historyItems, historySearch, historyEventFilter, historyPeriodFilter]);
+    return historyItems;
+  }, [historyItems]);
 
   const handleBulkUpdateChange = (itemId: number, field: 'consumed' | 'received' | 'consumedLocationA' | 'consumedLocationB' | 'receivedLocationA' | 'receivedLocationB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string) => {
     if (field === 'consumed' || field === 'received' || field === 'consumedLocationA' || field === 'consumedLocationB' || field === 'receivedLocationA' || field === 'receivedLocationB') {
@@ -1642,14 +1601,22 @@ const Stores: React.FC = () => {
   const enterDeleteSelectionMode = (preselectedId?: number) => {
     setIsDeleteSelectionMode(true);
     setSelectedStoreIds(preselectedId ? new Set([preselectedId]) : new Set());
+    setTargetSelection(null); setExcludedStoreIds(new Set());
   };
 
   const exitDeleteSelectionMode = () => {
     setIsDeleteSelectionMode(false);
     setSelectedStoreIds(new Set());
+    setTargetSelection(null); setExcludedStoreIds(new Set());
   };
 
   const toggleStoreSelection = (storeId: number) => {
+    if (targetSelection && pageSelectionIds.has(storeId)) {
+      setExcludedStoreIds(prev => {
+        const next = new Set(prev); if (next.has(storeId)) next.delete(storeId); else next.add(storeId); return next;
+      });
+      return;
+    }
     setSelectedStoreIds(prev => {
       const next = new Set(prev);
       if (next.has(storeId)) next.delete(storeId);
@@ -1659,54 +1626,40 @@ const Stores: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    const allSelected = filteredItems.length > 0 && filteredItems.every((item: StoreItem) => selectedStoreIds.has(item.id));
-    if (allSelected) {
+    if (targetSelection && !excludedStoreIds.size) {
+      setTargetSelection(null); setExcludedStoreIds(new Set());
       setSelectedStoreIds(new Set());
     } else {
-      setSelectedStoreIds(new Set(filteredItems.map((item: StoreItem) => item.id)));
+      const startedScope = scopeKey;
+      storesJson(storeUrl(scopeSegment, inventoryParams, "targets"), {}).then(json => {
+        if (currentScope.current !== startedScope) return;
+        setTargetSelection(json.data); setSelectedStoreIds(new Set()); setExcludedStoreIds(new Set());
+      }).catch(e => toast({ title: "Selection failed", description: e.message, variant: "destructive" }));
     }
   };
+  const isStoreSelected = (id: number) => selectedStoreIds.has(id) || (!!targetSelection && pageSelectionIds.has(id) && !excludedStoreIds.has(id));
+  const selectedStoreCount = (targetSelection?.total ?? 0) - excludedStoreIds.size + selectedStoreIds.size;
 
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
 
   const executeDeleteSelected = async () => {
-    const visibleIds = new Set(filteredItems.map((item: StoreItem) => item.id));
-    const idsToDelete = Array.from(selectedStoreIds).filter(id => visibleIds.has(id));
-    if (idsToDelete.length === 0) {
+    if (!selectedStoreCount) {
       toast({ title: "No items selected", description: "Please select at least one item to delete.", variant: "destructive" });
       return;
     }
     setIsDeletingSelected(true);
-    let successCount = 0;
-    let failCount = 0;
-    const failedIds = new Set<number>();
-    for (const storeId of idsToDelete) {
-      try {
-        const response = await fetch(`/technical/api/stores/${vesselId}/${storeId}/inactivate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (response.ok) {
-          successCount++;
-        } else {
-          failCount++;
-          failedIds.add(storeId);
-        }
-      } catch {
-        failCount++;
-        failedIds.add(storeId);
-      }
-    }
-    invalidateByUrlPrefix('/technical/api/stores');
-    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
-    setIsDeletingSelected(false);
-    if (failCount === 0) {
-      exitDeleteSelectionMode();
-      toast({ title: "Success", description: `${successCount} item(s) deleted successfully.` });
-    } else {
-      setSelectedStoreIds(failedIds);
-      toast({ title: "Partial failure", description: `${successCount} succeeded, ${failCount} failed. Failed items remain selected.`, variant: "destructive" });
-    }
+    try {
+      const token = targetSelection?.token ?? (await storesJson(storeUrl(scopeSegment, inventoryParams, "targets"), { ids: Array.from(selectedStoreIds) })).data.token;
+      const result = await storesJson(storeUrl(scopeSegment, inventoryParams, "targets/inactivate"),
+        { token, exclude: Array.from(excludedStoreIds), additionalIds: Array.from(selectedStoreIds) });
+      const { succeeded, failedIds } = result.data;
+      setTargetSelection(null); setExcludedStoreIds(new Set()); setSelectedStoreIds(new Set(failedIds));
+      invalidateByUrlPrefix('/technical/api/stores');
+      if (!failedIds.length) exitDeleteSelectionMode();
+      toast({ title: failedIds.length ? "Partial failure" : "Success", description: `${succeeded} succeeded, ${failedIds.length} failed.`, variant: failedIds.length ? "destructive" : "default" });
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    } finally { setIsDeletingSelected(false); }
   };
 
   // ============================================================
@@ -1717,7 +1670,7 @@ const Stores: React.FC = () => {
     if (!item) return undefined;
     const classes: string[] = [];
     if (item.isActive === false) classes.push('spare-row-inactive');
-    if (isDeleteSelectionMode && selectedStoreIds.has(item.id)) classes.push('spare-row-bulk-selected');
+    if (isDeleteSelectionMode && isStoreSelected(item.id)) classes.push('spare-row-bulk-selected');
     return classes.length > 0 ? classes.join(' ') : undefined;
   };
 
@@ -1741,7 +1694,7 @@ const Stores: React.FC = () => {
         headerComponent: () => (
           <input
             type="checkbox"
-            checked={filteredItems.length > 0 && filteredItems.every((i: StoreItem) => selectedStoreIds.has(i.id))}
+            checked={!!targetSelection && excludedStoreIds.size === 0}
             onChange={toggleSelectAll}
             className="h-4 w-4 rounded border-white cursor-pointer accent-white"
             data-testid="checkbox-select-all"
@@ -1752,7 +1705,7 @@ const Stores: React.FC = () => {
           return (
             <input
               type="checkbox"
-              checked={selectedStoreIds.has(item.id)}
+              checked={isStoreSelected(item.id)}
               onChange={() => toggleStoreSelection(item.id)}
               className="h-4 w-4 rounded border-gray-300 cursor-pointer"
               data-testid={`checkbox-store-${item.id}`}
@@ -2099,7 +2052,7 @@ const Stores: React.FC = () => {
     }
 
     return cols;
-  }, [activeTab, isDeleteSelectionMode, selectedStoreIds, filteredItems, isVessel, isHeadOfDept, isModifyMode, canEditStore, canDeleteStore, vesselId]);
+  }, [activeTab, isDeleteSelectionMode, selectedStoreIds, targetSelection, excludedStoreIds, pageSelectionIds, filteredItems, isVessel, isHeadOfDept, isModifyMode, canEditStore, canDeleteStore, vesselId]);
 
   // ============================================================
   // AG Grid: Location-tab items + column definitions
@@ -2119,11 +2072,8 @@ const Stores: React.FC = () => {
   // ============================================================
   // Pagination calculations
   // ============================================================
-  const locationTotalPages = Math.max(1, Math.ceil(locationItems.length / locationItemsPerPage));
-  const paginatedLocationItems = useMemo(() => {
-    const start = (locationPage - 1) * locationItemsPerPage;
-    return locationItems.slice(start, start + locationItemsPerPage);
-  }, [locationItems, locationPage, locationItemsPerPage]);
+  const locationTotalPages = Math.max(1, Math.ceil(inventoryTotal / locationItemsPerPage));
+  const paginatedLocationItems = locationItems;
   const goToLocationPage = (page: number) => {
     setLocationPage(Math.max(1, Math.min(page, locationTotalPages)));
   };
@@ -2271,20 +2221,25 @@ const Stores: React.FC = () => {
               min="0"
               className="w-full text-center border border-gray-200 rounded-md px-2 py-1 text-sm outline-none focus:border-blue-400"
               value={editingLocRobVal !== undefined ? editingLocRobVal : item._locRob}
-              onChange={(e) => setEditingLocRobValues(prev => ({ ...prev, [item._editKey]: e.target.value }))}
+              onChange={(e) => {
+                editedLocationRows.current.set(item.id, item);
+                setEditingLocRobValues(prev => ({ ...prev, [item._editKey]: e.target.value }));
+              }}
               onBlur={() => {
                 const newVal = editingLocRobVal !== undefined ? Number(editingLocRobVal) : item._locRob;
                 if (canEditStore && editingLocRobVal !== undefined && newVal !== item._locRob && !isNaN(newVal) && newVal >= 0) {
                   const fieldKey = item._side === 'A' ? 'robLocationA' : 'robLocationB';
-                  fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
+                  fetch(`/technical/api/stores/${item.vesselId || vesselId}/${item.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ [fieldKey]: newVal }),
-                  }).then(() => {
+                  }).then(response => {
+                    if (!response.ok) throw new Error("Failed to save location ROB");
                     invalidateByUrlPrefix('/technical/api/stores');
-                  });
+                    setEditingLocRobValues(prev => { const n = { ...prev }; delete n[item._editKey]; return n; });
+                    editedLocationRows.current.delete(item.id);
+                  }).catch(e => toast({ title: "Save failed", description: e.message, variant: "destructive" }));
                 }
-                setEditingLocRobValues(prev => { const n = { ...prev }; delete n[item._editKey]; return n; });
               }}
               disabled={!canEditStore || item.isActive === false}
               data-testid={`input-loc-rob-${item.id}`}
@@ -2566,7 +2521,7 @@ const Stores: React.FC = () => {
           {isDeleteSelectionMode ? (
             <>
               <span className="text-sm text-gray-600 mr-2" data-testid="text-selected-count">
-                {selectedStoreIds.size} item(s) selected
+                {selectedStoreCount} item(s) selected
               </span>
               <Button 
                 variant="outline" 
@@ -2584,7 +2539,7 @@ const Stores: React.FC = () => {
                 variant="destructive"
                 size="sm"
                 onClick={executeDeleteSelected}
-                disabled={selectedStoreIds.size === 0 || isDeletingSelected}
+                disabled={selectedStoreCount === 0 || isDeletingSelected}
                 data-testid="button-delete-selected"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
@@ -2904,6 +2859,16 @@ const Stores: React.FC = () => {
       </div>
 
       {/* Main Content - Scrollable */}
+      {(inventoryQuery.error || historyQuery.error || locationListQuery.error) && (
+        <div role="alert" className="p-3 text-red-700 bg-red-50">
+          {(inventoryQuery.error || historyQuery.error || locationListQuery.error)?.message}
+          <button className="ml-3 underline" onClick={() => {
+            if (viewMode === "history") historyQuery.refetch();
+            else { inventoryQuery.refetch(); if (viewMode === "location") locationListQuery.refetch(); }
+          }}>Retry</button>
+        </div>
+      )}
+      {myVesselsEmpty && <div className="p-3 text-amber-800" data-testid="banner-no-assigned-vessels">No vessels assigned.</div>}
       <div className="flex-1 overflow-y-auto">
         {/* Table */}
         {viewMode === "inventory" ? (
@@ -2911,14 +2876,17 @@ const Stores: React.FC = () => {
             <div className="flex-1 min-h-[400px]">
               <WOAgGridTable
                 columnDefs={inventoryColumnDefs}
-                rowData={filteredItems}
+                rowData={storesLoading ? [] : filteredItems}
+                loading={storesLoading}
                 getRowClass={inventoryGetRowClass}
                 noRowsMessage="No items found. Try adjusting your filters."
                 testId="stores-inventory-grid"
-                pagination={true}
-                paginationPageSize={25}
+                pagination={false}
+                serverQueryUrl={inventoryPageUrl}
+                onServerQueryChanged={publishGridModel}
               />
             </div>
+            <StoresPager page={inventoryPage} size={inventorySize} total={inventoryTotal} onPage={setInventoryPage} onSize={setInventorySize} />
           </div>
       ) : viewMode === "location" ? (
       /* Location View - Left Panel + Right Table */
@@ -2942,24 +2910,7 @@ const Stores: React.FC = () => {
           </div>
           <div className="overflow-y-auto flex-1">
             {(() => {
-              const locationMap = new Map<string, number>();
-              filteredItems.forEach(item => {
-                const locA = item.locationAName || '';
-                const locB = item.locationBName || '';
-                if (locA && (item.robLocationA ?? 0) > 0) {
-                  locationMap.set(locA, (locationMap.get(locA) || 0) + 1);
-                }
-                if (locB && (item.robLocationB ?? 0) > 0) {
-                  locationMap.set(locB, (locationMap.get(locB) || 0) + 1);
-                }
-              });
-              const locations = Array.from(locationMap.entries())
-                .map(([name, count]) => ({ name, count }))
-                .filter(l => {
-                  if (!locationTabSearch) return true;
-                  return l.name.toLowerCase().includes(locationTabSearch.toLowerCase());
-                })
-                .sort((a, b) => a.name.localeCompare(b.name));
+              const locations = locationListQuery.data?.items ?? [];
               if (locations.length === 0) {
                 return <div className="p-4 text-center text-gray-500 text-sm">No locations found</div>;
               }
@@ -2987,26 +2938,32 @@ const Stores: React.FC = () => {
               ));
             })()}
           </div>
+          <div className="flex justify-between p-2 text-xs border-t">
+            <button disabled={locationListPage <= 1} onClick={() => setLocationListPage(p => p - 1)}>Previous</button>
+            <span>{locationListPage} / {Math.max(1, locationListQuery.data?.totalPages ?? 1)}</span>
+            <button disabled={locationListPage >= (locationListQuery.data?.totalPages ?? 1)} onClick={() => setLocationListPage(p => p + 1)}>Next</button>
+          </div>
         </div>
 
         {/* Right Panel - Items Table (AG Grid) */}
           <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
             {!selectedLocationName ? (
               <div className="p-8 text-center text-gray-500">Select a location from the left panel to view stores items.</div>
-            ) : storesLoading ? (
-              <div className="p-8 text-center text-gray-500">Loading...</div>
             ) : (
               <>
                 <div className="flex-1 min-h-[400px]">
                   <WOAgGridTable
                     columnDefs={locationColumnDefs}
+                    loading={storesLoading}
+                    serverQueryUrl={inventoryPageUrl}
+                    onServerQueryChanged={publishGridModel}
                     rowData={paginatedLocationItems}
                     getRowClass={locationGetRowClass}
                     noRowsMessage="No items found at this location."
                     testId="stores-by-location-grid"
                   />
                 </div>
-                {locationItems.length > 0 && (
+                {inventoryTotal > 0 && (
                   <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="stores-location-pagination-footer">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <span>Show</span>
@@ -3025,7 +2982,7 @@ const Stores: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="stores-location-pagination-info">
                       <span>
-                        Showing {((locationPage - 1) * locationItemsPerPage) + 1} - {Math.min(locationPage * locationItemsPerPage, locationItems.length)} of {locationItems.length} items
+                        Showing {((locationPage - 1) * locationItemsPerPage) + 1} - {Math.min(locationPage * locationItemsPerPage, inventoryTotal)} of {inventoryTotal} items
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -3067,13 +3024,16 @@ const Stores: React.FC = () => {
           <div className="flex-1 min-h-[400px]">
             <WOAgGridTable
               columnDefs={historyColumnDefs}
-              rowData={filteredHistoryItems}
+              rowData={historyLoading ? [] : filteredHistoryItems}
+              loading={historyLoading}
               noRowsMessage="No history entries found. Actions like Receive, Consume, and Archive will appear here."
               testId="stores-history-grid"
-              pagination={true}
-              paginationPageSize={25}
+              pagination={false}
+              serverQueryUrl={historyPageUrl}
+              onServerQueryChanged={publishGridModel}
             />
           </div>
+          <StoresPager page={historyPage} size={historySize} total={historyTotal} onPage={setHistoryPage} onSize={setHistorySize} />
         </div>
         )}
 
