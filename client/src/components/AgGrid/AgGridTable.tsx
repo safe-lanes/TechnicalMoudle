@@ -113,6 +113,7 @@ export interface AgGridTableProps {
   singleClickEdit?: boolean;
   stopEditingWhenCellsLoseFocus?: boolean;
   getRowId?: (params: { data: any }) => string;
+  preserveColumnWidths?: boolean;
 }
 
 export const AgGridTable: React.FC<AgGridTableProps> = ({
@@ -148,6 +149,7 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
   singleClickEdit = false,
   stopEditingWhenCellsLoseFocus = false,
   getRowId,
+  preserveColumnWidths = false,
 }) => {
   const viewport = useViewport();
   const viewportConfig = getViewportConfig(viewport);
@@ -203,19 +205,21 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
   // Handle grid ready event with responsive setup
   const handleGridReady = useCallback((event: GridReadyEvent) => {
     gridApiRef.current = event.api;
-    handleResponsiveGrid(event.api);
+    if (!preserveColumnWidths) {
+      handleResponsiveGrid(event.api);
+    }
     
     if (onGridReady) {
       onGridReady(event);
     }
-  }, [onGridReady, handleResponsiveGrid]);
+  }, [onGridReady, handleResponsiveGrid, preserveColumnWidths]);
 
   // Handle viewport changes
   useEffect(() => {
-    if (gridApiRef.current && !gridApiRef.current.isDestroyed()) {
+    if (!preserveColumnWidths && gridApiRef.current && !gridApiRef.current.isDestroyed()) {
       handleResponsiveGrid(gridApiRef.current);
     }
-  }, [viewport, handleResponsiveGrid]);
+  }, [viewport, handleResponsiveGrid, preserveColumnWidths]);
 
   // Default column definitions with enterprise features
   const defaultColDef = useMemo(() => ({

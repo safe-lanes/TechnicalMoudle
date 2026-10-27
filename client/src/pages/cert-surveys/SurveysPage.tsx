@@ -382,20 +382,24 @@ export default function SurveysPage() {
     {
       headerName: 'Survey',
       field: 'surveyName',
-      flex: 1.5,
-      minWidth: 200,
+      width: 250,
+      minWidth: 150,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellClass: 'cert-survey-long-text',
+      tooltipValueGetter: (params) => params.value == null ? '' : String(params.value),
       filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true,
       wrapText: true,
-      autoHeight: true,
     },
     {
       headerName: 'Company Group',
       field: 'type',
-      width: 120,
+      width: 210,
+      minWidth: 100,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellClass: 'cert-survey-long-text',
+      tooltipValueGetter: (params) => params.value == null ? '' : String(params.value),
       filter: 'agSetColumnFilter',
       sortable: true,
       resizable: true,
@@ -403,9 +407,11 @@ export default function SurveysPage() {
     {
       headerName: 'Vessel',
       field: 'vessel',
-      flex: 1,
-      minWidth: 150,
+      width: 210,
+      minWidth: 120,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellClass: 'cert-survey-long-text',
+      tooltipValueGetter: (params) => params.value == null ? '' : String(params.value),
       filter: 'agSetColumnFilter',
       sortable: true,
       resizable: true,
@@ -524,20 +530,6 @@ export default function SurveysPage() {
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     setGridApi(params.api);
-    params.api.sizeColumnsToFit();
-    
-    const handleResize = () => {
-      setTimeout(() => {
-        if (params.api && !params.api.isDestroyed()) {
-          params.api.sizeColumnsToFit();
-        }
-      }, 100);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
   }, []);
 
   const fetchAllSurveys = useCallback(async () => {
@@ -732,6 +724,7 @@ export default function SurveysPage() {
             ) : (
               <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
                 <AgGridTable
+                  className="cert-survey-grid"
                   rowData={filteredSurveys}
                   columnDefs={columnDefs}
                   onGridReady={onGridReady}
@@ -739,6 +732,7 @@ export default function SurveysPage() {
                   context={gridContext}
                   getRowId={(params) => `${params.data.vesselId}::${params.data.masterId}`}
                   autoHeight={false}
+                  preserveColumnWidths
                   height="100%"
                   minHeight="300px"
                   width="100%"
@@ -752,7 +746,7 @@ export default function SurveysPage() {
                   theme="alpine"
                   singleClickEdit={true}
                   stopEditingWhenCellsLoseFocus={true}
-                  gridOptions={{ domLayout: 'normal' }}
+                  gridOptions={{ domLayout: 'normal', rowHeight: 46 }}
                 />
               </div>
             )}

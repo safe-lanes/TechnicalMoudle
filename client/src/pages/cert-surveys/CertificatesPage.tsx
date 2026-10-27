@@ -632,21 +632,25 @@ export default function CertificatesPage() {
     {
       headerName: 'Name of Certificate',
       field: 'certificateName',
-      flex: 1.5,
-      minWidth: 200,
+      width: 250,
+      minWidth: 150,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellClass: 'cert-survey-long-text',
+      tooltipValueGetter: (params) => params.value == null ? '' : String(params.value),
       filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true,
       wrapText: true,
-      autoHeight: true,
     },
     {
       headerName: 'Company Group',
       field: 'type',
-      width: 130,
+      width: 210,
+      minWidth: 100,
       valueFormatter: (params) => formatCompanyGroup(params.value),
       cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellClass: 'cert-survey-long-text',
+      tooltipValueGetter: (params) => formatCompanyGroup(params.value),
       filter: 'agSetColumnFilter',
       sortable: true,
       resizable: true,
@@ -654,9 +658,11 @@ export default function CertificatesPage() {
     ...(showVesselColumn ? [{
         headerName: 'Vessel',
         field: 'vessel',
-        flex: 1,
-        minWidth: 150,
+        width: 210,
+        minWidth: 120,
         cellStyle: { fontSize: '13px', color: '#4f5863' },
+        cellClass: 'cert-survey-long-text',
+        tooltipValueGetter: (params: any) => params.value == null ? '' : String(params.value),
         filter: 'agSetColumnFilter',
         sortable: true,
         resizable: true,
@@ -871,20 +877,6 @@ export default function CertificatesPage() {
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     setGridApi(params.api);
-    params.api.sizeColumnsToFit();
-    
-    const handleResize = () => {
-      setTimeout(() => {
-        if (params.api && !params.api.isDestroyed()) {
-          params.api.sizeColumnsToFit();
-        }
-      }, 100);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
   }, []);
 
   const onSortChanged = useCallback((event: any) => {
@@ -1126,6 +1118,7 @@ export default function CertificatesPage() {
             ) : (
               <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
                 <AgGridTable
+                  className="cert-survey-grid"
                   rowData={filteredCertificates}
                   columnDefs={columnDefs}
                   onGridReady={onGridReady}
@@ -1134,6 +1127,7 @@ export default function CertificatesPage() {
                   context={gridContext}
                   getRowId={(params) => `${params.data.vesselId}::${params.data.masterId}`}
                   autoHeight={false}
+                  preserveColumnWidths
                   height="100%"
                   minHeight="300px"
                   width="100%"
@@ -1147,7 +1141,7 @@ export default function CertificatesPage() {
                   theme="alpine"
                   singleClickEdit={true}
                   stopEditingWhenCellsLoseFocus={true}
-                  gridOptions={{ domLayout: 'normal' }}
+                  gridOptions={{ domLayout: 'normal', rowHeight: 46 }}
                 />
               </div>
             )}

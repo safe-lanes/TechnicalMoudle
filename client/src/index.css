@@ -182,6 +182,51 @@
   opacity: 0;
 }
 
+/* Certificate and survey tables retain fixed, user-resizable column widths. */
+.ag-theme-alpine.cert-survey-grid {
+  --ag-row-height: 46px;
+}
+
+.ag-theme-alpine.cert-survey-grid .ag-header-cell-resize {
+  width: 12px !important;
+  opacity: 0.5 !important;
+  cursor: col-resize;
+}
+
+.ag-theme-alpine.cert-survey-grid .ag-header-cell-resize::after {
+  width: 2px;
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+.ag-theme-alpine.cert-survey-grid .ag-header-cell:hover .ag-header-cell-resize {
+  opacity: 1 !important;
+}
+
+.ag-theme-alpine.cert-survey-grid .ag-cell.cert-survey-long-text:not(.ag-cell-inline-editing) {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ag-theme-alpine.cert-survey-grid .ag-cell.cert-survey-long-text .ag-cell-wrapper,
+.ag-theme-alpine.cert-survey-grid .ag-cell.cert-survey-long-text .ag-cell-value {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ag-theme-alpine.cert-survey-grid .ag-cell.cert-survey-long-text .ag-cell-wrapper {
+  height: 100%;
+}
+
+.ag-theme-alpine.cert-survey-grid .ag-cell.cert-survey-long-text .ag-cell-value {
+  display: -webkit-box;
+  max-height: 100%;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 /* Compact header cell layout - reduce internal spacing */
 .ag-theme-alpine .ag-header-cell-comp-wrapper {
   gap: 2px;
