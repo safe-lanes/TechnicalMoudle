@@ -5,11 +5,12 @@
  * Approval Workflow tree (ApprovalWorkflow.tsx).
  */
 import React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ApprovalDiagnosticsDetails, type SharedDiagnostics } from "./ApprovalDiagnosticsDetails";
 import {
   formatDiagnosticsOrphan,
   formatDiagnosticsMissingWorkflow,
@@ -325,17 +326,6 @@ export function DefectApprovalSettingsPanel({ readOnly }: { readOnly: boolean })
   );
 }
 
-// 28-Sep-2026 (Sahil C3/C4/C5) — shared approval diagnostics: Technical checks + failed updates across
-// modules, each group in plain language with one instruction. "Apply again" re-delivers a finished
-// approval to the change request / work order / defect that did not update (server checks the
-// module's Access Control edit permission).
-type SharedDiagnostics = {
-  available: boolean;
-  healthy: boolean;
-  groups: Array<{ key: string; title: string; consequence: string; instruction: string;
-    rows: Array<{ text: string; detail?: string; requuid?: string }> }>;
-};
-
 /** Short chip text per diagnostics group (the full title shows in View details). */
 const CHIP_LABEL: Record<string, [string, string]> = {
   blockedActions: ["action without an approval chain", "actions without an approval chain"],
@@ -348,6 +338,8 @@ const chipLabel = (key: string, count: number, fallback: string) =>
 
 export function ApprovalDiagnosticsPanel() {
   const queryClient = useQueryClient();
+  const detailsTriggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const { currentUser } = useAuth();
   const key = ["/technical/api/approvals/diagnostics"];
   const { data, isLoading, error } = useQuery<SharedDiagnostics>({
@@ -373,17 +365,22 @@ export function ApprovalDiagnosticsPanel() {
     onSuccess: (requuid) => { setMessage((m) => ({ ...m, [requuid]: "Applied." })); queryClient.invalidateQueries({ queryKey: key }); },
     onError: (e: Error, requuid) => setMessage((m) => ({ ...m, [requuid]: e.message })),
   });
+  const applyAgain = (requuid: string) => {
+    if (reapply.isPending) return;
+    setMessage((messages) => ({ ...messages, [requuid]: "" }));
+    reapply.mutate(requuid);
+  };
   return (
-    <section aria-label="Approval diagnostics" data-testid="approval-diagnostics"
+    <section ref={panelRef} tabIndex={-1} aria-label="Approval diagnostics" data-testid="approval-diagnostics"
       style={{ margin: "12px", padding: "14px", border: "1px solid #d0d5dd", borderRadius: 8, background: "#fff" }}>
       <h2 style={{ margin: 0, fontSize: 16, color: "#1e3a5f" }}>Approval diagnostics</h2>
       <p style={{ margin: "4px 0 12px", fontSize: 12, color: "#667085" }}>
         Read-only checks for Technical approvals, and approvals of any module that finished without updating their record.
       </p>
       {isLoading && <div style={{ fontSize: 13 }}>Loading diagnostics...</div>}
-      {(error || data?.available === false) && <div style={{ color: "#b42318", fontSize: 13 }}>Diagnostics unavailable. Contact your administrator.</div>}
-      {data?.available && data.healthy && <div style={{ color: "#067647", fontSize: 12 }} data-testid="approval-diagnostics-healthy">No problems found.</div>}
-      {data?.available && !data.healthy && (
+      {(error || data?.available === false) && <div style={{ color: "#8a3d30", fontSize: 13 }}>Diagnostics unavailable. Contact your administrator.</div>}
+      {!error && data?.available && data.healthy && <div style={{ color: "#35634e", fontSize: 12 }} data-testid="approval-diagnostics-healthy">No problems found.</div>}
+      {!error && data?.available && !data.healthy && (
         // Compact summary like the Defects box (Sahil's design): one chip per problem, details on request.
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
           {data.groups.map((g) => (
@@ -392,44 +389,22 @@ export function ApprovalDiagnosticsPanel() {
               border: "1px solid #fda29b", background: "#fff1f0", color: "#b42318",
             }}><strong>{g.rows.length}</strong> {chipLabel(g.key, g.rows.length, g.title)}</span>
           ))}
-          <Button variant="outline" size="sm" onClick={() => setDetailsOpen(true)} data-testid="button-approval-diagnostics-details">View details</Button>
+          <Button ref={detailsTriggerRef} variant="outline" size="sm" onClick={() => setDetailsOpen(true)} data-testid="button-approval-diagnostics-details">View details</Button>
         </div>
       )}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Approval diagnostics</DialogTitle>
-            <DialogDescription>Problems that stop Technical approvals, and approvals of any module that finished without updating their record.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 text-sm">
-            {(data?.groups ?? []).map((g) => (
-              <div key={g.key} data-testid={`approval-diagnostics-group-${g.key}`}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: "#b42318" }}>{g.title} ({g.rows.length})</div>
-                <div style={{ fontSize: 12, color: "#475467", margin: "2px 0" }}>{g.consequence}</div>
-                <div style={{ fontSize: 12, color: "#1e3a5f", marginBottom: 6 }}><strong>What to do:</strong> {g.instruction}</div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-                  {g.rows.map((r, i) => (
-                    <li key={`${g.key}-${i}`} style={{ marginBottom: 4 }}>
-                      <span>{r.text}</span>
-                      {r.detail && <span style={{ color: "#667085" }}> — {r.detail}</span>}
-                      {g.key === "failedUpdates" && r.requuid && (
-                        <>
-                          {" "}
-                          <button onClick={() => reapply.mutate(r.requuid!)} disabled={reapply.isPending}
-                            data-testid={`button-reapply-${r.requuid}`}
-                            style={{ marginLeft: 6, padding: "1px 8px", borderRadius: 5, border: "1px solid #2e90fa", background: "#fff", color: "#2e90fa", cursor: "pointer", fontSize: 12 }}>
-                            Apply again
-                          </button>
-                          {message[r.requuid] && <span style={{ marginLeft: 6, fontSize: 12 }}>{message[r.requuid]}</span>}
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
+        <ApprovalDiagnosticsDetails
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          data={data}
+          isLoading={isLoading}
+          error={error}
+          messages={message}
+          isPending={reapply.isPending}
+          pendingRequestId={reapply.variables}
+          onReapply={applyAgain}
+          returnFocus={() => (detailsTriggerRef.current ?? panelRef.current)?.focus()}
+        />
       </Dialog>
     </section>
   );
