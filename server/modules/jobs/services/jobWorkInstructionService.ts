@@ -86,6 +86,8 @@ export async function listForJob(jobId: string, actor: Actor, includeRemoved = f
   const links = await repo.listLinks(job.juuid, includeRemoved);
   return links.map((l) => ({
     jwluuid: l.jwluuid, jobId: l.jobId, vesselId: l.vesselId, isDeleted: l.isDeleted, attachedAt: l.attachedAt,
+    // A removed link keeps its row (D5); the removal time is its last update (setLinkDeleted stamps updatedAt).
+    removedAt: l.isDeleted ? ((l as { updatedAt?: Date | null }).updatedAt ?? null) : null,
     file: l.file ? {
       jwfuuid: l.file.jwfuuid, fileName: l.file.fileName, fileSize: l.file.fileSize, revisionRemarks: l.file.revisionRemarks,
       uploadedAt: l.file.uploadedAt, isDeleted: l.file.isDeleted,

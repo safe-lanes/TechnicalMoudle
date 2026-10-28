@@ -22,6 +22,7 @@ import { apiErrorMessage } from "@/lib/apiErrorMessage";
 import { downloadAuthedFile, viewAuthedDocument } from "@/lib/authedDownload";
 import { useToast } from "@/hooks/use-toast";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
+import { removedToggleLabel, showRemovedToggle, splitWorkInstructionRows, workInstructionRowMeta, workInstructionsListUrl, type WorkInstructionLinkRow } from "./workInstructionsList";
 
 interface WorkInstructionsDialogProps {
   isOpen: boolean;
@@ -38,16 +39,13 @@ interface WorkInstructionsDialogProps {
   jobUnsaved?: boolean;
 }
 
-interface LinkRow {
-  jwluuid: string; jobId: string; vesselId: string; isDeleted: boolean; attachedAt: string;
-  file: { jwfuuid: string; fileName: string; fileSize: number | null; revisionRemarks: string | null; uploadedAt: string; isDeleted: boolean } | null;
-}
+type LinkRow = WorkInstructionLinkRow;
 interface VesselFile { jwfuuid: string; fileName: string; fileSize: number | null; revisionRemarks: string | null; uploadedAt: string }
 
 const fmtSize = (n: number | null | undefined) => (n == null ? "" : n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const fmtDate = (s: string | null | undefined) => (s ? String(s).slice(0, 10) : "");
-export const workInstructionsQueryKey = (jobId: string | null | undefined, includeRemoved: boolean) =>
-  ["/technical/api/jobs", jobId ?? null, "work-instructions", includeRemoved] as const;
+export const workInstructionsQueryKey = (jobId: string | null | undefined) =>
+  ["/technical/api/jobs", jobId ?? null, "work-instructions"] as const;
 
 const WorkInstructionsDialog: React.FC<WorkInstructionsDialogProps> = ({ isOpen, onClose, jobId, workOrderId, vesselId, readOnly = false, jobUnsaved = false }) => {
   const { toast } = useToast();
@@ -61,12 +59,11 @@ const WorkInstructionsDialog: React.FC<WorkInstructionsDialogProps> = ({ isOpen,
 
   const viaWorkOrder = !jobId && !!workOrderId;
   const canManage = !readOnly && !isShip && !viaWorkOrder && !!jobId;
-  const listUrl = jobId
-    ? `/technical/api/jobs/${encodeURIComponent(jobId)}/work-instructions${showRemoved ? "?includeRemoved=1" : ""}`
-    : workOrderId ? `/technical/api/work-orders/${encodeURIComponent(workOrderId)}/work-instructions` : null;
+  // The Job list always includes removed links (D5: kept, restorable) — see workInstructionsList.ts for why.
+  const listUrl = workInstructionsListUrl(jobId, workOrderId);
 
   const list = useQuery<LinkRow[]>({
-    queryKey: jobId ? workInstructionsQueryKey(jobId, showRemoved) : ["/technical/api/work-orders", workOrderId ?? null, "work-instructions"],
+    queryKey: jobId ? workInstructionsQueryKey(jobId) : ["/technical/api/work-orders", workOrderId ?? null, "work-instructions"],
     enabled: isOpen && !!listUrl && !jobUnsaved,
     retry: false,
     queryFn: async () => {
@@ -87,8 +84,7 @@ const WorkInstructionsDialog: React.FC<WorkInstructionsDialogProps> = ({ isOpen,
   });
 
   const rows = list.data ?? [];
-  const active = useMemo(() => rows.filter((r) => !r.isDeleted), [rows]);
-  const removed = useMemo(() => rows.filter((r) => r.isDeleted), [rows]);
+  const { active, removed } = useMemo(() => splitWorkInstructionRows(rows), [rows]);
   const attachedFileIds = useMemo(() => new Set(active.map((r) => r.file?.jwfuuid)), [active]);
 
   const refresh = () => {
@@ -142,9 +138,7 @@ const WorkInstructionsDialog: React.FC<WorkInstructionsDialogProps> = ({ isOpen,
       <FileText className="h-4 w-4 flex-shrink-0 text-[#16569e]" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-gray-900">{r.file?.fileName ?? "(file missing)"}</div>
-        <div className="text-xs text-gray-500">
-          {fmtSize(r.file?.fileSize)}{r.file?.uploadedAt ? ` · uploaded ${fmtDate(r.file.uploadedAt)}` : ""}{r.file?.revisionRemarks ? ` · ${r.file.revisionRemarks}` : ""}{r.isDeleted ? " · removed" : ""}
-        </div>
+        <div className="text-xs text-gray-500">{workInstructionRowMeta(r, fmtSize, fmtDate)}</div>
       </div>
       {r.file && !r.isDeleted && (
         <>
@@ -177,9 +171,9 @@ const WorkInstructionsDialog: React.FC<WorkInstructionsDialogProps> = ({ isOpen,
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="font-medium text-gray-900">PDF attachments</h4>
-              {jobId && (removed.length > 0 || showRemoved) && (
+              {jobId && showRemovedToggle(removed.length, showRemoved) && (
                 <button type="button" className="text-xs text-[#1570ef]" onClick={() => setShowRemoved((v) => !v)} data-testid="wi-toggle-removed">
-                  {showRemoved ? "Hide removed" : `Show removed (${removed.length})`}
+                  {removedToggleLabel(removed.length, showRemoved)}
                 </button>
               )}
             </div>

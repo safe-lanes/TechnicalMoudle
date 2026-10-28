@@ -136,6 +136,16 @@ describe('reads', () => {
     expect(rows[0].file?.fileName).toBe('Pump_Overhaul.pdf');
     await expect(listForJob('job-1', { ...shipUser, vesselId: 'vessel-B' })).rejects.toMatchObject({ statusCode: 403 });
   });
+  it('with includeRemoved the removed links come back too, each with its removal time (28-Oct-2026, WI-13 Show removed)', async () => {
+    const removedOn = new Date('2026-10-27T10:00:00Z');
+    repo.listLinks.mockResolvedValue([
+      { jwluuid: 'l-1', jobId: 'job-1', vesselId: V, isDeleted: false, attachedAt: new Date(), updatedAt: new Date(), file: storedFile },
+      { jwluuid: 'l-2', jobId: 'job-1', vesselId: V, isDeleted: true, attachedAt: new Date(), updatedAt: removedOn, file: storedFile },
+    ]);
+    const rows = await listForJob('job-1', office, true);
+    expect(repo.listLinks).toHaveBeenCalledWith('job-1', true);
+    expect(rows.map((r) => [r.jwluuid, r.isDeleted, r.removedAt])).toEqual([['l-1', false, null], ['l-2', true, removedOn]]);
+  });
   it('the Work Order view is the linked Job\'s live list; a WO without a Job has none', async () => {
     repo.listLinks.mockResolvedValue([]);
     expect(await listForWorkOrder('job-1', office)).toEqual([]);
