@@ -91,7 +91,7 @@ const DEFAULT_USER: PublicUser = {
   email: "jeevan.naik@safe-lanes.com",
   role: "Sail Admin",
   userType: "Office",
-  vesselId: "7446783c-841a-11ed-aa7c-7003bca91a86",
+  vesselId: null,
   department: null,
   isActive: true,
   crewDesignation: "Marine Manager",
