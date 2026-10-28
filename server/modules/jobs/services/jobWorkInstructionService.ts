@@ -84,13 +84,22 @@ export async function listForJob(jobId: string, actor: Actor, includeRemoved = f
   const job = await loadVesselJob(jobId);
   assertVesselAccess(actor, job.vesselId);
   const links = await repo.listLinks(job.juuid, includeRemoved);
+  // 28-Oct-2026 (QA VS-03, Jeevan Issue 03): who uploaded / attached / removed, resolved from master_users at read
+  // time (names are not stored on the rows; an id without a master_users row shows no name).
+  const removedBy = (l: (typeof links)[number]) => (l.isDeleted ? (l as { updatedByUuid?: string | null }).updatedByUuid ?? null : null);
+  const names = await repo.findUserNames(
+    links.flatMap((l) => [l.file?.uploadedByUuid ?? null, l.attachedByUuid ?? null, removedBy(l)]).filter((x): x is string => !!x),
+  );
+  const nameOf = (id: string | null | undefined) => (id ? names.get(id) ?? null : null);
   return links.map((l) => ({
     jwluuid: l.jwluuid, jobId: l.jobId, vesselId: l.vesselId, isDeleted: l.isDeleted, attachedAt: l.attachedAt,
+    attachedByName: nameOf(l.attachedByUuid),
     // A removed link keeps its row (D5); the removal time is its last update (setLinkDeleted stamps updatedAt).
     removedAt: l.isDeleted ? ((l as { updatedAt?: Date | null }).updatedAt ?? null) : null,
+    removedByName: nameOf(removedBy(l)),
     file: l.file ? {
       jwfuuid: l.file.jwfuuid, fileName: l.file.fileName, fileSize: l.file.fileSize, revisionRemarks: l.file.revisionRemarks,
-      uploadedAt: l.file.uploadedAt, isDeleted: l.file.isDeleted,
+      uploadedAt: l.file.uploadedAt, isDeleted: l.file.isDeleted, uploadedByName: nameOf(l.file.uploadedByUuid),
     } : null,
   }));
 }

@@ -565,6 +565,8 @@ export interface IStorage {
   findJobWorkInstructionFileByName(vesselId: string, fileName: string): Promise<JobWorkInstructionFile | undefined>;
   createJobWorkInstructionFile(data: InsertJobWorkInstructionFile): Promise<JobWorkInstructionFile>;
   getJobWorkInstructionLinks(jobId: string, includeRemoved?: boolean): Promise<Array<JobWorkInstructionLink & { file: JobWorkInstructionFile | null }>>;
+  /** Display names for user ids (master_users.id); ids without a row are absent. 28-Oct-2026, Work Instructions "who". */
+  getMasterUserNamesByIds(ids: string[]): Promise<Map<string, string>>;
   getJobWorkInstructionLink(jwluuid: string): Promise<JobWorkInstructionLink | undefined>;
   findActiveJobWorkInstructionLink(jobId: string, fileUuid: string): Promise<JobWorkInstructionLink | undefined>;
   createJobWorkInstructionLink(data: InsertJobWorkInstructionLink): Promise<JobWorkInstructionLink>;

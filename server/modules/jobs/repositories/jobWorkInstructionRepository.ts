@@ -26,6 +26,11 @@ export async function listLinks(jobId: string, includeRemoved = false) {
   return storage.getJobWorkInstructionLinks(jobId, includeRemoved);
 }
 
+/** Names for the "who" columns of the list (uploaded / attached / removed by). */
+export async function findUserNames(ids: string[]): Promise<Map<string, string>> {
+  return storage.getMasterUserNamesByIds(ids);
+}
+
 export async function findLink(jwluuid: string) {
   return storage.getJobWorkInstructionLink(jwluuid);
 }

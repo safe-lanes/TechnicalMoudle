@@ -14,7 +14,10 @@ export interface WorkInstructionLinkRow {
   attachedAt: string;
   /** Set on removed links only: when the link was removed (server: the link's last update). */
   removedAt?: string | null;
-  file: { jwfuuid: string; fileName: string; fileSize: number | null; revisionRemarks: string | null; uploadedAt: string; isDeleted: boolean } | null;
+  /** Who attached / removed (resolved by the server from master_users; null when unknown). */
+  attachedByName?: string | null;
+  removedByName?: string | null;
+  file: { jwfuuid: string; fileName: string; fileSize: number | null; revisionRemarks: string | null; uploadedAt: string; isDeleted: boolean; uploadedByName?: string | null } | null;
 }
 
 /** The list endpoint for the dialog: a Job's list always carries removed links; a Work Order's list is current-only. */
@@ -41,7 +44,7 @@ export function removedToggleLabel(removedCount: number, showRemoved: boolean): 
   return showRemoved ? "Hide removed" : `Show removed (${removedCount})`;
 }
 
-/** Secondary line of a row: size · uploaded <date> · remarks · removed <date>. */
+/** Secondary line of a row: size · uploaded <date> by <name> · attached by <name> · remarks · removed <date> by <name>. */
 export function workInstructionRowMeta(
   r: WorkInstructionLinkRow,
   fmtSize: (n: number | null | undefined) => string,
@@ -50,8 +53,10 @@ export function workInstructionRowMeta(
   const parts: string[] = [];
   const size = fmtSize(r.file?.fileSize);
   if (size) parts.push(size);
-  if (r.file?.uploadedAt) parts.push(`uploaded ${fmtDate(r.file.uploadedAt)}`);
+  const by = (name: string | null | undefined) => (name ? ` by ${name}` : "");
+  if (r.file?.uploadedAt) parts.push(`uploaded ${fmtDate(r.file.uploadedAt)}${by(r.file.uploadedByName)}`);
+  if (r.attachedByName) parts.push(`attached by ${r.attachedByName}`);
   if (r.file?.revisionRemarks) parts.push(r.file.revisionRemarks);
-  if (r.isDeleted) parts.push(r.removedAt ? `removed ${fmtDate(r.removedAt)}` : "removed");
+  if (r.isDeleted) parts.push(`removed${r.removedAt ? ` ${fmtDate(r.removedAt)}` : ""}${by(r.removedByName)}`);
   return parts.join(" · ");
 }

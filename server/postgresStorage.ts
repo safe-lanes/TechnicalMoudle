@@ -10,6 +10,7 @@ import {
   sameOfficeReviewerRoles,
 } from '../shared/officeReviewer';
 import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not, getTableColumns } from 'drizzle-orm';
+import { masterUsers } from '@shared/schema'; // 28-Oct-2026: Work Instructions "who" names (getMasterUserNamesByIds)
 import { levelsMatch } from '@shared/approvals/level';
 import { getDb } from './db';
 import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
@@ -2379,6 +2380,17 @@ export class PostgresStorage {
         : and(eq(jobWorkInstructionLinks.jobId, jobId), eq(jobWorkInstructionLinks.isDeleted, false)))
       .orderBy(asc(jobWorkInstructionLinks.attachedAt));
     return rows.map((r) => ({ ...r.link, file: r.file }));
+  }
+
+  /** Display names for user ids (master_users.id = the SAILERP user id carried in x-user-id). Unknown ids are absent. */
+  async getMasterUserNamesByIds(ids: string[]): Promise<Map<string, string>> {
+    const unique = Array.from(new Set(ids.filter((x): x is string => typeof x === 'string' && x.length > 0)));
+    const out = new Map<string, string>();
+    if (unique.length === 0) return out;
+    const db = await getDb();
+    const rows = await db.select({ id: masterUsers.id, name: masterUsers.fullName }).from(masterUsers).where(inArray(masterUsers.id, unique));
+    for (const r of rows) if (r.name?.trim()) out.set(r.id, r.name.trim());
+    return out;
   }
 
   async getJobWorkInstructionLink(jwluuid: string): Promise<JobWorkInstructionLink | undefined> {

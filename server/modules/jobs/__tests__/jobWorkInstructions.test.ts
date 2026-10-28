@@ -12,6 +12,7 @@ vi.mock('../../sync/fileSyncProcessor', () => ({ FileSyncProcessor: { queueFileF
 const repo = vi.hoisted(() => ({
   findJob: vi.fn(), listVesselFiles: vi.fn(), findFile: vi.fn(), findFileByName: vi.fn(), createFile: vi.fn(),
   listLinks: vi.fn(), findLink: vi.fn(), findActiveLink: vi.fn(), createLink: vi.fn(), setLinkDeleted: vi.fn(),
+  findUserNames: vi.fn(),
 }));
 vi.mock('../repositories/jobWorkInstructionRepository', () => repo);
 
@@ -37,6 +38,7 @@ beforeEach(() => {
   repo.findFileByName.mockResolvedValue(undefined);
   repo.findFile.mockResolvedValue(storedFile);
   repo.findActiveLink.mockResolvedValue(undefined);
+  repo.findUserNames.mockResolvedValue(new Map());
   repo.createFile.mockImplementation(async (d: any) => ({ ...storedFile, ...d, jwfuuid: 'f-new' }));
   repo.createLink.mockImplementation(async (d: any) => ({ jwluuid: 'l-new', isDeleted: false, ...d }));
 });
@@ -145,6 +147,18 @@ describe('reads', () => {
     const rows = await listForJob('job-1', office, true);
     expect(repo.listLinks).toHaveBeenCalledWith('job-1', true);
     expect(rows.map((r) => [r.jwluuid, r.isDeleted, r.removedAt])).toEqual([['l-1', false, null], ['l-2', true, removedOn]]);
+  });
+  it('rows carry who uploaded / attached / removed, resolved from master_users; unknown ids give no name (28-Oct-2026, VS-03)', async () => {
+    repo.findUserNames.mockResolvedValue(new Map([['u-up', 'Uma Uploader'], ['u-rm', 'Rama Remover']]));
+    repo.listLinks.mockResolvedValue([
+      { jwluuid: 'l-1', jobId: 'job-1', vesselId: V, isDeleted: false, attachedAt: new Date(), attachedByUuid: 'u-up', updatedByUuid: 'u-up', file: { ...storedFile, uploadedByUuid: 'u-up' } },
+      { jwluuid: 'l-2', jobId: 'job-1', vesselId: V, isDeleted: true, attachedAt: new Date(), attachedByUuid: 'u-unknown', updatedAt: new Date(), updatedByUuid: 'u-rm', file: { ...storedFile, uploadedByUuid: 'u-unknown' } },
+    ]);
+    const rows = await listForJob('job-1', office, true);
+    expect(repo.findUserNames).toHaveBeenCalledWith(['u-up', 'u-up', 'u-unknown', 'u-unknown', 'u-rm']);
+    expect(rows.map((r) => [r.file?.uploadedByName, r.attachedByName, r.removedByName])).toEqual([
+      ['Uma Uploader', 'Uma Uploader', null], [null, null, 'Rama Remover'],
+    ]);
   });
   it('the Work Order view is the linked Job\'s live list; a WO without a Job has none', async () => {
     repo.listLinks.mockResolvedValue([]);

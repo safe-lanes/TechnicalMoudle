@@ -29,6 +29,9 @@ interface FileAttachmentDialogProps {
   itemName?: string;
   /** View only: no upload, no remove (e.g. a locked defect Part A). */
   readOnly?: boolean;
+  /** Return a message to REFUSE removing this file (shown as an error, nothing removed); null/undefined allows it.
+   *  28-Oct-2026 (QA DF-09): removal used to succeed locally and only fail later on Save. */
+  canRemove?: (attachment: FileAttachment) => string | null | undefined;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -42,6 +45,7 @@ export function FileAttachmentDialog({
   title = 'Manage Attachments',
   itemName,
   readOnly = false,
+  canRemove,
 }: FileAttachmentDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +117,11 @@ export function FileAttachmentDialog({
     const current = attachmentsRef.current;
     const attachment = current.find((a) => a.id === id);
     if (!attachment) return;
+    const refusal = canRemove?.(attachment);
+    if (refusal) {
+      toast({ title: 'Cannot remove this file', description: refusal, variant: 'destructive' });
+      return;
+    }
     commitAttachments(current.filter((a) => a.id !== id));
 
     toast({

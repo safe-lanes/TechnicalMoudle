@@ -44,6 +44,17 @@ test('a removed row shows when it was removed', () => {
   assert.equal(workInstructionRowMeta(row('c', true), fmtSize, fmtDate), '2 KB · uploaded 2026-10-19 · removed');
 });
 
+test('a row shows who uploaded, attached and removed when the server resolved the names (VS-03)', () => {
+  const fmtSize = (n: number | null | undefined) => (n == null ? '' : `${Math.round(n / 1024)} KB`);
+  const fmtDate = (s: string | null | undefined) => (s ? String(s).slice(0, 10) : '');
+  const named = { ...row('d', true, '2026-10-27T10:00:00Z'), attachedByName: 'Jeevan', removedByName: 'Nilesh',
+    file: { ...row('d', true).file!, uploadedByName: 'Jeevan' } };
+  assert.equal(workInstructionRowMeta(named, fmtSize, fmtDate),
+    '2 KB · uploaded 2026-10-19 by Jeevan · attached by Jeevan · removed 2026-10-27 by Nilesh');
+  const unknown = { ...row('e', false), attachedByName: null, file: { ...row('e', false).file!, uploadedByName: null } };
+  assert.equal(workInstructionRowMeta(unknown, fmtSize, fmtDate), '2 KB · uploaded 2026-10-19', 'unknown users add nothing');
+});
+
 test('the dialog uses these helpers (the old chicken-and-egg cannot come back)', () => {
   const src = readFileSync(new URL('../../client/src/components/WorkInstructionsDialog.tsx', import.meta.url), 'utf8');
   assert.match(src, /from "\.\/workInstructionsList"/);

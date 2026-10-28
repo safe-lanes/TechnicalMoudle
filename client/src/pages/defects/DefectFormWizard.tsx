@@ -22,6 +22,7 @@ import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
 import { FileAttachmentDialog, FileAttachment } from "@/components/FileAttachmentDialog";
+import { closureEvidenceRemovalRefusal } from "./closureEvidenceGuard";
 import { useVessels } from "@/hooks/useVessels";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 import { defectSources, findSourceById } from "@/data/defectSources";
@@ -2887,6 +2888,7 @@ export default function DefectFormWizard({
         onAttachmentsChange={setFileAttachments}
         title="C1 Attachments - Rectification Documentation"
         itemName="Rectification"
+        canRemove={(a) => closureEvidenceRemovalRefusal(a.id, currentDefect, closureHistory.data)}
       />
 
       <FileAttachmentDialog

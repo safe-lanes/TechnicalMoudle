@@ -89,28 +89,26 @@ export function WithdrawRequestPanel({
 
   const data = status.data;
   if (!data) return null;
+  // QA round 3 WD-01 (28-Oct-2026): the settled outcomes ("Withdrawn by … on …", "too late") are already
+  // rows of the "Approval process" list shown with every request, so this panel keeps only what that
+  // list cannot show yet: the Withdraw button, a withdrawal still waiting for the office, and a refusal.
   const latest = data.withdrawals[0] ?? null;
-  if (!data.canWithdraw && !latest) return null;
+  const note = latest && (latest.outcome === null || latest.outcome === "refused") ? latest : null;
+  if (!data.canWithdraw && !note) return null;
 
   return (
     <div className={`rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 space-y-2 ${className}`} data-testid="withdraw-request-panel">
-      {latest && (
-        <div data-testid={`withdrawal-note-${latest.outcome ?? "waiting"}`}>
-          {latest.outcome === null && (
+      {note && (
+        <div data-testid={`withdrawal-note-${note.outcome ?? "waiting"}`}>
+          {note.outcome === null && (
             <span className="text-amber-700">
-              Withdrawal sent by {latest.requestedByName || "the sender"} on {day(latest.requestedAt)} — waiting for the office (after sync).
+              Withdrawal sent by {note.requestedByName || "the sender"} on {day(note.requestedAt)} — waiting for the office (after sync).
             </span>
           )}
-          {latest.outcome === "withdrawn" && (
-            <span>Withdrawn by {latest.requestedByName || "the sender"} on {day(latest.outcomeAt ?? latest.requestedAt)}.</span>
+          {note.outcome === "refused" && (
+            <span className="text-red-700">Withdrawal refused: {note.outcomeNote || "not the sender."}</span>
           )}
-          {latest.outcome === "too-late" && (
-            <span className="text-red-700">Withdrawal too late: {latest.outcomeNote || "the request was already decided — the decision stands."}</span>
-          )}
-          {latest.outcome === "refused" && (
-            <span className="text-red-700">Withdrawal refused: {latest.outcomeNote || "not the sender."}</span>
-          )}
-          {latest.reason && <div className="text-slate-500">Reason: {latest.reason}</div>}
+          {note.reason && <div className="text-slate-500">Reason: {note.reason}</div>}
         </div>
       )}
       {data.canWithdraw && !confirming && (
