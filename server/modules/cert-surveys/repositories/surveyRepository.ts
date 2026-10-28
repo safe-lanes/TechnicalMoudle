@@ -6,6 +6,7 @@ import {
   vesselSurveyData,
 } from '@shared/schema';
 import { eq, and, asc, inArray, or, sql } from 'drizzle-orm';
+import { querySurveyPage, type SurveyPagingFilters } from './surveyPagingRepository';
 
 // ── Helpers ──
 
@@ -17,8 +18,18 @@ function getDb() {
 
 // ── Operational Survey Queries (Direct Drizzle) ──
 
-export async function getApplicableSurveys() {
-  const db = await getDb();
+type SurveyReadDb = Pick<NonNullable<ReturnType<typeof getDb>>, 'select' | 'execute'>;
+
+export async function getSurveyListPage(filters: SurveyPagingFilters) {
+  const db = getDb();
+  if (!db) throw Object.assign(new Error('Database not available'), { statusCode: 500 });
+  return db.transaction(async tx => {
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
+    return querySurveyPage(tx, filters);
+  });
+}
+
+export async function getApplicableSurveys(db: SurveyReadDb | null = getDb()) {
   if (!db) return null;
   return db.select().from(vesselSurveyApplicability)
     .where(and(
@@ -27,8 +38,7 @@ export async function getApplicableSurveys() {
     ));
 }
 
-export async function getMasterSurveysByIds(masterIds: string[]) {
-  const db = await getDb();
+export async function getMasterSurveysByIds(masterIds: string[], db: SurveyReadDb | null = getDb()) {
   if (!db) return null;
   return db.select().from(shipSurveysMaster)
     .where(and(
@@ -39,8 +49,7 @@ export async function getMasterSurveysByIds(masterIds: string[]) {
     .orderBy(asc(shipSurveysMaster.companySequence));
 }
 
-export async function getAllVesselSurveyData() {
-  const db = await getDb();
+export async function getAllVesselSurveyData(db: SurveyReadDb | null = getDb()) {
   if (!db) return null;
   return db.select().from(vesselSurveyData);
 }
