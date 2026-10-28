@@ -8,6 +8,7 @@
  * Mode selector shows 'advanced' disabled ("coming soon"). Per-scope enable/disable toggle.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ConfiguredApproverRole, type ConfiguredApproverLookup } from './ConfiguredApproverRole';
 
 interface Props {
   basePath?: string;
@@ -61,7 +62,7 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
   // classification: steps, roles, quorum, resolved approver names, and a ⚠ marker where a role
   // resolves to nobody (the same silent-stall risk F3 addresses at runtime).
   const [viewSteps, setViewSteps] = useState<Array<{ label: string; rule: string; slots: Array<{ roleId: string; roleLabel: string }> }> | null>(null);
-  const [approverNames, setApproverNames] = useState<Record<string, { names: string[]; vesselScoped: boolean; error?: string; users?: Array<{ id: string; name: string; vessels: string[] }> }>>({});
+  const [approverNames, setApproverNames] = useState<Record<string, ConfiguredApproverLookup>>({});
   // Jeevan #1: only the active version is listed; older versions behind "Show history".
   const [showVersionHistory, setShowVersionHistory] = useState(false);
 
@@ -261,48 +262,9 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
                     <div style={{ fontWeight: 600, fontSize: 13 }}>
                       Step {i + 1}: {st.label}{st.slots.length > 1 ? ` — ${st.rule === 'any' ? 'any one approves' : 'all must approve'}` : ''}
                     </div>
-                    {st.slots.map((sl) => {
-                      const r = approverNames[sl.roleId];
-                      const empty = !!r && !r.error && r.names.length === 0;
-                      // Jeevan #2: a table of approvers with their assigned vessels.
-                      if (r && !r.error && !empty && r.users) {
-                        return (
-                          <div key={sl.roleId} style={{ marginLeft: 12, marginTop: 4 }}>
-                            <div style={{ fontWeight: 500, fontSize: 13 }}>{sl.roleLabel}</div>
-                            <table data-testid="configured-approver-table" style={{ borderCollapse: 'collapse', fontSize: 12, marginTop: 4, width: '100%' }}>
-                              <thead><tr style={{ background: '#f9fafb', textAlign: 'left' }}>
-                                <th style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>User</th>
-                                <th style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>Role</th>
-                                <th style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>Assigned vessels</th>
-                              </tr></thead>
-                              <tbody>{r.users.map((u) => (
-                                <tr key={u.id}>
-                                  <td style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>{u.name}</td>
-                                  <td style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>{sl.roleLabel}</td>
-                                  <td style={{ padding: '4px 8px', border: '1px solid #e4e7ec' }}>
-                                    {u.vessels.length > 0 ? u.vessels.join(', ')
-                                      : r.vesselScoped
-                                        ? <span data-testid="approver-no-vessel" style={{ color: '#b42318' }}>⚠ no vessel assigned — cannot approve any request</span>
-                                        : <span style={{ color: '#667085' }}>all vessels</span>}
-                                  </td>
-                                </tr>
-                              ))}</tbody>
-                            </table>
-                            {r.vesselScoped && <div style={{ color: '#667085', fontSize: 12, marginTop: 2 }}>Approvers for a request are those assigned that request's vessel in SAILERP.</div>}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={sl.roleId} style={{ marginLeft: 12, fontSize: 13, marginTop: 2 }}>
-                          <span style={{ fontWeight: 500 }}>{sl.roleLabel}</span>
-                          {!r ? <span style={{ color: '#667085' }}> — resolving…</span>
-                            : r.error ? <span data-testid="configured-approver-load-error" style={{ color: '#667085' }}> — {r.error}</span>
-                            : empty
-                              ? <span data-testid="configured-approver-unresolved" style={{ color: '#b42318' }}> — ⚠ no approver resolved for this role</span>
-                              : <span style={{ color: '#475467' }}> — {r.names.join(', ')}{r.vesselScoped ? ' (vessel-scoped at runtime — the approvers for a given request are those assigned that vessel in SAILERP)' : ''}</span>}
-                        </div>
-                      );
-                    })}
+                    {st.slots.map((sl) => (
+                      <ConfiguredApproverRole key={sl.roleId} roleLabel={sl.roleLabel} result={approverNames[sl.roleId]} />
+                    ))}
                   </div>
                 ))}
               </div>
