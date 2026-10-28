@@ -91,7 +91,7 @@ const DEFAULT_USER: PublicUser = {
   email: "jeevan.naik@safe-lanes.com",
   role: "Sail Admin",
   userType: "Office",
-  vesselId: null,
+  vesselId: "7446783c-841a-11ed-aa7c-7003bca91a86",
   department: null,
   isActive: true,
   crewDesignation: "Marine Manager",
@@ -252,14 +252,18 @@ function clearVesselCaptureGuard(): void {
   try {
     // Object.keys returns a snapshot, so removing while iterating is safe.
     for (const key of Object.keys(sessionStorage)) {
-      if (key.startsWith(`${VESSEL_CAPTURE_GUARD}:`)) sessionStorage.removeItem(key);
+      if (key.startsWith(`${VESSEL_CAPTURE_GUARD}:`))
+        sessionStorage.removeItem(key);
     }
   } catch {
     // private-mode / storage-disabled: there was no guard to clear either.
   }
 }
 
-function captureVesselAssignments(assignments: MyVesselAssignment[], userUuid: string | null | undefined): void {
+function captureVesselAssignments(
+  assignments: MyVesselAssignment[],
+  userUuid: string | null | undefined,
+): void {
   if (!userUuid) return; // no forwarded identity → the server would reject it anyway
   // NEVER post an empty set: an absent/unreadable encrypted userProfile normalises to []
   // and must not be mistaken for "this user has no vessels". The server no-ops on empty
