@@ -7,7 +7,7 @@
  * add step rows (Select Approver → AND/OR → next row) → tick to save (a new active version).
  * Mode selector shows 'advanced' disabled ("coming soon"). Per-scope enable/disable toggle.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConfiguredApproverRole, type ConfiguredApproverLookup } from './ConfiguredApproverRole';
 
 interface Props {
@@ -56,6 +56,13 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
   const [enabled, setEnabled] = useState<boolean>(true);
   const [roles, setRoles] = useState<Role[]>([]);
   const [rows, setRows] = useState<StepRow[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  // Each selection owns its requests, draft and save lock. A new identity also handles
+  // switching away and back before an earlier request completes.
+  const request = useRef({ key: '', revision: 0, saving: false });
   const [versions, setVersions] = useState<WorkflowSummary[]>([]);
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({});
   // F7 — read-only "View configured approvers/tiers" for the active version of the selected
@@ -79,34 +86,63 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
   const scope = useMemo(() => mod?.scopes.find((s) => `${s.screenId}/${s.actionId}` === scopeKeySel), [mod, scopeKeySel]);
   const scopeQuery = scope ? `moduleId=${encodeURIComponent(moduleId)}&screenId=${encodeURIComponent(scope.screenId)}&actionId=${encodeURIComponent(scope.actionId)}` : '';
   const scopeDto = scope ? { moduleId, screenId: scope.screenId, actionId: scope.actionId } : null;
+  const selectionKey = `${basePath}|${hostKey}|${scopeQuery}|${classification}`;
+  const [selection, setSelection] = useState(selectionKey);
+  // Reset during selection, before rendering any controls for the new chain.
+  // An effect-only reset would briefly expose the previous selection's draft.
+  if (selection !== selectionKey) {
+    request.current = { key: selectionKey, revision: 0, saving: false };
+    setSelection(selectionKey);
+    setRows([]); setEditing(false); setSaving(false);
+    setVersions([]); setViewSteps(null); setApproverNames({});
+    setLoading(true); setLoadError(''); setMsg({}); setShowVersionHistory(false);
+  }
+  useEffect(() => () => {
+    request.current = { key: '', revision: 0, saving: false };
+  }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const owner = request.current;
+    const current = () => !cancelled && request.current === owner;
     if (!scope) return;
-    setRows([]); setMsg({});
-    api('GET', `/roles?${scopeQuery}`).then(setRoles).catch((e) => setMsg({ err: String(e.message) }));
-    api('GET', `/scopes/enabled?${scopeQuery}`).then((r) => setEnabled(!!r.enabled)).catch(() => setEnabled(true));
-    api('GET', `/workflows?${scopeQuery}`).then(setVersions).catch(() => setVersions([]));
-  }, [api, scopeQuery, scope]);
+    setRoles([]);
+    api('GET', `/roles?${scopeQuery}`).then((r) => { if (current()) setRoles(r); }).catch((e) => { if (current()) setMsg({ err: String(e.message) }); });
+    api('GET', `/scopes/enabled?${scopeQuery}`).then((r) => { if (current()) setEnabled(!!r.enabled); }).catch(() => { if (current()) setEnabled(true); });
+    api('GET', `/workflows?${scopeQuery}`).then((r) => {
+      if (!current()) return;
+      setVersions(r); setLoading(false);
+    }).catch((e) => {
+      if (current()) { setLoadError(`Could not load workflow versions: ${e.message}`); setLoading(false); }
+    });
+    return () => { cancelled = true; };
+  }, [api, scopeQuery, scope, selectionKey]);
+
+  useEffect(() => {
+    if (readOnly) { setEditing(false); setRows([]); }
+  }, [readOnly]);
 
   // F7 — load the active version's steps + resolved approver names for the read-only view.
   useEffect(() => {
     let cancelled = false;
-    setViewSteps(null); setApproverNames({});
+    const owner = request.current;
+    const revision = owner.revision;
+    const current = () => !cancelled && request.current === owner && owner.revision === revision;
     if (!classification) return;
     const active = versions
       .filter((v) => v.classification === classification && v.status === 'active')
       .sort((a, b) => b.version - a.version)[0]
       ?? versions.filter((v) => v.classification === classification).sort((a, b) => b.version - a.version)[0];
     if (!active) return;
+    setLoading(viewSteps === null);
     api('GET', `/workflows/${active.wfuuid}`).then(async (wf: any) => {
-      if (cancelled) return;
+      if (!current()) return;
       const steps = (wf?.nodes ?? [])
         .filter((n: any) => n.type === 'approval-step')
         .sort((a: any, b: any) => a.ordinal - b.ordinal)
         .map((n: any) => ({ label: n.label || n.key, rule: n.quorum?.rule ?? 'all', slots: (n.slots ?? []).map((s: any) => ({ roleId: s.roleId, roleLabel: s.roleLabel })) }));
       setViewSteps(steps);
-      // Jeevan #13: open the editor on the CURRENT chain (it was always empty, so the saved workflow looked missing).
-      setRows((current) => current.length > 0 ? current : steps.map((s: any) => ({ roles: s.slots, rule: s.rule === 'any' ? 'any' : 'all' })));
+      setLoading(false); setLoadError('');
       const uniqueRoleIds = Array.from(new Set(steps.flatMap((s: any) => s.slots.map((x: any) => x.roleId))));
       const entries = await Promise.all(uniqueRoleIds.map(async (rid) => {
         try {
@@ -117,23 +153,36 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
           return [rid, { names: j.names ?? [], vesselScoped: !!j.vesselScoped, users: Array.isArray(j.users) ? j.users : undefined }] as const;
         } catch { return [rid, { names: [], vesselScoped: false, error: 'could not load the approvers' }] as const; }
       }));
-      if (!cancelled) setApproverNames(Object.fromEntries(entries));
-    }).catch(() => { if (!cancelled) setViewSteps(null); });
+      if (current()) setApproverNames(Object.fromEntries(entries));
+    }).catch((e) => {
+      if (current()) { setLoadError(`Could not load saved workflow: ${e.message}`); setLoading(false); }
+    });
     return () => { cancelled = true; };
-  }, [api, classification, versions]);
+  }, [api, classification, versions, selectionKey]);
 
-  const addRow = () => setRows((r) => [...r, { roles: [], rule: 'all' }]);
+  const canMutate = editing && !readOnly && !saving;
+  const addRow = () => {
+    if (readOnly || saving || loading || loadError) return;
+    setRows((r) => [...(editing ? r : (viewSteps ?? []).map((s) => ({
+      roles: s.slots.map((role) => ({ ...role })), rule: s.rule === 'any' ? 'any' as const : 'all' as const,
+    }))), { roles: [], rule: 'all' }]);
+    setEditing(true); setMsg({});
+  };
   const setRowRole = (i: number, roleId: string) => {
+    if (!canMutate) return;
     const role = roles.find((r) => r.roleId === roleId);
     if (!role) return;
     setRows((rs) => rs.map((r, idx) => idx !== i || r.roles.some((x) => x.roleId === roleId) ? r : { ...r, roles: [...r.roles, role] }));
   };
-  const removeRole = (i: number, roleId: string) => setRows((rs) => rs.map((r, idx) => idx === i ? { ...r, roles: r.roles.filter((x) => x.roleId !== roleId) } : r));
-  const setRule = (i: number, rule: 'all' | 'any') => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, rule } : r)));
+  const removeRole = (i: number, roleId: string) => { if (canMutate) setRows((rs) => rs.map((r, idx) => idx === i ? { ...r, roles: r.roles.filter((x) => x.roleId !== roleId) } : r)); };
+  const setRule = (i: number, rule: 'all' | 'any') => { if (canMutate) setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, rule } : r))); };
 
   const save = async () => {
-    if (!scopeDto || !classification) return;
-    setMsg({});
+    if (!scopeDto || !classification || !canMutate || request.current.saving || !rows.some((r) => r.roles.length)) return;
+    const owner = request.current;
+    owner.saving = true;
+    const current = () => request.current === owner;
+    setSaving(true); setMsg({});
     const steps = rows.filter((r) => r.roles.length > 0);
     const nodes = steps.map((r, i) => ({
       key: `step-${i + 1}`, type: 'approval-step', label: `Step ${i + 1}`, ordinal: i,
@@ -143,15 +192,28 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
     const edges = all.slice(0, -1).map((n, i) => ({ from: n.key, to: all[i + 1].key }));
     try {
       const saved = await api('POST', '/workflows', { scope: scopeDto, classification, mode, label: `v-next`, nodes: all, edges });
+      if (!current()) return;
+      owner.revision += 1; // Ignore details requested before this confirmed save.
+      const revision = owner.revision;
+      setViewSteps(nodes.map((n) => ({ label: n.label, rule: n.quorum.rule, slots: n.slots })));
+      setVersions((vs) => [
+        ...vs.filter((v) => v.wfuuid !== saved.wfuuid).map((v) =>
+          v.classification === classification && v.status === 'active' ? { ...v, status: 'superseded' } : v),
+        saved,
+      ]);
+      setEditing(false); setRows([]);
       setMsg({ ok: `Saved as version ${saved.version} (active).` });
-      api('GET', `/workflows?${scopeQuery}`).then(setVersions).catch(() => undefined);
-      setRows([]);
-    } catch (e: any) { setMsg({ err: String(e.message) }); }
+      api('GET', `/workflows?${scopeQuery}`).then((r) => { if (current() && owner.revision === revision) setVersions(r); }).catch((e) => {
+        if (current() && owner.revision === revision) setMsg({ ok: `Saved as version ${saved.version} (active).`, err: `Could not refresh version details: ${e.message}` });
+      });
+    } catch (e: any) { if (current()) setMsg({ err: String(e.message) }); }
+    finally { owner.saving = false; if (current()) setSaving(false); }
   };
   const toggleEnabled = async () => {
     if (!scopeDto) return;
-    try { const r = await api('PUT', '/scopes/enabled', { scope: scopeDto, enabled: !enabled }); setEnabled(!!r.enabled); }
-    catch (e: any) { setMsg({ err: String(e.message) }); }
+    const owner = request.current;
+    try { const r = await api('PUT', '/scopes/enabled', { scope: scopeDto, enabled: !enabled }); if (request.current === owner) setEnabled(!!r.enabled); }
+    catch (e: any) { if (request.current === owner) setMsg({ err: String(e.message) }); }
   };
 
   return (
@@ -200,33 +262,43 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
 
           {classification && (<>
             <div style={S.h}>Steps (top to bottom)</div>
-            {rows.map((r, i) => (
+            {loading && <div role="status">Loading saved workflow…</div>}
+            {loadError && <div role="alert" style={S.err}>{loadError}</div>}
+            {!editing && !loading && !loadError && !(viewSteps?.length) && <div style={{ color: '#667085', marginBottom: 8 }}>No workflow saved for this classification.</div>}
+            {!editing && viewSteps?.map((st, i) => (
+              <div key={i} style={S.row} data-testid={`saved-workflow-step-${i + 1}`}>
+                <span>Step {i + 1}:</span>
+                {st.slots.map((role) => <span key={role.roleId} style={S.chip}>{role.roleLabel}</span>)}
+                {st.slots.length > 1 && <span>{st.rule === 'any' ? 'OR — any one approves' : 'AND — all must approve'}</span>}
+              </div>
+            ))}
+            {editing && !readOnly && rows.map((r, i) => (
               <div key={i} style={S.row}>
                 <span>Step {i + 1}:</span>
-                <select value="" onChange={(e) => setRowRole(i, e.target.value)}>
+                <select aria-label={`Step ${i + 1} approver`} disabled={saving} value="" onChange={(e) => setRowRole(i, e.target.value)}>
                   <option value="" disabled>Select Approver…</option>
                   {roles.map((x) => <option key={x.roleId} value={x.roleId}>{x.roleLabel}</option>)}
                 </select>
                 {r.roles.map((x) => (
-                  <span key={x.roleId} style={S.chip}>{x.roleLabel} <a onClick={() => removeRole(i, x.roleId)} style={{ cursor: 'pointer' }}>✕</a></span>
+                  <span key={x.roleId} style={S.chip}>{x.roleLabel} <button disabled={saving} aria-label={`Remove ${x.roleLabel} from step ${i + 1}`} onClick={() => removeRole(i, x.roleId)} style={{ cursor: 'pointer' }}>✕</button></span>
                 ))}
                 {r.roles.length > 1 && (<>
-                  <button style={{ ...S.btn, ...(r.rule === 'all' ? S.primary : {}) }} onClick={() => setRule(i, 'all')}>AND</button>
-                  <button style={{ ...S.btn, ...(r.rule === 'any' ? S.primary : {}) }} onClick={() => setRule(i, 'any')}>OR</button>
+                  <button disabled={saving} style={{ ...S.btn, ...(r.rule === 'all' ? S.primary : {}) }} onClick={() => setRule(i, 'all')}>AND</button>
+                  <button disabled={saving} style={{ ...S.btn, ...(r.rule === 'any' ? S.primary : {}) }} onClick={() => setRule(i, 'any')}>OR</button>
                 </>)}
               </div>
             ))}
             {!readOnly && <div style={S.row}>
-              <button style={S.btn} onClick={addRow}>+ Add step</button>
-              <button
+              <button style={{ ...S.btn, ...(saving || loading || loadError ? S.disabled : {}) }} disabled={saving || loading || !!loadError} onClick={addRow}>+ Add step</button>
+              {editing && <button
                 style={{ ...S.btn, ...S.primary, ...(rows.some((r) => r.roles.length > 0) ? {} : S.disabled) }}
-                disabled={!rows.some((r) => r.roles.length > 0)}
+                disabled={saving || !rows.some((r) => r.roles.length > 0)}
                 onClick={save}
                 title="Save as a new active version"
-              >✓ Save workflow</button>
+              >{saving ? 'Saving…' : '✓ Save workflow'}</button>}
             </div>}
             {readOnly && <div style={{ color: '#667085', fontSize: 13, marginBottom: 8 }}>View only — you do not have permission to change this approval workflow.</div>}
-            {msg.err && <div style={S.err}>{msg.err}</div>}
+            {msg.err && <div role="alert" style={S.err}>{msg.err}</div>}
             {msg.ok && <div style={S.ok}>{msg.ok}</div>}
 
             <div style={{ ...S.h, marginTop: 16 }}>Versions</div>
