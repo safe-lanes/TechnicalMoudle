@@ -15,3 +15,4 @@
 - [Spares pagination direction](spares-pagination-scope.md) — follow the Stores pagination structure while retaining Spares-specific business behavior.
 - [Work Order pagination direction](work-order-pagination-scope.md) — use Stores and Spares as the reference while retaining Work Order semantics.
 - [Running Hours loading scope](running-hours-loading-scope.md) — justify pagination per view; do not automatically paginate Overview or change RH business functionality.
+- [Certificates pagination scope](certificates-pagination-scope.md) — Certificates first; follow Spares loading principles without changing existing filters or exports.
