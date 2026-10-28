@@ -1,5 +1,6 @@
 import * as certRepo from '../repositories/certificateRepository';
 import { logFieldChanges } from '../../sync';
+import { supportsSqlCertificateSort } from '../repositories/certificateNumericPaging';
 
 // ── Types ──
 
@@ -18,6 +19,9 @@ interface CertificateFilters {
 
 export async function getCertificates(filters: CertificateFilters) {
   return certRepo.withCertificateReadSnapshot(async reader => {
+    if (supportsSqlCertificateSort(filters.sortBy)) {
+      return reader.queryNumericCertificatePage(filters);
+    }
     const page = filters.page || 1;
     const limit = filters.limit || 100;
     const sortBy = filters.sortBy;

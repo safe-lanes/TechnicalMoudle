@@ -42,7 +42,7 @@ try {
   });
 
   const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
-  const measurements: { scope: string; legacyMs: number[]; pagedMs: number[]; legacySourceBytes: number; pagedSourceBytes: number }[] = [];
+  const measurements: { scope: string; legacyMs: number[]; pagedMs: number[]; legacySourceBytes: number; pagedResponseBytes: number }[] = [];
   for (const [scope, filters] of [
     ['all-vessels', {}],
     ['single-vessel', { vesselId: vessels[0] }],
@@ -54,17 +54,16 @@ try {
     }
     const legacySource = await repo.getAllVesselCertificateData();
     const paged = await getCertificates(filters);
-    const metadata = await repo.getVesselCertificateMetadata();
     measurements.push({
       scope, legacyMs, pagedMs,
       legacySourceBytes: bytes(legacySource),
-      pagedSourceBytes: bytes(metadata) + bytes(paged.certificates.map(row => ({ attachments: row.attachments }))),
+      pagedResponseBytes: bytes(paged),
     });
   }
   console.log(JSON.stringify({
     comparisonCases: cases.length, sqlBoundaryCases: 7, allComparisonsEqual: true,
     measurements,
-    note: 'Source JSON representations, not wire bytes/heap measurements. Lightweight metadata ordering/count remains in Node for compatibility.',
+    note: 'Diagnostic legacy vessel-data source size versus current response JSON size, not wire bytes or heap measurements. Default/numeric sorts use SQL scope/count/page selection; explicit natural string sorts still use the compatibility path.',
   }, null, 2));
 } finally {
   await postgres.pool.end();

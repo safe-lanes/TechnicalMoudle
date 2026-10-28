@@ -5,6 +5,7 @@ import {
   vesselCertificateData,
 } from '@shared/schema';
 import { eq, and, asc, inArray, or, isNull, sql } from 'drizzle-orm';
+import { queryNumericCertificatePage, type CertificatePagingFilters } from './certificateNumericPaging';
 
 // ── Helpers ──
 
@@ -27,6 +28,7 @@ export interface CertificatePageRow {
 /** Keep compatibility ordering and attachment hydration on one read snapshot. */
 export async function withCertificateReadSnapshot<T>(
   read: (reader: {
+    queryNumericCertificatePage: (filters: CertificatePagingFilters) => ReturnType<typeof queryNumericCertificatePage>;
     getApplicableCertificates: () => ReturnType<typeof getApplicableCertificates>;
     getMasterCertificatesByIds: (ids: string[]) => ReturnType<typeof getMasterCertificatesByIds>;
     getVesselCertificateMetadata: () => ReturnType<typeof getVesselCertificateMetadata>;
@@ -38,6 +40,7 @@ export async function withCertificateReadSnapshot<T>(
   return db.transaction(async tx => {
     await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     return read({
+      queryNumericCertificatePage: filters => queryNumericCertificatePage(tx, filters),
       getApplicableCertificates: () => getApplicableCertificates(tx),
       getMasterCertificatesByIds: ids => getMasterCertificatesByIds(ids, tx),
       getVesselCertificateMetadata: () => getVesselCertificateMetadata(tx),
@@ -118,8 +121,7 @@ export async function getCertificatePage<Row extends CertificatePageRow>(
   });
 }
 
-export async function getAllVesselCertificateData() {
-  const db = await getDb();
+export async function getAllVesselCertificateData(db: CertificateReadDb | null = getDb()) {
   if (!db) return null;
   return db.select().from(vesselCertificateData)
     .where(

@@ -29,6 +29,14 @@ export function createCertificateRepositoryMock() {
     getVesselCertificateMetadata,
     getCertificatePage,
     withCertificateReadSnapshot: vi.fn(async (read: (reader: any) => unknown) =>
-      read({ ...repo, getVesselCertificateMetadata, getCertificatePage })),
+      read({
+        ...repo, getVesselCertificateMetadata, getCertificatePage,
+        // This adapter covers service delegation only. The actual numeric SQL
+        // path is compared against PostgreSQL in the read-only verification.
+        queryNumericCertificatePage: async (filters: any) => {
+          const { getLegacyCertificates } = await import('./legacyCertificateList');
+          return getLegacyCertificates(filters);
+        },
+      })),
   };
 }

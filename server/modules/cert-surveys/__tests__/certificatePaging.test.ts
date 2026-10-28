@@ -76,7 +76,7 @@ describe('Certificate loading compatibility', () => {
   it.each([1, 2, 3, 4])('matches the frozen legacy page %s including attachments and metadata', async page => {
     const filters = { page, limit: 100 };
     expect(await getCertificates(filters)).toEqual(await getLegacyCertificates(filters));
-    expect(mocked.getCertificatePage).toHaveBeenCalled();
+    expect(mocked.withCertificateReadSnapshot).toHaveBeenCalled();
   });
 
   it.each([

@@ -1,6 +1,6 @@
 # Certificate loading verification
 
-## Scope and implementation deviation
+## Current status: partially implemented, task remains open
 
 Only the operational Certificate read path changed. Frontend code, write APIs,
 Surveys, Defects, Admin configuration, schema, indexes and dependencies were not
@@ -8,24 +8,30 @@ changed.
 
 Attachment content is fetched only after SQL selects the requested rank window.
 Missing vessel data still produces blank values and an empty attachment array.
-Applicability, metadata, ordering and attachment hydration share a read-only,
-repeatable-read transaction.
+All read stages share a read-only, repeatable-read transaction.
 
-**This is compatibility-preserving hybrid paging, not fully database-bounded
-scalar loading.** Applicability and lightweight vessel metadata are still read
-without vessel/page restriction. Existing scope filtering, row construction,
-JavaScript sorting and counting remain in application memory. SQL receives
-ordered lightweight identities and selects the page before reading attachments.
-Consequently, scalar read volume and sorting memory still grow with the dataset.
+**Default and numeric-sort requests now use database-side scope, eligibility,
+counting and page selection.** Only the selected page's response rows cross to
+the application. SQL retains first-encountered vessel grouping and sequence
+ordering, including source-order ties, without introducing an ID tie-breaker.
+Unknown explicit sort fields retain their existing numeric-sequence fallback.
 
-This differs from an entirely SQL-side scope/order/count implementation. The
-existing natural, case-insensitive JavaScript comparator and unspecified source
-order were retained rather than silently substituting a SQL collation or adding
-a tie-breaker. No universal SQL ordering-equivalence claim is made.
+**Explicit text/date-string sorts still use the compatibility hybrid path.**
+That path reads applicability and lightweight vessel metadata, performs existing
+scope filtering, row construction, natural sorting and counting in application
+memory, then hydrates attachments only after SQL selects the ranked page.
+Its scalar loading remains unbounded. This remaining original scope has NOT
+been deferred into a follow-up or accepted as task completion.
+
+The existing natural, case-insensitive JavaScript comparator is not replaced
+with an approximate SQL comparator. The user declined a dedicated database
+sorting configuration. Catalog inspection found no existing natural-sort or
+ICU sort-key function, and only the plpgsql extension is installed. No
+configuration, sorting-function, extension or collation additions were made.
 
 ## Checks
 
-- The Certificate-module test suite covers old/new page membership, ordering,
+- The Certificate-module suite has **113 passing tests**, covering page membership, ordering,
   scope precedence, blank data, duplicate-data mapping, response metadata,
   attachment content and internal-ID removal.
 - A frozen pre-change service acts as an independent read oracle.
@@ -42,6 +48,16 @@ a tie-breaker. No universal SQL ordering-equivalence claim is made.
 - The development database read-only comparison passed **56 request cases**.
   Actual PostgreSQL execution passed **7 virtual-row boundary cases**, without
   inserting fixtures or modifying Certificate records.
+- **276 isolated PostgreSQL comparisons** exercise the actual numeric SQL path
+  against the legacy oracle using connection-local temporary tables. They cover
+  scope precedence, ECMAScript whitespace, Unicode lowercasing, null/false/true
+  deletion flags, inactive/deleted masters, missing saved data, duplicate data,
+  sequence ties, ascending/descending/default/unknown sorts, page boundaries
+  and the distinct no-eligible-master response. No public table data is changed.
+- Service-unit adapters supply fixture results for the numeric SQL delegation;
+  they are not evidence that the numeric SQL algorithm itself is correct.
+  Numeric-query unit checks and the actual PostgreSQL comparisons supply that
+  evidence.
 - The running page rendered its existing 100-row page and total of 639.
   Browser navigation completed page 1 → 2 → 1.
 - Browser CSV and Excel downloads each contained 639 data rows. Their content
@@ -56,26 +72,21 @@ a tie-breaker. No universal SQL ordering-equivalence claim is made.
 Three warm service-call samples per scope, in milliseconds. These include
 service/database work, not browser or end-to-end HTTP latency:
 
-| Scope | Legacy median | Hybrid median |
+| Scope | Legacy median | SQL default-path median |
 | --- | ---: | ---: |
-| All vessels, first 100 rows | 55.77 | 21.54 |
-| One vessel, first page | 61.85 | 11.29 |
+| All vessels, first 100 rows | 63.58 | 19.01 |
+| One vessel, first page | 56.38 | 8.69 |
 
-The JSON representations of the vessel-data reads measured:
-
-| Scope | Legacy complete vessel-data read | Lightweight metadata + selected attachments |
-| --- | ---: | ---: |
-| All vessels, first page | 7,997,057 bytes | 583,948 bytes |
-| One vessel, first page | 7,997,057 bytes | 36,436 bytes |
-
-These are diagnostic JSON-size comparisons, not measured wire bytes or heap
-usage. They exclude applicability/master reads and rank parameters. They are a
-development snapshot, not a production performance guarantee.
+These are a development snapshot, not a production performance guarantee.
+The probe also reports the legacy complete vessel-data JSON representation
+versus the current page response JSON representation. Those are different
+diagnostic components, not a measurement of total wire bytes or heap usage.
 
 Reproduce the read-only database comparison with:
 
 ```sh
 node --import tsx scripts/verify-certificate-paging.ts
+node --import tsx scripts/verify-certificate-numeric-fixtures.ts
 ```
 
 Run the module tests with:
@@ -86,8 +97,10 @@ node node_modules/vitest/vitest.mjs run server/modules/cert-surveys/__tests__
 
 ## Remaining limitations
 
-- Fully database-bounded scalar scope/order/count selection remains outstanding;
-  it needs a separately verified ordering-compatible design.
+- Fully database-bounded scalar scope/order/count selection remains outstanding
+  for explicit natural string/date-string sorts. It needs a verified design
+  using the unchanged database configuration, not a behavior change or an
+  assumption that the default/numeric SQL path completes the full task.
 - Source-dependent ordering remains source-dependent; no new stability
   guarantee or tie-breaker was introduced.
 - The large export request remains intentionally unbounded up to its existing
