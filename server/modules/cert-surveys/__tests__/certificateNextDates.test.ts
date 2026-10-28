@@ -1,15 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../repositories/certificateRepository', () => ({
-  getApplicableCertificates: vi.fn(),
-  getMasterCertificatesByIds: vi.fn(),
-  getAllVesselCertificateData: vi.fn(),
-  getCertificateApplicability: vi.fn(),
-  getMasterCertificateById: vi.fn(),
-  getVesselCertificateDataByKey: vi.fn(),
-  updateCertificateData: vi.fn(),
-  insertCertificateData: vi.fn(),
-}));
+vi.mock('../repositories/certificateRepository', async () => {
+  const { createCertificateRepositoryMock } = await import('./fixtures/certificateRepositoryMock');
+  return createCertificateRepositoryMock();
+});
 
 vi.mock('../../sync', () => ({
   logFieldChanges: vi.fn(async () => {}),
