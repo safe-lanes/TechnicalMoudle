@@ -7,8 +7,21 @@ behavior remains unchanged. This note records a concrete ordering mismatch
 requiring approval under the pagination task's preservation constraint.
 
 The user chose **"Preserve behavior and pause"** when offered deterministic
-date ordering. Work is paused and remains incomplete. Do not apply the proposed
-exception below without new explicit approval.
+date ordering, then asked to proceed with the task. Work has resumed without
+approval to alter ordering. The task remains incomplete. Do not apply the
+proposed exception below without new explicit approval.
+
+## Unconnected foundations
+
+The shared paged-query contract and trusted read-scope resolver are implemented
+as isolated building blocks. Neither is connected to the live endpoint yet.
+The resolver preserves authorized Office fleet reads, intersects My Vessels
+and Ship requests with active assignments, and treats an explicit empty list
+as no vessels. Contract and scope tests run without database access or writes.
+
+These building blocks are not database-backed pagination: SQL projection,
+paged reads, aggregates, server exports, queue APIs and client migration remain
+unimplemented. The existing endpoint still uses its original loading path.
 
 ## Reproduction
 
