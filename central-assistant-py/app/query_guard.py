@@ -89,7 +89,7 @@ class Decision:
                              "'previous' and only the filters the user changed; the server keeps the rest.",
                     "details": {"keptFilters": self.kept_filters}}
         facts = " ".join(_describe(x) for x in self.violations)
-        kept = ", ".join(f"{k} = {json.dumps(v)}" for k, v in self.kept_filters.items()) or "none"
+        kept = ", ".join(f"{k} = {json.dumps(v, ensure_ascii=False)}" for k, v in self.kept_filters.items()) or "none"
         return {"ok": False, "code": CODE_CHANGE,
                 "error": f"Not run. {facts} The previous question's filters are unchanged: {kept}. Tell the user exactly this: "
                          "which filters are kept, and that the condition above was NOT applied because they did not ask for it — "
@@ -99,13 +99,16 @@ class Decision:
 
 
 def _describe(v: dict[str, Any]) -> str:
+    if v["kind"] == "unrequested_new_filter":
+        return (f"{v['filter']} = {json.dumps(v['value'], ensure_ascii=False)} is not asked for in the user's question (no word such as "
+                f"'primary' or 'secondary'); it would narrow the answer.")
     if v["kind"] == "unrequested_removal":
-        return f"Removing the {v['filter']} condition ({json.dumps(v['value'])}) was not asked for in the user's message."
+        return f"Removing the {v['filter']} condition ({json.dumps(v['value'], ensure_ascii=False)}) was not asked for in the user's message."
     prev = v.get("previous")
     if prev is None:
-        return (f"{v['filter']} = {json.dumps(v['value'])} was NOT part of the previous question; it would be a NEW condition that "
+        return (f"{v['filter']} = {json.dumps(v['value'], ensure_ascii=False)} was NOT part of the previous question; it would be a NEW condition that "
                 f"the user's message does not ask for.")
-    return (f"{v['filter']} would change from {json.dumps(prev)} (previous question) to {json.dumps(v['value'])}; the user's "
+    return (f"{v['filter']} would change from {json.dumps(prev, ensure_ascii=False)} (previous question) to {json.dumps(v['value'], ensure_ascii=False)}; the user's "
             f"message does not ask for that change.")
 
 
@@ -176,8 +179,12 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
         return Decision(effective={**present, **new_filters}, basis=basis or "new",
                         violations=[{"kind": "invalid_crew_ids", "filter": "crewIds", "value": bad_ids}])
 
+    # the narrowing "primary assignments only" is never implied by a question: without the user's word it is refused
+    # even on a first question (review probe V01, 28-Oct: the model added it to "how many engineers are on board …")
+    status_viol = ([{"kind": "unrequested_new_filter", "filter": "crewStatus", "value": new_filters["crewStatus"]}]
+                   if "crewStatus" in new_filters and not evidence("crewStatus", new_filters["crewStatus"], user_text) else [])
     if not prev or not isinstance(prev.get("filters"), dict):
-        return Decision(effective={**present, **_consistent(new_filters)}, basis="new")
+        return Decision(effective={**present, **_consistent(new_filters)}, basis="new", violations=status_viol)
     inherited_all, not_carried = translate(prev.get("tool") or "", tool, prev["filters"])
     inherited = {k: v for k, v in inherited_all.items() if k in keys}
     if not basis:
@@ -185,7 +192,7 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
     if basis == "new":
         if inherited and looks_follow_up(user_text):
             return Decision(effective=inherited, basis="previous", violations=[{"kind": "new_basis_on_follow_up"}])
-        return Decision(effective={**present, **_consistent(new_filters)}, basis="new")
+        return Decision(effective={**present, **_consistent(new_filters)}, basis="new", violations=status_viol)
 
     violations: list[dict[str, Any]] = []
     eff = dict(inherited)

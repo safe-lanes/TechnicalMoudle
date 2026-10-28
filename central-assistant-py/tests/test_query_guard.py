@@ -176,3 +176,23 @@ def test_refusal_says_the_filter_was_not_part_of_the_previous_question():
     # a changed value is described as a change from the previous value
     d = qg.decide(D, {"mode": "count", "vessels": ["MV Alpha Star"], "conversation": {"basis": "previous"}}, PREV_DOCS, "and the expired ones?")
     assert "would change from" in d.refusal()["error"] and "MV Beta Ocean" in d.refusal()["error"]
+
+
+def test_refusal_text_keeps_non_ascii_values_maskable():
+    # security review 28-Oct: json.dumps would escape non-ASCII (backslash-u00f1), so the masker could not find a registered name
+    n = chr(241)
+    prev = {"tool": A, "filters": {"vessels": ["MV Ni" + n + "o Star"]}}
+    d = qg.decide(A, {"mode": "count", "vessels": ["MV Peque" + n + "a"], "conversation": {"basis": "previous"}}, prev, "and the other one?")
+    err = d.refusal()["error"]
+    assert ("Ni" + n + "o") in err and ("Peque" + n + "a") in err and (chr(92) + "u00f1") not in err
+
+
+def test_primary_only_without_evidence_is_refused_even_on_a_first_question():
+    # review probe V01 run 1: the model added crewStatus ['primary'] to "How many engineers are on board MV Beta Ocean?"
+    d = qg.decide(A, {"mode": "count", "vessels": ["MV Beta Ocean"], "rankGroups": ["engineers"], "crewStatus": ["primary"],
+                      "conversation": {"basis": "new"}}, None, "How many engineers are on board MV Beta Ocean?")
+    assert d.violations and d.violations[0]["filter"] == "crewStatus" and d.violations[0].get("previous") is None
+    assert "was NOT part of the previous question" not in d.refusal()["error"] and "not asked for" in d.refusal()["error"].lower()
+    ok = qg.decide(A, {"mode": "count", "vessels": ["MV Beta Ocean"], "crewStatus": ["primary"], "conversation": {"basis": "new"}}, None,
+                   "How many primary crew are on MV Beta Ocean?")
+    assert not ok.violations
