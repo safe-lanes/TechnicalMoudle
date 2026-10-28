@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Download, ExternalLink, FileText, Link2, RotateCcw, Trash2, Upload } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/apiErrorMessage";
+import { downloadAuthedFile, viewAuthedDocument } from "@/lib/authedDownload";
 import { useToast } from "@/hooks/use-toast";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
@@ -126,6 +127,15 @@ const WorkInstructionsDialog: React.FC<WorkInstructionsDialogProps> = ({ isOpen,
     `"${r.file?.fileName ?? "Attachment"}" restored`, "Could not restore");
   const openUrl = (f: { jwfuuid: string }, inline: boolean) =>
     `/technical/api/work-instruction-files/${encodeURIComponent(f.jwfuuid)}/download${inline ? "?inline=1" : ""}`;
+  // Open / Download go through the patched `fetch` (Bearer + x-user-* headers), never a plain link:
+  // a browser navigation carries no identity, which a multi-tenant office refuses with 401 (28-Oct-2026,
+  // QA WI-03/WI-04/WO-02/WO-04 "works on the vessel, error in the office"). Same pattern as the other documents.
+  const onOpen = (f: { jwfuuid: string; fileName: string }) =>
+    viewAuthedDocument(openUrl(f, true)).catch((error) =>
+      toast({ title: `Could not open "${f.fileName}"`, description: apiErrorMessage(error, "Please try again."), variant: "destructive" }));
+  const onDownload = (f: { jwfuuid: string; fileName: string }) =>
+    downloadAuthedFile(openUrl(f, false), f.fileName).catch((error) =>
+      toast({ title: `Could not download "${f.fileName}"`, description: apiErrorMessage(error, "Please try again."), variant: "destructive" }));
 
   const Row = ({ r }: { r: LinkRow }) => (
     <div className="flex items-center gap-3 rounded border border-gray-200 px-3 py-2" data-testid={`wi-row-${r.jwluuid}`}>
@@ -138,8 +148,8 @@ const WorkInstructionsDialog: React.FC<WorkInstructionsDialogProps> = ({ isOpen,
       </div>
       {r.file && !r.isDeleted && (
         <>
-          <Button asChild variant="ghost" size="sm" title="Open"><a href={openUrl(r.file, true)} target="_blank" rel="noreferrer" data-testid={`wi-open-${r.jwluuid}`}><ExternalLink className="h-4 w-4" /></a></Button>
-          <Button asChild variant="ghost" size="sm" title="Download"><a href={openUrl(r.file, false)} data-testid={`wi-download-${r.jwluuid}`}><Download className="h-4 w-4" /></a></Button>
+          <Button type="button" variant="ghost" size="sm" title="Open" onClick={() => void onOpen(r.file!)} data-testid={`wi-open-${r.jwluuid}`}><ExternalLink className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="sm" title="Download" onClick={() => void onDownload(r.file!)} data-testid={`wi-download-${r.jwluuid}`}><Download className="h-4 w-4" /></Button>
         </>
       )}
       {canManage && !r.isDeleted && (
