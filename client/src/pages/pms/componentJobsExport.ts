@@ -63,14 +63,23 @@ export function buildComponentJobsWorkbook(
   components: RecordData[],
   vessels: RecordData[],
   ranks?: RecordData[],
+  append?: {
+    workbook: ExcelJS.Workbook;
+    sheet?: ExcelJS.Worksheet;
+    rowOffset: number;
+    compositeKeys: Set<string>;
+    commitRows?: boolean;
+  },
 ) {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Vessel_Job");
-  sheet.columns = JOB_HEADERS.map((header, index) => ({ header, width: JOB_WIDTHS[index] }));
-  sheet.getCell("AB1").value = "_TEMPLATE_VERSION_2.0.0";
-  const lists = workbook.addWorksheet("Lists");
-  lists.columns = [18, 15, 20, 12, 20, 10].map(width => ({ width }));
-  JOB_LIST_ROWS.forEach(row => lists.addRow([...row]));
+  const workbook = append?.workbook ?? new ExcelJS.Workbook();
+  const sheet = append?.sheet ?? workbook.addWorksheet("Vessel_Job");
+  if (!append?.sheet) {
+    sheet.columns = JOB_HEADERS.map((header, index) => ({ header, width: JOB_WIDTHS[index] }));
+    sheet.getCell("AB1").value = "_TEMPLATE_VERSION_2.0.0";
+    const lists = workbook.addWorksheet("Lists");
+    lists.columns = [18, 15, 20, 12, 20, 10].map(width => ({ width }));
+    JOB_LIST_ROWS.forEach(row => lists.addRow([...row]));
+  }
 
   // Component codes are only unique within a vessel. Never resolve another
   // vessel's similarly coded component during All/My Vessels exports.
@@ -83,10 +92,10 @@ export function buildComponentJobsWorkbook(
     }
   });
   const issues: string[] = [];
-  const compositeKeys = new Set<string>();
+  const compositeKeys = append?.compositeKeys ?? new Set<string>();
 
   jobs.forEach((job, index) => {
-    const rowNumber = index + 2;
+    const rowNumber = index + (append?.rowOffset ?? 0) + 2;
     const warn = (message: string) => issues.push(`Row ${rowNumber} (${job.jobNo || "no job code"}): ${message}`);
     const componentFromId = byId.get(String(job.componentId));
     const linkedCodes: string[] = Array.isArray(job.linkedComponentCodes) ? job.linkedComponentCodes : [];
@@ -242,8 +251,9 @@ export function buildComponentJobsWorkbook(
     validations.forEach(([column, formula]) => {
       excelRow.getCell(column).dataValidation = { type: "list", allowBlank: true, formulae: [formula] };
     });
+    if (append?.commitRows) excelRow.commit();
   });
-  return { workbook, issues, rowCount: jobs.length };
+  return { workbook, sheet, issues, rowCount: jobs.length };
 }
 
 export async function downloadComponentJobsWorkbook(workbook: ExcelJS.Workbook, filename: string) {

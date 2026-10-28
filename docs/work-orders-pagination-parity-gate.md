@@ -2,28 +2,86 @@
 
 ## Status
 
-Database paging is not wired into the application. The existing application
-behavior remains unchanged. This note records a concrete ordering mismatch
-requiring approval under the pagination task's preservation constraint.
+Database paging is connected to all seven Work Order tabs. Both the explicit
+`/work-orders/paged` route and the existing `?page=` envelope use the bounded
+repository. Requests without `page` retain the independent legacy-array path.
 
-The user chose **"Preserve behavior and pause"** when offered deterministic
-date ordering, then asked to proceed with the task. Work has resumed without
-approval to alter ordering. The task remains incomplete. Do not apply the
-proposed exception below without new explicit approval.
+The user approved the explicit-date exception below when resuming work, and
+subsequently selected **"Approve consistent default ordering"** on 2026-10-28.
+Default ordering retains status priority, puts missing Due Dates first, orders
+populated dates chronologically (invalid populated values retain the legacy
+epoch fallback), and resolves ties by descending creation time and identifier.
+This approved change also covers secondary ordering, queues and exports.
+No saved dates, date displays, approval/stock/RH writes or calculations changed.
 
-## Unconnected foundations
+## Read contracts
 
-The shared paged-query contract and trusted read-scope resolver are implemented
-as isolated building blocks. Neither is connected to the live endpoint yet.
-The resolver preserves authorized Office fleet reads, intersects My Vessels
-and Ship requests with active assignments, and treats an explicit empty list
-as no vessels. Contract and scope tests run without database access or writes.
+Pages use validated, parameterized queries and one repeatable-read, read-only
+snapshot per operation. Only the selected page is hydrated in the application.
+Tab counts and rank options retain their complete vessel-scope semantics;
+approval-tier counts retain current filtered-tab semantics and per-vessel locks.
+Toolbar controls act before paging; AG Grid header filters remain page-local.
+Period requests carry a validated browser IANA timezone. Date-range boundaries,
+year/month/quarter membership and RH period-day calculations use that zone, not
+the server's timezone. The same predicate is reused for queues and scoped exports.
 
-These building blocks are not database-backed pagination: SQL projection,
-paged reads, aggregates, server exports, queue APIs and client migration remain
-unimplemented. The existing endpoint still uses its original loading path.
+The trusted scope resolver preserves Office fleet reads, intersects My Vessels
+and Ship requests with active assignments, and makes empty assignments/lists
+match nothing. Missing trusted identity returns 403 rather than fleet access.
 
-## Reproduction
+The browser reads availability metadata rather than downloading all Jobs.
+Review queues return complete ordered IDs only, in 200-record database batches.
+Server exports read batches of 200 and return a temporary file download handle.
+Handles are single-use, tenant/identity/scope-bound, expire after five minutes,
+and are removed on download, expiry, cancellation or generation failure.
+Temporary downloads currently require requests to reach the creating server.
+
+Work Order XLSX and Component Jobs XLSX are streamed. PDF generation keeps
+printable table cells in memory because the existing renderer needs them; it
+does not keep the complete hydrated source dataset or send it to the browser.
+Existing template columns, Lists sheet, validations and review notices are reused.
+Browser-local generation labels, timestamp date display and numeric locale are
+passed explicitly to server exports.
+
+## Verification evidence
+
+- Read-only development snapshot: 674 eligible Work Orders; 166 missing Due Dates;
+  no nonempty invalid Due Dates or submitted dates. Hydrated fields matched the
+  legacy service. All seven tabs and every supported sort in both directions
+  matched the approved baseline.
+- Isolated connection-local TEMP fixtures: 12 integration groups passed, covering
+  fixed clocks across leap/month/year and RH boundaries, three company grace
+  methods, mixed/invalid date ordering, all tabs, page boundaries, literal search,
+  four period modes, scope restrictions, a queue larger than 200, both Work Order
+  export formats, and 213 Component Jobs with template/cell/validation/notice parity.
+  Cross-timezone comparisons cover Brisbane, Kolkata, Los Angeles and Auckland
+  against a UTC server, including single days, DST, year/month/quarter boundaries,
+  repeated RH months, queues and filtered exports.
+- Focused baseline/transport/export-date tests: 56 passed.
+- Browser check using the application's existing forwarded Office test identity:
+  10 rendered rows out of 193, correct pager, server toolbar search and empty
+  result. No complete Work Order/Jobs/Components fallback downloads or page errors.
+- Representative development plan: `Limit`, 10 selected/hydrated rows out of 674
+  eligible records, 46,670 hydrated-row JSON bytes, approximately 612 ms SQL
+  execution and 56 ms planning. HTTP envelope was 47,181 bytes in 1.46 seconds.
+  Existing Job/Component indexes were used; no speculative indexes were added.
+  These small development-data measurements are not production-scale claims.
+- Production build passed. Typecheck retained 39 pre-existing errors outside
+  changed areas; no new changed-file errors were reported.
+
+Re-run database checks:
+
+```sh
+node --import tsx tests/db/work-orders-pagination-parity.ts
+node --import tsx tests/db/work-orders-pagination-parity.ts --profile
+node --import tsx tests/db/work-orders-pagination.test.ts
+```
+
+The parity script only reads development records. Integration writes are limited
+to connection-local temporary fixtures; no approval, completion or stock actions
+are executed. SQL date validation uses PostgreSQL 16's `pg_input_is_valid`.
+
+## Historical cyclic-comparison reproduction
 
 Run:
 
@@ -55,9 +113,9 @@ Sorting only the selected page in JavaScript would not preserve complete-scope
 sorting. Loading every record to sort in JavaScript would violate the bounded
 loading requirement. Neither is an acceptable fallback.
 
-## Proposed exception — not approved
+## Approved explicit-date exception
 
-Suggested narrow exception for explicit Due Date sorting: keep empty values
+For explicit Due Date sorting, keep empty values
 first, compare parseable dates chronologically next, then put nonempty
 unparseable values last and compare their original text within that group.
 Reverse this ordering for descending. Apply the same rule to submitted dates
@@ -67,6 +125,6 @@ This changes order only for comparisons involving an unparseable nonempty
 value. Empty values retain their current placement before valid dates in
 ascending order. No saved values or date displays need change.
 
-This policy was not approved and has not been implemented. Further
-status/hydration/default-order parity investigation would still be required if
-work resumes; the baseline tests do not establish SQL or export parity.
+This policy is implemented by the paged repository, not by changing the
+independent legacy comparator. The historical baseline tests deliberately retain
+the cyclic example so the reason for this approved exception remains visible.

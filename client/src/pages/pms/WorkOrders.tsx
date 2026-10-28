@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue } from "@/components/filters/PeriodFilter";
-import { getDisplayStatus, getDisplayedWorkOrderDueDate, getEffectiveStatus, filterAndSortWorkOrders, isDisplayedWorkOrderDueDateExpected, shouldShowNextDueHourColumn, type WorkOrderApprovalTierCounts } from "@shared/utils/workOrderFilters";
+import { getDisplayStatus, getDisplayedWorkOrderDueDate, getEffectiveStatus, isDisplayedWorkOrderDueDateExpected, shouldShowNextDueHourColumn, type WorkOrderApprovalTierCounts } from "@shared/utils/workOrderFilters";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -50,7 +50,6 @@ import { useWorkOrderToast as useToast } from "@/hooks/use-work-order-toast";
 import { workOrderResponseError } from "@/lib/workOrderErrorFeedback";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
-import { formatWorkOrderExportDueValue } from "./workOrderExportDueValue";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,8 +57,6 @@ import { useResolvedUserName } from "@/hooks/useResolvedUserName";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import { useApprovalPolicy, effectiveApprovalTier } from "@/hooks/useApprovalPolicy";
 import { startApprovalQueue } from "@/lib/approvalQueue";
-import * as XLSX from "xlsx";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
 import {
@@ -265,7 +262,9 @@ const WorkOrders: React.FC = () => {
   const vesselScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
   const vesselScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
-  const { isOfficeUser } = useAuth();
+  const { isOfficeUser, currentUser, domain } = useAuth();
+  const accountScopeKey = `${domain ?? ''}|${currentUser?.userUuid ?? ''}|${currentUser?.role ?? ''}|${currentUser?.userType ?? ''}`;
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { resolvedUserName } = useResolvedUserName();
   // Office (shore) replacement for the removed every-minute auto-scan: on shore,
   // WO generation is on-demand. The ship generates on its daily schedule.
@@ -292,13 +291,14 @@ const WorkOrders: React.FC = () => {
 
   // Server-side paginated fetch for the Work Orders module list. Search,
   // tab/status, period, rank, criticality, postponement-reason filtering and
-  // sorting all run on the server (single source of truth in
-  // @shared/utils/workOrderFilters); only one page of rows comes back.
+  // sorting run in the database projection; only one page is hydrated and sent.
   const { data: woEnvelope, isLoading, error } = useQuery<WorkOrdersPageEnvelope>({
-    queryKey: ['/technical/api/work-orders', vesselScopeKey, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir, currentPage, itemsPerPage],
-    queryFn: async () => {
+    queryKey: ['/technical/api/work-orders/paged', accountScopeKey, browserTimeZone, vesselScopeKey, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir, currentPage, itemsPerPage],
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
+      params.set('timeZone', browserTimeZone);
       applyVesselScope(params);
+      if (isMyVessels) params.set('scope', 'my');
       params.set('page', String(currentPage));
       params.set('pageSize', String(itemsPerPage));
       params.set('status', activeTab);
@@ -311,7 +311,7 @@ const WorkOrders: React.FC = () => {
         params.set('sortBy', woSortField);
         params.set('sortDir', woSortDir);
       }
-      const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
+      const response = await fetch(`/technical/api/work-orders/paged?${params.toString()}`, { signal });
       if (!response.ok) throw await workOrderResponseError(response);
       const json = await response.json();
       return json.data as WorkOrdersPageEnvelope;
@@ -320,16 +320,25 @@ const WorkOrders: React.FC = () => {
     refetchOnMount: 'always',  // Always fetch fresh data when navigating to this page
   });
 
-  // On-demand full fetch (no `page` param → raw enriched array). Used by the
-  // export builders and deep-link navigation that need the complete data set
-  // rather than just the current page.
-  const fetchAllWorkOrders = useCallback(async (): Promise<WorkOrderWithHydratedData[]> => {
+  const getReadParams = useCallback(() => {
     const params = new URLSearchParams();
+    params.set('timeZone', browserTimeZone);
     applyVesselScope(params);
-    const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
-    if (!response.ok) throw await workOrderResponseError(response);
-    return await response.json() as WorkOrderWithHydratedData[];
-  }, [applyVesselScope]);
+    if (isMyVessels) params.set('scope', 'my');
+    params.set('status', activeTab);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (periodFilter) params.set('period', JSON.stringify(periodFilter));
+    if (selectedRank && selectedRank !== 'all') params.set('rank', selectedRank);
+    if (criticalityParam) params.set('criticality', criticalityParam);
+    if (selectedPostponementReason && selectedPostponementReason !== 'all') params.set('postponementReason', selectedPostponementReason);
+    if (woSortField) { params.set('sortBy', woSortField); params.set('sortDir', woSortDir); }
+    return params;
+  }, [applyVesselScope, browserTimeZone, isMyVessels, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir]);
+  const readStamp = `${accountScopeKey}|${getReadParams().toString()}`;
+  const readStampRef = useRef(readStamp);
+  readStampRef.current = readStamp;
+  const completeReadAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => { completeReadAbort.current?.abort(); }, [readStamp]);
 
   const paginatedWorkOrders: WorkOrderWithHydratedData[] = woEnvelope?.items ?? [];
   const totalItems = woEnvelope?.total ?? 0;
@@ -337,14 +346,15 @@ const WorkOrders: React.FC = () => {
   const approvalTierCounts = woEnvelope?.approvalTierCounts;
   const uniqueRanks = woEnvelope?.rankOptions ?? [];
 
-  const { data: allVesselJobs = [], isError: componentJobsLoadError } = useQuery<any[]>({
-    queryKey: ['/technical/api/jobs', vesselScopeKey],
-    queryFn: async () => {
+  const { data: componentJobsAvailability, isError: componentJobsLoadError } = useQuery<{ count: number }>({
+    queryKey: ['/technical/api/work-orders/component-jobs-availability', accountScopeKey, vesselScopeKey],
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
       applyVesselScope(params);
-      const response = await fetch(`/technical/api/jobs?${params.toString()}`);
+      if (isMyVessels) params.set('scope', 'my');
+      const response = await fetch(`/technical/api/work-orders/component-jobs-availability?${params.toString()}`, { signal });
       if (!response.ok) throw await workOrderResponseError(response);
-      return await response.json();
+      return (await response.json()).data;
     },
     enabled: vesselScopeReady,
   });
@@ -435,7 +445,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: (result: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({
         title: result?.generated > 0 ? "Work orders generated" : "No work orders due",
         description: result?.message || "Generation complete.",
@@ -473,17 +483,6 @@ const WorkOrders: React.FC = () => {
   ];
 
   const getStatusBadgeColor = getWoStatusBadgeColor;
-
-  // Build the active filter params (matching the server query) so export
-  // builders can reproduce the same filtered set client-side over the full list.
-  const currentFilterParams = useMemo(() => ({
-    activeTab,
-    search: debouncedSearch,
-    period: periodFilter,
-    rank: selectedRank,
-    criticality: Array.from(criticalitySelections),
-    postponementReason: selectedPostponementReason,
-  }), [activeTab, debouncedSearch, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason]);
 
   const woColumnDefs: ColDef[] = useMemo(() => {
     const cols: ColDef[] = [
@@ -1008,13 +1007,14 @@ const WorkOrders: React.FC = () => {
   const handleStartReviewQueue = async () => {
     setStartingQueue(true);
     try {
-      const allWorkOrders = await fetchAllWorkOrders();
-      const ordered = filterAndSortWorkOrders(allWorkOrders, {
-        ...currentFilterParams,
-        sortField: woSortField ?? undefined,
-        sortDir: woSortDir,
-      });
-      const ids = ordered.map((wo) => wo.id).filter(Boolean);
+      const stamp = readStampRef.current;
+      completeReadAbort.current?.abort();
+      const abort = new AbortController();
+      completeReadAbort.current = abort;
+      const response = await fetch(`/technical/api/work-orders/review-queue?${getReadParams()}`, { signal: abort.signal });
+      if (!response.ok) throw await workOrderResponseError(response);
+      const { data: { ids } } = await response.json() as { data: { ids: string[] } };
+      if (abort.signal.aborted || stamp !== readStampRef.current) return;
       if (ids.length === 0) {
         toast({ title: "Nothing to review", description: "No work orders pending approval for the current filters." });
         return;
@@ -1022,7 +1022,8 @@ const WorkOrders: React.FC = () => {
       startApprovalQueue(ids, vesselId ?? null);
       setLocation(`/pms/work-order/${ids[0]}`);
     } catch (err: any) {
-      toast({ title: "Could not start review queue", description: err?.message, variant: "destructive" });
+      if (err?.name !== 'AbortError')
+        toast({ title: "Could not start review queue", description: err?.message, variant: "destructive" });
     } finally {
       setStartingQueue(false);
     }
@@ -1229,185 +1230,72 @@ const WorkOrders: React.FC = () => {
     return vessel?.name || vesselId;
   }, [vesselId, vessels]);
 
-  const exportWorkOrdersExcel = async () => {
-    setExportingType('wo-excel');
+  const exportServerFile = async (kind: 'wo-excel' | 'wo-pdf' | 'component-jobs') => {
+    const stamp = readStampRef.current;
+    const params = getReadParams().toString();
+    completeReadAbort.current?.abort();
+    const abort = new AbortController();
+    completeReadAbort.current = abort;
+    setExportingType(kind === 'component-jobs' ? 'cj-excel' : kind);
     try {
       const now = new Date();
       const timestamp = format(now, 'yyyyMMdd_HHmm');
-      const allWorkOrders = await fetchAllWorkOrders();
-      const exportList = (activeTab === "Postponed" || activeTab === "Unplanned")
-        ? filterAndSortWorkOrders(allWorkOrders, currentFilterParams)
-        : allWorkOrders;
-      const isPostponedExport = activeTab === "Postponed";
-
-      type BaseExcelRow = {
-        'S.No': number; 'Component': string; 'Work Order No': string; 'Job Title': string;
-        'Assigned To': string; 'Due Date': string; 'Status': string; 'Criticality': string;
-        'Maintenance Basis': string; 'Frequency': string; 'Postponement Reason': string; 'Postponement Remarks': string;
-      };
-      type PostponedExcelRow = BaseExcelRow & { 'Postpone Until': string; 'Authorized By': string };
-
-      const rows = exportList.map((wo, idx): BaseExcelRow | PostponedExcelRow => {
-        const dueDateStr = formatWorkOrderExportDueValue(wo);
-        const base: BaseExcelRow = {
-          'S.No': idx + 1,
-          'Component': wo.component || '-',
-          'Work Order No': wo.workOrderNo || wo.templateCode || '-',
-          'Job Title': wo.jobTitle || '-',
-          'Assigned To': wo.assignedTo || '-',
-          'Due Date': dueDateStr,
-          'Status': getDisplayStatus(wo),
-          'Criticality': wo.criticality || '-',
-          'Maintenance Basis': wo.maintenanceBasis || '-',
-          'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
-          'Postponement Reason': wo.postponementReason || '-',
-          'Postponement Remarks': wo.postponementRemarks || '-',
-        };
-        if (isPostponedExport) {
-          return {
-            ...base,
-            'Postpone Until': wo.postponementEndDate ? formatProfessionalDate(wo.postponementEndDate) : '-',
-            'Authorized By': wo.postponementAuthorizedBy || '-',
-          } satisfies PostponedExcelRow;
-        }
-        return base;
+      const title = activeTab === 'Postponed' ? 'Postponed_Work_Orders' : 'All_Work_Orders';
+      const safeVessel = vesselName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_');
+      const filename = kind === 'component-jobs'
+        ? `${safeVessel}_Jobs_${format(now, 'dd-MM-yyyy')}.xlsx`
+        : kind === 'wo-excel' ? `${safeVessel}_${title}_${timestamp}.xlsx`
+        : `${vesselName && vesselName !== 'All Vessels' ? `${safeVessel}_` : ''}${title}_${timestamp}.pdf`;
+      const metadata = await fetch(`/technical/api/work-orders/exports?${params}`, {
+        method: 'POST', signal: abort.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind, vesselName, filename, generatedAtLabel: format(now, 'dd MMM yyyy HH:mm'),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        }),
       });
+      if (!metadata.ok) throw await workOrderResponseError(metadata);
+      const { data } = await metadata.json() as {
+        data: { token: string; filename: string; rowCount: number; issues: string[] };
+      };
+      if (abort.signal.aborted || stamp !== readStampRef.current) return;
+      const response = await fetch(`/technical/api/work-orders/exports/${data.token}?${params}`, { signal: abort.signal });
+      if (!response.ok) throw await workOrderResponseError(response);
+      const blob = await response.blob();
+      if (abort.signal.aborted || stamp !== readStampRef.current) return;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = data.filename;
+      document.body.appendChild(anchor);
+      try { anchor.click(); } finally {
+        anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      if (kind === 'component-jobs') setComponentJobsExportIssues(data.issues);
+      toast({
+        title: data.issues.length ? 'Export Complete — Review Needed' : 'Export Complete',
+        description: `Exported ${data.rowCount} ${kind === 'component-jobs' ? 'component jobs' : 'work orders'} to ${kind === 'wo-pdf' ? 'PDF' : 'Excel'}${data.issues.length ? ` with ${data.issues.length} review notices.` : '.'}`,
+      });
+    } catch (error: any) {
+      if (error?.name !== 'AbortError' && stamp === readStampRef.current)
+        toast({ title: 'Export Failed', description: error?.message || 'Failed to generate export', variant: 'destructive' });
+    } finally { setExportingType(null); }
+  };
 
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = isPostponedExport
-        ? [{ wch: 6 }, { wch: 30 }, { wch: 35 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 50 }, { wch: 40 }, { wch: 18 }, { wch: 25 }]
-        : [{ wch: 6 }, { wch: 30 }, { wch: 35 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 50 }, { wch: 40 }];
-      const wb = XLSX.utils.book_new();
-      const sheetName = isPostponedExport ? 'Postponed Work Orders' : 'All Work Orders';
-      const fileName = isPostponedExport
-        ? `${vesselName}_Postponed_Work_Orders_${timestamp}.xlsx`
-        : `${vesselName}_All_Work_Orders_${timestamp}.xlsx`;
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      XLSX.writeFile(wb, fileName);
-
-      toast({ title: "Export Complete", description: `Exported ${rows.length} work orders to Excel` });
-    } catch (err) {
-      toast({ title: "Export Failed", description: err, variant: "destructive" });
-    }
-    setExportingType(null);
+  const exportWorkOrdersExcel = async () => {
+    await exportServerFile('wo-excel');
   };
 
   const exportWorkOrdersPdf = async () => {
-    setExportingType('wo-pdf');
-    try {
-      const isPostponedExport = activeTab === "Postponed";
-      const allWorkOrders = await fetchAllWorkOrders();
-      const exportList = (isPostponedExport || activeTab === "Unplanned")
-        ? filterAndSortWorkOrders(allWorkOrders, currentFilterParams)
-        : allWorkOrders;
-
-      const columns = isPostponedExport
-        ? [
-            { header: 'S.No', field: 'sNo', width: 10 },
-            { header: 'Component', field: 'component', width: 35 },
-            { header: 'Work Order No', field: 'workOrderNo', width: 40 },
-            { header: 'Job Title', field: 'jobTitle', width: 45 },
-            { header: 'Assigned To', field: 'assignedTo', width: 22 },
-            { header: 'Due Date', field: 'dueDate', width: 20 },
-            { header: 'Postpone Until', field: 'postponeUntil', width: 20 },
-            { header: 'Postponement Reason', field: 'postponementReason', width: 45 },
-            { header: 'Postponement Remarks', field: 'postponementRemarks', width: 45 },
-            { header: 'Authorized By', field: 'authorizedBy', width: 25 },
-            { header: 'Status', field: 'status', width: 16 },
-          ]
-        : [
-            { header: 'S.No', field: 'sNo', width: 10 },
-            { header: 'Component', field: 'component', width: 35 },
-            { header: 'Work Order No', field: 'workOrderNo', width: 40 },
-            { header: 'Job Title', field: 'jobTitle', width: 45 },
-            { header: 'Assigned To', field: 'assignedTo', width: 22 },
-            { header: 'Due Date', field: 'dueDate', width: 20 },
-            { header: 'Status', field: 'status', width: 16 },
-            { header: 'Criticality', field: 'criticality', width: 14 },
-            { header: 'Postponement Reason', field: 'postponementReason', width: 45 },
-            { header: 'Postponement Remarks', field: 'postponementRemarks', width: 45 },
-          ];
-
-      type BasePdfRow = {
-        sNo: number; component: string; workOrderNo: string; jobTitle: string;
-        assignedTo: string; dueDate: string; status: string; criticality: string;
-        postponementReason: string; postponementRemarks: string;
-      };
-      type PostponedPdfRow = BasePdfRow & { postponeUntil: string; authorizedBy: string };
-
-      const data = exportList.map((wo, idx): BasePdfRow | PostponedPdfRow => {
-        const dueDateStr = formatWorkOrderExportDueValue(wo);
-        const base: BasePdfRow = {
-          sNo: idx + 1,
-          component: wo.component || '-',
-          workOrderNo: wo.workOrderNo || wo.templateCode || '-',
-          jobTitle: wo.jobTitle || '-',
-          assignedTo: wo.assignedTo || '-',
-          dueDate: dueDateStr,
-          status: getDisplayStatus(wo),
-          criticality: wo.criticality || '-',
-          postponementReason: wo.postponementReason || '-',
-          postponementRemarks: wo.postponementRemarks || '-',
-        };
-        if (isPostponedExport) {
-          return {
-            ...base,
-            postponeUntil: wo.postponementEndDate ? formatProfessionalDate(wo.postponementEndDate) : '-',
-            authorizedBy: wo.postponementAuthorizedBy || '-',
-          } satisfies PostponedPdfRow;
-        }
-        return base;
-      });
-
-      const reportTitle = isPostponedExport ? 'Postponed Work Orders' : 'All Work Orders';
-      const reportSubtitle = isPostponedExport ? 'Work orders currently postponed' : 'Complete work order listing';
-
-      pdfReportGenerator.generateReport(
-        { title: reportTitle, subtitle: reportSubtitle, vessel: vesselName, orientation: 'landscape' },
-        columns,
-        data
-      );
-
-      toast({ title: "Export Complete", description: `Exported ${data.length} work orders to PDF` });
-    } catch (err) {
-      toast({ title: "Export Failed", description: err, variant: "destructive" });
-    }
-    setExportingType(null);
+    await exportServerFile('wo-pdf');
   };
 
   const exportComponentJobsExcel = async () => {
-    if (!allVesselJobs || allVesselJobs.length === 0) {
+    if (!componentJobsAvailability?.count) {
       toast({ title: "No Data", description: "No component jobs available to export.", variant: "destructive" });
       return;
     }
-    setExportingType('cj-excel');
-    try {
-      const { buildComponentJobsWorkbook, componentJobsFilename, downloadComponentJobsWorkbook } = await import("./componentJobsExport");
-      const params = new URLSearchParams();
-      applyVesselScope(params);
-      const [response, rankResult] = await Promise.all([
-        fetch(`/technical/api/components?${params.toString()}`),
-        fetch("/technical/api/admin/available-ranks")
-          .then(async response => response.ok ? await response.json() : null)
-          .catch(() => null),
-      ]);
-      if (!response.ok) throw new Error("Failed to read linked component records. Please try again.");
-      const components = await response.json();
-      if (!Array.isArray(components)) throw new Error("Unexpected component response. Export was not downloaded.");
-      const ranks = Array.isArray(rankResult) ? rankResult : undefined;
-      const { workbook, issues, rowCount } = buildComponentJobsWorkbook(allVesselJobs, components, vessels, ranks);
-      if (!ranks) issues.unshift("Rank Master could not be read. Approver values have not been checked; use the import preview to validate them.");
-      await downloadComponentJobsWorkbook(workbook, componentJobsFilename(vesselName));
-      setComponentJobsExportIssues(issues);
-      toast({
-        title: issues.length ? "Export Complete — Review Needed" : "Export Complete",
-        description: `Exported ${rowCount} component jobs to Excel${issues.length ? ` with ${issues.length} review notices.` : "."}`,
-      });
-    } catch (err) {
-      toast({ title: "Export Failed", description: err instanceof Error ? err.message : "Failed to export component jobs to Excel", variant: "destructive" });
-    } finally {
-      setExportingType(null);
-    }
+    await exportServerFile('component-jobs');
   };
 
   if (showPlanner) {
@@ -1714,6 +1602,11 @@ const WorkOrders: React.FC = () => {
         );
       })()}
 
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          Work orders could not be loaded: {error instanceof Error ? error.message : 'Please try again.'}
+        </p>
+      )}
       {/* Work Orders Table - AG Grid */}
       <div className="flex-1 overflow-hidden">
         <WOAgGridTable
@@ -1926,7 +1819,7 @@ const WorkOrders: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={exportComponentJobsExcel}
-                  disabled={!!exportingType || allVesselJobs.length === 0}
+                  disabled={!!exportingType || !componentJobsAvailability?.count}
                   data-testid="button-export-cj-excel"
                 >
                   {exportingType === 'cj-excel' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}

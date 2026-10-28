@@ -3,6 +3,7 @@ import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
 import { requireRole, requireApproverOrRole } from '../../middleware/auth';
 import * as woCtrl from './controllers/workOrderController';
+import * as woPaging from './controllers/workOrderPagingController';
 import * as woDocCtrl from './controllers/woDocumentController';
 import * as jwiCtrl from '../jobs/controllers/jobWorkInstructionController';
 
@@ -74,6 +75,13 @@ router.get('/approval-policy', asyncHandler(woCtrl.getApprovalPolicy));
 router.put('/approval-policy', asyncHandler(woCtrl.updateApprovalPolicy));
 
 // ── Core Work Order CRUD ──
+
+// Fixed paths must precede /work-orders/:id.
+router.get('/work-orders/paged', asyncHandler(woPaging.page));
+router.get('/work-orders/review-queue', asyncHandler(woPaging.queue));
+router.get('/work-orders/component-jobs-availability', asyncHandler(woPaging.componentJobsAvailability));
+router.post('/work-orders/exports', asyncHandler(woPaging.exportFile));
+router.get('/work-orders/exports/:token', asyncHandler(woPaging.downloadFile));
 
 // GET  /work-orders — list all (optional ?vesselId= filter)
 router.get('/work-orders', asyncHandler(woCtrl.listWorkOrders));

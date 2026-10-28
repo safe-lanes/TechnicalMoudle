@@ -40,6 +40,12 @@ describe('proposed Work Order paged transport contract', () => {
     expect(parse().vesselIds).toBeUndefined();
     expect(parse({ vesselIds: '' }).vesselIds).toBe('');
   });
+  it('accepts validated browser timezones and rejects invented/injected values', () => {
+    for (const timeZone of ['Australia/Brisbane', 'America/Los_Angeles', 'Asia/Kolkata', 'UTC'])
+      expect(parse({ timeZone }).timeZone).toBe(timeZone);
+    for (const timeZone of ['', 'invented-zone', "UTC');DROP TABLE work_orders;--", [], {}])
+      expect(workOrderPageQuery.safeParse({ timeZone }).success).toBe(false);
+  });
 
   it.each([
     { mode: 'year-only', year: 2026 },

@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { WORK_ORDER_TABS, type WorkOrderApprovalTierCounts } from './utils/workOrderFilters';
 
-// This contract is not yet connected to production routes. The SQL parity gate
-// must pass before replacing the existing Work Order list implementation.
+// Shared contract for database-paged Work Order reads and complete-scope APIs.
 export const WORK_ORDER_SORT_FIELDS = [
   'component', 'workOrderNo', 'jobTitle', 'assignedTo', 'dueDate', 'status',
   'dateCompleted', 'plannedDate', 'postponeUntil', 'postponementReason',
@@ -54,6 +53,11 @@ const criticality = z.string().max(200).default('').transform(value =>
   value.split(',').filter(Boolean),
 ).pipe(z.array(z.enum(['critical', 'non-critical', 'critical-component'])));
 
+const timeZone = z.string().min(1).max(100).refine(value => {
+  try { new Intl.DateTimeFormat('en-US', { timeZone: value }); return true; }
+  catch { return false; }
+}, 'Invalid period timezone');
+
 export const workOrderPageQuery = z.object({
   page: positiveInteger.default(1),
   // Preserve the existing maximum, including clamping requests above it.
@@ -62,6 +66,9 @@ export const workOrderPageQuery = z.object({
   // Undefined means no client narrowing; "" explicitly means no vessels.
   vesselIds: z.string().max(12000).optional(),
   scope: z.enum(['all', 'my']).optional(),
+  // Legacy callers without this field retain server-local period semantics.
+  // The Work Orders screen always sends the initiating browser's IANA zone.
+  timeZone: timeZone.default(Intl.DateTimeFormat().resolvedOptions().timeZone),
   status: z.enum(WORK_ORDER_TABS).default('Planned'),
   search: z.string().max(2000).default(''),
   period: encodedPeriod.optional().transform(value => value ?? null),

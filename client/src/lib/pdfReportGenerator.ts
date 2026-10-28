@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import {
@@ -55,6 +55,8 @@ export interface PDFReportConfig {
   headerColor?: [number, number, number];
   colorScheme?: 'blue' | 'red';
   dateRange?: string;
+  /** Captured browser-local label when a report is rendered on the server. */
+  generatedAtLabel?: string;
 }
 
 export interface TableColumn {
@@ -139,7 +141,7 @@ export interface DefectReportPdfData {
   verifiedByOfficePosition: string;
 }
 
-class PDFReportGenerator {
+export class PDFReportGenerator {
   private doc: jsPDF | null = null;
 
   generateReport(
@@ -147,6 +149,12 @@ class PDFReportGenerator {
     columns: TableColumn[],
     data: any[]
   ): void {
+    this.generateReportBytes(config, columns, data);
+    this.doc!.save(this.generateFilename(config.title, config.vessel));
+  }
+
+  /** Same layout as the browser report, without invoking a browser download. */
+  generateReportBytes(config: PDFReportConfig, columns: TableColumn[], data: any[]): Uint8Array {
     this.doc = new jsPDF({
       orientation: config.orientation || 'landscape',
       unit: 'mm',
@@ -165,8 +173,7 @@ class PDFReportGenerator {
 
     this.addFooter(pageWidth, pageHeight, margin);
 
-    const filename = this.generateFilename(config.title, config.vessel);
-    this.doc.save(filename);
+    return new Uint8Array(this.doc.output('arraybuffer'));
   }
 
   private addHeader(config: PDFReportConfig, pageWidth: number, margin: number): void {
@@ -207,7 +214,7 @@ class PDFReportGenerator {
     this.doc.setFont('helvetica', 'normal');
     this.doc.setTextColor(...PDF_COLORS.textDark);
     this.doc.text(`Vessel: ${config.vessel || 'All Vessels'}`, pageWidth - margin, 15, { align: 'right' });
-    this.doc.text(`Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`, pageWidth - margin, 20, { align: 'right' });
+    this.doc.text(`Generated: ${config.generatedAtLabel || format(new Date(), 'dd MMM yyyy HH:mm')}`, pageWidth - margin, 20, { align: 'right' });
   }
 
   private addDataTable(

@@ -16,12 +16,6 @@ import type { PostgresStorage } from '../../../postgresStorage';
 import { plannerDates, jobs } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { logFieldChanges } from '../../sync';
-import {
-  filterAndSortWorkOrders,
-  computeWorkOrderTabCounts,
-  computeApprovalTierCounts,
-  type WorkOrderFilterParams,
-} from '@shared/utils/workOrderFilters';
 import { extractJobNoFromWorkOrderNo } from '../../../utils/workOrderStatus';
 import { classifyApprovalTransition } from '../utils/approvalTransition';
 import { requiresWoCompletionRh } from '@shared/workOrders/woCompletionRhRequirement';
@@ -640,73 +634,6 @@ export async function getOverdueVesselWorkOrdersForAlerts() {
   return enriched
     .map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }))
     .filter((wo: any) => wo.status === 'Overdue' && wo.dataScope === 'vessel');
-}
-
-export interface ListWorkOrdersPagedParams extends WorkOrderFilterParams {
-  page: number;
-  pageSize: number;
-}
-
-export interface ListWorkOrdersPagedResult {
-  items: any[];
-  total: number;
-  page: number;
-  pageSize: number;
-  statusCounts: Record<string, number>;
-  approvalTierCounts: ReturnType<typeof computeApprovalTierCounts>;
-  rankOptions: string[];
-}
-
-async function computeVesselAwareApprovalTierCounts(workOrders: any[]) {
-  const vesselSettings = await repo.findAllPmsVesselSettings();
-  const lockByVessel = new Map(
-    vesselSettings.map((settings: any) => [settings.vesselId, settings.superintendentLockEnabled === true]),
-  );
-
-  return computeApprovalTierCounts(
-    workOrders.map((workOrder: any) => (
-      workOrder.approvalTier === 'superintendent_locked' && !lockByVessel.get(workOrder.vesselId)
-        ? { ...workOrder, approvalTier: 'superintendent_notification' }
-        : workOrder
-    )),
-  );
-}
-
-/**
- * Paginated variant of listWorkOrders. Reuses the exact same enrichment as the
- * non-paged path, then applies the shared filter/search/sort logic (single
- * source of truth in @shared/utils/workOrderFilters) before slicing the
- * requested page. Tab counts and rank options are derived from the full
- * enriched set so the UI's tab badges and rank dropdown stay complete even
- * though only one page of rows is returned.
- */
-export async function listWorkOrdersPaged(
-  vesselId: string | undefined,
-  vesselIds: string[] | undefined,
-  params: ListWorkOrdersPagedParams,
-): Promise<ListWorkOrdersPagedResult> {
-  const enriched = await listWorkOrders(vesselId, vesselIds);
-
-  const statusCounts = computeWorkOrderTabCounts(enriched);
-
-  const rankOptions = Array.from(
-    new Set(
-      enriched
-        .map((wo: any) => (typeof wo.assignedTo === 'string' ? wo.assignedTo.trim() : ''))
-        .filter((rank: string) => rank.length > 0),
-    ),
-  ).sort((a, b) => a.localeCompare(b));
-
-  const filtered = filterAndSortWorkOrders(enriched, params);
-  const approvalTierCounts = await computeVesselAwareApprovalTierCounts(filtered);
-
-  const total = filtered.length;
-  const pageSize = params.pageSize;
-  const page = params.page;
-  const start = (page - 1) * pageSize;
-  const items = filtered.slice(start, start + pageSize);
-
-  return { items, total, page, pageSize, statusCounts, approvalTierCounts, rankOptions };
 }
 
 // ── Rejection History ──

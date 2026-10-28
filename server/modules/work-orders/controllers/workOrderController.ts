@@ -13,11 +13,7 @@ import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
 import { getRbacIdentity, rbacMatches, type AuthenticatedRequest } from '../../../middleware/auth';
 import { enrichWorkOrderUpdateWithActor } from '../utils/updateActorIdentity';
-import type {
-  WorkOrderPeriodFilter,
-  WorkOrderSortField,
-  WorkOrderSortDir,
-} from '@shared/utils/workOrderFilters';
+import { page as readWorkOrderPage } from './workOrderPagingController';
 
 // Resolve a human-readable identity for the authenticated user so that audit
 // logs (e.g. rejection history) can show a real approver instead of "system".
@@ -60,52 +56,13 @@ export async function updateApprovalPolicy(req: Request, res: Response) {
 // ── Core Work Order CRUD ──
 
 export async function listWorkOrders(req: Request, res: Response) {
+  if (req.query.page !== undefined) return readWorkOrderPage(req, res);
   const vesselId = req.query.vesselId as string;
   const vesselIdsRaw = req.query.vesselIds as string | undefined;
   const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
 
-  // Backward-compatible: only the paginated path is gated behind `?page=`.
-  // Without it, return the raw enriched array exactly as before so the other
-  // (non-Work-Orders-module) consumers stay untouched.
-  if (req.query.page === undefined) {
-    const result = await woService.listWorkOrders(vesselId, vesselIds);
-    return res.json(result);
-  }
-
-  const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
-  const pageSizeRaw = parseInt(req.query.pageSize as string, 10) || 10;
-  const pageSize = Math.min(200, Math.max(1, pageSizeRaw));
-
-  let period: WorkOrderPeriodFilter | null = null;
-  if (typeof req.query.period === 'string' && req.query.period) {
-    try {
-      period = JSON.parse(req.query.period) as WorkOrderPeriodFilter;
-    } catch {
-      period = null;
-    }
-  }
-
-  const criticality = typeof req.query.criticality === 'string' && req.query.criticality
-    ? req.query.criticality.split(',').filter(Boolean)
-    : [];
-
-  const sortByRaw = typeof req.query.sortBy === 'string' ? req.query.sortBy : '';
-  const sortDirRaw = req.query.sortDir === 'desc' ? 'desc' : 'asc';
-
-  const result = await woService.listWorkOrdersPaged(vesselId, vesselIds, {
-    page,
-    pageSize,
-    activeTab: typeof req.query.status === 'string' ? req.query.status : 'Planned',
-    search: typeof req.query.search === 'string' ? req.query.search : '',
-    period,
-    rank: typeof req.query.rank === 'string' ? req.query.rank : '',
-    criticality,
-    postponementReason: typeof req.query.postponementReason === 'string' ? req.query.postponementReason : '',
-    sortField: sortByRaw ? (sortByRaw as WorkOrderSortField) : null,
-    sortDir: sortDirRaw as WorkOrderSortDir,
-  });
-
-  res.json({ success: true, data: result });
+  // No-page arrays remain a compatibility path for independent consumers.
+  return res.json(await woService.listWorkOrders(vesselId, vesselIds));
 }
 
 export async function getWorkOrder(req: Request, res: Response) {
