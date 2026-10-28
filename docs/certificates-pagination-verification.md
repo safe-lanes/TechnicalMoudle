@@ -1,113 +1,103 @@
-# Certificate loading verification
+# Certificate database pagination verification
 
-## Current status: partially implemented, task remains open
+## Implementation
 
-Only the operational Certificate read path changed. Frontend code, write APIs,
-Surveys, Defects, Admin configuration, schema, indexes and dependencies were not
-changed.
+The operational Certificates endpoint now performs vessel scoping, eligibility,
+counting, every supported sort and page selection in PostgreSQL. Application
+memory receives the count and selected response rows, not a complete candidate
+array or an application-generated rank list. Attachment content is selected
+only after the page is materialized.
 
-Attachment content is fetched only after SQL selects the requested rank window.
-Missing vessel data still produces blank values and an empty attachment array.
-All read stages share a read-only, repeatable-read transaction.
+Count and page reads share a read-only, repeatable-read transaction. Missing
+saved vessel data remains optional. Existing field fallbacks, source-dependent
+vessel/sequence ordering, stable sort ties, duplicate-data mapping and empty
+response variants are preserved. No ID-based tie-breaker was introduced.
 
-**Default and numeric-sort requests now use database-side scope, eligibility,
-counting and page selection.** Only the selected page's response rows cross to
-the application. SQL retains first-encountered vessel grouping and sequence
-ordering, including source-order ties, without introducing an ID tie-breaker.
-Unknown explicit sort fields retain their existing numeric-sequence fallback.
+The user explicitly approved the dedicated database sorting rule. Migration
+`185_certificate_natural_sort.sql` adds only the Certificate natural-sort
+collation: ICU en-US, numeric ordering, base sensitivity, nondeterministic
+comparison. Nondeterminism preserves case/accent/leading-zero equivalences as
+ties; the prior vessel/sequence/source order resolves those ties.
 
-**Explicit text/date-string sorts still use the compatibility hybrid path.**
-That path reads applicability and lightweight vessel metadata, performs existing
-scope filtering, row construction, natural sorting and counting in application
-memory, then hydrates attachments only after SQL selects the ranked page.
-Its scalar loading remains unbounded. This remaining original scope has NOT
-been deferred into a follow-up or accepted as task completion.
+The migration is idempotent and checks the existing object's configuration.
+ICU's equivalent `kn-true` and canonical `kn` spellings are both accepted.
+The text-sort path checks the Node runtime locale rather than silently assuming
+that a different locale matches the dedicated en-US collation.
 
-The existing natural, case-insensitive JavaScript comparator is not replaced
-with an approximate SQL comparator. The user declined a dedicated database
-sorting configuration. Catalog inspection found no existing natural-sort or
-ICU sort-key function, and only the plpgsql extension is installed. No
-configuration, sorting-function, extension or collation additions were made.
+There is no hybrid fallback. Text/date-string fields use the collation before
+paging; date strings remain strings, not chronological SQL date conversions.
+Unknown sort fields retain their prior numeric-sequence fallback.
 
-## Checks
+Frontend filter placement, expiry re-sorting of each received page, PDF/CSV/Excel
+helpers, query keys, edit APIs, validation, compound identity, attachments and
+the 5,000 ms cache invalidation behavior were not changed. Surveys, Defects,
+Admin configuration, table definitions, indexes and dependencies were untouched.
 
-- The Certificate-module suite has **113 passing tests**, covering page membership, ordering,
-  scope precedence, blank data, duplicate-data mapping, response metadata,
-  attachment content and internal-ID removal.
-- A frozen pre-change service acts as an independent read oracle.
+## Verification
+
+- **128 module tests passed.** SQL tests inspect scope precedence, count queries,
+  sort whitelisting, collation-before-limit, selected-page attachment hydration,
+  read-only snapshot use and response mapping.
+- **56 development-database comparisons** matched the frozen legacy read oracle
+  for page membership, order, values, attachments and response metadata.
+- **1,926 isolated PostgreSQL fixture comparisons** matched the legacy oracle.
+  They cover all supported text-sort fields and aliases in both directions,
+  numeric/default/unknown sorts, page boundaries, leading zeros, case, accents,
+  composed/decomposed Unicode, ligatures, Unicode vessel names and whitespace,
+  false/NULL deletion flags, missing data, duplicate saved data, deleted/inactive
+  masters and the no-eligible-master response variant.
+- Fixture tables are connection-local and disappear on disconnect. No public
+  Certificate records were inserted, edited or deleted for verification.
+- Service-unit adapters provide fixture envelopes for delegation tests; the
+  actual SQL algorithm is verified by the PostgreSQL comparisons above.
 - Tests execute the actual unchanged browser Due In/page-sort and export-helper
-  source against old/new responses.
-- PDF, CSV and Excel handlers are executed separately: PDF renderer inputs and
-  CSV/Excel serialized bytes/filenames are compared old versus new.
-- Isolated frontend callbacks check compound edit identity, selective cache
-  patching, the 5,000 ms refresh/reset behavior, attachment viewing/add/remove
-  callbacks and refusal to edit when permission is absent.
-- Repository checks inspect the narrow metadata projection, false-or-NULL
-  deletion predicate, SQL page boundary before attachment hydration and shared
-  transaction setup.
-- The development database read-only comparison passed **56 request cases**.
-  Actual PostgreSQL execution passed **7 virtual-row boundary cases**, without
-  inserting fixtures or modifying Certificate records.
-- **276 isolated PostgreSQL comparisons** exercise the actual numeric SQL path
-  against the legacy oracle using connection-local temporary tables. They cover
-  scope precedence, ECMAScript whitespace, Unicode lowercasing, null/false/true
-  deletion flags, inactive/deleted masters, missing saved data, duplicate data,
-  sequence ties, ascending/descending/default/unknown sorts, page boundaries
-  and the distinct no-eligible-master response. No public table data is changed.
-- Service-unit adapters supply fixture results for the numeric SQL delegation;
-  they are not evidence that the numeric SQL algorithm itself is correct.
-  Numeric-query unit checks and the actual PostgreSQL comparisons supply that
-  evidence.
-- The running page rendered its existing 100-row page and total of 639.
-  Browser navigation completed page 1 → 2 → 1.
-- Browser CSV and Excel downloads each contained 639 data rows. Their content
-  matched apart from Excel's existing UTF-8 BOM. Filenames remained unchanged.
-- A browser-generated PDF had a valid PDF signature, the 639-record subtitle
-  and the existing wrapped Certificate No. column header.
-- Live Certificate edits/uploads/deletions were not performed; those contracts
-  were checked through isolated callbacks and existing write-service tests.
+  functions against old/new data. Each PDF, CSV and Excel handler is checked
+  separately: PDF renderer inputs and CSV/Excel bytes/filenames match.
+- Isolated callbacks verify compound-key editing, selective cache updates,
+  refresh-timer reset at 5,000 ms, full attachment viewing/add/remove payloads
+  and permission refusal. Live attachment edits/deletions were not performed.
+- The running page rendered 100 rows with total 639 and navigated 1 → 2 → 1.
+  Clicking the certificate-name header triggered the SQL text-sort API, whose
+  response matched the legacy oracle.
+- Browser CSV and Excel downloads each contained 639 data rows; content matched
+  apart from Excel's existing UTF-8 BOM, with unchanged filenames.
+- Browser PDF output had a valid PDF signature, the 639-record subtitle and
+  the existing Certificate No. column header.
+- Running the collation migration twice after installation succeeded, verifying
+  its idempotence. Startup recorded the migration and the app served normally.
 
 ## Development measurements
 
-Three warm service-call samples per scope, in milliseconds. These include
-service/database work, not browser or end-to-end HTTP latency:
+Three warm service-call samples per scope; medians in milliseconds:
 
-| Scope | Legacy median | SQL default-path median |
+| Scope | Legacy | SQL paging |
 | --- | ---: | ---: |
-| All vessels, first 100 rows | 63.58 | 19.01 |
-| One vessel, first page | 56.38 | 8.69 |
+| All vessels, first 100 rows | 57.86 | 14.97 |
+| One vessel, first page | 55.89 | 6.20 |
 
-These are a development snapshot, not a production performance guarantee.
-The probe also reports the legacy complete vessel-data JSON representation
-versus the current page response JSON representation. Those are different
-diagnostic components, not a measurement of total wire bytes or heap usage.
+These include service/database work, not end-to-end HTTP or browser latency.
+The diagnostic legacy vessel-data JSON source was 7,997,057 bytes; selected-page
+response JSON was 582,087 bytes for all vessels and 14,301 bytes for one vessel.
+Those are different diagnostic components, not total wire-byte/heap
+measurements or a production performance guarantee.
 
-Reproduce the read-only database comparison with:
+## Reproduction
 
 ```sh
+node node_modules/vitest/vitest.mjs run server/modules/cert-surveys/__tests__
 node --import tsx scripts/verify-certificate-paging.ts
 node --import tsx scripts/verify-certificate-numeric-fixtures.ts
 ```
 
-Run the module tests with:
+The last script's historical filename is retained; it now tests every sort.
 
-```sh
-node node_modules/vitest/vitest.mjs run server/modules/cert-surveys/__tests__
-```
+## Existing limitations outside this change
 
-## Remaining limitations
-
-- Fully database-bounded scalar scope/order/count selection remains outstanding
-  for explicit natural string/date-string sorts. It needs a verified design
-  using the unchanged database configuration, not a behavior change or an
-  assumption that the default/numeric SQL path completes the full task.
-- Source-dependent ordering remains source-dependent; no new stability
-  guarantee or tie-breaker was introduced.
-- The large export request remains intentionally unbounded up to its existing
-  requested limit of 100000.
-- Project-wide TypeScript checking remains blocked by diagnostics in unchanged
-  files, including PlannerDateInput, micro-frontend exports and other modules.
-  No diagnostics were reported for the changed Certificate runtime files in the
-  captured check.
-- The browser retains its existing AG Grid licensing/configuration warnings.
-  They were not changed as part of this loading-only work.
+- Source-dependent legacy ordering remains source-dependent; there is no new
+  stability guarantee across arbitrary physical/query-plan changes.
+- Large exports retain their existing requested limit of 100000.
+- Project-wide TypeScript checking still reports errors in unchanged modules;
+  no diagnostics were reported for the Certificate files in the captured check.
+- Existing AG Grid licensing/configuration warnings remain.
+- Broader runtime-upgrade sorting fuzz tests and interleaved multi-connection
+  snapshot tests would strengthen future regression protection.

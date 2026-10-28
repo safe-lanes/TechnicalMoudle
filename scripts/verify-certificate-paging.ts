@@ -4,7 +4,6 @@
  */
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
-import { sql } from 'drizzle-orm';
 import { resolvePostgres } from '../server/postgresClient';
 import * as repo from '../server/modules/cert-surveys/repositories/certificateRepository';
 import { getCertificates } from '../server/modules/cert-surveys/services/certificateService';
@@ -31,16 +30,6 @@ try {
     assert.deepEqual(await getCertificates(filters), await getLegacyCertificates(filters));
   }
 
-  // Test actual SQL page boundaries with virtual rows and no database writes.
-  await postgres.db.transaction(async tx => {
-    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
-    const virtual = Array.from({ length: 247 }, (_, rank) => ({ rank, attachments: [] }));
-    for (const [page, limit] of [[1, 100], [2, 100], [3, 100], [4, 100], [-1, 100], [1, -2], [1, 100000]]) {
-      assert.deepEqual(await repo.getCertificatePage(tx, virtual, page, limit),
-        virtual.slice((page - 1) * limit, (page - 1) * limit + limit));
-    }
-  });
-
   const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
   const measurements: { scope: string; legacyMs: number[]; pagedMs: number[]; legacySourceBytes: number; pagedResponseBytes: number }[] = [];
   for (const [scope, filters] of [
@@ -61,9 +50,9 @@ try {
     });
   }
   console.log(JSON.stringify({
-    comparisonCases: cases.length, sqlBoundaryCases: 7, allComparisonsEqual: true,
+    comparisonCases: cases.length, allComparisonsEqual: true,
     measurements,
-    note: 'Diagnostic legacy vessel-data source size versus current response JSON size, not wire bytes or heap measurements. Default/numeric sorts use SQL scope/count/page selection; explicit natural string sorts still use the compatibility path.',
+    note: 'Diagnostic legacy vessel-data source size versus current response JSON size, not wire bytes or heap measurements. All supported sorts use SQL scope/count/page selection.',
   }, null, 2));
 } finally {
   await postgres.pool.end();

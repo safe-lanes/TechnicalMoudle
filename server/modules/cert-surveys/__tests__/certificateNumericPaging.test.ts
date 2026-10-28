@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { queryNumericCertificatePage, supportsSqlCertificateSort } from '../repositories/certificateNumericPaging';
+import { queryCertificatePage } from '../repositories/certificatePagingRepository';
 
 const dialect = new PgDialect();
 
@@ -10,10 +10,10 @@ function database(total = 239, scopedTotal = total) {
     .mockResolvedValueOnce({ rows: [] }) };
 }
 
-describe('Database Certificate scope/count/sequence paging', () => {
+describe('Database Certificate scope/count/sort paging', () => {
   it('returns only the database count and bounded page, without application candidate metadata', async () => {
     const db = database();
-    const result = await queryNumericCertificatePage(db as any, { page: 2 });
+    const result = await queryCertificatePage(db as any, { page: 2 });
     expect(result).toMatchObject({ total: 239, page: 2, limit: 100, totalPages: 3 });
     expect(db.execute).toHaveBeenCalledTimes(2);
     const count = dialect.sqlToQuery(db.execute.mock.calls[0][0]);
@@ -35,7 +35,7 @@ describe('Database Certificate scope/count/sequence paging', () => {
     [{ vesselNames: ' VESSEL 2, vessel 1 ' }, 'lower(btrim', [['vessel 2', 'vessel 1']]],
   ])('pushes the existing scope precedence into both SQL stages: %j', async (filters, expression, values) => {
     const db = database();
-    await queryNumericCertificatePage(db as any, filters);
+    await queryCertificatePage(db as any, filters);
     for (const [statement] of db.execute.mock.calls) {
       const query = dialect.sqlToQuery(statement);
       expect(query.sql).toContain(expression);
@@ -46,21 +46,21 @@ describe('Database Certificate scope/count/sequence paging', () => {
 
   it('preserves the early empty-scope response without page/sort metadata', async () => {
     const db = database(0);
-    expect(await queryNumericCertificatePage(db as any, { vesselId: 'missing' }))
+    expect(await queryCertificatePage(db as any, { vesselId: 'missing' }))
       .toEqual({ certificates: [], total: 0, page: 1, limit: 100 });
     expect(db.execute).toHaveBeenCalledOnce();
   });
 
   it('retains full metadata for applicability that has no eligible active master', async () => {
     const db = database(0, 1);
-    expect(await queryNumericCertificatePage(db as any, {})).toMatchObject({
+    expect(await queryCertificatePage(db as any, {})).toMatchObject({
       certificates: [], total: 0, totalPages: 0, sortBy: 'companySequence', sortOrder: 'asc',
     });
   });
 
   it('does not treat default metadata sortOrder=desc as a request to reverse vessel/sequence order', async () => {
     const db = database();
-    await queryNumericCertificatePage(db as any, { sortOrder: 'desc' });
+    await queryCertificatePage(db as any, { sortOrder: 'desc' });
     const query = dialect.sqlToQuery(db.execute.mock.calls[1][0]);
     expect(query.sql).not.toContain('effective_sequence DESC');
     expect(query.sql).toContain('p.vessel_order ASC, p.effective_sequence ASC, p.source_order ASC');
@@ -68,18 +68,17 @@ describe('Database Certificate scope/count/sequence paging', () => {
 
   it('preserves numeric-sort ties using prior vessel/sequence/source encounter order', async () => {
     const db = database();
-    await queryNumericCertificatePage(db as any, { sortBy: 'companySequence', sortOrder: 'desc' });
+    await queryCertificatePage(db as any, { sortBy: 'companySequence', sortOrder: 'desc' });
     expect(dialect.sqlToQuery(db.execute.mock.calls[1][0]).sql)
       .toContain('p.effective_sequence DESC, p.vessel_order ASC, p.effective_sequence ASC, p.source_order ASC');
   });
 
-  it('refuses to substitute a database collation for the natural string comparator', async () => {
-    expect(supportsSqlCertificateSort('certificateName')).toBe(false);
-    expect(supportsSqlCertificateSort('expiryDate')).toBe(false);
-    expect(supportsSqlCertificateSort('unknown')).toBe(true);
+  it.each(['id', 'companyId', 'certificateName', 'name', 'vessel', 'certificateNumber', 'type', 'companyGroup', 'issueDate', 'expiryDate', 'lastAnnual', 'nextAnnual', 'lastInterm', 'nextInterm', 'endorsementDate'])('uses the dedicated natural collation for %s before LIMIT', async sortBy => {
     const db = database();
-    await expect(queryNumericCertificatePage(db as any, { sortBy: 'certificateName' }))
-      .rejects.toThrow('Natural text sorting is not supported');
-    expect(db.execute).not.toHaveBeenCalled();
+    await queryCertificatePage(db as any, { sortBy, sortOrder: 'desc' });
+    const query = dialect.sqlToQuery(db.execute.mock.calls[1][0]);
+    expect(query.sql).toContain('COLLATE public.certificates_natural_en_us DESC');
+    expect(query.sql.indexOf('COLLATE public.certificates_natural_en_us')).toBeLessThan(query.sql.indexOf('OFFSET'));
+    expect(query.sql.indexOf('d.attachments')).toBeGreaterThan(query.sql.indexOf('page AS MATERIALIZED'));
   });
 });

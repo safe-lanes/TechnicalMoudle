@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-/** Shared service-test adapter. SQL paging itself is covered separately. */
+/** Service-delegation fixtures only; actual SQL parity is checked in PostgreSQL. */
 export function createCertificateRepositoryMock() {
   const repo = {
     getApplicableCertificates: vi.fn(),
@@ -12,31 +12,11 @@ export function createCertificateRepositoryMock() {
     updateCertificateData: vi.fn(),
     insertCertificateData: vi.fn(),
   };
-  const getVesselCertificateMetadata = vi.fn(async () => {
-    const records = await repo.getAllVesselCertificateData();
-    return records?.map(({ attachments, ...metadata }: any) => metadata);
-  });
-  const getCertificatePage = vi.fn(async (rows: any[], page: number, limit: number) => {
-    const data = await repo.getAllVesselCertificateData.mock.results.at(-1)?.value;
-    const offset = (page - 1) * limit;
-    return rows.slice(offset, offset + limit).map(({ _certificateDataId, ...row }) => ({
-      ...row,
-      attachments: data?.find((item: any) => item.id === _certificateDataId)?.attachments || [],
-    }));
-  });
   return {
     ...repo,
-    getVesselCertificateMetadata,
-    getCertificatePage,
-    withCertificateReadSnapshot: vi.fn(async (read: (reader: any) => unknown) =>
-      read({
-        ...repo, getVesselCertificateMetadata, getCertificatePage,
-        // This adapter covers service delegation only. The actual numeric SQL
-        // path is compared against PostgreSQL in the read-only verification.
-        queryNumericCertificatePage: async (filters: any) => {
-          const { getLegacyCertificates } = await import('./legacyCertificateList');
-          return getLegacyCertificates(filters);
-        },
-      })),
+    getCertificateListPage: vi.fn(async filters => {
+      const { getLegacyCertificates } = await import('./legacyCertificateList');
+      return getLegacyCertificates(filters, repo);
+    }),
   };
 }

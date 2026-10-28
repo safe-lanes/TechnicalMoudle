@@ -5,7 +5,7 @@ import {
   vesselCertificateData,
 } from '@shared/schema';
 import { eq, and, asc, inArray, or, isNull, sql } from 'drizzle-orm';
-import { queryNumericCertificatePage, type CertificatePagingFilters } from './certificateNumericPaging';
+import { queryCertificatePage, type CertificatePagingFilters } from './certificatePagingRepository';
 
 // ── Helpers ──
 
@@ -19,33 +19,13 @@ function getDb() {
 
 type CertificateReadDb = Pick<NonNullable<ReturnType<typeof getDb>>, 'select' | 'execute'>;
 
-export interface CertificatePageRow {
-  /** Internal hydration identity, removed before returning HTTP rows. */
-  _certificateDataId?: number;
-  attachments: unknown;
-}
-
-/** Keep compatibility ordering and attachment hydration on one read snapshot. */
-export async function withCertificateReadSnapshot<T>(
-  read: (reader: {
-    queryNumericCertificatePage: (filters: CertificatePagingFilters) => ReturnType<typeof queryNumericCertificatePage>;
-    getApplicableCertificates: () => ReturnType<typeof getApplicableCertificates>;
-    getMasterCertificatesByIds: (ids: string[]) => ReturnType<typeof getMasterCertificatesByIds>;
-    getVesselCertificateMetadata: () => ReturnType<typeof getVesselCertificateMetadata>;
-    getCertificatePage: <Row extends CertificatePageRow>(rows: Row[], page: number, limit: number) => Promise<Row[]>;
-  }) => Promise<T>,
-): Promise<T> {
-  const db = await getDb();
+/** Count and every sorted page share one read-only snapshot. */
+export async function getCertificateListPage(filters: CertificatePagingFilters) {
+  const db = getDb();
   if (!db) throw Object.assign(new Error('Database not available'), { statusCode: 500 });
   return db.transaction(async tx => {
     await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
-    return read({
-      queryNumericCertificatePage: filters => queryNumericCertificatePage(tx, filters),
-      getApplicableCertificates: () => getApplicableCertificates(tx),
-      getMasterCertificatesByIds: ids => getMasterCertificatesByIds(ids, tx),
-      getVesselCertificateMetadata: () => getVesselCertificateMetadata(tx),
-      getCertificatePage: (rows, page, limit) => getCertificatePage(tx, rows, page, limit),
-    });
+    return queryCertificatePage(tx, filters);
   });
 }
 
@@ -71,54 +51,6 @@ export async function getMasterCertificatesByIds(masterIds: string[], db: Certif
       )
     )
     .orderBy(asc(shipCertificatesMaster.companySequence));
-}
-
-/** Lightweight values for the existing JavaScript compatibility comparator. */
-export async function getVesselCertificateMetadata(db: CertificateReadDb | null = getDb()) {
-  if (!db) return null;
-  return db.select({
-    id: vesselCertificateData.id,
-    vesselId: vesselCertificateData.vesselId,
-    masterId: vesselCertificateData.masterId,
-    certificateNumber: vesselCertificateData.certificateNumber,
-    issueDate: vesselCertificateData.issueDate,
-    expiryDate: vesselCertificateData.expiryDate,
-    lastAnnual: vesselCertificateData.lastAnnual,
-    nextAnnual: vesselCertificateData.nextAnnual,
-    lastInterm: vesselCertificateData.lastInterm,
-    nextInterm: vesselCertificateData.nextInterm,
-    endorsementDate: vesselCertificateData.endorsementDate,
-    lastEditUpload: vesselCertificateData.lastEditUpload,
-  }).from(vesselCertificateData)
-    .where(or(eq(vesselCertificateData.isDeleted, false), isNull(vesselCertificateData.isDeleted)));
-}
-
-export async function getCertificatePage<Row extends CertificatePageRow>(
-  db: CertificateReadDb, rows: Row[], page: number, limit: number,
-): Promise<Row[]> {
-  if (!rows.length) return [];
-  // Match the previous Array.slice window, including negative legacy inputs.
-  const offset = (page - 1) * limit;
-  const index = (value: number) => value < 0
-    ? Math.max(rows.length + value, 0) : Math.min(value, rows.length);
-  const start = index(offset);
-  const length = Math.max(index(offset + limit) - start, 0);
-  const ranks = rows.map((row, rank) => ({ rank, data_id: row._certificateDataId ?? null }));
-  const result = await db.execute(sql`
-    WITH page AS MATERIALIZED (
-      SELECT rank, data_id
-      FROM jsonb_to_recordset(${JSON.stringify(ranks)}::jsonb) AS ranked(rank integer, data_id integer)
-      ORDER BY rank LIMIT ${length} OFFSET ${start}
-    )
-    SELECT page.rank, data.attachments
-    FROM page
-    LEFT JOIN vessel_certificate_data data ON data.id = page.data_id
-    ORDER BY page.rank
-  `);
-  return result.rows.map(record => {
-    const { _certificateDataId, ...row } = rows[Number(record.rank)];
-    return { ...row, attachments: record.attachments || [] } as unknown as Row;
-  });
 }
 
 export async function getAllVesselCertificateData(db: CertificateReadDb | null = getDb()) {
