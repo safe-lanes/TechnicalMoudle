@@ -95,3 +95,46 @@ def test_name_parts_only_when_enabled():
     tech = Masker()                                                       # Technical: unchanged behaviour
     tech.learn_from_json(rows)
     assert "Petra" in tech.mask_text("Is Petra on board?")
+
+
+# ── 28-Oct-2026 Astra round 3: conversation ownership + full history discard ──
+def test_ownership_mine_other_unknown_and_never_adopted():
+    mask_memory.clear()
+    me = ("crewing-pilot", "trial-a.local", "1", "conv-9")
+    assert mask_memory.ownership(*me) == "unknown"
+    mask_memory.remember(Masker(), *me)
+    assert mask_memory.ownership(*me) == "mine"
+    for other in [("crewing-pilotmt", "trial-a.local", "1", "conv-9"),   # issuer
+                  ("crewing-pilot", "trial-b.local", "1", "conv-9"),     # company
+                  ("crewing-pilot", "trial-a.local", "2", "conv-9")]:    # user
+        assert mask_memory.ownership(*other) == "other"
+        mask_memory.remember(Masker(), *other)                          # must NOT take the conversation over
+        assert mask_memory.ownership(*me) == "mine" and mask_memory.ownership(*other) == "other"
+        assert mask_memory.recall(Masker(), *other) is None
+    assert mask_memory.ownership("crewing-pilot", "trial-a.local", "1", "conv-10") == "unknown"
+
+
+def test_restart_forgets_ownership_and_query_state_together():
+    mask_memory.clear()
+    me = ("crewing-pilot", "trial-a.local", "1", "conv-11")
+    mask_memory.remember(Masker(), *me)
+    mask_memory.set_query_state(*me, {"tool": "crewing_query_documents", "filters": {"vessels": ["MV Beta Ocean"]}})
+    mask_memory.clear()                                                    # = container restart
+    assert mask_memory.ownership(*me) == "unknown"
+    assert mask_memory.recall(Masker(), *me) is None and mask_memory.get_query_state(*me) is None
+
+
+def test_notices_name_the_reason_and_tell_the_model_not_to_guess():
+    assert "different session or user" in mask_memory.USER_NOTICE["other"]
+    assert "could not be verified" in mask_memory.USER_NOTICE["unverified"]
+    assert "ask the user to restate" in mask_memory.MODEL_NOTE and "do not guess" in mask_memory.MODEL_NOTE
+
+
+def test_guard_rules_replace_the_rebuild_rule_only_when_enabled(monkeypatch):
+    from app import config
+    base = agent.crewing_tool_loop_instructions()
+    assert "take the previous 'Filters:' line" in base and "conversation.basis" not in base
+    monkeypatch.setattr(config.settings(), "assistant_query_state_guard", True)
+    guarded = agent.crewing_tool_loop_instructions()
+    assert "conversation.basis 'previous'" in guarded and "Never add a filter the user did not ask for" in guarded
+    assert agent.TOOL_LOOP_INSTRUCTIONS == _released_tool_loop_text()      # Technical text still byte-identical

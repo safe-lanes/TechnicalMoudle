@@ -46,7 +46,7 @@ from pydantic_ai.toolsets import AbstractToolset
 from pydantic_ai.toolsets.abstract import ToolsetTool
 from pydantic_core import SchemaValidator, core_schema
 
-from . import llm
+from . import llm, mask_memory, query_guard
 from .config import settings
 from .masking import Masker
 from .retrieval import search_docs_tool
@@ -67,6 +67,11 @@ class Deps:
     partial: bool = False
     tools_used: list[str] = field(default_factory=list)
     citations: list[dict[str, Any]] = field(default_factory=list)   # manual excerpts returned by search_module_docs
+    # 28-Oct-2026 (Astra round 3): server-held query state — the conversation key (None = no state is read or written)
+    # and the user's CURRENT message (unmasked), the only text a filter change is checked against.
+    conv_key: tuple[str, str, str, str] | None = None
+    user_message: str = ""
+    query_guard: bool = False
 
 
 # ── module manifests (Data API discovery) ─────────────────────────────────────────
@@ -140,10 +145,14 @@ class ManifestToolset(AbstractToolset[Deps]):
 
     id = "manifest"  # type: ignore[assignment]
 
-    def __init__(self, manifest_tools: list[dict[str, Any]]):
+    def __init__(self, manifest_tools: list[dict[str, Any]], conversation_param: bool = False):
+        # round 3: with the query-state guard on, the Crewing query tools get the assistant-side `conversation`
+        # parameter (basis previous/new, unset); it is consumed by the guard and never forwarded to the module.
+        tools = [query_guard.with_conversation_param(t) if conversation_param and t.get("name") in query_guard.QUERY_TOOLS else t
+                 for t in manifest_tools]
         self._defs = [SEARCH_DOCS_TOOL] + [
             ToolDefinition(name=t["name"], description=t.get("description") or "", parameters_json_schema=t.get("parameters") or {"type": "object", "properties": {}})
-            for t in manifest_tools
+            for t in tools
         ]
 
     async def get_tools(self, ctx: RunContext[Deps]) -> dict[str, ToolsetTool[Deps]]:
@@ -169,15 +178,36 @@ class ManifestToolset(AbstractToolset[Deps]):
                     if c not in deps.citations:
                         deps.citations.append(c)
         else:
-            try:
-                out = await asyncio.wait_for(
-                    execute_module_tool(deps.instance, name, args, deps.identity_token, f"{int(deps.started_at)}-{len(deps.tools_used)}"),
-                    timeout=s.tool_timeout_ms / 1000.0)
-            except TimeoutError:
-                out = {"ok": False, "error": f"{deps.ui_module}/{name} timed out"}  # G1: timeout as data
+            decision = None
+            if deps.query_guard and name in query_guard.QUERY_TOOLS:
+                # round 3: the server-held query decides what runs — omitted filters are retained, unrequested changes
+                # are refused (the model is told to ask the user), `conversation` never reaches the module.
+                prev = mask_memory.get_query_state(*deps.conv_key) if deps.conv_key else None
+                decision = query_guard.decide(name, args, prev, deps.user_message)
+                args = {k: v for k, v in decision.effective.items() if k != "conversation"}
+                print(f"[assistant] query guard {name}: basis={decision.basis} inherited={decision.inherited} "
+                      f"violations={[v['kind'] + ':' + str(v.get('filter', '')) for v in decision.violations]}")
+            if decision is not None and decision.violations:
+                out = {"ok": True, "data": decision.refusal()}
+            else:
+                args = {k: v for k, v in args.items() if k != "conversation"}
+                try:
+                    out = await asyncio.wait_for(
+                        execute_module_tool(deps.instance, name, args, deps.identity_token, f"{int(deps.started_at)}-{len(deps.tools_used)}"),
+                        timeout=s.tool_timeout_ms / 1000.0)
+                except TimeoutError:
+                    out = {"ok": False, "error": f"{deps.ui_module}/{name} timed out"}  # G1: timeout as data
             if out.get("ok") is False and "timed out" in str(out.get("error") or ""):
                 deps.partial = True
             result = out.get("data") if out.get("ok") else {"error": out.get("error")}
+            if decision is not None and isinstance(result, dict):
+                state = query_guard.state_from_result(name, result)
+                if state and deps.conv_key:
+                    mask_memory.set_query_state(*deps.conv_key, state)   # the validated query Crewing echoed
+                if result.get("ok") is True:
+                    result["conversationBasis"] = decision.basis
+                    if decision.inherited:
+                        result["filtersKeptFromPreviousQuestion"] = decision.inherited
         if deps.masker:
             deps.masker.learn_from_json(result)   # learn identifiers from REAL data …
             result = deps.masker.mask_json(result)  # … then the result rejoins history masked (G3)
@@ -335,7 +365,8 @@ def crewing_tool_loop_instructions() -> str:
     docs_rules = _between(TOOL_LOOP_INSTRUCTIONS, "For HOW-TO questions", "If a tool returns an error")
     convo_rules = _between(TOOL_LOOP_INSTRUCTIONS, "RULE — follow-ups:", "RULE — options:")
     fresh_rules = _between(TOOL_LOOP_INSTRUCTIONS, "RULE — fresh data:", "RULE — more:")
-    return CREWING_DATA_RULES + " " + docs_rules + convo_rules + fresh_rules + CREWING_CLOSING_RULES
+    closing = CREWING_CLOSING_RULES_GUARD if settings().assistant_query_state_guard else CREWING_CLOSING_RULES
+    return CREWING_DATA_RULES + " " + docs_rules + convo_rules + fresh_rules + closing
 
 CREWING_DATA_RULES = (
     "You are the SAIL Crewing assistant. Keep two sources apart: LIVE DATA (crew on board, licences/certificates and "
@@ -377,6 +408,24 @@ CREWING_CLOSING_RULES = (
     "RULE — follow-up filters: for 'only engineers', 'same for MV X', 'what about the expired ones' take the previous "
     "'Filters:' line, change only what the user changed, and call the tool again with the complete set. 'Show more' = the "
     "same call with offset = the previous nextOffset. "
+    "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
+    "RULE — options: whenever you offer the user a choice of what to ask, include documentation how-to questions (for example "
+    "'How do I plan a relief?') beside the live-data options. "
+    "Answer in short plain language; numbered steps for how-tos."
+)
+
+# 28-Oct-2026 (Astra round 3): with ASSISTANT_QUERY_STATE_GUARD the server keeps the previous query; the model declares
+# the relation of each call to it instead of rebuilding the filter set from its own 'Filters:' sentence.
+CREWING_CLOSING_RULES_GUARD = (
+    "RULE — follow-up filters: the server remembers the filters of the previous data question. For a follow-up ('only "
+    "engineers', 'same for MV X', 'what about the expired ones', 'show them as a list', 'show more') call the tool with "
+    "conversation.basis 'previous' and pass ONLY what the user changed; every other filter is kept by the server. If the "
+    "user removed a condition ('all vessels', 'regardless of rank'), list it in conversation.unset. 'Show more' = basis "
+    "'previous' with offset = the previous nextOffset. For a genuinely new question use conversation.basis 'new'. Never "
+    "add a filter the user did not ask for (for example primary assignments only). If the tool answers "
+    "filter_change_not_requested or follow_up_needs_previous_basis, do not retry that change: tell the user which "
+    "filters are kept and ask whether they want the change. The result's `query` is the filter set that actually ran — "
+    "write the 'Filters:' line from it. "
     "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
     "RULE — options: whenever you offer the user a choice of what to ask, include documentation how-to questions (for example "
     "'How do I plan a relief?') beside the live-data options. "
@@ -490,12 +539,16 @@ PARTIAL_NOTE = "\n\n(Note: answered from partial data — some lookups did not c
 
 
 async def run_tool_loop(message: str, ui_module: str, identity_token: str, masker: Masker | None, manifest_tools: list[dict[str, Any]],
-                        history: list[ModelMessage] | None = None, instance: dict[str, Any] | None = None) -> LoopResult:
-    deps = Deps(masker=masker, ui_module=ui_module, identity_token=identity_token, started_at=time.monotonic(), instance=instance)
+                        history: list[ModelMessage] | None = None, instance: dict[str, Any] | None = None,
+                        conv_key: tuple[str, str, str, str] | None = None, user_message: str = "") -> LoopResult:
+    guard = bool(settings().assistant_query_state_guard and ui_module == "crewing")
+    deps = Deps(masker=masker, ui_module=ui_module, identity_token=identity_token, started_at=time.monotonic(), instance=instance,
+                conv_key=conv_key, user_message=user_message, query_guard=guard)
     token = current_masker.set(masker)
     try:
         agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=tool_loop_instructions(ui_module),
-                                        toolsets=[ManifestToolset(manifest_tools)], model_settings=_tool_loop_settings(), retries=0)
+                                        toolsets=[ManifestToolset(manifest_tools, conversation_param=guard)],
+                                        model_settings=_tool_loop_settings(), retries=0)
         result = await agent.run(message, deps=deps, message_history=history or None)
     finally:
         current_masker.reset(token)

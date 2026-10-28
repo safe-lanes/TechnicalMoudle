@@ -64,12 +64,21 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
             masker.register(identity["userName"], "PERSON")
         if ctx.get("vesselName"):
             masker.register(ctx["vesselName"], "VESSEL")
-        if s.assistant_mask_conversation_memory:
-            recalled = mask_memory.recall(masker, *mem_key)
-            if recalled is None and isinstance(raw_history, list) and raw_history:
-                # fail closed: no memory for this exact issuer/company/user/conversation → never replay earlier answers
-                raw_history = mask_memory.withhold_assistant_turns(raw_history)
-                print("[assistant] masking memory miss with history — earlier answers withheld")
+    # 28-Oct-2026 (Astra round 3): conversation state is bound to issuer + company + user + conversationId. When the
+    # request carries history but the state for this exact key is missing (restart, expiry, new/reused id) or the id is
+    # held by ANOTHER identity, BOTH the earlier user questions and assistant answers are discarded before any model
+    # call; the user is told (USER_NOTICE) and the model is told to ask for a restatement (MODEL_NOTE).
+    discarded: str | None = None
+    owned = "mine"
+    if masker and s.assistant_mask_conversation_memory:
+        owned = mask_memory.ownership(*mem_key)
+        recalled = None if owned == "other" else mask_memory.recall(masker, *mem_key)
+        if recalled is None and isinstance(raw_history, list) and raw_history:
+            discarded = "other" if owned == "other" else "unverified"
+            print(f"[assistant] conversation history discarded ({discarded}): {len(raw_history)} earlier turn(s) not used")
+            raw_history = []
+    state_key = mem_key if (masker and s.assistant_mask_conversation_memory and owned != "other") else None
+    model_note = mask_memory.MODEL_NOTE if discarded else ""
     log_masked = masking_on and tenant in s.masked_only_log_tenants
 
     def for_log(t: str | None) -> str | None:
@@ -124,16 +133,20 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
             # user's own question. Authorisation stays with the module's Data API.
             # the widget's earlier turns ride along as history (masked on the wire like everything else) so
             # follow-ups ('readable format', 'more') refer to the previous answer instead of restarting.
-            r = await agent.run_tool_loop(agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker, manifest["tools"],
-                                          history=agent.build_history(raw_history), instance=live)
+            r = await agent.run_tool_loop(model_note + agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker,
+                                          manifest["tools"], history=agent.build_history(raw_history), instance=live,
+                                          conv_key=state_key, user_message=message)
             if masker and masker.warnings:
                 print("[assistant] unmask warnings:", masker.warnings)
-            if masker and s.assistant_mask_conversation_memory:
-                mask_memory.remember(masker, *mem_key)
-            log("answer", r.text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used,
+            if state_key:
+                mask_memory.remember(masker, *state_key)
+            text = r.text + ("\n\n" + mask_memory.USER_NOTICE[discarded] if discarded else "")
+            log("answer", text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used,
                 citations=r.citations if ui_module == "crewing" else None)
-            out = {"response": r.text, "gate": "answer", "module": MODULE_LABELS.get(ui_module, ui_module),
+            out = {"response": text, "gate": "answer", "module": MODULE_LABELS.get(ui_module, ui_module),
                    "toolsUsed": r.tools_used, "partial": r.partial, "usage": r.usage}
+            if discarded:
+                out["historyDiscarded"] = discarded
             if ui_module == "crewing":
                 out["citations"] = r.citations  # 21-Oct-2026 trial: source chips for manual answers on the tool-loop path
             return 200, out
@@ -216,8 +229,10 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
         text, usage = await agent.answer_docs(system, user, masker, history=history)
         if masker and masker.warnings:
             print("[assistant] unmask warnings:", masker.warnings)
-        if masker and s.assistant_mask_conversation_memory:
-            mask_memory.remember(masker, *mem_key)
+        if state_key:
+            mask_memory.remember(masker, *state_key)
+        if discarded:
+            text = text + "\n\n" + mask_memory.USER_NOTICE[discarded]
         log("answer", text, module=routed.module, citations=citations, confidence=routed.confidence, usage=usage, model=s.chat_model)
         return 200, {"response": text, "gate": "answer", "module": label, "citations": citations, "confidence": round(routed.confidence, 4), "usage": usage,
                      "routing": getattr(routed, "reason", "vector routing")}
