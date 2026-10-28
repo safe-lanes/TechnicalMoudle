@@ -1,6 +1,6 @@
 # Crewing chatbot — business rules to confirm
 
-For **Sahil and Sagar Chadda** · prepared 28-Oct-2026 by support · **final, consolidated** (replaces revisions 1–3). One document, so we do not come back to you area by area.
+For **Sahil and Sagar Chadda** · prepared 28-Oct-2026 by support · **final, consolidated** (replaces revisions 1–3). One document covering the current and the later areas, so that we ask you once and keep follow-up questions to a minimum.
 
 ## Why we are asking
 
