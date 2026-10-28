@@ -72,9 +72,12 @@ class Decision:
     violations: list[dict[str, Any]] = field(default_factory=list)
     inherited: list[str] = field(default_factory=list)
     not_carried: list[str] = field(default_factory=list)   # previous filters with no equivalent on this tool
+    kept_filters: dict[str, Any] = field(default_factory=dict)   # the previous question's filters as they stand (no refused change)
 
     def refusal(self) -> dict[str, Any]:
-        """The tool result handed back to the model instead of running the query (same shape as a Crewing refusal)."""
+        """The tool result handed back to the model instead of running the query (same shape as a Crewing refusal).
+        28-Oct-2026 review: the wording must say the truth — a refused filter was NOT part of the previous question; the
+        model introduced it. The model is told what to tell the user."""
         if any(v["kind"] == "invalid_crew_ids" for v in self.violations):
             return {"ok": False, "code": CODE_IDS,
                     "error": "crewIds must be the crewId values returned by crewing_find_crew (UUIDs) — never a placeholder. "
@@ -84,21 +87,26 @@ class Decision:
             return {"ok": False, "code": CODE_BASIS,
                     "error": "This reads as a follow-up to the previous question. Call again with conversation.basis "
                              "'previous' and only the filters the user changed; the server keeps the rest.",
-                    "details": {"keptFilters": self.effective}}
-        changes = [{k: v for k, v in x.items() if k != "kind"} | {"change": x["kind"]} for x in self.violations]
+                    "details": {"keptFilters": self.kept_filters}}
+        facts = " ".join(_describe(x) for x in self.violations)
+        kept = ", ".join(f"{k} = {json.dumps(v)}" for k, v in self.kept_filters.items()) or "none"
         return {"ok": False, "code": CODE_CHANGE,
-                "error": "The previous question's filters are kept on the server. The user's message does not ask for: "
-                         + "; ".join(_describe(x) for x in self.violations) + ". Do not retry with that change — either "
-                         "call again without it, or ask the user whether they want it applied.",
-                "details": {"changes": changes, "keptFilters": self.effective}}
+                "error": f"Not run. {facts} The previous question's filters are unchanged: {kept}. Tell the user exactly this: "
+                         "which filters are kept, and that the condition above was NOT applied because they did not ask for it — "
+                         "then ask whether they want it. Never say that it was part of the previous question. Do not retry it on your own.",
+                "details": {"notApplied": [{k: v for k, v in x.items() if k != "kind"} | {"change": x["kind"]} for x in self.violations],
+                            "keptFilters": self.kept_filters}}
 
 
 def _describe(v: dict[str, Any]) -> str:
     if v["kind"] == "unrequested_removal":
-        return f"removing the {v['filter']} condition"
+        return f"Removing the {v['filter']} condition ({json.dumps(v['value'])}) was not asked for in the user's message."
     prev = v.get("previous")
-    return f"{'changing' if prev is not None else 'adding'} {v['filter']} = {json.dumps(v['value'])}" + (
-        f" (was {json.dumps(prev)})" if prev is not None else "")
+    if prev is None:
+        return (f"{v['filter']} = {json.dumps(v['value'])} was NOT part of the previous question; it would be a NEW condition that "
+                f"the user's message does not ask for.")
+    return (f"{v['filter']} would change from {json.dumps(prev)} (previous question) to {json.dumps(v['value'])}; the user's "
+            f"message does not ask for that change.")
 
 
 # ── normalisation ──────────────────────────────────────────────────────────────
@@ -186,6 +194,7 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
             if not (re.search(REMOVAL, user_text or "", re.I) or evidence(k, eff[k], user_text)):
                 violations.append({"kind": "unrequested_removal", "filter": k, "value": eff[k]})
             eff.pop(k)
+    kept_filters = dict(inherited)
     for k, v in new_filters.items():
         if k in eff and same(k, eff[k], v):
             continue
@@ -194,7 +203,39 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
         eff[k] = v
     eff = _consistent(eff)
     kept = [k for k in inherited if k in eff and k not in new_filters]
-    return Decision(effective={**present, **eff}, basis="previous", violations=violations, inherited=kept, not_carried=not_carried)
+    return Decision(effective={**present, **eff}, basis="previous", violations=violations, inherited=kept, not_carried=not_carried,
+                    kept_filters=kept_filters)
+
+
+# ── pagination line (28-Oct-2026 review item 1) ─────────────────────────────────
+UNIT_WORDS = {"people": "matching crew members", "assignments": "matching assignments", "documents": "matching documents"}
+
+
+def paging_summary(result: dict[str, Any]) -> dict[str, Any] | None:
+    """The server's own paging facts of a list-mode result (None for count/group/refusals)."""
+    if not isinstance(result, dict) or result.get("ok") is not True or result.get("mode") != "list":
+        return None
+    try:
+        return {"total": int(result.get("total") or 0), "returned": int(result.get("returned") or 0),
+                "offset": int(result.get("offset") or 0), "unit": str(result.get("unit") or "records"),
+                "more": result.get("nextOffset") is not None}
+    except (TypeError, ValueError):
+        return None
+
+
+def paging_line(p: dict[str, Any]) -> str:
+    """'Showing 5 of 8 matching crew members (records 1–5; 3 more available).' — built from the server's totals,
+    never from the model's text."""
+    unit = UNIT_WORDS.get(p["unit"], f"matching {p['unit']}")
+    total, returned, offset = p["total"], p["returned"], p["offset"]
+    if total == 0:
+        return f"Showing 0 {unit}."
+    if offset == 0 and returned >= total:
+        return f"Showing all {total} {unit}."
+    first, last = offset + 1, offset + returned
+    rest = total - last
+    tail = f"{rest} more available" if rest > 0 and p.get("more") else "end of list"
+    return f"Showing {returned} of {total} {unit} (records {first}–{last}; {tail})."
 
 
 # ── cross-tool translation and consistency ─────────────────────────────────────

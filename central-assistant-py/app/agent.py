@@ -72,6 +72,7 @@ class Deps:
     conv_key: tuple[str, str, str, str] | None = None
     user_message: str = ""
     query_guard: bool = False
+    paging: dict[str, Any] | None = None   # server totals of the LAST list-mode Crewing result (review item 1)
 
 
 # ── module manifests (Data API discovery) ─────────────────────────────────────────
@@ -200,6 +201,10 @@ class ManifestToolset(AbstractToolset[Deps]):
             if out.get("ok") is False and "timed out" in str(out.get("error") or ""):
                 deps.partial = True
             result = out.get("data") if out.get("ok") else {"error": out.get("error")}
+            if deps.ui_module == "crewing" and name in query_guard.QUERY_TOOLS and isinstance(result, dict):
+                p = query_guard.paging_summary(result)
+                if p is not None:
+                    deps.paging = p
             if decision is not None and isinstance(result, dict):
                 state = query_guard.state_from_result(name, result)
                 if state and deps.conv_key:
@@ -321,6 +326,7 @@ class LoopResult:
     usage: dict[str, int] | None
     partial: bool
     citations: list[dict[str, Any]] = field(default_factory=list)
+    paging: dict[str, Any] | None = None
 
 
 # Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
@@ -426,9 +432,11 @@ CREWING_CLOSING_RULES_GUARD = (
     "'regardless of rank' / 'all ranks' / 'everyone' → unset ['rankGroups', 'ranks']; 'any time' → unset the window. 'Show more' = basis "
     "'previous' with offset = the previous nextOffset. For a genuinely new question use conversation.basis 'new'. Never "
     "add a filter the user did not ask for (for example primary assignments only). If the tool answers "
-    "filter_change_not_requested or follow_up_needs_previous_basis, do not retry that change: tell the user which "
-    "filters are kept and ask whether they want the change. The result's `query` is the filter set that actually ran — "
-    "write the 'Filters:' line from it. "
+    "filter_change_not_requested, the refused condition was NOT part of the previous question — you introduced it: tell "
+    "the user which filters are kept (keptFilters) and that this condition was not applied because they did not ask for "
+    "it, then ask whether they want it; never present it as something the earlier question already had, and do not retry "
+    "it on your own. On follow_up_needs_previous_basis call again with basis 'previous'. The result's `query` is the "
+    "filter set that actually ran — write the 'Filters:' line from it. "
     "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
     "RULE — options: whenever you offer the user a choice of what to ask, include documentation how-to questions (for example "
     "'How do I plan a relief?') beside the live-data options. "
@@ -558,7 +566,8 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     text = masker.unmask_text(result.output) if masker else result.output
     if deps.partial:
         text = f"{text}{PARTIAL_NOTE}"
-    return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial, citations=deps.citations)
+    return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial, citations=deps.citations,
+                      paging=deps.paging)
 
 
 async def answer_docs(system: str, user: str, masker: Masker | None, history: list[ModelMessage] | None = None) -> tuple[str, dict[str, int] | None]:

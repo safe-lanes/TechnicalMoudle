@@ -15,7 +15,7 @@ import asyncio
 import time
 from typing import Any
 
-from . import agent, db, llm, mask_memory, notify, retrieval
+from . import agent, db, llm, mask_memory, notify, query_guard, retrieval
 from .config import MODULE_LABELS, settings
 from .masking import Masker
 
@@ -140,7 +140,12 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
                 print("[assistant] unmask warnings:", masker.warnings)
             if state_key:
                 mask_memory.remember(masker, *state_key)
-            text = r.text + ("\n\n" + mask_memory.USER_NOTICE[discarded] if discarded else "")
+            text = r.text
+            if ui_module == "crewing" and r.paging:
+                # 28-Oct-2026 review item 1: the paging line comes from the server's totals, never from the model's memory
+                text += "\n\n" + query_guard.paging_line(r.paging)
+            if discarded:
+                text += "\n\n" + mask_memory.USER_NOTICE[discarded]
             log("answer", text, module=ui_module, usage=r.usage, model=s.chat_model, tools_used=r.tools_used,
                 citations=r.citations if ui_module == "crewing" else None)
             out = {"response": text, "gate": "answer", "module": MODULE_LABELS.get(ui_module, ui_module),

@@ -151,3 +151,28 @@ def test_run3_fixes_cross_tool_translation_consistency_and_placeholder_ids():
     assert d.violations[0]["kind"] == "invalid_crew_ids" and d.refusal()["code"] == qg.CODE_IDS
     ok = qg.decide(D, {"mode": "count", "crewIds": ["4b6c2d1e-1111-4222-8333-444455556666"], "conversation": {"basis": "previous"}}, PREV_ASSIGN, "their certificates")
     assert not ok.violations
+
+
+# ── 28-Oct-2026 review (Astra): pagination from server totals; accurate clarification wording ──
+def test_paging_line_uses_server_totals_only():
+    first = {"ok": True, "mode": "list", "unit": "people", "total": 8, "returned": 5, "offset": 0, "nextOffset": 5}
+    second = {"ok": True, "mode": "list", "unit": "people", "total": 8, "returned": 3, "offset": 5, "nextOffset": None}
+    assert qg.paging_line(qg.paging_summary(first)) == "Showing 5 of 8 matching crew members (records 1-5; 3 more available).".replace("-", "–")
+    assert qg.paging_line(qg.paging_summary(second)) == "Showing 3 of 8 matching crew members (records 6-8; end of list).".replace("-", "–")
+    assert qg.paging_line(qg.paging_summary({"ok": True, "mode": "list", "unit": "documents", "total": 2, "returned": 2, "offset": 0, "nextOffset": None})) == "Showing all 2 matching documents."
+    assert qg.paging_line(qg.paging_summary({"ok": True, "mode": "list", "unit": "documents", "total": 0, "returned": 0, "offset": 0, "nextOffset": None})) == "Showing 0 matching documents."
+    assert qg.paging_summary({"ok": True, "mode": "count", "total": 8}) is None          # count/group answers get no line
+    assert qg.paging_summary({"ok": False, "code": "not_allowed"}) is None
+
+
+def test_refusal_says_the_filter_was_not_part_of_the_previous_question():
+    d = qg.decide(A, {"mode": "count", "crewStatus": ["primary"], "conversation": {"basis": "previous"}}, PREV_ASSIGN, "same for MV Beta Ocean")
+    r = d.refusal()
+    assert r["code"] == qg.CODE_CHANGE
+    assert 'crewStatus = ["primary"] was NOT part of the previous question' in r["error"]
+    assert "Never say that it was part of the previous question" in r["error"]
+    assert r["details"]["keptFilters"] == PREV_ASSIGN["filters"] and "crewStatus" not in r["details"]["keptFilters"]
+    assert r["details"]["notApplied"][0]["filter"] == "crewStatus"
+    # a changed value is described as a change from the previous value
+    d = qg.decide(D, {"mode": "count", "vessels": ["MV Alpha Star"], "conversation": {"basis": "previous"}}, PREV_DOCS, "and the expired ones?")
+    assert "would change from" in d.refusal()["error"] and "MV Beta Ocean" in d.refusal()["error"]
