@@ -151,9 +151,19 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
     present = {k: v for k, v in args.items() if k in PRESENTATION_KEYS}
     new_filters = {k: v for k, v in args.items() if k in keys}
 
+    # crewStatus with both values is no filter at all (run 1: the model wrote ['primary','secondary'] on a new question)
+    if isinstance(new_filters.get("crewStatus"), list) and {str(x).lower() for x in new_filters["crewStatus"]} >= {"primary", "secondary"}:
+        new_filters.pop("crewStatus")
+
     if not prev or not isinstance(prev.get("filters"), dict):
         return Decision(effective={**present, **new_filters}, basis="new")
-    inherited_all = prev["filters"] if prev.get("tool") == tool else {k: v for k, v in prev["filters"].items() if k in SHARED_KEYS}
+    if prev.get("tool") == tool:
+        inherited_all = dict(prev["filters"])
+    else:
+        inherited_all = {k: v for k, v in prev["filters"].items() if k in SHARED_KEYS}
+        if prev.get("tool") == "crewing_query_assignments" and tool == "crewing_query_documents":
+            # an assignments question is BY DEFINITION about crew on board; 'their certificates' keeps that scope
+            inherited_all["crewOnBoard"] = True
     inherited = {k: v for k, v in inherited_all.items() if k in keys}
     if not basis:
         basis = "previous" if (inherited and looks_follow_up(user_text)) else "new"

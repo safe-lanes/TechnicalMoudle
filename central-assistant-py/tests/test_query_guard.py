@@ -112,3 +112,18 @@ def test_query_state_is_bound_to_the_conversation_key_and_forgotten_on_a_miss():
     assert mask_memory.get_query_state("crewing-pilot", "trial-a.local", "2", "conv-1") is None
     mask_memory.clear()                                                   # restart
     assert mask_memory.get_query_state(*key) is None
+
+
+def test_run1_fixes_cross_tool_on_board_scope_and_both_statuses_is_no_filter():
+    # R02.4 (run 1): 'how many certificates do they hold' after an assignments question — crewOnBoard true is the
+    # inherited scope, not an unrequested change
+    d = qg.decide(D, {"mode": "count", "crewOnBoard": True, "expiryWithin": {"direction": "next", "amount": 60, "unit": "days"},
+                      "conversation": {"basis": "previous"}}, PREV_ASSIGN, "how many certificates do they hold that expire in the next 60 days?")
+    assert not d.violations and d.effective["crewOnBoard"] is True and d.effective["vessels"] == ["MV Beta Ocean"]
+    # R04.3 (run 1): crewStatus ['primary','secondary'] on a new question is no filter and is not forwarded
+    d = qg.decide(A, {"mode": "list", "vessels": ["MV Alpha Trader"], "crewStatus": ["primary", "secondary"], "conversation": {"basis": "new"}},
+                  PREV_DOCS, "List all crew on board MV Alpha Trader")
+    assert "crewStatus" not in d.effective and not d.violations
+    # but primary-only on a follow-up without evidence is still refused
+    d = qg.decide(A, {"mode": "list", "crewStatus": ["primary"], "conversation": {"basis": "previous"}}, PREV_ASSIGN, "list them")
+    assert d.violations and d.violations[0]["filter"] == "crewStatus"
