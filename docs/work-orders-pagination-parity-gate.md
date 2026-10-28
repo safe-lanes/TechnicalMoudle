@@ -6,6 +6,10 @@ Database paging is not wired into the application. The existing application
 behavior remains unchanged. This note records a concrete ordering mismatch
 requiring approval under the pagination task's preservation constraint.
 
+The user chose **"Preserve behavior and pause"** when offered deterministic
+date ordering. Work is paused and remains incomplete. Do not apply the proposed
+exception below without new explicit approval.
+
 ## Reproduction
 
 Run:
@@ -38,7 +42,7 @@ Sorting only the selected page in JavaScript would not preserve complete-scope
 sorting. Loading every record to sort in JavaScript would violate the bounded
 loading requirement. Neither is an acceptable fallback.
 
-## Decision required
+## Proposed exception — not approved
 
 Suggested narrow exception for explicit Due Date sorting: keep empty values
 first, compare parseable dates chronologically next, then put nonempty
@@ -50,6 +54,6 @@ This changes order only for comparisons involving an unparseable nonempty
 value. Empty values retain their current placement before valid dates in
 ascending order. No saved values or date displays need change.
 
-This is a proposed policy, not an implemented or approved change. Further
-status/hydration/default-order parity investigation is still required after
-the decision; the baseline tests do not establish SQL or export parity.
+This policy was not approved and has not been implemented. Further
+status/hydration/default-order parity investigation would still be required if
+work resumes; the baseline tests do not establish SQL or export parity.
