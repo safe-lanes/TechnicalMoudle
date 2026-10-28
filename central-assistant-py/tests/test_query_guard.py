@@ -127,3 +127,27 @@ def test_run1_fixes_cross_tool_on_board_scope_and_both_statuses_is_no_filter():
     # but primary-only on a follow-up without evidence is still refused
     d = qg.decide(A, {"mode": "list", "crewStatus": ["primary"], "conversation": {"basis": "previous"}}, PREV_ASSIGN, "list them")
     assert d.violations and d.violations[0]["filter"] == "crewStatus"
+
+
+def test_run3_fixes_cross_tool_translation_consistency_and_placeholder_ids():
+    # R01.3 (run 3): documents → assignments follow-up carries the document condition as hasDocument (not a change)
+    hd = {"expiryState": "not_expired", "expiryWithin": {"direction": "next", "amount": 60, "unit": "days"}}
+    d = qg.decide(A, {"mode": "list", "vessels": ["MV Alpha Star"], "rankGroups": ["engineers"], "hasDocument": hd,
+                      "conversation": {"basis": "previous"}}, {"tool": D, "filters": {"vessels": ["MV Alpha Star"], "rankGroups": ["engineers"], **hd}},
+                  "show them as a list")
+    assert not d.violations and d.effective["hasDocument"] == hd
+    # and if the model omits it, it is retained in translated form
+    d = qg.decide(A, {"mode": "list", "conversation": {"basis": "previous"}}, {"tool": D, "filters": {"vessels": ["MV Alpha Star"], **hd}}, "show them as a list")
+    assert d.effective["hasDocument"] == hd and d.effective["vessels"] == ["MV Alpha Star"]
+    # assignments(hasDocument) → documents carries the condition back up + on-board scope
+    d = qg.decide(D, {"mode": "count", "conversation": {"basis": "previous"}}, {"tool": A, "filters": {"vessels": ["MV Beta Ocean"], "hasDocument": hd, "crewStatus": ["primary"]}},
+                  "how many certificates is that?")
+    assert d.effective["expiryWithin"]["amount"] == 60 and d.effective["crewOnBoard"] is True and d.not_carried == ["crewStatus"]
+    # R01.4 (run 3): 'the expired ones' drops the future window instead of returning an impossible zero
+    d = qg.decide(D, {"mode": "count", "expiryState": "expired", "conversation": {"basis": "previous"}}, PREV_DOCS, "and the expired ones?")
+    assert not d.violations and d.effective["expiryState"] == "expired" and "expiryWithin" not in d.effective
+    # R02.4 (run 3): a placeholder crewIds value is refused, never run
+    d = qg.decide(D, {"mode": "count", "crewIds": ["<primary-engineer-ids>"], "conversation": {"basis": "previous"}}, PREV_ASSIGN, "their certificates")
+    assert d.violations[0]["kind"] == "invalid_crew_ids" and d.refusal()["code"] == qg.CODE_IDS
+    ok = qg.decide(D, {"mode": "count", "crewIds": ["4b6c2d1e-1111-4222-8333-444455556666"], "conversation": {"basis": "previous"}}, PREV_ASSIGN, "their certificates")
+    assert not ok.violations

@@ -208,6 +208,8 @@ class ManifestToolset(AbstractToolset[Deps]):
                     result["conversationBasis"] = decision.basis
                     if decision.inherited:
                         result["filtersKeptFromPreviousQuestion"] = decision.inherited
+                    if decision.not_carried:
+                        result["previousFiltersWithNoEquivalentHere"] = decision.not_carried   # e.g. crewStatus on documents
         if deps.masker:
             deps.masker.learn_from_json(result)   # learn identifiers from REAL data …
             result = deps.masker.mask_json(result)  # … then the result rejoins history masked (G3)

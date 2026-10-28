@@ -62,6 +62,7 @@ FOLLOWUP = r"(^\s*(and|or|also|but)\b)|\b(them|those|these|same|more|again|too|o
 
 CODE_CHANGE = "filter_change_not_requested"
 CODE_BASIS = "follow_up_needs_previous_basis"
+CODE_IDS = "invalid_crew_ids"
 
 
 @dataclass
@@ -70,9 +71,15 @@ class Decision:
     basis: str
     violations: list[dict[str, Any]] = field(default_factory=list)
     inherited: list[str] = field(default_factory=list)
+    not_carried: list[str] = field(default_factory=list)   # previous filters with no equivalent on this tool
 
     def refusal(self) -> dict[str, Any]:
         """The tool result handed back to the model instead of running the query (same shape as a Crewing refusal)."""
+        if any(v["kind"] == "invalid_crew_ids" for v in self.violations):
+            return {"ok": False, "code": CODE_IDS,
+                    "error": "crewIds must be the crewId values returned by crewing_find_crew (UUIDs) — never a placeholder. "
+                             "Call crewing_find_crew first, or query without crewIds.",
+                    "details": {"rejected": self.violations[0]["value"]}}
         if any(v["kind"] == "new_basis_on_follow_up" for v in self.violations):
             return {"ok": False, "code": CODE_BASIS,
                     "error": "This reads as a follow-up to the previous question. Call again with conversation.basis "
@@ -155,22 +162,22 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
     if isinstance(new_filters.get("crewStatus"), list) and {str(x).lower() for x in new_filters["crewStatus"]} >= {"primary", "secondary"}:
         new_filters.pop("crewStatus")
 
+    # crewIds come only from crewing_find_crew (UUIDs); a placeholder such as "<ids>" would silently give 0 results (run 3)
+    bad_ids = [x for x in (new_filters.get("crewIds") or []) if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", str(x), re.I)]
+    if bad_ids:
+        return Decision(effective={**present, **new_filters}, basis=basis or "new",
+                        violations=[{"kind": "invalid_crew_ids", "filter": "crewIds", "value": bad_ids}])
+
     if not prev or not isinstance(prev.get("filters"), dict):
-        return Decision(effective={**present, **new_filters}, basis="new")
-    if prev.get("tool") == tool:
-        inherited_all = dict(prev["filters"])
-    else:
-        inherited_all = {k: v for k, v in prev["filters"].items() if k in SHARED_KEYS}
-        if prev.get("tool") == "crewing_query_assignments" and tool == "crewing_query_documents":
-            # an assignments question is BY DEFINITION about crew on board; 'their certificates' keeps that scope
-            inherited_all["crewOnBoard"] = True
+        return Decision(effective={**present, **_consistent(new_filters)}, basis="new")
+    inherited_all, not_carried = translate(prev.get("tool") or "", tool, prev["filters"])
     inherited = {k: v for k, v in inherited_all.items() if k in keys}
     if not basis:
         basis = "previous" if (inherited and looks_follow_up(user_text)) else "new"
     if basis == "new":
         if inherited and looks_follow_up(user_text):
             return Decision(effective=inherited, basis="previous", violations=[{"kind": "new_basis_on_follow_up"}])
-        return Decision(effective={**present, **new_filters}, basis="new")
+        return Decision(effective={**present, **_consistent(new_filters)}, basis="new")
 
     violations: list[dict[str, Any]] = []
     eff = dict(inherited)
@@ -185,8 +192,55 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
         if not evidence(k, v, user_text):
             violations.append({"kind": "unrequested_change", "filter": k, "value": v, "previous": eff.get(k)})
         eff[k] = v
+    eff = _consistent(eff)
     kept = [k for k in inherited if k in eff and k not in new_filters]
-    return Decision(effective={**present, **eff}, basis="previous", violations=violations, inherited=kept)
+    return Decision(effective={**present, **eff}, basis="previous", violations=violations, inherited=kept, not_carried=not_carried)
+
+
+# ── cross-tool translation and consistency ─────────────────────────────────────
+DOC_KEYS = ("documentTypes", "documentNameContains", "expiryState", "expiryWithin")   # = the hasDocument sub-keys
+
+
+def translate(prev_tool: str, tool: str, filters: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """The previous filters expressed in the new tool's vocabulary, plus the previous filters that have no equivalent.
+    assignments.hasDocument{…} ⇄ documents.{documentTypes, documentNameContains, expiryState, expiryWithin};
+    an assignments question is by definition about crew on board → documents.crewOnBoard true."""
+    if prev_tool == tool or not prev_tool:
+        return dict(filters), []
+    out: dict[str, Any] = {k: v for k, v in filters.items() if k in SHARED_KEYS}
+    lost: list[str] = []
+    if prev_tool == "crewing_query_assignments" and tool == "crewing_query_documents":
+        out["crewOnBoard"] = True
+        hd = filters.get("hasDocument") if isinstance(filters.get("hasDocument"), dict) else {}
+        for k in DOC_KEYS:
+            if k in hd and hd[k] not in (None, "", [], {}):
+                out[k] = hd[k]
+        lost = [k for k in filters if k not in SHARED_KEYS and k != "hasDocument"]
+    elif prev_tool == "crewing_query_documents" and tool == "crewing_query_assignments":
+        hd = {k: filters[k] for k in DOC_KEYS if k in filters and filters[k] not in (None, "", [], {})}
+        if hd and hd.get("expiryState") != "any" or len(hd) > 1 or (hd and "expiryState" not in hd):
+            out["hasDocument"] = hd
+        lost = [k for k in filters if k not in SHARED_KEYS and k not in DOC_KEYS and not (k == "crewOnBoard" and filters[k] is True)]
+    else:
+        lost = [k for k in filters if k not in SHARED_KEYS]
+    return out, lost
+
+
+def _consistent(filters: dict[str, Any]) -> dict[str, Any]:
+    """A document cannot be both expired and expiring in a FUTURE window (run 3: 'the expired ones' kept the 60-day window
+    and found nothing). When expiryState becomes 'expired', a 'next' window is dropped; the model is told via query."""
+    f = dict(filters)
+    win = f.get("expiryWithin")
+    if f.get("expiryState") == "expired" and isinstance(win, dict) and win.get("direction") == "next":
+        f.pop("expiryWithin")
+    hd = f.get("hasDocument")
+    if isinstance(hd, dict):
+        hd = dict(hd)
+        w = hd.get("expiryWithin")
+        if hd.get("expiryState") == "expired" and isinstance(w, dict) and w.get("direction") == "next":
+            hd.pop("expiryWithin")
+        f["hasDocument"] = hd
+    return f
 
 
 def state_from_result(tool: str, result: dict[str, Any]) -> dict[str, Any] | None:
