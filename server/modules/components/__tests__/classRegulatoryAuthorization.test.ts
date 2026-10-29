@@ -86,11 +86,14 @@ describe("Section H actual route authorization (no production database)", () => 
     expect((await fetch(root, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ componentId: "c" }) })).status).toBe(201);
     expect(service.createClassEntry.mock.calls[0][2]).toMatchObject({ userId: id, role: "Editor" });
   });
-  it("allows a view-only Office identity to read but not write", async () => {
-    permissions.getRoleMenuPermissions.mockResolvedValue([{ menuMuid: "m", canView: true, canEdit: false }]);
+  it("allows every verified Office user even when Component view/edit flags are false", async () => {
+    permissions.getRoleMenuPermissions.mockResolvedValue([{ menuMuid: "m", canView: false, canEdit: false }]);
     expect((await fetch(root + "/component", { headers })).status).toBe(200);
     expect((await fetch(root + "/component/access", { headers })).status).toBe(200);
-    expect((await fetch(root + "/1", { method: "DELETE", headers })).status).toBe(403);
+    for (const [method, suffix] of actions) expect((await fetch(root + suffix, {
+      method, headers, body: JSON.stringify({ componentId: "c" }),
+    })).status).toBe(method === "POST" && suffix === "" ? 201 : 200);
+    expect(permissions.getRoleByName).not.toHaveBeenCalled();
   });
   it("returns the explicit refusal when the development control is disabled", async () => {
     serverVerified = undefined; source = "none";
@@ -175,13 +178,40 @@ describe("Section H actual route authorization (no production database)", () => 
   });
   it("refuses a Ship identity even if its role has admin bypass", async () => {
     serverVerified = { userId: id, role: "Sail Admin", userType: "Ship", missing: [] };
-    expect((await fetch(root, { method: "POST", headers: { ...headers, "x-user-role": "Sail Admin", "x-user-type": "Ship" }, body: "{}" })).status).toBe(403);
+    const shipHeaders = { ...headers, "x-user-role": "Sail Admin", "x-user-type": "Ship" };
+    expect((await fetch(root + "/component", { headers: shipHeaders })).status).toBe(200);
+    for (const [method, suffix] of actions) expect((await fetch(root + suffix, {
+      method, headers: shipHeaders, body: "{}",
+    })).status).toBe(403);
+    expect(service.createClassEntry).not.toHaveBeenCalled();
+    expect(service.mutateClassEntry).not.toHaveBeenCalled();
   });
-  it("refuses view-only, unconfigured and role-forged callers", async () => {
-    permissions.getRoleMenuPermissions.mockResolvedValue([{ menuMuid: "m", canView: true, canEdit: false }]);
-    expect((await fetch(root + "/1", { method: "DELETE", headers })).status).toBe(403);
+  it.each(["Accounts Officer", "Unconfigured Office"])("allows %s through every lifecycle action without role permission lookups", async role => {
+    serverVerified.role = role;
+    permissions.getRoleByName.mockRejectedValue(new Error("Unrelated permissions unavailable"));
+    const officeHeaders = { ...headers, "x-user-role": role };
+    expect((await fetch(root + "/component?includeDeleted=true", { headers: officeHeaders })).status).toBe(200);
+    expect(service.listClassEntries).toHaveBeenCalledWith("component", expect.objectContaining({
+      role, userType: "Office", identityMode: "verified", canEdit: true,
+    }), true);
+    for (const [method, suffix] of actions) expect((await fetch(root + suffix, {
+      method, headers: officeHeaders, body: JSON.stringify({ componentId: "c" }),
+    })).status).toBe(method === "POST" && suffix === "" ? 201 : 200);
+    expect(permissions.getRoleByName).not.toHaveBeenCalled();
+  });
+  it("names unavailable standalone verification rather than falling back to the development viewer", async () => {
+    serverVerified = undefined; source = "none";
+    vi.stubEnv("JWT_SECRET", "");
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("PMS_SECTION_H_DEV_READONLY", "true");
+    const response = await fetch(root + "/component", { headers: { Authorization: "Bearer unavailable-session" } });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "IDENTITY_UNAVAILABLE" });
+    expect(service.listClassEntries).not.toHaveBeenCalled();
+  });
+  it("permits unconfigured Office roles but still refuses role-forged callers", async () => {
     permissions.getRoleByName.mockResolvedValue(null);
-    expect((await fetch(root + "/1/restore", { method: "POST", headers, body: "{}" })).status).toBe(403);
+    expect((await fetch(root + "/1/restore", { method: "POST", headers, body: "{}" })).status).toBe(200);
+    service.mutateClassEntry.mockClear();
     expect((await fetch(root + "/1", { method: "DELETE", headers: { ...headers, "x-user-role": "Sail Admin" } })).status).toBe(403);
     expect(service.mutateClassEntry).not.toHaveBeenCalled();
   });

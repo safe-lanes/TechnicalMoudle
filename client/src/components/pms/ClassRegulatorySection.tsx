@@ -24,7 +24,7 @@ type Draft = {
 const blankDraft = (): Draft => ({ classificationSocietyKey: "", surveyTypeKey: "", certificateNumber: "", lastClassSurvey: "", nextSurveyDue: "", classRequirements: "", information: "" });
 const apiRoot = "/technical/api";
 const inputClass = "h-8 rounded-sm border-[#52baf3] text-sm focus-visible:ring-[#52baf3]";
-type Access = { canView: boolean; canEdit: boolean; identityMode: string; reasonCode?: string; reason?: string };
+type Access = { canView: boolean; canEdit: boolean; canViewRemoved?: boolean; identityMode: string; reasonCode?: string; reason?: string };
 const sessionEpochs = new WeakMap<object, number>();
 let nextSessionEpoch = 0;
 function sessionEpoch(user: object | null) {
@@ -68,7 +68,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   const [storageEpoch, setStorageEpoch] = useState(0);
   useEffect(() => {
     const changed = (event: StorageEvent) => {
-      if (event.key === null || ["credentials", "profile", "domain"].includes(event.key)) setStorageEpoch(value => value + 1);
+      if (event.key === null || ["credentials", "profile", "userProfile", "domain"].includes(event.key)) setStorageEpoch(value => value + 1);
     };
     window.addEventListener("storage", changed);
     return () => window.removeEventListener("storage", changed);
@@ -122,7 +122,9 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   });
   const canEdit = !readOnly && accessQuery.isSuccess && !accessQuery.isFetching &&
     !accessQuery.isError && accessQuery.data?.canEdit === true && accessQuery.data?.identityMode === "verified";
-  const effectiveIncludeDeleted = canEdit && includeDeleted;
+  const canViewRemoved = !readOnly && accessQuery.isSuccess && !accessQuery.isFetching &&
+    !accessQuery.isError && accessQuery.data?.canViewRemoved === true && accessQuery.data?.identityMode === "verified";
+  const effectiveIncludeDeleted = canViewRemoved && includeDeleted;
   const listUrl = `${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}${effectiveIncludeDeleted ? "?includeDeleted=true" : ""}`;
   const rowsQuery = useQuery<RegulatoryEntry[]>({
     queryKey: [`${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}`, securityScope, effectiveIncludeDeleted],
@@ -131,12 +133,16 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
     staleTime: 0, gcTime: 0,
   });
   const societyQuery = useQuery<Master[]>({
-    queryKey: [`${apiRoot}/fleet/master-lists?listType=classificationSociety`],
+    queryKey: [`${apiRoot}/fleet/master-lists?listType=classificationSociety`, securityScope],
+    queryFn: async () => (await apiRequest("GET", `${apiRoot}/fleet/master-lists?listType=classificationSociety`)).json(),
     enabled: !!id && canEdit,
+    staleTime: 0, gcTime: 0,
   });
   const surveyQuery = useQuery<Master[]>({
-    queryKey: [`${apiRoot}/fleet/master-lists?listType=surveyType`],
+    queryKey: [`${apiRoot}/fleet/master-lists?listType=surveyType`, securityScope],
+    queryFn: async () => (await apiRequest("GET", `${apiRoot}/fleet/master-lists?listType=surveyType`)).json(),
     enabled: !!id && canEdit,
+    staleTime: 0, gcTime: 0,
   });
   useEffect(() => {
     // Erase inactive caches belonging to an old session/role/tenant, including removed records.
@@ -283,11 +289,11 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
       {!readOnly && accessQuery.isLoading && <div className="h-8 animate-pulse rounded-sm bg-slate-100" />}
       {accessQuery.isError && <div role="alert" className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorDetails(accessQuery.error).message} This register is read-only until access can be confirmed. <Button size="sm" variant="outline" className="ml-2 h-7" onClick={() => accessQuery.refetch()}>Retry access</Button></div>}
       {accessQuery.isSuccess && !canEdit && <div className="flex items-start gap-2 rounded-sm border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><span>{accessQuery.data.reason || "You have read-only access to classification records."}</span></div>}
-      {canEdit && <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="h-4 w-4 text-emerald-700" />Changes save per entry, independently of the component.</div>
+      {(canEdit || canViewRemoved) && <div className="flex flex-wrap items-center justify-between gap-2">
+        {canEdit && <div className="flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="h-4 w-4 text-emerald-700" />Changes save per entry, independently of the component.</div>}
         <div className="flex flex-wrap gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={includeDeleted} onChange={(e) => setIncludeDeleted(e.target.checked)} />Show removed</label>
-          <Button size="sm" className="h-8 bg-[#16569e] text-white hover:bg-[#12477f]" onClick={() => begin()} disabled={editingId !== null || saveMutation.isPending}><Plus className="mr-1 h-3.5 w-3.5" />Add entry</Button>
+          {canViewRemoved && <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={includeDeleted} onChange={(e) => setIncludeDeleted(e.target.checked)} />Show removed</label>}
+          {canEdit && <Button size="sm" className="h-8 bg-[#16569e] text-white hover:bg-[#12477f]" onClick={() => begin()} disabled={editingId !== null || saveMutation.isPending}><Plus className="mr-1 h-3.5 w-3.5" />Add entry</Button>}
         </div>
       </div>}
       {saveError && <p role="alert" className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{saveError}</p>}

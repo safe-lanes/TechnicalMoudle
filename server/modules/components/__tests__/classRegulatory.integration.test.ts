@@ -12,7 +12,7 @@ vi.mock("../../../storage", () => ({ storage: {} }));
 
 const component = "8eb5b00d-55cb-4c0f-8b62-000000000191";
 const vessel = "8eb5b00d-55cb-4c0f-8b62-000000000192";
-const actor = { userId: "8eb5b00d-55cb-4c0f-8b62-000000000193", role: "Editor", userType: "Office" as const, canEdit: true };
+const actor = { userId: "8eb5b00d-55cb-4c0f-8b62-000000000193", role: "Editor", userType: "Office" as const, canEdit: true, identityMode: "verified" as const };
 const business = { classificationSocietyKey: "DNV", surveyTypeKey: "CLS-ANN", certificateNumber: "TEST", lastClassSurvey: "20-Dec-2015" };
 let conn: any, pool: any;
 const migrations = [
@@ -95,7 +95,7 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
   it("rejects invalid masters, scope tampering, dates and unauthorized direct service writes", async () => {
     await expect(createClassEntry(component, { ...business, surveyTypeKey: "DNV" }, actor)).rejects.toMatchObject({ statusCode: 400 });
     await expect(createClassEntry(component, { ...business, lastClassSurvey: "2025-02-29" }, actor)).rejects.toMatchObject({ statusCode: 400 });
-    await expect(createClassEntry(component, business, { ...actor, canEdit: false })).rejects.toMatchObject({ statusCode: 403 });
+    await expect(createClassEntry(component, business, { ...actor, identityMode: undefined })).rejects.toMatchObject({ statusCode: 403 });
     const row = await createClassEntry(component, business, actor);
     await expect(mutateClassEntry(row.id, { componentId: "other" }, "update", actor)).rejects.toMatchObject({ statusCode: 400 });
     const ship = { ...actor, userType: "Ship" as const };
@@ -111,6 +111,36 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     await conn.query("UPDATE pg_temp.component_class_regulatory SET last_class_survey='bad historical date' WHERE id=$1", [row.id]);
     expect(await mutateClassEntry(row.id, { information: "unrelated" }, "update", actor)).toMatchObject({ lastClassSurvey: "bad historical date" });
     await expect(mutateClassEntry(row.id, { lastClassSurvey: "changed bad date" }, "update", actor)).rejects.toMatchObject({ statusCode: 400 });
+  });
+  it("grants non-admin verified Office users the full lifecycle across vessels without an assignment", async () => {
+    const office = { ...actor, role: "Accounts Officer", canEdit: false };
+    const secondVessel = "8eb5b00d-55cb-4c0f-8b62-000000000198";
+    const secondComponent = "8eb5b00d-55cb-4c0f-8b62-000000000199";
+    await conn.query("INSERT INTO pg_temp.vessels (id,vuuid,code,name) VALUES ('TEST-V2',$1,'TEST-V2','Other Vessel')", [secondVessel]);
+    await conn.query("INSERT INTO pg_temp.components (id,cuuid,vessel_id,vessel_code,name,component_code) VALUES ('other-component',$1,$2,'TEST-V2','Other Component','602.001')", [secondComponent, secondVessel]);
+    await conn.query("UPDATE pg_temp.sync_settings SET setting_value=$1 WHERE setting_key='section_h_ready_vessels'", [JSON.stringify([vessel, secondVessel])]);
+    for (const componentId of [component, secondComponent]) {
+      expect(await componentClassAccess(componentId, office)).toMatchObject({
+        canEdit: true, canViewRemoved: true, identityMode: "verified", reasonCode: "EDIT_ALLOWED",
+      });
+      const row = await createClassEntry(componentId, business, office);
+      expect(await mutateClassEntry(row.id, { information: "Office edit" }, "update", office)).toMatchObject({ updatedByUuid: office.userId });
+      await mutateClassEntry(row.id, {}, "delete", office);
+      expect(await listClassEntries(componentId, office)).toHaveLength(0);
+      expect(await listClassEntries(componentId, office, true)).toHaveLength(1);
+      expect(await mutateClassEntry(row.id, {}, "restore", office)).toMatchObject({ isDeleted: false, ccruuid: row.ccruuid });
+    }
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.audit_log WHERE user_id=$1", [office.userId])).rows[0].n).toBe(8);
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.master_user_vessels")).rows[0].n).toBe(0);
+  });
+  it("denies unverified service actors without creating audit or business side effects", async () => {
+    for (const identityMode of [undefined, "development-readonly"] as const) {
+      const unverified = { ...actor, canEdit: true, identityMode };
+      await expect(createClassEntry(component, business, unverified)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(listClassEntries(component, unverified, true)).rejects.toMatchObject({ statusCode: 403 });
+    }
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.component_class_regulatory")).rows[0].n).toBe(0);
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.audit_log")).rows[0].n).toBe(0);
   });
   it("safely gates historical NULL identities rather than random-backfilling", async () => {
     const row = await createClassEntry(component, business, actor);
@@ -128,7 +158,7 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     await conn.query("UPDATE pg_temp.component_class_regulatory SET ccruuid=NULL WHERE id=$1", [record.id]);
     expect(await listClassEntries(component, { ...actor, canEdit: false })).toHaveLength(1);
     expect(await componentClassAccess(component, { ...actor, canEdit: false })).toMatchObject({
-      canView: true, canEdit: false, identityMode: "verified", reasonCode: "VIEW_ONLY",
+      canView: true, canEdit: false, canViewRemoved: true, identityMode: "verified", reasonCode: "RECONCILIATION_PENDING",
     });
     expect(await componentClassAccess(component, actor)).toMatchObject({ reasonCode: "RECONCILIATION_PENDING", canView: true });
     const preview = { ...actor, canEdit: false, identityMode: "development-readonly" as const };

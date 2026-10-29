@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
-import { requireAuth, requirePMSAdmin, requireRole } from '../../middleware/auth';
+import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import * as componentCtrl from './controllers/componentController';
 import * as uploadCtrl from './controllers/componentUploadController';
 import * as subCtrl from './controllers/subEntityController';
 import * as classCtrl from './controllers/classRegulatoryController';
-import { requireSectionHIdentity, requireSectionHReadIdentity, requireSectionHView } from './services/classRegulatoryAccess';
+import { requireSectionHIdentity, requireSectionHReadIdentity, requireSectionHView, requireSectionHOffice } from './services/classRegulatoryAccess';
 
 const router = Router();
 
@@ -65,8 +65,7 @@ router.get('/component-documents/:id/download', requireAuth, asyncHandler(subCtr
 // ── Component Class Regulatory ──
 
 const sectionHView = [requireAuth, requireSectionHReadIdentity, requireSectionHView];
-const sectionHWrite = [requireAuth, requireSectionHIdentity, requireRole('Office'),
-  requirePermission('pms-components', 'edit', { enforce: true, unconfigured: 'deny' })];
+const sectionHWrite = [requireAuth, requireSectionHIdentity, requireSectionHOffice];
 router.get('/component-class-regulatory/:componentId/access', ...sectionHView, classCtrl.access);
 router.get('/component-class-regulatory/:componentId', ...sectionHView, classCtrl.list);
 router.post('/component-class-regulatory', ...sectionHWrite, classCtrl.create);

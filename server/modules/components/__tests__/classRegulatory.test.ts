@@ -19,10 +19,10 @@ function request(overrides: Record<string, any> = {}) {
     verifiedUser: { userId: id, role: "Editor", userType: "Office", missing: [] }, ...overrides,
   } as any;
 }
-describe("Section H verified identity and existing edit permission", () => {
+describe("Section H verified Office entitlement", () => {
   beforeEach(() => vi.clearAllMocks());
   it("accepts matching verified claims without relying on mock role", () => {
-    expect(verifiedSectionHActor(request())).toEqual({ userId: id, role: "Editor", userType: "Office", canEdit: false });
+    expect(verifiedSectionHActor(request())).toEqual({ userId: id, role: "Editor", userType: "Office", canEdit: false, identityMode: "verified" });
   });
   it.each(["mock"])("refuses source %s even with a verified privileged-sounding identity", source => {
     expect(() => verifiedSectionHActor(request({ rbac: { source, role: "Sail Admin", userType: "Office" } }))).toThrow();
@@ -46,19 +46,26 @@ describe("Section H verified identity and existing edit permission", () => {
   it("never gives Ship an edit bypass", async () => {
     expect(await sectionHCanEdit({ userId: id, role: "Sail Admin", userType: "Ship", canEdit: false })).toBe(false);
   });
-  it("accepts an arbitrary Office role only when Component edit is configured", async () => {
+  it("accepts every verified Office role regardless of Component edit permission", async () => {
     mocks.getRoleByName.mockResolvedValue({ ruid: "r" });
     mocks.getRoleMenuPermissions.mockResolvedValue([{ menuMuid: "m", canEdit: true }]);
     mocks.getActiveMenuItems.mockResolvedValue([{ muid: "m", name: "pms-components" }]);
     expect(await sectionHCanEdit(verifiedSectionHActor(request()))).toBe(true);
     mocks.getRoleMenuPermissions.mockResolvedValue([{ menuMuid: "m", canEdit: false }]);
-    expect(await sectionHCanEdit(verifiedSectionHActor(request()))).toBe(false);
+    expect(await sectionHCanEdit(verifiedSectionHActor(request()))).toBe(true);
+    expect(mocks.getRoleByName).not.toHaveBeenCalled();
   });
-  it("denies unconfigured roles and does not swallow permission failures", async () => {
+  it("does not depend on role configuration or the unrelated menu-permission service", async () => {
     mocks.getRoleByName.mockResolvedValue(null);
-    expect(await sectionHCanEdit(verifiedSectionHActor(request()))).toBe(false);
+    expect(await sectionHCanEdit(verifiedSectionHActor(request()))).toBe(true);
     mocks.getRoleByName.mockRejectedValue(new Error("offline"));
-    await expect(sectionHCanEdit(verifiedSectionHActor(request()))).rejects.toThrow("offline");
+    expect(await sectionHCanEdit(verifiedSectionHActor(request()))).toBe(true);
+    expect(mocks.getRoleByName).not.toHaveBeenCalled();
+  });
+  it("refuses development and unresolved actors even when their profile says Office", async () => {
+    const actor = verifiedSectionHActor(request());
+    expect(await sectionHCanEdit({ ...actor, identityMode: "development-readonly", canEdit: true })).toBe(false);
+    expect(await sectionHCanEdit({ ...actor, identityMode: undefined, canEdit: true })).toBe(false);
   });
 });
 

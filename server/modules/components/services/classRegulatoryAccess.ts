@@ -5,7 +5,6 @@ import { ForbiddenError } from "../../shared/errors";
 import { and, eq } from "drizzle-orm";
 import { masterUserVessels } from "@shared/schema";
 import { getDb } from "../../../db";
-import { storage } from "../../../storage";
 import jwt from "jsonwebtoken";
 import { readVerifiedUser } from "../../../middleware/tenantMiddleware";
 import { tenantConnectionManager } from "../../../utils/tenantConnectionManager";
@@ -44,10 +43,10 @@ export function verifiedSectionHActor(req: SectionHRequest): SectionHActor {
   }
   // The configured SAILERP id claim is the canonical master_users.id contract.
   // Never substitute req.user.userUuid (which can be the default mock or a browser header).
-  return { userId: verified.userId, role: verified.role, userType: verified.userType, canEdit: false };
+  return { userId: verified.userId, role: verified.role, userType: verified.userType, canEdit: false, identityMode: "verified" };
 }
 
-export const DEVELOPMENT_READONLY_REASON = "Development preview — read-only. A verified Office session is required to make changes.";
+export const DEVELOPMENT_READONLY_REASON = "Development preview — read-only. No verified Office session was received. Sign in through the integrated application to edit; the default preview user cannot authorize changes.";
 export function sectionHDevelopmentReadEnabled() {
   return process.env.NODE_ENV === "development" && process.env.PMS_SECTION_H_DEV_READONLY === "true" &&
     !tenantConnectionManager.isMultiTenantEnabled;
@@ -116,20 +115,25 @@ async (req: SectionHRequest, res: Response, next: NextFunction) => {
 export const requireSectionHIdentity = resolveIdentity(false);
 export const requireSectionHReadIdentity = resolveIdentity(true);
 export function requireSectionHView(req: SectionHRequest, res: Response, next: NextFunction) {
-  if (req.sectionHActor?.identityMode === "development-readonly") return next();
+  if (req.sectionHActor?.identityMode === "development-readonly" || sectionHOfficeCanManage(req.sectionHActor)) return next();
   return requirePermission("pms-components", "view", { enforce: true, unconfigured: "deny" })(req, res, next);
 }
 
-/** Same Component edit permission policy as the UI, after verified-source/type checks. */
+/** Section H entitlement only: every verified Office identity, regardless of role/menu permissions. */
+export function sectionHOfficeCanManage(actor?: SectionHActor): boolean {
+  return !!actor?.userId && actor.identityMode === "verified" && actor.userType === "Office";
+}
+
+export function requireSectionHOffice(req: SectionHRequest, res: Response, next: NextFunction) {
+  if (!sectionHOfficeCanManage(req.sectionHActor)) return res.status(403).json({
+    error: "A verified Office session is required to manage Classification & Regulatory Data.",
+    code: "OFFICE_SESSION_REQUIRED",
+  });
+  next();
+}
+
 export async function sectionHCanEdit(actor: SectionHActor): Promise<boolean> {
-  if (actor.identityMode === "development-readonly" || actor.userType !== "Office") return false;
-  if (actor.role === "Sail Admin" || actor.role === "PMS Admin") return true;
-  const role = await storage.getRoleByName(actor.role);
-  if (!role) return false;
-  const permissions = await storage.getRoleMenuPermissions(role.ruid);
-  const menus = await storage.getActiveMenuItems();
-  const menu = menus.find(item => item.name === "pms-components");
-  return !!menu && permissions.some(item => item.menuMuid === menu.muid && item.canEdit === true);
+  return sectionHOfficeCanManage(actor);
 }
 
 export async function assertSectionHScope(actor: SectionHActor, vesselId: string | null) {
