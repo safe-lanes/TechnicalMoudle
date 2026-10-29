@@ -1,4 +1,5 @@
 import { getAccessToken } from "./authToken";
+import { isReplit } from "./env";
 
 let activeRank: string | null = null;
 const listeners = new Set<(rank: string | null) => void>();
@@ -118,8 +119,19 @@ export function installRankFetchInterceptor(): void {
 
     // Inject auth/audit headers without overwriting any the caller already set.
     const applyAuthHeaders = (h: Headers) => {
+      // Section H explicitly selects its approved default workspace actor.
+      // Do not mix in a stale real session (including a still-valid Ship token).
+      // This is transport selection only; the server independently checks its
+      // development environment and canonical default user before granting it.
+      const path = new URL(url, window.location.origin).pathname;
+      const sectionHDefault = isReplit() && h.get("x-section-h-development") === "default-user" &&
+        (path === `${API_PREFIX}/component-class-regulatory` ||
+          path.startsWith(`${API_PREFIX}/component-class-regulatory/`) ||
+          (path === `${API_PREFIX}/fleet/master-lists` &&
+            ["classificationSociety", "surveyType"].includes(new URL(url, window.location.origin).searchParams.get("listType") || "")));
+      if (sectionHDefault) h.delete("authorization");
       if (rank && !h.has("x-rank")) h.set("x-rank", rank);                                   // (a) x-rank
-      if (token && !h.has("authorization")) h.set("Authorization", `Bearer ${token}`);        // (b) Bearer token
+      if (token && !sectionHDefault && !h.has("authorization")) h.set("Authorization", `Bearer ${token}`); // (b) Bearer token
       if (identity.userId && !h.has("x-user-id")) h.set("x-user-id", encodeURIComponent(identity.userId)); // (c) x-user-*
       if (identity.name && !h.has("x-user-name")) h.set("x-user-name", encodeURIComponent(identity.name));
       if (identity.email && !h.has("x-user-email")) h.set("x-user-email", encodeURIComponent(identity.email));

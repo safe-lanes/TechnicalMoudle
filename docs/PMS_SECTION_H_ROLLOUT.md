@@ -4,13 +4,36 @@
 
 The latest user clarification on 29 October 2026 supersedes the earlier Component-edit-permission restriction: **all verified Office users** may manage Section H for **all vessels**, regardless of role name or Component menu view/edit/create/delete flags. Ship users remain read-only, retain the existing Component view-permission check and require an active vessel assignment. Other initial-release functional/master/audit rules remain unchanged.
 
-Section H uses a resource-local verified-Office entitlement for record access, removed-record reads and every lifecycle mutation, including service-layer checks. It grants no admin shortcut to Ship, mock, absent or spoofed identities and does not change the global permission framework or legacy admin aliases. Permission to maintain regulatory master data remains separate; selecting existing society/type values does not grant master maintenance rights.
+Section H uses a resource-local Office entitlement for record access, removed-record reads and every lifecycle mutation, including service-layer checks. Production requires a verified Office session; the explicitly approved Replit default-user path below is a separate development exception, not a verified production session. There is no admin shortcut to Ship or arbitrary mock/absent/spoofed identities, and no global permission-framework or legacy-admin-alias changes. Permission to maintain regulatory master data remains separate; selecting existing society/type values does not grant master maintenance rights.
 
 `tenantMiddleware` verifies a SAILERP JWT and supplies `verifiedUser`. Section H reuses that context where present. Its resource-local adapter also verifies standalone Bearer tokens with the same configured JWT_SECRET/HS256 policy and maps the signed configurable id claim through the existing non-deleted `master_users.id` lookup. No JWT `sub`, email or default-user substitution is performed. Missing signed role/type can use the existing master-user lookup; missing or ambiguous identity is refused. Unknown standalone users are refused. Database lookup outages are 503, not an invalid-token fallback.
 
 Optional browser identity headers are not required when a real verified session exists. Contradictory user/role/type headers are refused. The default mock user's UUID is not compared to the signed canonical id when no identity header was supplied. Only Section H request-local RBAC is derived from the verified actor; global authentication and the global pass-through admin alias are unchanged. Forced mock-RBAC mode cannot obtain verified write access.
 
-### Standalone development read-only option
+### Approved two-environment access selection
+
+The latest user direction supersedes the earlier read-only-only preview policy:
+
+| Environment | Section H identity |
+|---|---|
+| Browser `VITE_APP_ENV === "replit"` | AuthContext's default workspace user, even if a stale stored production profile exists |
+| Missing/different browser flag | Existing AuthContext encrypted `userProfile` / `userType` flow, with the existing encrypted credential transport and no default-user fallback |
+
+The single default-user definition is in `shared/developmentUser.ts`, consumed by AuthContext and the server. Section H alone gets `sectionHUser`; global `currentUser`, other module access, authentication aliases and master-maintenance permissions are unchanged. AuthContext must finish hydration and an explicit logout disables the development identity, requests and controls. A later real login clears the existing logout marker. Development selection does not claim that a browser profile is verified authentication.
+
+Section H requests explicitly select `x-section-h-development: default-user` and send the selected default UUID/role/type. These are **not security credentials**. The server accepts this selection only when its own `NODE_ENV=development`, its own `VITE_APP_ENV=replit`, and multitenancy is disabled. A production server refuses it even if the browser bundle contains the flag or a caller forges headers. No client parameter alone enables this exception.
+
+This deliberately provides no individual authentication inside the approved Replit preview: anyone who can access that development server can select the same configured default actor and, once readiness is approved, exercise that actor's Office rights. Restrict preview sharing accordingly and never point this development profile at production data. Canonical audit attribution identifies the configured default user, not the individual browser visitor.
+
+The server constructs the actor from the shared default-user definition, never from browser role/type/UUID values, and requires every forwarded value to match it. The configured user must be active, have a canonical UUID and match a non-deleted `master_users.id` record of the same Office/Ship type; lookup failure is refused, not auto-provisioned. Returned identity mode is `replit-default`, not `verified`. Service-layer entitlement rechecks the server environment, default identity and Office type; Ship has no write shortcut.
+
+An already verified integrated identity is never upgraded through the development selector. In standalone Replit, explicit default-user selection takes precedence over stale browser Bearer credentials, just as it takes precedence over a stale stored profile. The global fetch interceptor has a narrowly scoped transport exception: only Replit Section H/default-selected regulatory master reads omit stored or explicitly supplied Authorization, including still-valid tokens for a different user; all other requests keep normal Bearer injection. The server still independently enforces its own development configuration and never upgrades an already verified Ship context. Absent the selector, existing invalid/expired-token rejection still applies. Outside Replit the normal verified-session path remains unchanged.
+
+All lifecycle operations retain canonical actor audit attribution, server-owned component/vessel scope, transactionality, historical UUID reconciliation and per-vessel rollout readiness. The approved development identity is not approval to modify readiness settings, reconcile production data or enable a vessel installation. Office removed-record visibility remains independent of write readiness.
+
+At the development inspection for this change, the default UUID mapped to an Office master user and no historical regulatory UUIDs were missing, but **no `section_h_ready_vessels` setting existed**. Therefore that installation correctly reports `ROLLOUT_PENDING`, not the former missing-session banner. No readiness setting or public business data was changed. Full lifecycle persistence is exercised with session-local TEMP tables and a ready test vessel, not by activating the shared database.
+
+### Legacy standalone development read-only option
 
 `PMS_SECTION_H_DEV_READONLY=true` is an explicit non-secret **development-environment-only** opt-in. The code defaults it OFF, requires `NODE_ENV=development`, and refuses this mode whenever multitenancy is enabled. Do not enable it against production data or put it in a shared/production environment.
 
@@ -18,11 +41,11 @@ When deliberately enabled for an approved development dataset, GET active record
 
 All mutations and removed-record reads remain refused to that profile, even with forged admin headers or a ready-vessel setting. Present invalid/expired Bearer tokens never fall back to development viewing. Production refuses the development mode even if the control is mistakenly set. The banner now explicitly names the missing verified session rather than suggesting Office business entitlement was refused.
 
-### Standalone preview prerequisite
+### Production session prerequisite
 
-The frontend already reads encrypted credentials from sessionStorage, then localStorage, and attaches a bearer only to same-origin API calls. On Replit, absent credentials intentionally retain the default mock profile rather than redirecting to a real login. That Office-looking profile does not create a verified server session. At the access correction's development inspection, the supported configuration check reported no JWT_SECRET; no secret value or browser credentials were retrieved.
+Outside the approved Replit exception, the frontend reads encrypted credentials from sessionStorage, then localStorage, and attaches a bearer only to same-origin API calls. Reading encrypted `userProfile` is the UI identity source, not proof of a valid server session.
 
-Use the existing integrated login and matching verification configuration, including the canonical user mapping, to establish a real Office session. Do not mint a test token for the shared application, enable mock writes, or change the default user to work around this prerequisite. Genuine Office/Ship browser lifecycle verification is unavailable until approved real sessions exist; the development banner is expected to remain in the unsigned standalone preview. A separate development-only authenticated editor mechanism requires review before implementation or activation.
+Use the existing integrated login and matching verification configuration, including canonical user mapping, for production Office access. Do not mint test credentials for the shared application or expose the development exception to production. Genuine integrated Office/Ship browser lifecycle verification still requires approved real sessions; the new Replit default-user path is separately labelled and tested.
 
 ### View and edit are independent
 
@@ -94,3 +117,11 @@ Provisioning retains its existing active-row snapshot policy. Removed entries al
 ## Completion evidence and remaining environment gates
 
 Record focused test/build results in the delivery response. Cross-installation inventory, mapping, remote migrations, authenticated production session checks, separately released finalization and actual shore–vessel rollout require authorized target evidence. They are not inferred from local tests and no production/vessel operation is authorized or claimed here.
+
+### Environment-specific access verification
+
+- Nine focused suites passed, 116 tests total: source precedence, logout, request transport, production/multitenant rejection of development access, forged headers, verified Ship denials, canonical identity mapping, TEMP-table lifecycle/audit/readiness and existing synchronization invariants. A real client/interceptor/HTTP-server integration test supplies a valid non-default Ship token and verifies it is not forwarded to the explicitly selected Replit default-user path; normal-module and production requests retain their token.
+- Production build passed. Repository type checking still reports 39 pre-existing diagnostics, none in this change's files.
+- After restarting the app, a fresh browser selected Alejandro / 271.010 RUDDER and confirmed the actual access request used the default-user selector and returned `identityMode=replit-default`, `canView=true`, `canViewRemoved=true`, `canEdit=false`, `reasonCode=ROLLOUT_PENDING`. Records loaded normally, Show removed worked, no write controls appeared and refresh retained the same correct outcome.
+- Explicit browser logout followed by reload remained signed out without issuing a new Section H request or restoring the default user.
+- No live business record was created/changed during browser verification. Ready-vessel CRUD was verified only in session-local PostgreSQL TEMP tables. No readiness activation, schema/migration change, production session verification or physical shore/vessel rollout was performed.

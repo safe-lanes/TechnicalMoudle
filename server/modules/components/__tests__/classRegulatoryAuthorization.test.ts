@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import express from "express";
 import type { Server } from "node:http";
 import jwt from "jsonwebtoken";
+import { createDefaultDevelopmentUser } from "@shared/developmentUser";
 
 const service = vi.hoisted(() => ({
   createClassEntry: vi.fn(), mutateClassEntry: vi.fn(), listClassEntries: vi.fn(), componentClassAccess: vi.fn(),
@@ -54,6 +55,8 @@ describe("Section H actual route authorization (no production database)", () => 
   afterAll(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
   beforeEach(() => {
     vi.unstubAllEnvs();
+    // Do not accidentally inherit the developer workspace's opt-in in tests.
+    vi.stubEnv("VITE_APP_ENV", "");
     vi.clearAllMocks(); source = "forwarded"; loggedIn = true;
     identity.multiTenant = false;
     identity.mapped.mockResolvedValue({ role: "Editor", userType: "Office" });
@@ -214,5 +217,80 @@ describe("Section H actual route authorization (no production database)", () => 
     service.mutateClassEntry.mockClear();
     expect((await fetch(root + "/1", { method: "DELETE", headers: { ...headers, "x-user-role": "Sail Admin" } })).status).toBe(403);
     expect(service.mutateClassEntry).not.toHaveBeenCalled();
+  });
+  const defaultUser = createDefaultDevelopmentUser();
+  const developmentHeaders = {
+    "content-type": "application/json", "x-section-h-development": "default-user",
+    "x-user-id": defaultUser.userUuid!, "x-user-role": defaultUser.role, "x-user-type": defaultUser.userType!,
+  };
+  function enableWorkspace() {
+    serverVerified = undefined; source = "none";
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("VITE_APP_ENV", "replit");
+  }
+  it("uses the server-owned default workspace user for every lifecycle operation", async () => {
+    enableWorkspace();
+    expect((await fetch(root + "/component?includeDeleted=true", { headers: developmentHeaders })).status).toBe(200);
+    expect(service.listClassEntries).toHaveBeenCalledWith("component", expect.objectContaining({
+      userId: defaultUser.userUuid, identityMode: "replit-default", userType: "Office", canEdit: true,
+    }), true);
+    for (const [method, suffix] of actions) expect((await fetch(root + suffix, {
+      method, headers: developmentHeaders, body: JSON.stringify({ componentId: "c" }),
+    })).status).toBe(method === "POST" && suffix === "" ? 201 : 200);
+    expect(identity.mapped).toHaveBeenCalledWith(defaultUser.userUuid);
+  });
+  it.each(["production", "test"])("cannot activate default-user access in %s", async environment => {
+    enableWorkspace(); vi.stubEnv("NODE_ENV", environment);
+    for (const [method, suffix] of actions) expect((await fetch(root + suffix, {
+      method, headers: developmentHeaders, body: "{}",
+    })).status).toBe(403);
+    expect(identity.mapped).not.toHaveBeenCalled();
+  });
+  it.each(["", "production", "Replit"])("does not use workspace access for server VITE_APP_ENV=%s", async value => {
+    enableWorkspace(); vi.stubEnv("VITE_APP_ENV", value);
+    expect((await fetch(root, { method: "POST", headers: developmentHeaders, body: "{}" })).status).toBe(403);
+    expect(identity.mapped).not.toHaveBeenCalled();
+  });
+  it("never uses the development exception in multitenant mode", async () => {
+    enableWorkspace(); identity.multiTenant = true;
+    expect((await fetch(root, { method: "POST", headers: developmentHeaders, body: "{}" })).status).toBe(403);
+    expect(identity.mapped).not.toHaveBeenCalled();
+  });
+  it("requires the explicit workspace request and matching default identity, not arbitrary user headers", async () => {
+    enableWorkspace();
+    expect((await fetch(root, { method: "POST", headers, body: "{}" })).status).toBe(403);
+    for (const overrides of [
+      { "x-user-id": id }, { "x-user-role": "Super Admin" }, { "x-user-type": "Ship" }, { "x-user-id": "" },
+    ]) {
+      expect((await fetch(root, { method: "POST", headers: { ...developmentHeaders, ...overrides }, body: "{}" })).status).toBe(403);
+    }
+    expect(service.createClassEntry).not.toHaveBeenCalled();
+  });
+  it("refuses unmapped or mismatched canonical workspace users without inserting anything", async () => {
+    enableWorkspace();
+    for (const mapping of [null, { role: "Sail Admin", userType: "Ship" }]) {
+      identity.mapped.mockResolvedValue(mapping);
+      const response = await fetch(root, { method: "POST", headers: developmentHeaders, body: "{}" });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "DEVELOPMENT_IDENTITY_UNMAPPED" });
+    }
+    identity.mapped.mockRejectedValue(new Error("sensitive lookup failure"));
+    const unavailable = await fetch(root, { method: "POST", headers: developmentHeaders, body: "{}" });
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.text()).not.toContain("sensitive");
+    expect(service.createClassEntry).not.toHaveBeenCalled();
+  });
+  it("does not upgrade an already verified Ship session through a workspace marker", async () => {
+    enableWorkspace();
+    serverVerified = { userId: id, role: "Sail Admin", userType: "Ship", missing: [] };
+    expect((await fetch(root, { method: "POST", headers: developmentHeaders, body: "{}" })).status).toBe(403);
+    expect(identity.mapped).not.toHaveBeenCalled();
+    expect(service.createClassEntry).not.toHaveBeenCalled();
+  });
+  it("selects the explicit Replit source even when stale production credentials remain in the browser", async () => {
+    enableWorkspace();
+    expect((await fetch(root, { method: "POST",
+      headers: { ...developmentHeaders, authorization: "Bearer stale-profile-token" }, body: JSON.stringify({ componentId: "c" }),
+    })).status).toBe(201);
+    expect(service.createClassEntry.mock.calls[0][2].identityMode).toBe("replit-default");
   });
 });

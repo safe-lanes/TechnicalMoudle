@@ -6,6 +6,7 @@ import {
   ReactNode,
 } from "react";
 import type { PublicUser, UserRole } from "@shared/schema";
+import { createDefaultDevelopmentUser, selectSectionHUser } from "@shared/developmentUser";
 import type { UIRole } from "@shared/uiRoles";
 import {
   useViewModeResolution,
@@ -84,27 +85,7 @@ function resolveDomain(): string | null {
   return null;
 }
 
-const DEFAULT_USER: PublicUser = {
-  id: 1,
-  username: "Jeevan Admin",
-  fullName: "Jeevan SuperAdmin",
-  email: "jeevan.naik@safe-lanes.com",
-  role: "Sail Admin",
-  userType: "Office",
-  vesselId: null,
-  department: null,
-  isActive: true,
-  crewDesignation: "Marine Manager",
-  rank_name: "Master",
-  userUuid: "b808b560-26c4-4c4b-8c0f-8c785e49770c",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  isSync: null,
-  createdByUuid: null,
-  updatedByUuid: null,
-  isDeleted: null,
-  sortOrder: null,
-};
+const DEFAULT_USER = createDefaultDevelopmentUser();
 
 export interface MyVesselAssignment {
   vesselId: string;
@@ -164,6 +145,8 @@ function normalizeMyVessels(
 
 interface AuthContextType {
   currentUser: PublicUser | null;
+  /** Section H's approved environment-specific source; never changes other modules. */
+  sectionHUser: PublicUser | null;
   myVessels: MyVesselAssignment[];
   /** Organization/tenant code from the standalone encrypted `domain`
    * localStorage key (NOT a field on userProfile). Null when absent. */
@@ -546,6 +529,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     currentUser,
+    sectionHUser: selectSectionHUser(import.meta.env.VITE_APP_ENV, currentUser, DEFAULT_USER, hasLoggedOutMarker()),
     myVessels,
     domain,
     isAuthenticated: !!currentUser,

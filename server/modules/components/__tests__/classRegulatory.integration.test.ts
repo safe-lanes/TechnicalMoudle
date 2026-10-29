@@ -5,6 +5,7 @@ import * as schema from "@shared/schema";
 import { resolvePostgres } from "../../../postgresClient";
 import { createClassEntry, mutateClassEntry, listClassEntries, componentClassAccess } from "../services/classRegulatoryService";
 import { applyClassRegulatoryRows, CLASS_REGULATORY_REQUIRED_COLUMNS } from "../../sync/classRegulatorySync";
+import { createDefaultDevelopmentUser } from "@shared/developmentUser";
 
 const fixture = vi.hoisted(() => ({ db: null as any }));
 vi.mock("../../../db", () => ({ getDb: async () => fixture.db }));
@@ -132,6 +133,31 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     }
     expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.audit_log WHERE user_id=$1", [office.userId])).rows[0].n).toBe(8);
     expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.master_user_vessels")).rows[0].n).toBe(0);
+  });
+  it("preserves readiness, full lifecycle and canonical audit attribution for the approved Replit actor", async () => {
+    const user = createDefaultDevelopmentUser();
+    const workspaceActor = { userId: user.userUuid!, role: user.role, userType: "Office" as const,
+      canEdit: false, identityMode: "replit-default" as const };
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("VITE_APP_ENV", "replit");
+    try {
+      expect(await componentClassAccess(component, workspaceActor)).toMatchObject({
+        canEdit: true, canViewRemoved: true, identityMode: "replit-default",
+      });
+      const row = await createClassEntry(component, business, workspaceActor);
+      await mutateClassEntry(row.id, { information: "Workspace edit" }, "update", workspaceActor);
+      await mutateClassEntry(row.id, {}, "delete", workspaceActor);
+      expect(await listClassEntries(component, workspaceActor)).toHaveLength(0);
+      expect(await listClassEntries(component, workspaceActor, true)).toHaveLength(1);
+      expect(await mutateClassEntry(row.id, {}, "restore", workspaceActor)).toMatchObject({ ccruuid: row.ccruuid, isDeleted: false });
+      const history = (await conn.query("SELECT user_id,created_by_uuid,action_type FROM pg_temp.audit_log ORDER BY id")).rows;
+      expect(history.map((r: any) => r.action_type)).toEqual(["create", "update", "delete", "restore"]);
+      expect(history.every((r: any) => r.user_id === user.userUuid && r.created_by_uuid === user.userUuid)).toBe(true);
+      await conn.query("DELETE FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'");
+      expect(await componentClassAccess(component, workspaceActor)).toMatchObject({
+        canEdit: false, canViewRemoved: true, reasonCode: "ROLLOUT_PENDING", identityMode: "replit-default",
+      });
+      await expect(mutateClassEntry(row.id, {}, "delete", workspaceActor)).rejects.toMatchObject({ statusCode: 409 });
+    } finally { vi.unstubAllEnvs(); }
   });
   it("denies unverified service actors without creating audit or business side effects", async () => {
     for (const identityMode of [undefined, "development-readonly"] as const) {

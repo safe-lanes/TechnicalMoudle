@@ -10,13 +10,14 @@ import { readVerifiedUser } from "../../../middleware/tenantMiddleware";
 import { tenantConnectionManager } from "../../../utils/tenantConnectionManager";
 import { requirePermission } from "../../../middleware/permissions";
 import { findMasterUserById } from "../../assistant-api/masterUserRepository";
+import { createDefaultDevelopmentUser } from "@shared/developmentUser";
 
 export interface SectionHActor {
   userId: string;
   role: string;
   userType: "Office" | "Ship";
   canEdit: boolean;
-  identityMode?: "verified" | "development-readonly";
+  identityMode?: "verified" | "development-readonly" | "replit-default";
 }
 export type SectionHRequest = AuthenticatedRequest & {
   verifiedUser?: VerifiedUser;
@@ -52,11 +53,44 @@ export function sectionHDevelopmentReadEnabled() {
     !tenantConnectionManager.isMultiTenantEnabled;
 }
 
+/** Server configuration, never a client header or the built frontend bundle. */
+export function sectionHReplitEnabled() {
+  return process.env.NODE_ENV === "development" && process.env.VITE_APP_ENV === "replit" &&
+    !tenantConnectionManager.isMultiTenantEnabled;
+}
+
 /** Only Section H uses this adapter; global mock/tenant behavior is unchanged. */
 const resolveIdentity = (allowDevelopment: boolean) =>
 async (req: SectionHRequest, res: Response, next: NextFunction) => {
   if (!req.user) return res.status(401).json({ error: "Please sign in to view Classification & Regulatory Data.", code: "AUTHENTICATION_REQUIRED" });
   try {
+    if (!req.verifiedUser && sectionHReplitEnabled() &&
+        req.headers["x-section-h-development"] === "default-user") {
+      const user = createDefaultDevelopmentUser();
+      if (!user.isActive || user.isDeleted || !user.userUuid ||
+          (user.userType !== "Office" && user.userType !== "Ship")) {
+        return res.status(403).json({ error: "The default workspace user is not active or has no valid identity.", code: "DEVELOPMENT_IDENTITY_INVALID" });
+      }
+      // The UUID must exist in the same canonical directory used by production.
+      // Do not insert a fake user or attribute writes to a browser-supplied UUID.
+      const mapped = await findMasterUserById(user.userUuid);
+      if (!mapped || mapped.userType !== user.userType) {
+        return res.status(403).json({
+          error: "The default workspace user has no matching canonical user/type in this installation. Register the correct development user before editing.",
+          code: "DEVELOPMENT_IDENTITY_UNMAPPED",
+        });
+      }
+      for (const [name, expected] of [["x-user-id", user.userUuid], ["x-user-role", user.role], ["x-user-type", user.userType]]) {
+        const value = req.headers[name];
+        if (typeof value !== "string" || decodeURIComponent(value) !== expected) {
+          return res.status(403).json({ error: "The Section H workspace identity does not match its configured default user.", code: "DEVELOPMENT_IDENTITY_MISMATCH" });
+        }
+      }
+      req.sectionHActor = { userId: user.userUuid, role: user.role, userType: user.userType,
+        identityMode: "replit-default", canEdit: false };
+      req.rbac = { source: "forwarded", role: user.role, userType: user.userType };
+      return next();
+    }
     if (!req.verifiedUser) {
       const authorization = req.headers.authorization;
       if (authorization) {
@@ -119,9 +153,14 @@ export function requireSectionHView(req: SectionHRequest, res: Response, next: N
   return requirePermission("pms-components", "view", { enforce: true, unconfigured: "deny" })(req, res, next);
 }
 
-/** Section H entitlement only: every verified Office identity, regardless of role/menu permissions. */
+/** Section H only: verified Office, or the explicitly approved server-owned Replit actor. */
 export function sectionHOfficeCanManage(actor?: SectionHActor): boolean {
-  return !!actor?.userId && actor.identityMode === "verified" && actor.userType === "Office";
+  if (!actor?.userId || actor.userType !== "Office") return false;
+  if (actor.identityMode === "verified") return true;
+  const user = createDefaultDevelopmentUser();
+  return actor.identityMode === "replit-default" && sectionHReplitEnabled() &&
+    user.isActive && !user.isDeleted && user.userType === "Office" &&
+    actor.userId === user.userUuid && actor.role === user.role;
 }
 
 export function requireSectionHOffice(req: SectionHRequest, res: Response, next: NextFunction) {

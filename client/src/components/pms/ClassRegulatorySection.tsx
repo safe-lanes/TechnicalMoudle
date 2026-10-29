@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { sectionHRequest } from "@/lib/sectionHRequest";
+import { isReplit } from "@/lib/env";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,7 +66,8 @@ export interface ClassRegulatorySectionProps {
 
 /** Multi-entry, independently saved register for component Section H. */
 export default function ClassRegulatorySection({ componentId, readOnly = false, classItem = true }: ClassRegulatorySectionProps) {
-  const { currentUser, domain } = useAuth();
+  const { sectionHUser: currentUser, domain } = useAuth();
+  const apiRequest = (method: string, url: string, data?: unknown) => sectionHRequest(currentUser, method, url, data);
   const [storageEpoch, setStorageEpoch] = useState(0);
   useEffect(() => {
     const changed = (event: StorageEvent) => {
@@ -117,19 +120,21 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   const accessQuery = useQuery<Access>({
     queryKey: [accessUrl, securityScope],
     queryFn: async () => (await apiRequest("GET", accessUrl)).json(),
-    enabled: !!id,
+    enabled: !!id && !!currentUser,
     staleTime: 0, gcTime: 0, refetchOnMount: "always",
   });
+  const managedIdentity = !!currentUser && (accessQuery.data?.identityMode === "verified" ||
+    (isReplit() && accessQuery.data?.identityMode === "replit-default"));
   const canEdit = !readOnly && accessQuery.isSuccess && !accessQuery.isFetching &&
-    !accessQuery.isError && accessQuery.data?.canEdit === true && accessQuery.data?.identityMode === "verified";
+    !accessQuery.isError && accessQuery.data?.canEdit === true && managedIdentity;
   const canViewRemoved = !readOnly && accessQuery.isSuccess && !accessQuery.isFetching &&
-    !accessQuery.isError && accessQuery.data?.canViewRemoved === true && accessQuery.data?.identityMode === "verified";
+    !accessQuery.isError && accessQuery.data?.canViewRemoved === true && managedIdentity;
   const effectiveIncludeDeleted = canViewRemoved && includeDeleted;
   const listUrl = `${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}${effectiveIncludeDeleted ? "?includeDeleted=true" : ""}`;
   const rowsQuery = useQuery<RegulatoryEntry[]>({
     queryKey: [`${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}`, securityScope, effectiveIncludeDeleted],
     queryFn: async () => (await apiRequest("GET", listUrl)).json(),
-    enabled: !!id,
+    enabled: !!id && !!currentUser,
     staleTime: 0, gcTime: 0,
   });
   const societyQuery = useQuery<Master[]>({
@@ -278,6 +283,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
     </div>
   );
 
+  if (!currentUser) return <div role="alert" className="text-sm text-amber-900">Please sign in to access Classification &amp; Regulatory Data.</div>;
   if (!id) return <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Save the component first to add or view classification records.</div>;
   if (rowsQuery.isLoading) return <div className="space-y-2" aria-label="Loading classification records">{[1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-sm bg-slate-100" />)}</div>;
   if (rowsQuery.isError) return <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="min-w-0 flex-1">{errorDetails(rowsQuery.error).message}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => rowsQuery.refetch()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Retry records</Button><Button size="sm" variant="outline" onClick={() => accessQuery.refetch()}>Retry access</Button></div></div>;
@@ -290,7 +296,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
       {accessQuery.isError && <div role="alert" className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorDetails(accessQuery.error).message} This register is read-only until access can be confirmed. <Button size="sm" variant="outline" className="ml-2 h-7" onClick={() => accessQuery.refetch()}>Retry access</Button></div>}
       {accessQuery.isSuccess && !canEdit && <div className="flex items-start gap-2 rounded-sm border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><span>{accessQuery.data.reason || "You have read-only access to classification records."}</span></div>}
       {(canEdit || canViewRemoved) && <div className="flex flex-wrap items-center justify-between gap-2">
-        {canEdit && <div className="flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="h-4 w-4 text-emerald-700" />Changes save per entry, independently of the component.</div>}
+        {canEdit && <div className="flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="h-4 w-4 text-emerald-700" />{accessQuery.data?.identityMode === "replit-default" ? "Replit default-user access. " : ""}Changes save per entry, independently of the component.</div>}
         <div className="flex flex-wrap gap-2">
           {canViewRemoved && <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={includeDeleted} onChange={(e) => setIncludeDeleted(e.target.checked)} />Show removed</label>}
           {canEdit && <Button size="sm" className="h-8 bg-[#16569e] text-white hover:bg-[#12477f]" onClick={() => begin()} disabled={editingId !== null || saveMutation.isPending}><Plus className="mr-1 h-3.5 w-3.5" />Add entry</Button>}
