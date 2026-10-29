@@ -159,6 +159,21 @@ def evidence(key: str, value: Any, text: str) -> bool:
     return any(w in t for w in _value_words(value))
 
 
+def _both_kinds_unless_licences_alone(filters: dict[str, Any], user_text: str) -> None:
+    """Drop a licence-only documentTypes (top level or inside hasDocument) when the user's words also say certificate(s) /
+    document(s) — unless they said 'certificate of competency' (= a licence). Mutates in place."""
+    text = user_text or ""
+    both = bool(re.search(r"certif|document", text, re.I)) and not re.search(r"certificates? of competenc|\bcoc\b", text, re.I)
+    if not both:
+        return
+    for holder in (filters, filters.get("hasDocument") if isinstance(filters.get("hasDocument"), dict) else None):
+        if holder is None:
+            continue
+        dt = holder.get("documentTypes")
+        if isinstance(dt, list) and [str(x).lower() for x in dt] == ["licence"]:
+            holder.pop("documentTypes")
+
+
 # ── the decision ───────────────────────────────────────────────────────────────
 def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_text: str) -> Decision:
     """args = the model's (unmasked) tool arguments; prev = {'tool', 'filters'} held for the conversation, or None."""
@@ -172,6 +187,10 @@ def decide(tool: str, args: dict[str, Any], prev: dict[str, Any] | None, user_te
     # crewStatus with both values is no filter at all (run 1: the model wrote ['primary','secondary'] on a new question)
     if isinstance(new_filters.get("crewStatus"), list) and {str(x).lower() for x in new_filters["crewStatus"]} >= {"primary", "secondary"}:
         new_filters.pop("crewStatus")
+
+    # Sahil A2 (29-Oct-2026): "certificates" / "licence or certificate" mean BOTH kinds. A licence-only filter stands only when
+    # the user's own words name licences / CoCs alone (v2 runs 1-2: the model set ['licence'] for "a licence or certificate").
+    _both_kinds_unless_licences_alone(new_filters, user_text)
 
     # crewIds come only from crewing_find_crew (UUIDs); a placeholder such as "<ids>" would silently give 0 results (run 3)
     bad_ids = [x for x in (new_filters.get("crewIds") or []) if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", str(x), re.I)]

@@ -219,3 +219,19 @@ def test_rank_config_line_reports_unclassified_from_server_only():
     assert qg.rank_config_line({"ok": True, "rankConfig": {"unclassifiedOnBoard": {"people": 0, "ranks": []}}}) is None   # nothing unclassified → no line
     assert qg.rank_config_line({"ok": True, "totals": {"people": 3}}) is None                                                 # no groups involved
     assert qg.rank_config_line({"ok": False, "code": "not_allowed", "rankConfig": {"unclassifiedOnBoard": {"people": 2}}}) is None
+
+
+def test_licence_or_certificate_means_both_kinds():
+    # Sahil A2 (29-Oct-2026): "licence or certificate" = both kinds; licence-only stands when the user names licences / CoCs alone
+    d = qg.decide(D, {"mode": "count", "documentTypes": ["licence"], "expiryWithin": {"direction": "next", "amount": 30, "unit": "days"}}, None,
+                  "How many crew members have a licence or certificate expiring within 30 days?")
+    assert "documentTypes" not in d.effective and d.effective["expiryWithin"]["amount"] == 30
+    d = qg.decide(D, {"mode": "count", "documentTypes": ["licence"]}, None, "How many licences expire in 30 days?")
+    assert d.effective["documentTypes"] == ["licence"]
+    d = qg.decide(D, {"mode": "count", "documentTypes": ["licence"]}, None, "Which certificates of competency expire soon?")
+    assert d.effective["documentTypes"] == ["licence"]                       # CoC = a licence
+    d = qg.decide(D, {"mode": "count", "documentTypes": ["training"]}, None, "training certificates expiring in 60 days")
+    assert d.effective["documentTypes"] == ["training"]                      # only the licence-only narrowing is corrected
+    a = qg.decide("crewing_query_assignments", {"mode": "count", "hasDocument": {"documentTypes": ["licence"], "expiryWithin": {"direction": "next", "amount": 30, "unit": "days"}}}, None,
+                  "crew on board with a licence or certificate expiring within 30 days")
+    assert "documentTypes" not in a.effective["hasDocument"]
