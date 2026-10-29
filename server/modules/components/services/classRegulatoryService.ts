@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
-import { auditLog, componentClassRegulatory as entries, components, masterLists, vessels, syncSettings } from "@shared/schema";
+import { auditLog, componentClassRegulatory as entries, components, masterLists, vessels } from "@shared/schema";
 import { classRegulatoryInput, validateClassRegulatoryDates } from "@shared/classRegulatory";
 import { getDb } from "../../../db";
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors";
@@ -39,16 +39,6 @@ export async function listClassEntries(componentId: string, actor: SectionHActor
 async function assertReconciled(db: Connection) {
   const missing = await db.select({ id: entries.id }).from(entries).where(isNull(entries.ccruuid)).limit(1);
   if (missing.length) throw new ConflictError("Section H is read-only until historical shore/vessel identities have been reconciled.");
-}
-
-async function rolloutReady(db: Connection, vesselId: string): Promise<boolean> {
-  const [setting] = await db.select({ value: syncSettings.settingValue }).from(syncSettings)
-    .where(and(eq(syncSettings.settingKey, "section_h_ready_vessels"), eq(syncSettings.isDeleted, false))).limit(1);
-  if (!setting?.value) return false;
-  try {
-    const ids: unknown = JSON.parse(setting.value);
-    return Array.isArray(ids) && ids.every(id => typeof id === "string") && ids.includes(vesselId);
-  } catch { return false; }
 }
 
 async function businessFields(db: Connection, raw: unknown, existing?: typeof entries.$inferSelect) {
@@ -106,7 +96,6 @@ export async function createClassEntry(componentId: string, raw: unknown, actor:
     await tx.execute(sql`SELECT cuuid FROM components WHERE cuuid = ${componentId} FOR UPDATE`);
     const { component, vessel } = await parent(tx, componentId, actor);
     await assertReconciled(tx);
-    if (!await rolloutReady(tx, vessel.vuuid)) throw new ConflictError("Section H writes are pending the verified shore/vessel rollout for this vessel.");
     const values = await businessFields(tx, raw);
     const [saved] = await tx.insert(entries).values({
       ...values, ccruuid: randomUUID(), componentId: component.cuuid,
@@ -126,9 +115,8 @@ export async function mutateClassEntry(id: number, raw: unknown, action: "update
   return db.transaction(async tx => {
     const [existing] = await tx.select().from(entries).where(eq(entries.id, id)).for("update");
     if (!existing) throw new NotFoundError("Classification & Regulatory entry not found");
-    const { vessel } = await parent(tx, existing.componentId, actor);
+    await parent(tx, existing.componentId, actor);
     await assertReconciled(tx);
-    if (!await rolloutReady(tx, vessel.vuuid)) throw new ConflictError("Section H writes are pending the verified shore/vessel rollout for this vessel.");
     if (action === "update" && existing.isDeleted) throw new ConflictError("Restore this entry before editing it.");
     if ((action === "delete" && existing.isDeleted) || (action === "restore" && !existing.isDeleted)) return existing;
     const now = new Date();
@@ -146,7 +134,7 @@ export async function mutateClassEntry(id: number, raw: unknown, action: "update
 
 export async function componentClassAccess(componentId: string, actor: SectionHActor) {
   const db = await getDb();
-  const { vessel } = await parent(db, componentId, actor);
+  await parent(db, componentId, actor);
   const canViewRemoved = sectionHOfficeCanManage(actor);
   const viewOnly = (reasonCode: string, reason: string) => ({
     canView: true, canEdit: false, canViewRemoved, identityMode: actor.identityMode || "verified", reasonCode, reason,
@@ -155,8 +143,6 @@ export async function componentClassAccess(componentId: string, actor: SectionHA
   if (actor.userType === "Ship") return viewOnly("VESSEL_READONLY", "Vessel users can view classification records but cannot change them.");
   if (!sectionHOfficeCanManage(actor)) return viewOnly("SESSION_UNVERIFIED", "A verified Office session is required to manage entries.");
   const missing = await db.select({ id: entries.id }).from(entries).where(isNull(entries.ccruuid)).limit(1);
-  const ready = await rolloutReady(db, vessel.vuuid);
   if (missing.length) return viewOnly("RECONCILIATION_PENDING", "Historical shore/vessel identities must be reconciled before editing.");
-  if (!ready) return viewOnly("ROLLOUT_PENDING", "Section H writes are pending the verified shore/vessel rollout for this vessel.");
   return { canView: true, canEdit: true, canViewRemoved, identityMode: actor.identityMode || "verified", reasonCode: "EDIT_ALLOWED" };
 }

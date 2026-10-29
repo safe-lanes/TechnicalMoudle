@@ -47,7 +47,6 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     for (const migration of migrations) await conn.query(await readFile(`migrations/${migration}`, "utf8"));
     await conn.query("INSERT INTO pg_temp.vessels (id,vuuid,code,name) VALUES ('TEST-V',$1,'TEST-V','Section H Test')", [vessel]);
     await conn.query("INSERT INTO pg_temp.components (id,cuuid,vessel_id,vessel_code,name,component_code) VALUES ('test-component',$1,$2,'TEST-V','Test Component','601.001')", [component, vessel]);
-    await conn.query("INSERT INTO pg_temp.sync_settings (setting_key,setting_value) VALUES ('section_h_ready_vessels',$1)", [JSON.stringify([vessel])]);
   });
   it("replays all three SQL files without duplicating or resetting masters", async () => {
     await conn.query("UPDATE pg_temp.master_lists SET list_value = 'Edited DNV', is_active = false WHERE list_type='classificationSociety' AND list_key='DNV'");
@@ -56,6 +55,15 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     expect(counts.rows).toEqual(expect.arrayContaining([{ list_type: "classificationSociety", n: 19 }, { list_type: "surveyType", n: 46 }]));
     const saved = await conn.query("SELECT list_value,is_active FROM pg_temp.master_lists WHERE list_key='DNV'");
     expect(saved.rows[0]).toEqual({ list_value: "Edited DNV", is_active: false });
+  });
+  it("replays the readiness-key cleanup without changing any other settings", async () => {
+    await conn.query("INSERT INTO pg_temp.sync_settings (setting_key,setting_value) VALUES ('section_h_ready_vessels','[]'),('unrelated-test-setting','keep')");
+    const before = (await conn.query("SELECT * FROM pg_temp.sync_settings WHERE setting_key='unrelated-test-setting'")).rows;
+    const cleanup = await readFile("migrations/189_remove_section_h_ready_vessels.sql", "utf8");
+    await conn.query(cleanup);
+    await conn.query(cleanup);
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'")).rows[0].n).toBe(0);
+    expect((await conn.query("SELECT * FROM pg_temp.sync_settings WHERE setting_key='unrelated-test-setting'")).rows).toEqual(before);
   });
   it("persists multiple same-pair entries, edits independently and preserves untouched legacy fields", async () => {
     const first = await createClassEntry(component, business, actor);
@@ -119,7 +127,6 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     const secondComponent = "8eb5b00d-55cb-4c0f-8b62-000000000199";
     await conn.query("INSERT INTO pg_temp.vessels (id,vuuid,code,name) VALUES ('TEST-V2',$1,'TEST-V2','Other Vessel')", [secondVessel]);
     await conn.query("INSERT INTO pg_temp.components (id,cuuid,vessel_id,vessel_code,name,component_code) VALUES ('other-component',$1,$2,'TEST-V2','Other Component','602.001')", [secondComponent, secondVessel]);
-    await conn.query("UPDATE pg_temp.sync_settings SET setting_value=$1 WHERE setting_key='section_h_ready_vessels'", [JSON.stringify([vessel, secondVessel])]);
     for (const componentId of [component, secondComponent]) {
       expect(await componentClassAccess(componentId, office)).toMatchObject({
         canEdit: true, canViewRemoved: true, identityMode: "verified", reasonCode: "EDIT_ALLOWED",
@@ -134,7 +141,7 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.audit_log WHERE user_id=$1", [office.userId])).rows[0].n).toBe(8);
     expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.master_user_vessels")).rows[0].n).toBe(0);
   });
-  it("preserves readiness, full lifecycle and canonical audit attribution for the approved Replit actor", async () => {
+  it("allows the approved Replit actor full lifecycle without a readiness setting and preserves canonical audit attribution", async () => {
     const user = createDefaultDevelopmentUser();
     const workspaceActor = { userId: user.userUuid!, role: user.role, userType: "Office" as const,
       canEdit: false, identityMode: "replit-default" as const };
@@ -152,11 +159,9 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
       const history = (await conn.query("SELECT user_id,created_by_uuid,action_type FROM pg_temp.audit_log ORDER BY id")).rows;
       expect(history.map((r: any) => r.action_type)).toEqual(["create", "update", "delete", "restore"]);
       expect(history.every((r: any) => r.user_id === user.userUuid && r.created_by_uuid === user.userUuid)).toBe(true);
-      await conn.query("DELETE FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'");
       expect(await componentClassAccess(component, workspaceActor)).toMatchObject({
-        canEdit: false, canViewRemoved: true, reasonCode: "ROLLOUT_PENDING", identityMode: "replit-default",
+        canEdit: true, canViewRemoved: true, reasonCode: "EDIT_ALLOWED", identityMode: "replit-default",
       });
-      await expect(mutateClassEntry(row.id, {}, "delete", workspaceActor)).rejects.toMatchObject({ statusCode: 409 });
     } finally { vi.unstubAllEnvs(); }
   });
   it("denies unverified service actors without creating audit or business side effects", async () => {
@@ -174,13 +179,32 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     await expect(createClassEntry(component, business, actor)).rejects.toMatchObject({ statusCode: 409 });
     await expect(mutateClassEntry(row.id, {}, "delete", actor)).rejects.toMatchObject({ statusCode: 409 });
   });
-  it("refuses writes before the per-vessel rollout is verified", async () => {
-    await conn.query("DELETE FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'");
-    await expect(createClassEntry(component, business, actor)).rejects.toMatchObject({ statusCode: 409 });
+  it.each([null, "not-json", "[]", '["another-vessel"]'])("ignores an absent or obsolete readiness value: %s", async value => {
+    if (value !== null) {
+      await conn.query("INSERT INTO pg_temp.sync_settings (setting_key,setting_value) VALUES ('section_h_ready_vessels',$1)", [value]);
+    }
+    expect(await componentClassAccess(component, actor)).toMatchObject({ canEdit: true, reasonCode: "EDIT_ALLOWED" });
+    const row = await createClassEntry(component, business, actor);
+    expect(row.ccruuid).toBeTruthy();
+    expect(await mutateClassEntry(row.id, { information: "No rollout dependency" }, "update", actor)).toMatchObject({
+      information: "No rollout dependency", isSync: false,
+    });
+    await mutateClassEntry(row.id, {}, "delete", actor);
+    expect(await mutateClassEntry(row.id, {}, "restore", actor)).toMatchObject({ ccruuid: row.ccruuid, isDeleted: false });
+    expect((await conn.query("SELECT action_type FROM pg_temp.audit_log ORDER BY id")).rows.map((r: any) => r.action_type))
+      .toEqual(["create", "update", "delete", "restore"]);
+    const ship = { ...actor, userType: "Ship" as const };
+    await conn.query("INSERT INTO pg_temp.master_user_vessels (user_uuid,vessel_id) VALUES ($1,$2)", [ship.userId, vessel]);
+    expect(await componentClassAccess(component, ship)).toMatchObject({ canView: true, canEdit: false, reasonCode: "VESSEL_READONLY" });
+    await expect(createClassEntry(component, business, ship)).rejects.toMatchObject({ statusCode: 403 });
+    for (const action of ["update", "delete", "restore"] as const) {
+      await expect(mutateClassEntry(row.id, {}, action, ship)).rejects.toMatchObject({ statusCode: 403 });
+    }
+    await expect(listClassEntries(component, ship, true)).rejects.toMatchObject({ statusCode: 403 });
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.audit_log")).rows[0].n).toBe(4);
   });
-  it("returns active records and explicit read-only access independently of readiness and UUID backfill", async () => {
+  it("returns active records and explicit read-only access independently of UUID backfill", async () => {
     const record = await createClassEntry(component, business, actor);
-    await conn.query("DELETE FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'");
     await conn.query("UPDATE pg_temp.component_class_regulatory SET ccruuid=NULL WHERE id=$1", [record.id]);
     expect(await listClassEntries(component, { ...actor, canEdit: false })).toHaveLength(1);
     expect(await componentClassAccess(component, { ...actor, canEdit: false })).toMatchObject({

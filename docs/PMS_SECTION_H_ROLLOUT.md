@@ -23,15 +23,15 @@ The single default-user definition is in `shared/developmentUser.ts`, consumed b
 
 Section H requests explicitly select `x-section-h-development: default-user` and send the selected default UUID/role/type. These are **not security credentials**. The server accepts this selection only when its own `NODE_ENV=development`, its own `VITE_APP_ENV=replit`, and multitenancy is disabled. A production server refuses it even if the browser bundle contains the flag or a caller forges headers. No client parameter alone enables this exception.
 
-This deliberately provides no individual authentication inside the approved Replit preview: anyone who can access that development server can select the same configured default actor and, once readiness is approved, exercise that actor's Office rights. Restrict preview sharing accordingly and never point this development profile at production data. Canonical audit attribution identifies the configured default user, not the individual browser visitor.
+This deliberately provides no individual authentication inside the approved Replit preview: anyone who can access that development server can select the same configured default actor and exercise that actor's Office rights, subject to validation and historical UUID integrity checks. Restrict preview sharing accordingly and never point this development profile at production data. Canonical audit attribution identifies the configured default user, not the individual browser visitor.
 
 The server constructs the actor from the shared default-user definition, never from browser role/type/UUID values, and requires every forwarded value to match it. The configured user must be active, have a canonical UUID and match a non-deleted `master_users.id` record of the same Office/Ship type; lookup failure is refused, not auto-provisioned. Returned identity mode is `replit-default`, not `verified`. Service-layer entitlement rechecks the server environment, default identity and Office type; Ship has no write shortcut.
 
 An already verified integrated identity is never upgraded through the development selector. In standalone Replit, explicit default-user selection takes precedence over stale browser Bearer credentials, just as it takes precedence over a stale stored profile. The global fetch interceptor has a narrowly scoped transport exception: only Replit Section H/default-selected regulatory master reads omit stored or explicitly supplied Authorization, including still-valid tokens for a different user; all other requests keep normal Bearer injection. The server still independently enforces its own development configuration and never upgrades an already verified Ship context. Absent the selector, existing invalid/expired-token rejection still applies. Outside Replit the normal verified-session path remains unchanged.
 
-All lifecycle operations retain canonical actor audit attribution, server-owned component/vessel scope, transactionality, historical UUID reconciliation and per-vessel rollout readiness. The approved development identity is not approval to modify readiness settings, reconcile production data or enable a vessel installation. Office removed-record visibility remains independent of write readiness.
+All lifecycle operations retain canonical actor audit attribution, server-owned component/vessel scope, transactionality and historical UUID integrity checks. Normal editing does not require manual per-vessel rollout approval. The approved development identity is not approval to reconcile production data, provision a vessel installation or bypass receiver compatibility. Office removed-record visibility remains independent of historical UUID write readiness.
 
-At the development inspection for this change, the default UUID mapped to an Office master user and no historical regulatory UUIDs were missing, but **no `section_h_ready_vessels` setting existed**. Therefore that installation correctly reports `ROLLOUT_PENDING`, not the former missing-session banner. No readiness setting or public business data was changed. Full lifecycle persistence is exercised with session-local TEMP tables and a ready test vessel, not by activating the shared database.
+Historical inspection before removal of the rollout restriction found the default UUID mapped to an Office master user, no missing historical regulatory UUIDs and no readiness setting. The former implementation returned `ROLLOUT_PENDING`; this was an implementation-added restriction, not a business requirement. That behavior is superseded: absence of a readiness setting no longer affects editing. Full lifecycle persistence is exercised with session-local TEMP tables, not by changing shared business records.
 
 ### Legacy standalone development read-only option
 
@@ -82,7 +82,13 @@ Chosen utility: `scripts/reconcile-section-h.ts`. Reviewed input: a private, ins
 
 The API refuses Section H mutations while any historical NULL identity remains. This is a safety gate, not an instruction to fill independent random UUIDs on each installation.
 
-There is also a fail-closed per-vessel activation gate in existing instance-local `sync_settings`: `section_h_ready_vessels`, a JSON array of reviewed vessel UUIDs. No value is seeded or enabled by this implementation. After verifying authorization, audit, schema, mapping and peer capability, an authorized operator may record only those ready vessel UUIDs through approved operational procedures. Missing/malformed configuration leaves writes disabled, including for a new empty table. Do not add a wildcard or expose this gate as an ordinary master-data edit.
+### Removed per-vessel editing restriction
+
+The user explicitly rejected the implementation-added `section_h_ready_vessels` allowlist. Section H no longer reads it for access, create, update, soft-delete or restore, and no longer emits `ROLLOUT_PENDING`. Office users manage records across vessels without assignments or per-vessel activation; Ship users remain read-only within their existing viewing scope. Existing historical NULL UUID checks, parent validity, business validation and atomic audit remain enforced.
+
+`migrations/189_remove_section_h_ready_vessels.sql` is a file-based, idempotent **data-cleanup** migration discovered by the existing runner. It acquires a transaction-level advisory lock and deletes only the exact obsolete setting key. No schema, column, constraint, other setting or business record is changed; replay and a missing key are safe no-ops. Number 188 remains reserved for the separately authorized historical-identity finalization described above.
+
+This changes saving/access, not sync delivery: capability `component_class_regulatory_uuid_v1`, receiver schema and dependency checks, UUID-only identity, timestamp/replay guards, provisioning validation and failure-safe checkpoints remain required. No replacement readiness key is introduced, sync direction remains shore-to-ship, and no artificial field logs are added.
 
 ## Transport, provisioning and field-log matrix
 
@@ -118,7 +124,16 @@ Provisioning retains its existing active-row snapshot policy. Removed entries al
 
 Record focused test/build results in the delivery response. Cross-installation inventory, mapping, remote migrations, authenticated production session checks, separately released finalization and actual shore–vessel rollout require authorized target evidence. They are not inferred from local tests and no production/vessel operation is authorized or claimed here.
 
-### Environment-specific access verification
+### Readiness restriction removal verification
+
+- Six focused suites passed, 90 tests total, including real PostgreSQL TEMP-table lifecycle tests without any readiness setting, ignored empty/malformed/stale values, cross-vessel non-admin Office editing, Ship denials, canonical audit, stable UUIDs and full-row sync/replay behavior.
+- The cleanup migration was replayed twice against session-local TEMP settings; the obsolete row was removed and an unrelated setting remained byte-for-byte unchanged.
+- The existing development migration runner recorded `189_remove_section_h_ready_vessels` as applied. The obsolete key was already absent; all 14 other settings retained the same complete-row fingerprint before and after startup.
+- Live development access responses for Alejandro / 271.010 RUDDER and a component on Vessel 8 both returned `identityMode=replit-default`, `canEdit=true`, `canViewRemoved=true`, `reasonCode=EDIT_ALLOWED`.
+- Frontend production build and backend bundle completed. The workflow restarted successfully and the Component page rendered. The existing Add Entry control remains governed by the server's `canEdit` response; no client permission override was added.
+- No live classification business record, production installation or physical vessel was modified or synchronized during verification. Actual integrated-production sessions and physical shore/vessel delivery are not claimed by these local checks.
+
+### Historical environment-specific access verification (before restriction removal)
 
 - Nine focused suites passed, 116 tests total: source precedence, logout, request transport, production/multitenant rejection of development access, forged headers, verified Ship denials, canonical identity mapping, TEMP-table lifecycle/audit/readiness and existing synchronization invariants. A real client/interceptor/HTTP-server integration test supplies a valid non-default Ship token and verifies it is not forwarded to the explicitly selected Replit default-user path; normal-module and production requests retain their token.
 - Production build passed. Repository type checking still reports 39 pre-existing diagnostics, none in this change's files.
