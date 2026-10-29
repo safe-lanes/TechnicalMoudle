@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
@@ -23,12 +24,20 @@ type Draft = {
 const blankDraft = (): Draft => ({ classificationSocietyKey: "", surveyTypeKey: "", certificateNumber: "", lastClassSurvey: "", nextSurveyDue: "", classRequirements: "", information: "" });
 const apiRoot = "/technical/api";
 const inputClass = "h-8 rounded-sm border-[#52baf3] text-sm focus-visible:ring-[#52baf3]";
+type Access = { canView: boolean; canEdit: boolean; identityMode: string; reasonCode?: string; reason?: string };
+const sessionEpochs = new WeakMap<object, number>();
+let nextSessionEpoch = 0;
+function sessionEpoch(user: object | null) {
+  if (!user) return 0;
+  if (!sessionEpochs.has(user)) sessionEpochs.set(user, ++nextSessionEpoch);
+  return sessionEpochs.get(user)!;
+}
 function errorDetails(error: unknown): { message: string; fields: Record<string, string> } {
   const raw = error instanceof Error ? error.message : "The entry could not be saved.";
   try {
     const start = raw.indexOf("{");
     const parsed = JSON.parse(start >= 0 ? raw.slice(start) : raw);
-    return { message: parsed.error || "Please check the entry and try again.", fields: parsed.fieldErrors || {} };
+    return { message: parsed.message || parsed.error || "Please check the entry and try again.", fields: parsed.fieldErrors || {} };
   } catch {
     return { message: raw.replace(/^\d+:\s*/, "") || "The entry could not be saved.", fields: {} };
   }
@@ -55,6 +64,18 @@ export interface ClassRegulatorySectionProps {
 
 /** Multi-entry, independently saved register for component Section H. */
 export default function ClassRegulatorySection({ componentId, readOnly = false, classItem = true }: ClassRegulatorySectionProps) {
+  const { currentUser, domain } = useAuth();
+  const [storageEpoch, setStorageEpoch] = useState(0);
+  useEffect(() => {
+    const changed = (event: StorageEvent) => {
+      if (event.key === null || ["credentials", "profile", "domain"].includes(event.key)) setStorageEpoch(value => value + 1);
+    };
+    window.addEventListener("storage", changed);
+    return () => window.removeEventListener("storage", changed);
+  }, []);
+  const securityScope = JSON.stringify([domain, currentUser?.userUuid, currentUser?.role, currentUser?.userType,
+    currentUser?.vesselId, sessionEpoch(currentUser), storageEpoch]);
+  const principalScope = JSON.stringify([domain, currentUser?.userUuid, currentUser?.role, currentUser?.userType, currentUser?.vesselId]);
   const id = componentId == null ? "" : String(componentId);
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
@@ -66,6 +87,13 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   const originalDates = useRef({ lastClassSurvey: "", nextSurveyDue: "" });
   const originalReferences = useRef({ classificationSocietyKey: "", surveyTypeKey: "", classificationSociety: "", surveyType: "" });
   const previousComponentId = useRef(id);
+  const previousPrincipal = useRef(principalScope);
+  useEffect(() => {
+    if (previousPrincipal.current === principalScope) return;
+    previousPrincipal.current = principalScope;
+    setEditingId(null); setDraft(blankDraft()); setIncludeDeleted(false); setFieldErrors({}); setSaveError("");
+    setSwitchNotice("Section H was reset because the signed-in user or vessel access changed.");
+  }, [principalScope]);
   useEffect(() => {
     if (previousComponentId.current === id) return;
     const discardedDraft = editingId !== null;
@@ -85,31 +113,44 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
     window.addEventListener("beforeunload", warnBeforeLeave);
     return () => window.removeEventListener("beforeunload", warnBeforeLeave);
   }, [editingId]);
-  const listUrl = `${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}${includeDeleted ? "?includeDeleted=true" : ""}`;
+  const accessUrl = `${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}/access`;
+  const accessQuery = useQuery<Access>({
+    queryKey: [accessUrl, securityScope],
+    queryFn: async () => (await apiRequest("GET", accessUrl)).json(),
+    enabled: !!id,
+    staleTime: 0, gcTime: 0, refetchOnMount: "always",
+  });
+  const canEdit = !readOnly && accessQuery.isSuccess && !accessQuery.isFetching &&
+    !accessQuery.isError && accessQuery.data?.canEdit === true && accessQuery.data?.identityMode === "verified";
+  const effectiveIncludeDeleted = canEdit && includeDeleted;
+  const listUrl = `${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}${effectiveIncludeDeleted ? "?includeDeleted=true" : ""}`;
   const rowsQuery = useQuery<RegulatoryEntry[]>({
-    queryKey: [`${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}`, includeDeleted],
+    queryKey: [`${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}`, securityScope, effectiveIncludeDeleted],
     queryFn: async () => (await apiRequest("GET", listUrl)).json(),
     enabled: !!id,
-  });
-  const accessQuery = useQuery<{ canEdit: boolean; reason?: string }>({
-    queryKey: [`${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}/access`],
-    enabled: !!id && !readOnly,
+    staleTime: 0, gcTime: 0,
   });
   const societyQuery = useQuery<Master[]>({
     queryKey: [`${apiRoot}/fleet/master-lists?listType=classificationSociety`],
-    enabled: !!id && !readOnly && (accessQuery.data?.canEdit ?? false),
+    enabled: !!id && canEdit,
   });
   const surveyQuery = useQuery<Master[]>({
     queryKey: [`${apiRoot}/fleet/master-lists?listType=surveyType`],
-    enabled: !!id && !readOnly && (accessQuery.data?.canEdit ?? false),
+    enabled: !!id && canEdit,
   });
-  const canEdit = !readOnly && accessQuery.data?.canEdit === true;
+  useEffect(() => {
+    // Erase inactive caches belonging to an old session/role/tenant, including removed records.
+    queryClient.removeQueries({ predicate: query => typeof query.queryKey[0] === "string" &&
+      query.queryKey[0].startsWith(`${apiRoot}/component-class-regulatory/`) &&
+      query.queryKey[1] !== securityScope });
+  }, [securityScope]);
   const entries = useMemo(() => rowsQuery.data || [], [rowsQuery.data]);
   const societies = useMemo(() => (societyQuery.data || []).filter((x) => x.isActive !== false && x.isDeleted !== true), [societyQuery.data]);
   const surveys = useMemo(() => (surveyQuery.data || []).filter((x) => x.isActive !== false && x.isDeleted !== true), [surveyQuery.data]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (!canEdit) throw new Error("Edit access could not be confirmed. Your draft has not been saved.");
       if (!id || inFlight.current) throw new Error("A save is already in progress.");
       inFlight.current = true;
       const payload = {
@@ -141,6 +182,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   });
   const lifecycleMutation = useMutation({
     mutationFn: async ({ entry, restore }: { entry: RegulatoryEntry; restore: boolean }) => {
+      if (!canEdit) throw new Error("Edit access could not be confirmed. No record was changed.");
       if (inFlight.current) throw new Error("An action is already in progress.");
       inFlight.current = true;
       return apiRequest(restore ? "POST" : "DELETE", `${apiRoot}/component-class-regulatory/${entry.id}${restore ? "/restore" : ""}`);
@@ -232,15 +274,15 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
 
   if (!id) return <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Save the component first to add or view classification records.</div>;
   if (rowsQuery.isLoading) return <div className="space-y-2" aria-label="Loading classification records">{[1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-sm bg-slate-100" />)}</div>;
-  if (rowsQuery.isError) return <div className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="min-w-0 flex-1">{accessQuery.data?.reason || "Classification records could not be loaded. Verify your access and retry."}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => rowsQuery.refetch()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Retry records</Button>{!readOnly && <Button size="sm" variant="outline" onClick={() => accessQuery.refetch()}>Retry access</Button>}</div></div>;
+  if (rowsQuery.isError) return <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="min-w-0 flex-1">{errorDetails(rowsQuery.error).message}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => rowsQuery.refetch()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Retry records</Button><Button size="sm" variant="outline" onClick={() => accessQuery.refetch()}>Retry access</Button></div></div>;
 
   return (
     <section className="space-y-3" aria-label="Classification and regulatory data">
       {!classItem && <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">This component is marked “Class Item: No”. Records remain visible and are not removed.</div>}
       {switchNotice && <p role="status" className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{switchNotice}</p>}
       {!readOnly && accessQuery.isLoading && <div className="h-8 animate-pulse rounded-sm bg-slate-100" />}
-      {!readOnly && accessQuery.isError && <div role="alert" className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800">Edit permission could not be verified. This register is read-only until access can be confirmed. <Button size="sm" variant="outline" className="ml-2 h-7" onClick={() => accessQuery.refetch()}>Retry</Button></div>}
-      {!readOnly && accessQuery.data && !canEdit && <div className="flex items-start gap-2 rounded-sm border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><span>{accessQuery.data.reason || "You have read-only access to classification records."}</span></div>}
+      {accessQuery.isError && <div role="alert" className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorDetails(accessQuery.error).message} This register is read-only until access can be confirmed. <Button size="sm" variant="outline" className="ml-2 h-7" onClick={() => accessQuery.refetch()}>Retry access</Button></div>}
+      {accessQuery.isSuccess && !canEdit && <div className="flex items-start gap-2 rounded-sm border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><span>{accessQuery.data.reason || "You have read-only access to classification records."}</span></div>}
       {canEdit && <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="h-4 w-4 text-emerald-700" />Changes save per entry, independently of the component.</div>
         <div className="flex flex-wrap gap-2">
@@ -262,9 +304,10 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
           {textField("information", "Information", 2000, true)}
         </div>
         {(societyQuery.isError || surveyQuery.isError) && <p role="alert" className="text-xs text-red-700">Master selections could not be loaded. <button className="underline" onClick={() => { societyQuery.refetch(); surveyQuery.refetch(); }}>Retry</button></p>}
-        <div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={cancel} disabled={saveMutation.isPending}><X className="mr-1 h-3.5 w-3.5" />Cancel</Button><Button size="sm" onClick={saveEntry} disabled={saveMutation.isPending || (editingId === "new" && (!draft.classificationSocietyKey || !draft.surveyTypeKey))}><Save className="mr-1 h-3.5 w-3.5" />{saveMutation.isPending ? "Saving…" : "Save entry"}</Button></div>
+        {!canEdit && <p role="status" className="text-sm text-amber-800">Edit access is not currently confirmed. Your draft has been retained.</p>}
+        <div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={cancel} disabled={saveMutation.isPending}><X className="mr-1 h-3.5 w-3.5" />Cancel</Button><Button size="sm" onClick={saveEntry} disabled={!canEdit || saveMutation.isPending || (editingId === "new" && (!draft.classificationSocietyKey || !draft.surveyTypeKey))}><Save className="mr-1 h-3.5 w-3.5" />{saveMutation.isPending ? "Saving…" : "Save entry"}</Button></div>
       </div>}
-      {entries.length === 0 && editingId === null ? <div className="rounded-sm border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-medium text-slate-700">No classification records yet</p><p className="mt-1 text-xs text-slate-500">{canEdit ? "Add a record for each certificate or survey." : "No records have been entered for this component."}</p></div> : (
+      {rowsQuery.isSuccess && entries.length === 0 && editingId === null ? <div className="rounded-sm border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-medium text-slate-700">No classification records have been added for this component.</p>{canEdit && <p className="mt-1 text-xs text-slate-500">Add a record for each certificate or survey.</p>}</div> : (
         <div className="space-y-2">
           {entries.map((entry) => <article key={entry.id} className={`rounded-sm border ${entry.isDeleted ? "border-slate-200 bg-slate-50 opacity-80" : "border-slate-200 bg-white"} p-3`}>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">

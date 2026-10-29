@@ -7,7 +7,7 @@ import * as componentCtrl from './controllers/componentController';
 import * as uploadCtrl from './controllers/componentUploadController';
 import * as subCtrl from './controllers/subEntityController';
 import * as classCtrl from './controllers/classRegulatoryController';
-import { requireSectionHIdentity } from './services/classRegulatoryAccess';
+import { requireSectionHIdentity, requireSectionHReadIdentity, requireSectionHView } from './services/classRegulatoryAccess';
 
 const router = Router();
 
@@ -64,8 +64,7 @@ router.get('/component-documents/:id/download', requireAuth, asyncHandler(subCtr
 
 // ── Component Class Regulatory ──
 
-const sectionHView = [requireAuth, requireSectionHIdentity,
-  requirePermission('pms-components', 'view', { enforce: true, unconfigured: 'deny' })];
+const sectionHView = [requireAuth, requireSectionHReadIdentity, requireSectionHView];
 const sectionHWrite = [requireAuth, requireSectionHIdentity, requireRole('Office'),
   requirePermission('pms-components', 'edit', { enforce: true, unconfigured: 'deny' })];
 router.get('/component-class-regulatory/:componentId/access', ...sectionHView, classCtrl.access);

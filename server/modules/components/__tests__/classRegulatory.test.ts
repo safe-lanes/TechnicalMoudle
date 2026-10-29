@@ -15,6 +15,7 @@ const id = "8eb5b00d-55cb-4c0f-8b62-000000000190";
 function request(overrides: Record<string, any> = {}) {
   return {
     user: { userUuid: id }, rbac: { source: "forwarded", role: "Editor", userType: "Office" },
+    headers: { "x-user-id": id, "x-user-role": "Editor", "x-user-type": "Office" },
     verifiedUser: { userId: id, role: "Editor", userType: "Office", missing: [] }, ...overrides,
   } as any;
 }
@@ -23,11 +24,16 @@ describe("Section H verified identity and existing edit permission", () => {
   it("accepts matching verified claims without relying on mock role", () => {
     expect(verifiedSectionHActor(request())).toEqual({ userId: id, role: "Editor", userType: "Office", canEdit: false });
   });
-  it.each(["none", "mock"])("refuses source %s even with a verified privileged-sounding identity", source => {
+  it.each(["mock"])("refuses source %s even with a verified privileged-sounding identity", source => {
     expect(() => verifiedSectionHActor(request({ rbac: { source, role: "Sail Admin", userType: "Office" } }))).toThrow();
   });
   it("rejects headers without JWT-verified context", () => {
     expect(() => verifiedSectionHActor(request({ verifiedUser: undefined }))).toThrow();
+  });
+  it("does not confuse the default mock UUID with a verified canonical user when headers are absent", () => {
+    expect(verifiedSectionHActor(request({
+      user: { userUuid: "default-mock-id" }, headers: {}, rbac: { source: "none", role: null, userType: null },
+    })).userId).toBe(id);
   });
   it("rejects forged roles, type and canonical identity", () => {
     for (const verifiedUser of [

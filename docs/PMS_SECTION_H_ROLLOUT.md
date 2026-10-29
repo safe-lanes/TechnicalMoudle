@@ -6,7 +6,25 @@ The user confirmed on 29 October 2026: use existing Component **edit permission*
 
 The existing permission framework treats genuine Sail Admin/PMS Admin as having Component edit rights; this resource follows that existing policy, only AFTER verified identity and Office checks. It does not extend these shortcuts to Ship, mock, absent or spoofed identities.
 
-`tenantMiddleware` already verifies a SAILERP JWT and supplies `verifiedUser`. Section H uses that existing context, requires it to match `req.rbac` and canonical user UUID, and never authenticates from x-user-* headers alone. No secrets or environment settings were changed. A standalone session, source mock/none, mismatched claims, absent JWT verification or missing claims is refused. Single-tenant deployments without this verified context need a separately reviewed authentication adapter; do not disable the guard to make a demo editable.
+`tenantMiddleware` verifies a SAILERP JWT and supplies `verifiedUser`. Section H reuses that context where present. Its resource-local adapter also verifies standalone Bearer tokens with the same configured JWT_SECRET/HS256 policy and maps the signed configurable id claim through the existing non-deleted `master_users.id` lookup. No JWT `sub`, email or default-user substitution is performed. Missing signed role/type can use the existing master-user lookup; missing or ambiguous identity is refused. Unknown standalone users are refused. Database lookup outages are 503, not an invalid-token fallback.
+
+Optional browser identity headers are not required when a real verified session exists. Contradictory user/role/type headers are refused. The default mock user's UUID is not compared to the signed canonical id when no identity header was supplied. Only Section H request-local RBAC is derived from the verified actor; global authentication and the global pass-through admin alias are unchanged. Forced mock-RBAC mode cannot obtain verified write access.
+
+### Standalone development read-only option
+
+`PMS_SECTION_H_DEV_READONLY=true` is an explicit non-secret **development-environment-only** opt-in. The code defaults it OFF, requires `NODE_ENV=development`, and refuses this mode whenever multitenancy is enabled. Do not enable it against production data or put it in a shared/production environment.
+
+When deliberately enabled for an approved development dataset, GET active records and GET access use a fixed server-owned Office development viewer, never browser headers. The access response identifies `identityMode=development-readonly`, `canView=true`, `canEdit=false` and explains: "Development preview — read-only. A verified Office session is required to make changes." Anyone who can open that shared preview can view this profile's active records; there is no claim that this is a real authenticated Office user.
+
+All mutations and removed-record reads remain refused to that profile, even with forged admin headers or a ready-vessel setting. Present invalid/expired Bearer tokens never fall back to development viewing. Production refuses the development mode even if the control is mistakenly set.
+
+### View and edit are independent
+
+Normal record loading applies view permission and component/vessel scope, but does not depend on historical UUID reconciliation, edit permission or write activation. Verified Ship users remain read-only with active vessel scope; verified Office view-only users can read without the write gates. The access response adds `canView`, `identityMode` and `reasonCode`, distinguishing development read-only, vessel read-only, view-only permission, reconciliation pending and rollout pending. Existing record-array responses remain unchanged.
+
+The UI displays safe specific errors, a truthful successful-empty state, and independent records/access retries. Failed edit/access checks retain a draft without enabling Save. Cache keys partition by viewer, role/type, tenant, vessel scope and auth-session generation; old caches including removed entries are cleared on session changes. Permission refreshes use active-only reads until edit access is freshly confirmed.
+
+This access correction adds no SQL, table, column, backfill, migration replay, write activation, or synchronization changes. It does not enable the deferred historical finalization or claim live integrated Office/Ship session evidence.
 
 Office scope is all vessels under the confirmed policy. Ship scope uses active `master_user_vessels` assignments; these are login-captured and must be refreshed by the existing integration. This change does not assert their freshness or redesign login/user administration.
 

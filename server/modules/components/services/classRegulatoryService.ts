@@ -4,7 +4,7 @@ import { auditLog, componentClassRegulatory as entries, components, masterLists,
 import { classRegulatoryInput, validateClassRegulatoryDates } from "@shared/classRegulatory";
 import { getDb } from "../../../db";
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors";
-import { assertSectionHScope, type SectionHActor } from "./classRegulatoryAccess";
+import { assertSectionHScope, DEVELOPMENT_READONLY_REASON, type SectionHActor } from "./classRegulatoryAccess";
 
 const active = or(isNull(entries.isDeleted), eq(entries.isDeleted, false));
 export class ClassRegulatoryValidationError extends AppError {
@@ -30,7 +30,7 @@ async function parent(db: Connection, componentId: string, actor: SectionHActor)
 export async function listClassEntries(componentId: string, actor: SectionHActor, includeDeleted = false) {
   const db = await getDb();
   await parent(db, componentId, actor);
-  if (includeDeleted && !actor.canEdit) throw new ForbiddenError("Component edit permission is required to view removed entries.");
+  if (includeDeleted && (actor.identityMode === "development-readonly" || !actor.canEdit)) throw new ForbiddenError("Component edit permission is required to view removed entries.");
   return db.select().from(entries).where(and(eq(entries.componentId, componentId), includeDeleted ? undefined : active))
     .orderBy(asc(entries.sortOrder), asc(entries.ccruuid), asc(entries.id));
 }
@@ -85,7 +85,7 @@ async function businessFields(db: Connection, raw: unknown, existing?: typeof en
 }
 
 function assertWrite(actor: SectionHActor) {
-  if (actor.userType !== "Office" || !actor.canEdit) throw new ForbiddenError("Office Component edit permission is required.");
+  if (actor.identityMode === "development-readonly" || actor.userType !== "Office" || !actor.canEdit) throw new ForbiddenError("Office Component edit permission is required.");
 }
 async function audit(tx: Tx, actor: SectionHActor, action: string,
   saved: typeof entries.$inferSelect, before?: typeof entries.$inferSelect) {
@@ -147,12 +147,15 @@ export async function mutateClassEntry(id: number, raw: unknown, action: "update
 export async function componentClassAccess(componentId: string, actor: SectionHActor) {
   const db = await getDb();
   const { vessel } = await parent(db, componentId, actor);
+  const viewOnly = (reasonCode: string, reason: string) => ({
+    canView: true, canEdit: false, identityMode: actor.identityMode || "verified", reasonCode, reason,
+  });
+  if (actor.identityMode === "development-readonly") return viewOnly("DEVELOPMENT_READONLY", DEVELOPMENT_READONLY_REASON);
+  if (actor.userType === "Ship") return viewOnly("VESSEL_READONLY", "Vessel users can view classification records but cannot change them.");
+  if (!actor.canEdit) return viewOnly("VIEW_ONLY", "Office Component edit permission is required to manage entries.");
   const missing = await db.select({ id: entries.id }).from(entries).where(isNull(entries.ccruuid)).limit(1);
   const ready = await rolloutReady(db, vessel.vuuid);
-  return {
-    canEdit: actor.canEdit && !missing.length && ready,
-    reason: missing.length ? "Historical shore/vessel identities must be reconciled before editing." :
-      !ready ? "Section H writes are pending the verified shore/vessel rollout for this vessel." :
-      !actor.canEdit ? "Office Component edit permission is required to manage entries." : undefined,
-  };
+  if (missing.length) return viewOnly("RECONCILIATION_PENDING", "Historical shore/vessel identities must be reconciled before editing.");
+  if (!ready) return viewOnly("ROLLOUT_PENDING", "Section H writes are pending the verified shore/vessel rollout for this vessel.");
+  return { canView: true, canEdit: true, identityMode: actor.identityMode || "verified", reasonCode: "EDIT_ALLOWED" };
 }

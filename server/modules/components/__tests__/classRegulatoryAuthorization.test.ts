@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { Server } from "node:http";
+import jwt from "jsonwebtoken";
 
 const service = vi.hoisted(() => ({
   createClassEntry: vi.fn(), mutateClassEntry: vi.fn(), listClassEntries: vi.fn(), componentClassAccess: vi.fn(),
@@ -8,6 +9,11 @@ const service = vi.hoisted(() => ({
 const permissions = vi.hoisted(() => ({
   getRoleByName: vi.fn(), getRoleMenuPermissions: vi.fn(), getActiveMenuItems: vi.fn(),
 }));
+const identity = vi.hoisted(() => ({ multiTenant: false, mapped: vi.fn() }));
+vi.mock("../../../utils/tenantConnectionManager", () => ({
+  tenantConnectionManager: { get isMultiTenantEnabled() { return identity.multiTenant; } },
+}));
+vi.mock("../../assistant-api/masterUserRepository", () => ({ findMasterUserById: identity.mapped }));
 vi.mock("../../../storage", () => ({ storage: permissions }));
 vi.mock("../services/classRegulatoryService", () => ({
   ...service, ClassRegulatoryValidationError: class extends Error {},
@@ -47,14 +53,20 @@ describe("Section H actual route authorization (no production database)", () => 
   });
   afterAll(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks(); source = "forwarded"; loggedIn = true;
+    identity.multiTenant = false;
+    identity.mapped.mockResolvedValue({ role: "Editor", userType: "Office" });
     serverVerified = { userId: id, role: "Editor", userType: "Office", missing: [] };
     permissions.getRoleByName.mockResolvedValue({ ruid: "r" });
     permissions.getActiveMenuItems.mockResolvedValue([{ name: "pms-components", muid: "m" }]);
     permissions.getRoleMenuPermissions.mockResolvedValue([{ menuMuid: "m", canView: true, canEdit: true }]);
     service.createClassEntry.mockResolvedValue({ id: 1 });
     service.mutateClassEntry.mockResolvedValue({ id: 1 });
+    service.listClassEntries.mockResolvedValue([]);
+    service.componentClassAccess.mockResolvedValue({ canView: true, canEdit: false, identityMode: "verified" });
   });
+  afterAll(() => vi.unstubAllEnvs());
   it("refuses every write when only browser headers are supplied", async () => {
     serverVerified = undefined;
     for (const [method, suffix] of actions) {
@@ -64,9 +76,90 @@ describe("Section H actual route authorization (no production database)", () => 
     expect(service.createClassEntry).not.toHaveBeenCalled();
     expect(service.mutateClassEntry).not.toHaveBeenCalled();
   });
-  it.each(["none", "mock"])("refuses %s even when a trusted-looking verified object exists", async value => {
+  it.each(["mock"])("refuses %s even when a trusted-looking verified object exists", async value => {
     source = value;
     expect((await fetch(root, { method: "POST", headers, body: JSON.stringify({ componentId: "c" }) })).status).toBe(403);
+  });
+  it("accepts verified claims without optional browser identity headers", async () => {
+    source = "none";
+    expect((await fetch(root + "/component")).status).toBe(200);
+    expect((await fetch(root, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ componentId: "c" }) })).status).toBe(201);
+    expect(service.createClassEntry.mock.calls[0][2]).toMatchObject({ userId: id, role: "Editor" });
+  });
+  it("allows a view-only Office identity to read but not write", async () => {
+    permissions.getRoleMenuPermissions.mockResolvedValue([{ menuMuid: "m", canView: true, canEdit: false }]);
+    expect((await fetch(root + "/component", { headers })).status).toBe(200);
+    expect((await fetch(root + "/component/access", { headers })).status).toBe(200);
+    expect((await fetch(root + "/1", { method: "DELETE", headers })).status).toBe(403);
+  });
+  it("returns the explicit refusal when the development control is disabled", async () => {
+    serverVerified = undefined; source = "none";
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("PMS_SECTION_H_DEV_READONLY", "false");
+    const response = await fetch(root + "/component");
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "SESSION_UNVERIFIED" });
+  });
+  it("uses only a server-owned read-only development profile and refuses every mutation", async () => {
+    serverVerified = undefined; source = "none";
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("PMS_SECTION_H_DEV_READONLY", "true");
+    expect((await fetch(root + "/component", { headers: { ...headers, "x-user-id": "forged", "x-user-role": "Sail Admin" } })).status).toBe(200);
+    expect(service.listClassEntries.mock.calls[0][1]).toMatchObject({
+      userId: "section-h-development-viewer", identityMode: "development-readonly", canEdit: false,
+    });
+    for (const [method, suffix] of actions) expect((await fetch(root + suffix, {
+      method, headers, body: JSON.stringify({ componentId: "c" }),
+    })).status).toBe(403);
+    expect(service.createClassEntry).not.toHaveBeenCalled();
+    expect(service.mutateClassEntry).not.toHaveBeenCalled();
+  });
+  it.each(["production", "test"])("never enables development reads in %s", async environment => {
+    serverVerified = undefined;
+    vi.stubEnv("NODE_ENV", environment); vi.stubEnv("PMS_SECTION_H_DEV_READONLY", "true");
+    expect((await fetch(root + "/component")).status).toBe(403);
+  });
+  it("never enables development reads in multitenant mode", async () => {
+    serverVerified = undefined; identity.multiTenant = true;
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("PMS_SECTION_H_DEV_READONLY", "true");
+    expect((await fetch(root + "/component")).status).toBe(403);
+  });
+  it("verifies standalone Bearer credentials and looks up the signed canonical user", async () => {
+    serverVerified = undefined; source = "none";
+    vi.stubEnv("JWT_SECRET", "fixture-only-section-h-signing-key");
+    const token = jwt.sign({ id, role: "Editor", userType: "Office" }, "fixture-only-section-h-signing-key", { algorithm: "HS256", expiresIn: "1m" });
+    const response = await fetch(root + "/component", { headers: { Authorization: `Bearer ${token}` } });
+    expect(response.status).toBe(200);
+    expect(identity.mapped).toHaveBeenCalledWith(id);
+    expect(service.listClassEntries.mock.calls[0][1]).toMatchObject({ userId: id, role: "Editor", identityMode: "verified" });
+  });
+  it("uses the established server master lookup for missing signed role claims", async () => {
+    serverVerified = { userId: id, role: null, userType: "Office", missing: ["role"] }; source = "none";
+    expect((await fetch(root + "/component")).status).toBe(200);
+    expect(identity.mapped).toHaveBeenCalledWith(id);
+  });
+  it("never falls back to development access after invalid, expired or unmapped credentials", async () => {
+    serverVerified = undefined; source = "none";
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("PMS_SECTION_H_DEV_READONLY", "true");
+    vi.stubEnv("JWT_SECRET", "fixture-only-section-h-signing-key");
+    const tokens = [
+      ["garbage", "INVALID_SESSION"],
+      [jwt.sign({ id, role: "Editor", userType: "Office" }, "fixture-only-section-h-signing-key", { expiresIn: -1 }), "SESSION_EXPIRED"],
+    ];
+    for (const [token, code] of tokens) {
+      const response = await fetch(root + "/component", { headers: { authorization: `Bearer ${token}` } });
+      expect(response.status).toBe(401); expect(await response.json()).toMatchObject({ code });
+    }
+    identity.mapped.mockResolvedValue(null);
+    const token = jwt.sign({ id, role: "Editor", userType: "Office" }, "fixture-only-section-h-signing-key");
+    expect((await fetch(root + "/component", { headers: { authorization: `Bearer ${token}` } })).status).toBe(403);
+    expect(service.listClassEntries).not.toHaveBeenCalled();
+  });
+  it("refuses conflicting identity and treats lookup outages as infrastructure failures", async () => {
+    expect((await fetch(root + "/component", { headers: { ...headers, "x-user-id": "someone-else" } })).status).toBe(403);
+    serverVerified = { userId: id, role: null, userType: "Office", missing: ["role"] };
+    identity.mapped.mockRejectedValue(new Error("database password must not be exposed"));
+    const response = await fetch(root + "/component", { headers });
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain("password");
   });
   it("returns 401 without an authenticated request user", async () => {
     loggedIn = false;

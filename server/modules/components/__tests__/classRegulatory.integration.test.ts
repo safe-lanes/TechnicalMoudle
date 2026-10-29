@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 import { resolvePostgres } from "../../../postgresClient";
-import { createClassEntry, mutateClassEntry, listClassEntries } from "../services/classRegulatoryService";
+import { createClassEntry, mutateClassEntry, listClassEntries, componentClassAccess } from "../services/classRegulatoryService";
 import { applyClassRegulatoryRows, CLASS_REGULATORY_REQUIRED_COLUMNS } from "../../sync/classRegulatorySync";
 
 const fixture = vi.hoisted(() => ({ db: null as any }));
@@ -121,6 +121,23 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
   it("refuses writes before the per-vessel rollout is verified", async () => {
     await conn.query("DELETE FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'");
     await expect(createClassEntry(component, business, actor)).rejects.toMatchObject({ statusCode: 409 });
+  });
+  it("returns active records and explicit read-only access independently of readiness and UUID backfill", async () => {
+    const record = await createClassEntry(component, business, actor);
+    await conn.query("DELETE FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'");
+    await conn.query("UPDATE pg_temp.component_class_regulatory SET ccruuid=NULL WHERE id=$1", [record.id]);
+    expect(await listClassEntries(component, { ...actor, canEdit: false })).toHaveLength(1);
+    expect(await componentClassAccess(component, { ...actor, canEdit: false })).toMatchObject({
+      canView: true, canEdit: false, identityMode: "verified", reasonCode: "VIEW_ONLY",
+    });
+    expect(await componentClassAccess(component, actor)).toMatchObject({ reasonCode: "RECONCILIATION_PENDING", canView: true });
+    const preview = { ...actor, canEdit: false, identityMode: "development-readonly" as const };
+    expect(await componentClassAccess(component, preview)).toMatchObject({
+      canView: true, canEdit: false, identityMode: "development-readonly", reasonCode: "DEVELOPMENT_READONLY",
+    });
+    expect(await listClassEntries(component, preview)).toHaveLength(1);
+    await expect(listClassEntries(component, { ...preview, canEdit: true }, true)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(mutateClassEntry(record.id, {}, "delete", { ...preview, canEdit: true })).rejects.toMatchObject({ statusCode: 403 });
   });
   it("enforces known-UUID uniqueness without constraining society/type duplicates", async () => {
     const first = await createClassEntry(component, business, actor);

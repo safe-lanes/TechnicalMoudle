@@ -15,9 +15,11 @@ export const classRegulatoryHandler = (
     if (error instanceof service.ClassRegulatoryValidationError) {
       return res.status(400).json({ error: error.message, fieldErrors: error.fieldErrors });
     }
-    if (error instanceof AppError) return res.status(error.statusCode).json({ error: error.message });
+    if (error instanceof AppError) return res.status(error.statusCode).json({
+      error: error.message, code: error.statusCode === 403 ? "ACCESS_DENIED" : error.statusCode === 404 ? "COMPONENT_NOT_FOUND" : "REQUEST_REFUSED",
+    });
     console.error("[Section H] request failed", error);
-    return res.status(503).json({ error: "Classification & Regulatory Data is temporarily unavailable. Please try again." });
+    return res.status(503).json({ error: "Classification & Regulatory Data is temporarily unavailable. Please try again.", code: "SERVICE_UNAVAILABLE" });
   }
 };
 
