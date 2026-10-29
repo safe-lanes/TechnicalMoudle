@@ -274,6 +274,31 @@ def breakdown_line(result: dict[str, Any]) -> str | None:
     return f"Of these, {expired}; {upcoming}."
 
 
+# ── rank-configuration line (29-Oct-2026, Sahil A5: groups come from Rank Administration; gaps are reported, never guessed) ──
+def rank_config_line(result: dict[str, Any]) -> str | None:
+    """'Not counted in any rank group: 2 crew on board whose ranks have no category in Rank Administration (Deck Cadet,
+    Gas Engineer).' — from the server's rankConfig report; None when no group was involved or nothing is unclassified."""
+    if not isinstance(result, dict) or result.get("ok") is not True:
+        return None
+    rc = result.get("rankConfig")
+    if not isinstance(rc, dict):
+        return None
+    u = rc.get("unclassifiedOnBoard") if isinstance(rc.get("unclassifiedOnBoard"), dict) else rc.get("unclassifiedInResult")
+    if not isinstance(u, dict):
+        return None
+    try:
+        people = int(u.get("people") or 0)
+    except (TypeError, ValueError):
+        return None
+    if people <= 0:
+        return None
+    ranks = [str(r) for r in (u.get("ranks") or []) if r]
+    where = "on board" if "unclassifiedOnBoard" in rc else "in this result"
+    names = f" ({', '.join(sorted(ranks))})" if ranks else ""
+    return (f"Not counted in any rank group: {people} crew {where} whose {'rank has' if people == 1 else 'ranks have'} no category "
+            f"in Rank Administration{names}.")
+
+
 # ── cross-tool translation and consistency ─────────────────────────────────────
 DOC_KEYS = ("documentTypes", "documentNameContains", "expiryState", "expiryWithin")   # = the hasDocument sub-keys
 

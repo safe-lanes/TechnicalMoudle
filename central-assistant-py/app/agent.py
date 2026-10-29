@@ -74,6 +74,7 @@ class Deps:
     query_guard: bool = False
     paging: dict[str, Any] | None = None   # server totals of the LAST list-mode Crewing result (review item 1)
     breakdown: str | None = None           # expired / upcoming line of the LAST Crewing result with an expiry condition (A4)
+    rank_line: str | None = None           # unclassified-ranks line of the LAST Crewing result that used rank groups (A5)
 
 
 # ── module manifests (Data API discovery) ─────────────────────────────────────────
@@ -210,6 +211,10 @@ class ManifestToolset(AbstractToolset[Deps]):
                 bl = query_guard.breakdown_line(result)
                 if bl is not None or result.get("ok") is True:
                     deps.breakdown = bl
+                # 29-Oct-2026 (Sahil A5): unclassified ranks are reported from the server's rankConfig, never guessed or dropped
+                rl = query_guard.rank_config_line(result)
+                if rl is not None or result.get("ok") is True:
+                    deps.rank_line = rl
             if decision is not None and isinstance(result, dict):
                 state = query_guard.state_from_result(name, result)
                 if state and deps.conv_key:
@@ -333,6 +338,7 @@ class LoopResult:
     citations: list[dict[str, Any]] = field(default_factory=list)
     paging: dict[str, Any] | None = None
     breakdown: str | None = None
+    rank_line: str | None = None
 
 
 # Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
@@ -400,8 +406,9 @@ CREWING_DATA_RULES = (
     "expired/upcoming and `breakdown` gives both counts: always state both ('N already expired, M expiring by <date>') and mark "
     "expired rows. 'Only upcoming' / 'not yet expired' = expiryState not_expired; 'expired' = expiryState expired. Use the time "
     "unit the user said (60 days and 2 months are different windows). If the user asks about expiring documents without a period, "
-    "ask which period (for example 30 days, 60 days or 2 months) instead of choosing one. 'Certificates' means both licences and "
-    "training-course certificates unless the user names one kind. "
+    "ask which period (for example 30 days, 60 days or 2 months) instead of choosing one. 'Certificates', 'documents', "
+    "'licence or certificate' and 'licences/certificates' all mean BOTH kinds (omit documentTypes); set licence only when the "
+    "user asks for licences/CoCs alone, training only for courses/training alone. "
     "RULE — rank groups: 'engineers', 'officers', 'ratings' and the other groups are the categories configured in Rank "
     "Administration, not a fixed list; when the result's rankConfig reports unclassified ranks or people, say so in one sentence "
     "(e.g. '2 crew on board hold ranks with no category in Rank Administration (Gas Engineer, Deck Cadet) and are not counted'). "
@@ -583,7 +590,7 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     if deps.partial:
         text = f"{text}{PARTIAL_NOTE}"
     return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial, citations=deps.citations,
-                      paging=deps.paging, breakdown=deps.breakdown)
+                      paging=deps.paging, breakdown=deps.breakdown, rank_line=deps.rank_line)
 
 
 async def answer_docs(system: str, user: str, masker: Masker | None, history: list[ModelMessage] | None = None) -> tuple[str, dict[str, int] | None]:

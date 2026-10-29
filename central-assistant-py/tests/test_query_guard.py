@@ -208,3 +208,14 @@ def test_breakdown_line_from_server_counts_only():
     assert qg.breakdown_line({"ok": True, "mode": "count", "total": 8}) is None            # no expiry condition → no line
     assert qg.breakdown_line({"ok": False, "code": "not_allowed", "breakdown": {}}) is None  # refusals never get a line
     assert qg.breakdown_line({"ok": True, "breakdown": {"expired": {"documents": 0, "people": 0}, "upcoming": {"documents": 0, "people": 0}}, "asOf": "2026-11-01"})         == "Of these, 0 documents (0 people) already expired as of 2026-11-01; 0 documents (0 people) have not expired yet."
+
+
+def test_rank_config_line_reports_unclassified_from_server_only():
+    # 29-Oct-2026 (Sahil A5): unclassified ranks come from the server's rankConfig report, never from the model
+    ob = {"ok": True, "rankConfig": {"source": "x", "unclassifiedOnBoard": {"assignments": 2, "people": 2, "ranks": ["Gas Engineer", "Deck Cadet"]}}}
+    assert qg.rank_config_line(ob) == "Not counted in any rank group: 2 crew on board whose ranks have no category in Rank Administration (Deck Cadet, Gas Engineer)."
+    one = {"ok": True, "rankConfig": {"unclassifiedInResult": {"documents": 1, "people": 1, "ranks": ["Wiper"]}}}
+    assert qg.rank_config_line(one) == "Not counted in any rank group: 1 crew in this result whose rank has no category in Rank Administration (Wiper)."
+    assert qg.rank_config_line({"ok": True, "rankConfig": {"unclassifiedOnBoard": {"people": 0, "ranks": []}}}) is None   # nothing unclassified → no line
+    assert qg.rank_config_line({"ok": True, "totals": {"people": 3}}) is None                                                 # no groups involved
+    assert qg.rank_config_line({"ok": False, "code": "not_allowed", "rankConfig": {"unclassifiedOnBoard": {"people": 2}}}) is None
