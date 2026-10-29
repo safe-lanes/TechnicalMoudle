@@ -1332,6 +1332,8 @@ var init_schema = __esm({
       // Format: SP-<ComponentCode>-<NNN>
       critical: text2("critical").notNull(),
       // 'Critical' | 'Non-Critical' | 'Yes' | 'No'
+      spareCategory: text2("spare_category"),
+      optimumQty: integer2("optimum_qty"),
       rob: integer2("rob").notNull().default(0),
       // Remaining on Board (total = robLocationA + robLocationB)
       robLocationA: integer2("rob_location_a").notNull().default(0),
@@ -1424,6 +1426,7 @@ var init_schema = __esm({
       sortOrder: integer2("sort_order")
     }, (table) => ({
       componentIdIdx: index2("idx_spare_component").on(table.componentId),
+      classificationCheck: check("spares_category_optimum_check", sql2`CASE WHEN ${table.spareCategory} = 'optimum' THEN ${table.optimumQty} IS NOT NULL AND ${table.optimumQty} > 0 ELSE ${table.optimumQty} IS NULL END`),
       vesselIdIdx: index2("idx_spare_vessel").on(table.vesselId),
       componentSpareCodeIdx: index2("idx_spare_code").on(table.vesselId, table.componentSpareCode),
       dataScopeIdx: index2("idx_spare_data_scope").on(table.dataScope),
@@ -3479,6 +3482,8 @@ var init_schema = __esm({
       manualName: text2("manual_name"),
       pageNumber: text2("page_number"),
       criticality: text2("criticality"),
+      spareCategory: text2("spare_category"),
+      optimumQty: integer2("optimum_qty"),
       isActive: boolean2("is_active").notNull().default(true),
       ihm: text2("ihm"),
       evidenceType: text2("evidence_type"),
@@ -3491,6 +3496,7 @@ var init_schema = __esm({
       isSync: boolean2("is_sync").default(false)
     }, (table) => ({
       partCodeIdx: index2("idx_fleet_spares_part_code").on(table.partCode),
+      classificationCheck: check("fleet_spares_category_optimum_check", sql2`CASE WHEN ${table.spareCategory} = 'optimum' THEN ${table.optimumQty} IS NOT NULL AND ${table.optimumQty} > 0 ELSE ${table.optimumQty} IS NULL END`),
       fleetEquipmentCodeIdx: index2("idx_fleet_spares_equipment").on(table.fleetEquipmentCode),
       fleetSparesUuidIdx: uniqueIndex2("idx_fleet_spares_uuid").on(table.fleetSparesUuid),
       fleetComponentsUuidIdx: index2("idx_fleet_spares_component_uuid").on(table.fleetComponentsUuid)
@@ -7951,1779 +7957,275 @@ var init_completedWorkOrderDate = __esm({
   }
 });
 
-// server/modules/running-hours/utils/readingDate.ts
-var readingDate_exports = {};
-__export(readingDate_exports, {
-  InvalidReadingDateError: () => InvalidReadingDateError,
-  canonicalReadingDay: () => canonicalReadingDay,
-  canonicalizeReadingDateInput: () => canonicalizeReadingDateInput,
-  formatReadingDay: () => formatReadingDay,
-  parseReadingDayStrict: () => parseReadingDayStrict,
-  requireReadingDayInput: () => requireReadingDayInput,
-  todayReadingDay: () => todayReadingDay
+// shared/spareClassification.ts
+var spareClassification_exports = {};
+__export(spareClassification_exports, {
+  MAX_OPTIMUM_QTY: () => MAX_OPTIMUM_QTY,
+  OPTIMUM_CATEGORY: () => OPTIMUM_CATEGORY,
+  SPARE_CATEGORY_LABELS: () => SPARE_CATEGORY_LABELS,
+  SPARE_CATEGORY_LIST_TYPE: () => SPARE_CATEGORY_LIST_TYPE,
+  SPARE_CATEGORY_TYPE: () => SPARE_CATEGORY_TYPE,
+  classificationColumns: () => classificationColumns,
+  classificationFields: () => classificationFields,
+  hasClassification: () => hasClassification,
+  importSpareClassification: () => importSpareClassification,
+  mergeSpareClassification: () => mergeSpareClassification,
+  normalizeClassificationPatch: () => normalizeClassificationPatch,
+  spareClassificationTemplateMode: () => spareClassificationTemplateMode,
+  validateSpareClassification: () => validateSpareClassification
 });
-function daysInMonth(yearNum, monthIdx) {
-  return new Date(Date.UTC(yearNum, monthIdx + 1, 0)).getUTCDate();
+function hasClassification(value) {
+  return [...classificationFields, ...classificationColumns].some((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
-function utcDay(y, mIdx, d) {
-  if (mIdx < 0 || mIdx > 11) return null;
-  if (d < 1 || d > daysInMonth(y, mIdx)) return null;
-  return new Date(Date.UTC(y, mIdx, d));
-}
-function parseReadingDayStrict(value) {
-  if (value === null || value === void 0) return null;
-  if (value instanceof Date) {
-    if (isNaN(value.getTime())) return null;
-    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
-  }
-  const str = String(value).trim();
-  if (!str) return null;
-  const iso = str.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
-  if (iso) {
-    return utcDay(parseInt(iso[1], 10), parseInt(iso[2], 10) - 1, parseInt(iso[3], 10));
-  }
-  const legacy = str.match(
-    /^([0-9]{1,2})[-\s]+([A-Za-z]{3,})[-\s]+([0-9]{4})(?:[-\s]+([0-9]{1,2}):([0-9]{1,2}))?/
-  );
-  if (legacy) {
-    const monthIdx = MONTH_INDEX[legacy[2].slice(0, 3).toLowerCase()];
-    if (monthIdx === void 0) return null;
-    if (legacy[4] !== void 0) {
-      const hh = parseInt(legacy[4], 10);
-      const mi = parseInt(legacy[5], 10);
-      if (hh > 23 || mi > 59) return null;
-    }
-    return utcDay(parseInt(legacy[3], 10), monthIdx, parseInt(legacy[1], 10));
-  }
-  return null;
-}
-function formatReadingDay(d) {
-  return d.toISOString().slice(0, 10);
-}
-function canonicalReadingDay(value) {
-  const d = parseReadingDayStrict(value);
-  return d ? formatReadingDay(d) : null;
-}
-function canonicalizeReadingDateInput(value) {
-  const strict = canonicalReadingDay(value);
-  if (strict) return strict;
-  if (typeof value !== "string") return null;
-  const m = value.trim().match(/^([0-9]{1,2})[-\/]([0-9]{1,2})[-\/]([0-9]{4})/);
-  if (m) {
-    const d = utcDay(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
-    return d ? formatReadingDay(d) : null;
-  }
-  return null;
-}
-function todayReadingDay() {
-  return formatReadingDay(/* @__PURE__ */ new Date());
-}
-function requireReadingDayInput(value, field = "reading date") {
-  if (value === null || value === void 0) return null;
-  if (typeof value === "string" && value.trim() === "") return null;
-  const canonical = canonicalizeReadingDateInput(value);
-  if (!canonical) throw new InvalidReadingDateError(value, field);
-  return canonical;
-}
-var MONTH_INDEX, InvalidReadingDateError;
-var init_readingDate = __esm({
-  "server/modules/running-hours/utils/readingDate.ts"() {
-    "use strict";
-    MONTH_INDEX = {
-      jan: 0,
-      feb: 1,
-      mar: 2,
-      apr: 3,
-      may: 4,
-      jun: 5,
-      jul: 6,
-      aug: 7,
-      sep: 8,
-      oct: 9,
-      nov: 10,
-      dec: 11
-    };
-    InvalidReadingDateError = class extends Error {
-      status = 400;
-      code = "RH_INVALID_READING_DATE";
-      constructor(value, field = "reading date") {
-        super(`Invalid ${field} "${String(value)}". Use a real calendar date (e.g. ${todayReadingDay()}).`);
-        this.name = "ValidationError";
-      }
-    };
-  }
-});
-
-// server/modules/running-hours/rhEventComparator.ts
-var rhEventComparator_exports = {};
-__export(rhEventComparator_exports, {
-  RH_GUARD_STRIP_COLUMNS: () => RH_GUARD_STRIP_COLUMNS,
-  applyWinningRhToComponent: () => applyWinningRhToComponent,
-  canApplyWinningRHToCurrent: () => canApplyWinningRHToCurrent,
-  claimWoRhSync: () => claimWoRhSync,
-  compareRhEvents: () => compareRhEvents,
-  effectiveReadingDay: () => effectiveReadingDay,
-  incomingRhStamp: () => incomingRhStamp,
-  localRhClaimDay: () => localRhClaimDay,
-  originRank: () => originRank,
-  parseReadingDay: () => parseReadingDay,
-  releaseWoRhSync: () => releaseWoRhSync,
-  resolveRhBaselineDay: () => resolveRhBaselineDay,
-  selectWinningRhEvent: () => selectWinningRhEvent,
-  selfHealInheritedRhCaches: () => selfHealInheritedRhCaches,
-  selfHealRhComponents: () => selfHealRhComponents,
-  shouldStripIncomingRh: () => shouldStripIncomingRh
-});
-function parseReadingDay(dateStr) {
-  if (!dateStr) return null;
-  return parseReadingDayStrict(String(dateStr));
-}
-function originRank(originSide) {
-  const o = (originSide || "").toLowerCase();
-  if (o === "ship") return 0;
-  if (o === "shore") return 2;
-  return 1;
-}
-function enteredAtMs(e) {
-  const v = e.enteredAtUTC instanceof Date ? e.enteredAtUTC : e.enteredAtUTC ? new Date(String(e.enteredAtUTC)) : null;
-  return v && !isNaN(v.getTime()) ? v.getTime() : 0;
-}
-function effectiveReadingDay(e) {
-  const d = parseReadingDay(e.dateUpdatedLocal);
-  if (d) return d;
-  const ms = enteredAtMs(e);
-  if (!ms) return null;
-  const t = new Date(ms);
-  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
-}
-function compareRhEvents(a, b) {
-  const pa = parseReadingDay(a.dateUpdatedLocal);
-  const pb = parseReadingDay(b.dateUpdatedLocal);
-  if (!!pa !== !!pb) return pa ? 1 : -1;
-  const da = effectiveReadingDay(a)?.getTime() ?? -Infinity;
-  const db12 = effectiveReadingDay(b)?.getTime() ?? -Infinity;
-  if (da !== db12) return da - db12 > 0 ? 1 : -1;
-  const ra = originRank(a.originSide);
-  const rb = originRank(b.originSide);
-  if (ra !== rb) return rb - ra > 0 ? 1 : -1;
-  const ea = enteredAtMs(a);
-  const eb = enteredAtMs(b);
-  if (ea !== eb) return ea - eb > 0 ? 1 : -1;
-  return a.rhauuid > b.rhauuid ? 1 : -1;
-}
-function incomingRhStamp(row) {
-  return row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["rh_inherited_updated_at"] ?? row["rhInheritedUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
-}
-function localRhClaimDay(winnerDay, localCacheStampRaw) {
-  const cacheDay = localCacheStampRaw ? parseReadingDay(String(localCacheStampRaw instanceof Date ? localCacheStampRaw.toISOString() : localCacheStampRaw)) : null;
-  if (winnerDay && cacheDay) return winnerDay.getTime() >= cacheDay.getTime() ? winnerDay : cacheDay;
-  return winnerDay ?? cacheDay ?? null;
-}
-function shouldStripIncomingRh(incomingStampRaw, localWinnerDay) {
-  const incomingDay = incomingStampRaw ? parseReadingDay(String(incomingStampRaw instanceof Date ? incomingStampRaw.toISOString() : incomingStampRaw)) : null;
-  return !incomingDay || incomingDay.getTime() <= localWinnerDay.getTime();
-}
-async function latestRotationDay(conn, componentId) {
-  try {
-    const r = await conn.query(
-      `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`,
-      [componentId]
-    );
-    const v = r.rows[0]?.latest;
-    if (!v) return null;
-    const d = v instanceof Date ? v : new Date(String(v));
-    if (isNaN(d.getTime())) return null;
-    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  } catch {
-    return null;
-  }
-}
-function canApplyWinningRHToCurrent(currentRH, winnerRH, approvedReset = false) {
-  return approvedReset || currentRH === null || currentRH === void 0 || !Number.isFinite(currentRH) || winnerRH >= currentRH;
-}
-async function selectWinningRhEvent(conn, componentId) {
-  const rotDay = await latestRotationDay(conn, componentId);
-  const params = [componentId];
-  let rotClause = "";
-  if (rotDay) {
-    rotClause = ` AND ${READING_DAY_SQL} >= $2::date`;
-    params.push(rotDay.toISOString().split("T")[0]);
-  }
-  const r = await conn.query(
-    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side,
-            meter_replaced, is_renewal_reset
-       FROM running_hours_audit
-      WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
-        AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
-      ORDER BY ${PARSED_DAY_SQL} DESC NULLS LAST,
-               ${READING_DAY_SQL} DESC,
-               (CASE WHEN lower(origin_side) = 'ship' THEN 0 WHEN origin_side IS NULL OR origin_side = '' THEN 1 ELSE 2 END) ASC,
-               entered_at_utc DESC,
-               rhauuid DESC
-      LIMIT 1`,
-    params
-  );
-  const row = r.rows[0];
-  if (!row) return null;
-  const rhRaw = row.cumulative_rh ?? row.new_rh;
-  const rh = parseFloat(String(rhRaw));
-  if (rhRaw === null || rhRaw === void 0 || isNaN(rh)) return null;
-  const day = effectiveReadingDay({
-    rhauuid: row.rhauuid,
-    dateUpdatedLocal: row.date_updated_local,
-    enteredAtUTC: row.entered_at_utc,
-    originSide: row.origin_side
+function normalizeClassificationPatch(value = {}) {
+  const patch = {};
+  classificationFields.forEach((key, index3) => {
+    const column = classificationColumns[index3];
+    if (Object.prototype.hasOwnProperty.call(value, key)) patch[key] = value[key];
+    else if (Object.prototype.hasOwnProperty.call(value, column)) patch[key] = value[column];
   });
-  if (!day) return null;
-  return {
-    rhauuid: row.rhauuid,
-    rh,
-    readingDay: day,
-    dateUpdatedLocal: row.date_updated_local,
-    originSide: row.origin_side ?? null,
-    approvedReset: row.meter_replaced === true || row.is_renewal_reset === true
+  return patch;
+}
+function validateSpareClassification(value, options = {}) {
+  const fail = (message) => {
+    throw Object.assign(new Error(message), { statusCode: 400 });
   };
+  const category = value.spareCategory == null || value.spareCategory === "" ? null : typeof value.spareCategory === "string" ? value.spareCategory.trim() || null : fail("Spare Category must be a valid Master List key.");
+  if (!category && options.required) fail("Spare Category is required.");
+  if (category && options.categoryKeys && !options.categoryKeys.has(category)) {
+    fail(`Unknown Spare Category '${category}'. Select a category from Master List > Spares.`);
+  }
+  const raw = value.optimumQty;
+  const blank = raw == null || raw === "";
+  if (category !== OPTIMUM_CATEGORY) {
+    if (!blank) fail("Optimum Qty must be blank unless Spare Category is Optimum.");
+    return { spareCategory: category, optimumQty: null };
+  }
+  if (blank || typeof raw !== "number" && typeof raw !== "string" || typeof raw === "string" && !/^\d+$/.test(raw.trim())) {
+    fail("Optimum Qty must be a positive whole number between 1 and 2147483647.");
+  }
+  const qty = Number(raw);
+  if (!Number.isInteger(qty) || qty <= 0 || qty > MAX_OPTIMUM_QTY) {
+    fail("Optimum Qty must be a positive whole number between 1 and 2147483647.");
+  }
+  return { spareCategory: category, optimumQty: qty };
 }
-async function applyWinningRhToComponent(conn, componentId, context) {
-  const winner = await selectWinningRhEvent(conn, componentId);
-  if (!winner) return false;
-  const lastUpdatedText = canonicalReadingDay(winner.dateUpdatedLocal) || formatReadingDay(winner.readingDay);
-  let comp = null;
-  try {
-    const c = await conn.query(
-      `SELECT id, rh_counter_type, rh_master_component_id, rh_counter_source,
-              meter_replaced_last_rh, component_code, vessel_id,
-              current_cumulative_rh, rh_current_inherited_cached, rh_inherited_updated_at, last_updated,
-              rh_current_master, rh_master_updated_at
-         FROM components WHERE cuuid = $1 LIMIT 1`,
-      [componentId]
-    );
-    comp = c.rows[0] || null;
-  } catch {
-  }
-  const counterType = String(comp?.rh_counter_type || "").toUpperCase();
-  const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
-  const currentLiveRH = parseFloat(String(
-    counterType === "MASTER" ? comp?.rh_current_master ?? comp?.current_cumulative_rh ?? "0" : comp?.current_cumulative_rh ?? "0"
-  ));
-  if (comp && !canApplyWinningRHToCurrent(currentLiveRH, winner.rh, winner.approvedReset)) {
-    console.warn(
-      `[RH-Derive:${context}] rejected lower non-reset winner for component=${componentId}: current=${currentLiveRH}, incoming=${winner.rh}, event=${winner.rhauuid}, reading=${winner.readingDay.toISOString().split("T")[0]}`
-    );
-    return "unchanged";
-  }
-  if (counterType === "INHERITED" && masterRef) {
-    let cache3 = null;
-    let cacheDay = null;
-    try {
-      const m = await conn.query(
-        `SELECT cuuid, meter_replaced_last_rh, rh_current_master, current_cumulative_rh FROM components
-          WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
-            AND (is_deleted = false OR is_deleted IS NULL)
-          ORDER BY (cuuid = $1) DESC LIMIT 1`,
-        [masterRef, comp.vessel_id]
-      );
-      const master = m.rows[0];
-      if (master) {
-        const baseline = parseFloat(master.meter_replaced_last_rh || "0") || 0;
-        const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
-        const currentMasterRH = parseFloat(master.rh_current_master ?? master.current_cumulative_rh ?? "0");
-        if (masterWinner && canApplyWinningRHToCurrent(currentMasterRH, masterWinner.rh, masterWinner.approvedReset)) {
-          cache3 = (baseline + masterWinner.rh).toFixed(2);
-          cacheDay = masterWinner.readingDay;
-        } else if (masterWinner) {
-          console.warn(
-            `[RH-Derive:${context}] preserved INHERITED cache because master winner would roll back master=${master.cuuid}: current=${currentMasterRH}, incoming=${masterWinner.rh}`
-          );
-        }
-      }
-    } catch (e) {
-      console.log(`[RH-Derive:${context}] INHERITED cache lookup failed for master=${masterRef}: ${String(e?.message || e).substring(0, 120)} \u2014 cache preserved`);
-    }
-    const num = (v) => v === null || v === void 0 ? null : parseFloat(String(v));
-    const day = (v) => v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null;
-    const childLastUpdatedText = cacheDay && cacheDay.getTime() > winner.readingDay.getTime() ? formatReadingDay(cacheDay) : lastUpdatedText;
-    const unchanged = num(comp.current_cumulative_rh) === num(winner.rh.toFixed(2)) && (cache3 === null || num(comp.rh_current_inherited_cached) === num(cache3)) && (cacheDay === null || day(comp.rh_inherited_updated_at) === cacheDay.getTime()) && String(comp.last_updated ?? "") === childLastUpdatedText;
-    if (unchanged) {
-      return "unchanged";
-    }
-    await conn.query(
-      `UPDATE components SET current_cumulative_rh = $1,
-          rh_current_inherited_cached = COALESCE($2, rh_current_inherited_cached),
-          rh_inherited_updated_at = COALESCE($3, rh_inherited_updated_at),
-          last_updated = $4, updated_at = NOW()
-        WHERE cuuid = $5`,
-      [winner.rh.toFixed(2), cache3, cacheDay, childLastUpdatedText, componentId]
-    );
-    console.log(`[RH-Derive:${context}] INHERITED component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} cache=${cache3 ?? "preserved"} cacheDay=${cacheDay ? cacheDay.toISOString().split("T")[0] : "preserved"} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
-    return true;
-  }
-  const numM = (v) => v === null || v === void 0 ? null : parseFloat(String(v));
-  const dayM = (v) => v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null;
-  const masterUnchanged = comp && numM(comp.current_cumulative_rh) === numM(winner.rh.toFixed(2)) && numM(comp.rh_current_master) === numM(winner.rh.toFixed(2)) && dayM(comp.rh_master_updated_at) === winner.readingDay.getTime() && String(comp.last_updated ?? "") === lastUpdatedText;
-  if (!masterUnchanged) {
-    await conn.query(
-      `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
-          rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
-        WHERE cuuid = $4`,
-      [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
-    );
-    console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
-  }
-  let childrenRefreshed = 0;
-  if (counterType === "MASTER") {
-    try {
-      const baseline = parseFloat(comp?.meter_replaced_last_rh || "0") || 0;
-      const total = (baseline + winner.rh).toFixed(2);
-      const r = await conn.query(
-        `UPDATE components SET rh_current_inherited_cached = $1,
-            rh_inherited_updated_at = $2,
-            -- Task #427 convergence: only ADVANCE the child's last_updated to the
-            -- master's reading day; a child whose own reading day is newer keeps
-            -- its stamp (the INHERITED derive stamps max(child day, master day)).
-            last_updated = CASE
-              WHEN safe_rh_reading_day(last_updated) IS NULL
-                OR safe_rh_reading_day(last_updated) < ($2 AT TIME ZONE 'UTC')::date THEN $3
-              ELSE last_updated END,
-            updated_at = NOW()
-          WHERE (rh_master_component_id = $4
-                 OR (vessel_id = $6 AND (
-                      ($5::text IS NOT NULL AND (rh_master_component_id = $5 OR rh_counter_source = $5))
-                      OR ($7::text IS NOT NULL AND rh_master_component_id = $7))))
-            AND upper(rh_counter_type) = 'INHERITED'
-            AND (is_deleted = false OR is_deleted IS NULL)
-            AND (rh_current_inherited_cached IS DISTINCT FROM $1::decimal
-                 OR rh_inherited_updated_at IS DISTINCT FROM $2
-                 OR ((safe_rh_reading_day(last_updated) IS NULL
-                      OR safe_rh_reading_day(last_updated) < ($2 AT TIME ZONE 'UTC')::date)
-                     AND last_updated IS DISTINCT FROM $3))`,
-        [total, winner.readingDay, lastUpdatedText, componentId, comp?.component_code ?? null, comp?.vessel_id ?? null, comp?.id ?? null]
-      );
-      if (r.rowCount) {
-        childrenRefreshed = r.rowCount;
-        console.log(`[RH-Derive:${context}] master=${componentId} refreshed inherited cache on ${r.rowCount} child component(s) total=${total}`);
-      }
-    } catch (e) {
-      console.log(`[RH-Derive:${context}] inherited-children cache refresh failed for master=${componentId}: ${String(e?.message || e).substring(0, 120)}`);
-    }
-  }
-  if (masterUnchanged && childrenRefreshed === 0) return "unchanged";
-  return true;
+function mergeSpareClassification(saved, patch, options = {}) {
+  saved = normalizeClassificationPatch(saved);
+  patch = normalizeClassificationPatch(patch);
+  return validateSpareClassification({
+    spareCategory: patch.spareCategory !== void 0 ? patch.spareCategory : saved?.spareCategory,
+    optimumQty: patch.optimumQty !== void 0 ? patch.optimumQty : saved?.optimumQty
+  }, typeof options === "boolean" ? { required: options } : options);
 }
-async function selfHealInheritedRhCaches(conn) {
-  const r = await conn.query(
-    `SELECT cuuid FROM components
-      WHERE upper(rh_counter_type) = 'INHERITED'
-        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
-        AND (is_deleted = false OR is_deleted IS NULL)`
-  );
-  let healed = 0;
-  for (const row of r.rows) {
-    try {
-      const res = await applyWinningRhToComponent(conn, row.cuuid, "self-heal");
-      if (res === true) healed++;
-    } catch (e) {
-      console.log(`[RH-SelfHeal] component=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
-    }
-  }
-  return { scanned: r.rows.length, healed };
+function spareClassificationTemplateMode(headers) {
+  const normalized = headers.map((h) => String(h).trim().toLowerCase().replace(/[\s_-]+/g, ""));
+  const category = normalized.includes("sparecategory");
+  const quantity = normalized.includes("optimumqty") || normalized.includes("optimumquantity");
+  if (category !== quantity) throw Object.assign(new Error(
+    "Incomplete spare field mapping: Spare Category and Optimum Qty must both be mapped, or both absent for a legacy template."
+  ), { statusCode: 400 });
+  return category ? "classified" : "legacy";
 }
-async function selfHealRhComponents(conn, opts) {
-  const started = Date.now();
-  const batchSize = opts?.batchSize ?? 100;
-  const vesselClause = opts?.vesselId ? ` AND vessel_id = $1` : "";
-  const vesselParams = opts?.vesselId ? [opts.vesselId] : [];
-  const metrics = {
-    mastersScanned: 0,
-    childrenScanned: 0,
-    mastersHealed: 0,
-    childrenHealed: 0,
-    rhDecreases: 0,
-    errors: 0,
-    durationMs: 0
-  };
-  const healSet = async (rows, kind) => {
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      try {
-        const oldRh = row.current_cumulative_rh !== null && row.current_cumulative_rh !== void 0 ? parseFloat(String(row.current_cumulative_rh)) : null;
-        const res = await applyWinningRhToComponent(conn, row.cuuid, "self-heal");
-        if (res === true) {
-          if (kind === "master") metrics.mastersHealed++;
-          else metrics.childrenHealed++;
-          const after = await conn.query(`SELECT current_cumulative_rh FROM components WHERE cuuid = $1`, [row.cuuid]);
-          const newRh = after.rows?.[0]?.current_cumulative_rh != null ? parseFloat(String(after.rows[0].current_cumulative_rh)) : null;
-          if (oldRh !== null && newRh !== null && newRh < oldRh) {
-            metrics.rhDecreases++;
-            console.warn(`[RH-SelfHeal] \u26A0\uFE0F RH DECREASE on ${kind} ${row.component_code || row.cuuid}: ${oldRh} \u2192 ${newRh} (rotation-guard/winner change \u2014 audit if unexpected)`);
-          }
-        }
-      } catch (e) {
-        metrics.errors++;
-        console.log(`[RH-SelfHeal] ${kind}=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
-      }
-      if ((i + 1) % batchSize === 0) {
-        console.log(`[RH-SelfHeal] progress: ${i + 1}/${rows.length} ${kind}s processed`);
-      }
-    }
-  };
-  const masters = await conn.query(
-    `SELECT cuuid, component_code, current_cumulative_rh FROM components
-      WHERE upper(rh_counter_type) = 'MASTER'
-        AND (is_deleted = false OR is_deleted IS NULL)${vesselClause}`,
-    vesselParams
-  );
-  metrics.mastersScanned = masters.rows.length;
-  await healSet(masters.rows, "master");
-  const children = await conn.query(
-    `SELECT cuuid, component_code, current_cumulative_rh FROM components
-      WHERE upper(rh_counter_type) = 'INHERITED'
-        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
-        AND (is_deleted = false OR is_deleted IS NULL)${vesselClause}`,
-    vesselParams
-  );
-  metrics.childrenScanned = children.rows.length;
-  await healSet(children.rows, "child");
-  metrics.durationMs = Date.now() - started;
-  return metrics;
+function importSpareClassification(row, categories) {
+  if (spareClassificationTemplateMode(Object.keys(row)) === "legacy") return {};
+  const raw = String(row["Spare Category"] ?? "").trim();
+  const exact = categories.find((category) => category.listKey === raw);
+  const matches = exact ? [exact] : categories.filter((category) => category.listValue.trim().toLowerCase() === raw.toLowerCase());
+  if (!raw || matches.length !== 1) throw Object.assign(new Error("Select a valid Spare Category from the Spares Master List."), { statusCode: 400 });
+  return validateSpareClassification({ spareCategory: matches[0].listKey, optimumQty: row["Optimum Qty"] }, { required: true });
 }
-async function resolveRhBaselineDay(conn, componentId, componentStampFallback) {
-  try {
-    const winner = await selectWinningRhEvent(conn, componentId);
-    if (winner) return winner.readingDay;
-  } catch {
-  }
-  if (componentStampFallback && !isNaN(componentStampFallback.getTime())) {
-    return new Date(Date.UTC(
-      componentStampFallback.getUTCFullYear(),
-      componentStampFallback.getUTCMonth(),
-      componentStampFallback.getUTCDate()
-    ));
-  }
-  return null;
-}
-async function claimWoRhSync(conn, wouuid) {
-  const r = await conn.query(
-    `UPDATE work_orders SET rh_synced_at = NOW() WHERE wouuid = $1 AND rh_synced_at IS NULL RETURNING wouuid`,
-    [wouuid]
-  );
-  return r.rows.length > 0;
-}
-async function releaseWoRhSync(conn, wouuid) {
-  try {
-    await conn.query(`UPDATE work_orders SET rh_synced_at = NULL WHERE wouuid = $1`, [wouuid]);
-  } catch (e) {
-    console.error(`[RH-Claim] release failed for WO ${wouuid}: ${e?.message || e}`);
-  }
-}
-var READING_DAY_SQL, PARSED_DAY_SQL, RH_GUARD_STRIP_COLUMNS;
-var init_rhEventComparator = __esm({
-  "server/modules/running-hours/rhEventComparator.ts"() {
+var SPARE_CATEGORY_TYPE, OPTIMUM_CATEGORY, MAX_OPTIMUM_QTY, SPARE_CATEGORY_LIST_TYPE, SPARE_CATEGORY_LABELS, classificationFields, classificationColumns;
+var init_spareClassification = __esm({
+  "shared/spareClassification.ts"() {
     "use strict";
-    init_readingDate();
-    READING_DAY_SQL = `COALESCE(safe_rh_reading_day(date_updated_local), (entered_at_utc AT TIME ZONE 'UTC' AT TIME ZONE 'UTC')::date)`;
-    PARSED_DAY_SQL = `safe_rh_reading_day(date_updated_local)`;
-    RH_GUARD_STRIP_COLUMNS = [
-      "current_cumulative_rh",
-      "currentCumulativeRH",
-      "rh_current_master",
-      "rhCurrentMaster",
-      "rh_master_updated_at",
-      "rhMasterUpdatedAt",
-      "rh_master_update_source",
-      "rhMasterUpdateSource",
-      "last_updated",
-      "lastUpdated",
-      "rh_current_inherited_cached",
-      "rhCurrentInheritedCached",
-      "rh_inherited_updated_at",
-      "rhInheritedUpdatedAt"
-    ];
+    SPARE_CATEGORY_TYPE = "spareCategory";
+    OPTIMUM_CATEGORY = "optimum";
+    MAX_OPTIMUM_QTY = 2147483647;
+    SPARE_CATEGORY_LIST_TYPE = SPARE_CATEGORY_TYPE;
+    SPARE_CATEGORY_LABELS = {
+      essential: "Essential",
+      optimum: "Optimum",
+      general: "General"
+    };
+    classificationFields = ["spareCategory", "optimumQty"];
+    classificationColumns = ["spare_category", "optimum_qty"];
   }
 });
 
-// server/modules/sync/oneWayApplier.ts
-import { createHash } from "crypto";
-function getSoftDeleteSetClause(tableName) {
-  return tableName === "jobs" || tableName === "components" || tableName === "spares" ? "is_deleted = true, is_active = false, updated_at = NOW()" : "is_deleted = true, updated_at = NOW()";
+// server/utils/workOrderStatus.ts
+var workOrderStatus_exports = {};
+__export(workOrderStatus_exports, {
+  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
+  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
+  buildRhCycleWOMap: () => buildRhCycleWOMap,
+  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
+  findBlockingWOForJob: () => findBlockingWOForJob,
+  isBlockingStatus: () => isBlockingStatus,
+  isCompletedStatus: () => isCompletedStatus,
+  isUnplannedWorkOrderNo: () => isUnplannedWorkOrderNo
+});
+function isBlockingStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
 }
-async function getColumnMeta(pool4, tableName) {
-  if (columnMetaCache.has(tableName)) return columnMetaCache.get(tableName);
-  let identityAlwaysCols = /* @__PURE__ */ new Set();
-  let jsonCols = /* @__PURE__ */ new Set();
-  let allCols = /* @__PURE__ */ new Set();
-  let arrayCols = /* @__PURE__ */ new Set();
-  let requiredCols = /* @__PURE__ */ new Set();
-  try {
-    const identityResult = await pool4.query(
-      `SELECT a.attname FROM pg_attribute a
-       JOIN pg_class c ON a.attrelid = c.oid
-       JOIN pg_namespace n ON c.relnamespace = n.oid
-       WHERE n.nspname = 'public' AND c.relname = $1 AND a.attidentity IN ('a', 'd')`,
-      [tableName]
-    );
-    identityAlwaysCols = new Set((identityResult.rows || []).map((r) => r.attname));
-    const serialResult = await pool4.query(
-      `SELECT a.attname FROM pg_attribute a
-       JOIN pg_class c ON a.attrelid = c.oid
-       JOIN pg_namespace n ON c.relnamespace = n.oid
-       JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-       WHERE n.nspname = 'public' AND c.relname = $1
-       AND pg_get_expr(d.adbin, d.adrelid) LIKE 'nextval(%'`,
-      [tableName]
-    );
-    for (const r of serialResult.rows || []) {
-      identityAlwaysCols.add(r.attname);
-    }
-  } catch {
-  }
-  try {
-    const jsonResult = await pool4.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = $1
-       AND data_type IN ('json', 'jsonb')`,
-      [tableName]
-    );
-    jsonCols = new Set((jsonResult.rows || []).map((r) => r.column_name));
-  } catch {
-  }
-  try {
-    const colResult = await pool4.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = $1`,
-      [tableName]
-    );
-    allCols = new Set((colResult.rows || []).map((r) => r.column_name));
-  } catch {
-  }
-  try {
-    const arrResult = await pool4.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = $1 AND data_type = 'ARRAY'`,
-      [tableName]
-    );
-    arrayCols = new Set((arrResult.rows || []).map((r) => r.column_name));
-  } catch {
-  }
-  try {
-    const reqResult = await pool4.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = $1
-       AND is_nullable = 'NO' AND column_default IS NULL`,
-      [tableName]
-    );
-    requiredCols = new Set((reqResult.rows || []).map((r) => r.column_name));
-  } catch {
-  }
-  const meta = { identityAlwaysCols, jsonCols, allCols, arrayCols, requiredCols };
-  columnMetaCache.set(tableName, meta);
-  return meta;
+function isCompletedStatus(status) {
+  if (!status) return false;
+  const normalizedStatus = status.toLowerCase().trim();
+  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
 }
-async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
-  try {
-    const params = [componentId];
-    let sql34 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
-    if (excludeRhruuid) {
-      sql34 += ` AND rhruuid <> $2`;
-      params.push(excludeRhruuid);
-    }
-    const res = await conn.query(sql34, params);
-    const v = res.rows[0]?.latest;
-    if (!v) return null;
-    const d = v instanceof Date ? v : new Date(String(v));
-    return isNaN(d.getTime()) ? null : d;
-  } catch {
-    return null;
+function extractJobNoFromWorkOrderNo(workOrderNo, vesselCode) {
+  if (!workOrderNo) return null;
+  if (isUnplannedWorkOrderNo(workOrderNo)) return null;
+  const knownVesselCode = vesselCode?.trim();
+  const numberWithoutKnownVesselPrefix = knownVesselCode && workOrderNo.startsWith(`${knownVesselCode}-`) ? workOrderNo.slice(knownVesselCode.length + 1) : workOrderNo;
+  const vesselPrefixedMkrMatch = numberWithoutKnownVesselPrefix.match(
+    /^(?:.+-)?(MKR-[^-]+-\d+)-\d+\.\d+.*-\d{4}-\d+$/
+  );
+  if (vesselPrefixedMkrMatch) {
+    return vesselPrefixedMkrMatch[1];
   }
+  const newFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  if (newFormatMatch) {
+    return newFormatMatch[1];
+  }
+  const woSuffixMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  if (woSuffixMatch) {
+    return woSuffixMatch[1];
+  }
+  const oldFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+)-\d{4}-\d+$/);
+  if (oldFormatMatch) {
+    return oldFormatMatch[1];
+  }
+  return null;
 }
-async function applyRotationToComponent(conn, rowData, rowUuid) {
-  const compId = rowData["component_id"];
-  const inStamp = rowData["in_stamp"];
-  const inRh = rowData["in_rh"];
-  if (!compId || !inStamp || inRh === void 0 || inRh === null) return;
-  const rotRaw = rowData["rotation_date"];
-  const rotDate = rotRaw instanceof Date ? rotRaw : new Date(String(rotRaw || ""));
-  if (isNaN(rotDate.getTime())) return;
-  try {
-    const latestOther = await getLatestRotationDate(conn, compId, rowUuid);
-    if (latestOther && latestOther.getTime() > rotDate.getTime()) {
-      syncDiag(`ROTATION-APPLY SKIP (stale): component=${compId} rotation=${rowUuid} (${rotDate.toISOString()}) older than latest local rotation ${latestOther.toISOString()}`);
+function isUnplannedWorkOrderNo(workOrderNo) {
+  if (!workOrderNo) return false;
+  return /(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(workOrderNo.trim());
+}
+function buildJobsWithActiveWOSet(workOrders2, vesselId) {
+  const byJobId = /* @__PURE__ */ new Set();
+  const byJobNo = /* @__PURE__ */ new Set();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
       return;
     }
-    await conn.query(
-      `UPDATE components SET current_stamp = $1, current_cumulative_rh = $2, rh_current_master = $2,
-         rh_master_updated_at = $3, rh_master_update_source = 'ROTATION', last_updated = $4, updated_at = NOW()
-       WHERE cuuid = $5`,
-      [inStamp, String(inRh), rotDate, rotDate.toISOString(), compId]
-    );
-    syncDiag(`ROTATION-APPLY: component=${compId} stamp=${inStamp} baseline=${inRh} from rotation ${rowUuid}`);
-  } catch (rotErr) {
-    syncDiag(`ROTATION-APPLY ERROR: component=${compId} rotation=${rowUuid}: ${rotErr.message}`);
-  }
-}
-function toTimeOrNull(v) {
-  if (v === null || v === void 0 || v === "") return null;
-  const d = v instanceof Date ? v : new Date(String(v));
-  return isNaN(d.getTime()) ? null : d.getTime();
-}
-function evaluateJobTrackingGuard(localRow, incomingRow) {
-  const incomingStamp = toTimeOrNull(incomingRow["tracking_rebaselined_at"] ?? incomingRow["trackingRebaselinedAt"]);
-  const localStamp = toTimeOrNull(localRow["tracking_rebaselined_at"] ?? localRow["trackingRebaselinedAt"]);
-  if (incomingStamp !== null && (localStamp === null || incomingStamp > localStamp)) {
-    return [];
-  }
-  const strip = [];
-  for (const col of JOB_TRACKING_COLUMNS) {
-    const localVal = localRow[col];
-    if (localVal !== null && localVal !== void 0 && localVal !== "") {
-      strip.push(col);
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
     }
-  }
-  const estimateColumns = ["rh_estimated_due_date", "rh_average_per_day", "rh_estimate_basis"];
-  const localRhCycleInitialized = [
-    "last_done_rh",
-    ...estimateColumns
-  ].some((col) => {
-    const value = localRow[col];
-    return value !== null && value !== void 0 && value !== "";
+    if (isBlockingStatus(wo.status)) {
+      if (wo.jobId) {
+        byJobId.add(wo.jobId);
+      }
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        byJobNo.add(`${woVesselId}|${jobNo}`);
+      }
+    }
   });
-  if (localRhCycleInitialized) {
-    for (const col of estimateColumns) {
-      if (!strip.includes(col)) strip.push(col);
-    }
-  }
-  if (strip.length > 0) strip.push("tracking_rebaselined_at");
-  return strip;
+  return { byJobId, byJobNo };
 }
-async function applyOneWayRows(tableName, rows) {
-  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
-  syncDiag(`ONE-WAY-APPLY START: ${tableName} \u2014 ${rows.length} rows`);
-  const config = getTableSyncConfig(tableName);
-  if (!config) {
-    return {
-      inserted: 0,
-      updated: 0,
-      softDeleted: 0,
-      silentNoOps: 0,
-      errors: [{ rowIndex: -1, error: `Unknown table: ${tableName}` }]
-    };
-  }
-  const identityCol = config.identityColumn;
-  const lookupColumn = identityCol || "id";
-  const pool4 = await getPool();
-  const meta = await getColumnMeta(pool4, tableName);
-  const COMPOSITE_KEY_TABLES = {
-    vessel_certificate_applicability: ["vessel_id", "master_id"],
-    vessel_survey_applicability: ["vessel_id", "master_id"],
-    // RBAC permissions — UNIQUE on (role_ruid, menu_muid)
-    adm_role_menu_access: ["role_ruid", "menu_muid"],
-    // Vessel department config — UNIQUE on (vessel_id, department)
-    vessel_department_config: ["vessel_id", "department"],
-    // Master lists — UNIQUE on (list_type, list_key)
-    master_lists: ["list_type", "list_key"],
-    // Job-component links — UNIQUE on (job_id, component_id)
-    job_component_links: ["job_id", "component_id"],
-    // Labels config — logical key (config_type, key), no formal UNIQUE constraint
-    ship_certificates_labels_config: ["config_type", "key"],
-    ship_surveys_labels_config: ["config_type", "key"],
-    // Alert config — one per vessel
-    alert_config: ["vessel_id"],
-    // Component class regulatory — match by (component_id, survey_type, classification_society)
-    component_class_regulatory: ["component_id", "survey_type", "classification_society"],
-    // Approval workflow config — UNIQUE (function_id, variable_name). SEEDED ON BOTH SIDES
-    // by migration 126 with per-instance random awcuuid, so identity (awcuuid) matching would
-    // MISS the ship's seeded row and the INSERT would 23505 on the natural unique EVERY cycle.
-    // Natural-key matching UPDATEs the seeded row's values instead (the local awcuuid is kept —
-    // buildUpdatePairs excludes the lookup column — so this table matches by natural key
-    // permanently). Requires FORCE_COMPOSITE below (table HAS an identityCol).
-    approval_workflow_config: ["function_id", "variable_name"]
-  };
-  const FORCE_COMPOSITE = /* @__PURE__ */ new Set(["approval_workflow_config"]);
-  const compositeKeys = COMPOSITE_KEY_TABLES[tableName] || null;
-  const useCompositeKey = compositeKeys !== null && (!identityCol || FORCE_COMPOSITE.has(tableName));
-  const result = { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    try {
-      const isDeleted = row.is_deleted === true || row.isDeleted === true;
-      let existCheck;
-      let whereClause;
-      let whereValues;
-      if (useCompositeKey) {
-        const conditions = [];
-        whereValues = [];
-        let pIdx = 1;
-        for (const keyCol of compositeKeys) {
-          const val = row[keyCol] || row[toCamelCase(keyCol)];
-          if (!val) {
-            break;
-          }
-          conditions.push(`"${keyCol}" = $${pIdx}`);
-          whereValues.push(val);
-          pIdx++;
-        }
-        if (conditions.length !== compositeKeys.length) {
-          const lookupValue = row[lookupColumn] || row[toCamelCase(lookupColumn)];
-          if (!lookupValue) {
-            result.errors.push({ rowIndex: i, error: `Missing composite key columns for "${tableName}"` });
-            continue;
-          }
-          whereClause = `"${lookupColumn}" = $1`;
-          whereValues = [lookupValue];
-        } else {
-          whereClause = conditions.join(" AND ");
-        }
-        existCheck = await pool4.query(
-          `SELECT "id" FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
-          whereValues
-        );
-      } else {
-        const lookupValue = row[lookupColumn] || row[toCamelCase(lookupColumn)];
-        if (!lookupValue) {
-          result.errors.push({ rowIndex: i, error: `Missing identity column "${lookupColumn}"` });
-          continue;
-        }
-        whereClause = `"${lookupColumn}" = $1`;
-        whereValues = [lookupValue];
-        existCheck = await pool4.query(
-          `SELECT 1 FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
-          whereValues
-        );
-      }
-      if (existCheck.rows.length > 0 && config.immutable) {
-        syncDiag(`ONE-WAY-APPLY IMMUTABLE: ${tableName} row already present \u2014 acknowledged, not updated`);
-        continue;
-      }
-      if (existCheck.rows.length > 0) {
-        if (isDeleted) {
-          await pool4.query(
-            `UPDATE "${tableName}" SET ${getSoftDeleteSetClause(tableName)} WHERE ${whereClause}`,
-            whereValues
-          );
-          result.softDeleted++;
-        } else {
-          let rowToApply = row;
-          if (tableName === "jobs") {
-            try {
-              const localRes = await pool4.query(
-                `SELECT last_done_date, next_due_date, last_done_rh, next_due_rh, tracking_rebaselined_at
-                   FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
-                whereValues
-              );
-              if (localRes.rows.length > 0) {
-                const strip = evaluateJobTrackingGuard(localRes.rows[0], row);
-                if (strip.length > 0) {
-                  rowToApply = { ...row };
-                  for (const col of strip) {
-                    delete rowToApply[col];
-                    delete rowToApply[toCamelCase(col)];
-                  }
-                  syncDiag(`JOB-TRACKING-GUARD: ${tableName} row preserved local tracking columns [${strip.join(",")}] \u2014 incoming shore values stripped (no newer rebaseline stamp)`);
-                }
-              }
-            } catch (guardErr) {
-              syncDiag(`JOB-TRACKING-GUARD lookup failed for ${tableName}: ${String(guardErr?.message || guardErr).substring(0, 120)}`);
-            }
-          }
-          if (tableName === "components") {
-            const cuuid = row["cuuid"] || row["Cuuid"] || row[toCamelCase("cuuid")];
-            if (cuuid) {
-              const latestRotation = await getLatestRotationDate(pool4, cuuid);
-              if (latestRotation) {
-                const incomingUpdatedRaw = row["updated_at"] ?? row["updatedAt"];
-                const incomingUpdated = incomingUpdatedRaw instanceof Date ? incomingUpdatedRaw : new Date(String(incomingUpdatedRaw || ""));
-                if (isNaN(incomingUpdated.getTime()) || incomingUpdated.getTime() < latestRotation.getTime()) {
-                  rowToApply = { ...row };
-                  for (const col of [
-                    "current_stamp",
-                    "currentStamp",
-                    "current_cumulative_rh",
-                    "currentCumulativeRH",
-                    "rh_current_master",
-                    "rhCurrentMaster",
-                    "rh_master_updated_at",
-                    "rhMasterUpdatedAt",
-                    "rh_master_update_source",
-                    "rhMasterUpdateSource",
-                    "last_updated",
-                    "lastUpdated",
-                    "rh_current_inherited_cached",
-                    "rhCurrentInheritedCached",
-                    "rh_inherited_updated_at",
-                    "rhInheritedUpdatedAt"
-                  ]) {
-                    delete rowToApply[col];
-                  }
-                  syncDiag(`ROTATION-GUARD: components.${cuuid} incoming row (updated_at=${incomingUpdatedRaw}) predates local rotation ${latestRotation.toISOString()} \u2014 stamp/RH columns preserved`);
-                }
-              }
-              try {
-                const { selectWinningRhEvent: selectWinningRhEvent2, incomingRhStamp: incomingRhStamp2, shouldStripIncomingRh: shouldStripIncomingRh2, localRhClaimDay: localRhClaimDay2, RH_GUARD_STRIP_COLUMNS: RH_GUARD_STRIP_COLUMNS2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-                const localWinner = await selectWinningRhEvent2(pool4, cuuid);
-                let localCacheStamp = null;
-                try {
-                  const cs = await pool4.query(
-                    `SELECT rh_inherited_updated_at FROM components WHERE cuuid = $1 LIMIT 1`,
-                    [cuuid]
-                  );
-                  localCacheStamp = cs.rows[0]?.rh_inherited_updated_at ?? null;
-                } catch {
-                }
-                const claimDay = localRhClaimDay2(localWinner?.readingDay ?? null, localCacheStamp);
-                if (claimDay) {
-                  const incomingRhStampRaw = incomingRhStamp2(row);
-                  if (shouldStripIncomingRh2(incomingRhStampRaw, claimDay)) {
-                    if (rowToApply === row) rowToApply = { ...row };
-                    for (const col of RH_GUARD_STRIP_COLUMNS2) {
-                      delete rowToApply[col];
-                    }
-                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) does not beat local RH claim ${claimDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
-                  }
-                }
-              } catch (rhGuardErr) {
-                syncDiag(`RH-LATEST-GUARD lookup failed for components.${cuuid}: ${String(rhGuardErr?.message || rhGuardErr).substring(0, 120)}`);
-              }
-            }
-          }
-          const updatePairs = buildUpdatePairs(rowToApply, lookupColumn, meta);
-          if (updatePairs.setClauses.length > 0) {
-            const offset = updatePairs.values.length;
-            const reindexedWhere = whereClause.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + offset}`);
-            const updateSQL = `UPDATE "${tableName}" SET ${updatePairs.setClauses.join(", ")}, updated_at = NOW() WHERE ${reindexedWhere}`;
-            await pool4.query(updateSQL, [...updatePairs.values, ...whereValues]);
-          }
-          result.updated++;
-        }
-      } else {
-        if (isDeleted) {
-          result.softDeleted++;
-          continue;
-        }
-        const insertParts = buildInsertParts(row, meta, useCompositeKey);
-        if (insertParts.columns.length > 0) {
-          const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(", ")}) VALUES (${insertParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
-          const ins = await pool4.query(insertSQL, insertParts.values);
-          if ((ins.rowCount ?? 0) > 0) {
-            result.inserted++;
-          } else {
-            result.silentNoOps++;
-            let detail = "row did not land (ON CONFLICT DO NOTHING absorbed a unique/PK collision)";
-            try {
-              const pkVal = row["id"] ?? row["ID"];
-              if (pkVal !== void 0 && pkVal !== null && lookupColumn) {
-                const clash = await pool4.query(
-                  `SELECT "${lookupColumn}" AS existing FROM "${tableName}" WHERE "id" = $1 LIMIT 1`,
-                  [pkVal]
-                );
-                if (clash.rows.length > 0) {
-                  detail = `PK id=${pkVal} already held by a DIFFERENT ${lookupColumn} (ship="${clash.rows[0].existing}", shore="${row[lookupColumn] ?? row[toCamelCase(lookupColumn)]}") \u2014 independently seeded table, shore row discarded`;
-                }
-              }
-            } catch {
-            }
-            result.errors.push({ rowIndex: i, error: detail });
-            syncDiag(`ONE-WAY-APPLY SILENT NO-OP: ${tableName} row[${i}]: ${detail}`);
-          }
-        }
-      }
-    } catch (err2) {
-      syncDiag(`ONE-WAY-APPLY ROW ERROR: ${tableName} row[${i}]: ${err2.message.substring(0, 150)}`);
-      result.errors.push({ rowIndex: i, error: err2.message });
+function buildRhCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
     }
-  }
-  syncDiag(
-    `ONE-WAY-APPLY DONE: ${tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, silentNoOps=${result.silentNoOps}, errors=${result.errors.length}`
-  );
-  if (meta.identityAlwaysCols.size > 0) {
-    for (const col of Array.from(meta.identityAlwaysCols)) {
-      try {
-        await pool4.query(
-          `SELECT setval(pg_get_serial_sequence('"${tableName}"', '${col}'), GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableName}"), 0), 1))`
-        );
-      } catch (e) {
-        console.warn(`[OneWayApplier] Could not advance sequence for ${tableName}.${col}: ${e.message}`);
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueRhSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
       }
     }
-  }
-  if (result.errors.length > 0) {
-    console.error(`[OneWayApplier] ${result.errors.length} errors applying ${tableName}:`);
-    result.errors.slice(0, 5).forEach(
-      (e) => console.error(`  - row ${e.rowIndex}: ${e.error}`)
-    );
-    if (result.errors.length > 5) {
-      console.error(`  ... and ${result.errors.length - 5} more`);
-    }
-  }
-  return result;
+  });
+  return cycleMap;
 }
-function toCamelCase(str) {
-  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-}
-function toSnakeCase(str) {
-  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
-}
-function fieldNameToColumn(fieldName) {
-  return SYNC_COLUMN_ALIASES[fieldName] ?? toSnakeCase(fieldName);
-}
-function coerceArrayValue(value) {
-  if (value === null || value === void 0) return null;
-  if (Array.isArray(value)) return value;
-  if (typeof value === "string") {
-    const s = value.trim();
-    if (s.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(s);
-        if (Array.isArray(parsed)) return parsed;
-      } catch {
+function buildCalendarCycleWOMap(workOrders2, vesselId) {
+  const cycleMap = /* @__PURE__ */ new Map();
+  workOrders2.forEach((wo) => {
+    if (wo.isDeleted === true) {
+      return;
+    }
+    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
+    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+      return;
+    }
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    if (wo.cycleDueDateSnapshot) {
+      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      if (jobNo) {
+        const woVesselId = wo.vesselId || "unknown";
+        const compCode = wo.componentCode || "";
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
+        cycleMap.set(cycleKey, wo);
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
       }
     }
-    return value;
-  }
-  return value;
+  });
+  return cycleMap;
 }
-function coerceValue(value, snakeKey, meta) {
-  if (value === null || value === void 0) return null;
-  if (meta.jsonCols.has(snakeKey)) {
-    if (typeof value === "string") {
-      try {
-        JSON.parse(value);
-        return value;
-      } catch {
-        return JSON.stringify(value);
-      }
-    }
-    if (typeof value === "object" && !(value instanceof Date)) {
-      return JSON.stringify(value);
-    }
-    return JSON.stringify(value);
-  }
-  if (meta.arrayCols.has(snakeKey)) {
-    return coerceArrayValue(value);
-  }
-  if (typeof value === "object" && !(value instanceof Date)) {
-    return JSON.stringify(value);
-  }
-  return value;
+function findBlockingWOForJob(workOrders2, jobId, jobNo) {
+  return workOrders2.find((wo) => {
+    if (wo.isDeleted === true) return false;
+    if (!isBlockingStatus(wo.status)) return false;
+    if (wo.jobId === jobId) return true;
+    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+    return woJobNo === jobNo;
+  });
 }
-function buildUpdatePairs(row, identityCol, meta) {
-  const setClauses = [];
-  const values = [];
-  let paramIndex = 1;
-  for (const [key, value] of Object.entries(row)) {
-    const snakeKey = toSnakeCase(key);
-    if (SKIP_UPDATE_COLUMNS.has(key) || SKIP_UPDATE_COLUMNS.has(snakeKey)) continue;
-    if (meta.identityAlwaysCols.has(key) || meta.identityAlwaysCols.has(snakeKey)) continue;
-    if (key === identityCol || snakeKey === identityCol) continue;
-    if (key === "updated_at" || key === "updatedAt") continue;
-    if (meta.allCols.size > 0 && !meta.allCols.has(snakeKey)) continue;
-    setClauses.push(`"${snakeKey}" = $${paramIndex}`);
-    values.push(coerceValue(value, snakeKey, meta));
-    paramIndex++;
-  }
-  return { setClauses, values };
-}
-function buildInsertParts(row, meta, skipIntegerPK = false) {
-  const columns = [];
-  const placeholders = [];
-  const values = [];
-  let paramIndex = 1;
-  for (const [key, value] of Object.entries(row)) {
-    const snakeKey = toSnakeCase(key);
-    if (meta.identityAlwaysCols.has(key) || meta.identityAlwaysCols.has(snakeKey)) continue;
-    if (skipIntegerPK && snakeKey === "id" && typeof value === "number") continue;
-    if (meta.allCols.size > 0 && !meta.allCols.has(snakeKey)) continue;
-    columns.push(`"${snakeKey}"`);
-    placeholders.push(`$${paramIndex}`);
-    values.push(coerceValue(value, snakeKey, meta));
-    paramIndex++;
-  }
-  return { columns, placeholders, values };
-}
-async function resolveParentLinks(pool4, tableName, row) {
-  for (const link of PARENT_UUID_LINKS[tableName] || []) {
-    const parentUuid = row[link.uuidCol] ?? row[toCamelCase(link.uuidCol)];
-    if (!parentUuid) {
-      if (link.optional) continue;
-      return `no ${link.uuidCol} \u2014 cannot tell which ${link.parentTable} it belongs to`;
-    }
-    const r = await pool4.query(`SELECT id FROM "${link.parentTable}" WHERE "${link.parentUuidCol}" = $1 LIMIT 1`, [parentUuid]);
-    if (r.rows.length === 0) return `${link.parentTable} ${parentUuid} has not arrived on this instance yet`;
-    row[link.fkCol] = r.rows[0].id;
-    if (toCamelCase(link.fkCol) in row) row[toCamelCase(link.fkCol)] = r.rows[0].id;
-  }
-  return null;
-}
-function md5Uuid(text8) {
-  const h = createHash("md5").update(text8, "utf8").digest("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-function latestLogValue(logs, column) {
-  let best = null;
-  for (const l of logs) {
-    if (fieldNameToColumn(l.fieldName) !== column || l.newValue == null) continue;
-    const t = new Date(String(l.changedAt)).getTime() || 0;
-    if (!best || t >= best.t) best = { t, v: String(l.newValue) };
-  }
-  return best ? best.v : null;
-}
-function isNonPortableParentLinkLog(log2) {
-  const links = PARENT_UUID_LINKS[log2.tableName];
-  if (!links) return false;
-  const col = fieldNameToColumn(log2.fieldName);
-  return links.some((l) => l.fkCol === col);
-}
-async function applyFieldLogInserts(fieldLogs, externalClient) {
-  if (fieldLogs.length === 0) {
-    return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [], needsFullRows: [] };
-  }
-  syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
-  const pool4 = externalClient || await getPool();
-  let insertedRows = 0;
-  const updateLogs = [];
-  const errors = [];
-  const failedRowUuids = [];
-  const needsFullRows = [];
-  const originalKeyOf = /* @__PURE__ */ new Map();
-  let workingLogs = fieldLogs;
-  if (fieldLogs.some((l) => LEGACY_ID_KEYED[l.tableName] && /^\d+$/.test(String(l.rowUuid)))) {
-    const legacyGroups = /* @__PURE__ */ new Map();
-    workingLogs = [];
-    for (const log2 of fieldLogs) {
-      if (LEGACY_ID_KEYED[log2.tableName] && /^\d+$/.test(String(log2.rowUuid))) {
-        const k = `${log2.tableName}::${log2.rowUuid}`;
-        if (!legacyGroups.has(k)) legacyGroups.set(k, []);
-        legacyGroups.get(k).push(log2);
-      } else {
-        workingLogs.push(log2);
-      }
-    }
-    for (const logs of Array.from(legacyGroups.values())) {
-      const { tableName, rowUuid: senderId } = logs[0];
-      const uuid2 = LEGACY_ID_KEYED[tableName].derive(String(senderId), logs);
-      if (!uuid2) {
-        const msg = `${tableName}.${senderId}: changed on an instance still running the previous version \u2014 applies after its next update; kept pending`;
-        errors.push(msg);
-        failedRowUuids.push(String(senderId));
-        syncDiag(`FIELD-LOG-INSERT LEGACY-WAIT: ${msg}`);
-        continue;
-      }
-      originalKeyOf.set(`${tableName}::${uuid2}`, String(senderId));
-      syncDiag(`FIELD-LOG-INSERT LEGACY-KEY: ${tableName} sender id ${senderId} \u2192 ${uuid2}`);
-      for (const l of logs) workingLogs.push({ ...l, rowUuid: uuid2 });
-    }
-  }
-  const groups = /* @__PURE__ */ new Map();
-  for (const log2 of workingLogs) {
-    const key = `${log2.tableName}::${log2.rowUuid}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(log2);
-  }
-  syncDiag(`FIELD-LOG-INSERT: ${groups.size} groups from ${fieldLogs.length} logs`);
-  const groupKeys = Array.from(groups.keys());
-  for (const groupKey of groupKeys) {
-    const logs = groups.get(groupKey);
-    const isInsertGroup = logs.every((l) => l.oldValue == null);
-    const hasAnyInsertLogs = logs.some((l) => l.oldValue == null);
-    const tableName = logs[0].tableName;
-    const rowUuid = logs[0].rowUuid;
-    const config = getTableSyncConfig(tableName);
-    if (!config) {
-      errors.push(`${tableName}: unknown table`);
-      updateLogs.push(...logs);
-      continue;
-    }
-    const identityCol = config.identityColumn || "id";
-    const isImmutable = !!config.immutable;
-    let isRecoveryInsert = false;
-    if (!isInsertGroup && !hasAnyInsertLogs) {
-      try {
-        const exist = await pool4.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
-        if (exist.rows.length > 0) {
-          if (isImmutable) {
-            syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver \u2014 re-delivered log acked as already-applied (immutable; no UPDATE issued)`);
-            continue;
-          }
-          updateLogs.push(...logs);
-          continue;
-        }
-        const msg = `${tableName}.${rowUuid}: UPDATE-shaped group (${logs.length} logs) for a row that does NOT exist on receiver \u2014 attempting recovery INSERT from newValues`;
-        console.warn(`[FieldLogInsert] ${msg}`);
-        syncDiag(`FIELD-LOG-INSERT RECOVERY: ${msg}`);
-        isRecoveryInsert = true;
-      } catch (existErr) {
-        errors.push(`${tableName}.${rowUuid}: exist-check failed (${existErr.message})`);
-        updateLogs.push(...logs);
-        continue;
-      }
-    }
-    let meta = null;
-    let rowData = {};
-    const savepointName = `ins_${tableName.replace(/[^a-z0-9_]/gi, "")}_${rowUuid.replace(/[^a-z0-9]/gi, "").substring(0, 8)}`;
-    if (externalClient) {
-      try {
-        await pool4.query(`SAVEPOINT ${savepointName}`);
-      } catch {
-      }
-    }
-    try {
-      const existCheck = await pool4.query(
-        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-        [rowUuid]
-      );
-      if (existCheck.rows.length > 0) {
-        if (isImmutable) {
-          if (externalClient) {
-            try {
-              await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
-            } catch {
-            }
-          }
-          syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver \u2014 re-delivered INSERT-origin log acked as already-applied (immutable; no UPDATE issued)`);
-          continue;
-        }
-        updateLogs.push(...logs);
-        continue;
-      }
-      meta = await getColumnMeta(pool4, tableName);
-      rowData = {};
-      rowData[identityCol] = rowUuid;
-      if (config.vesselScopeColumn && logs[0].vesselId) {
-        rowData[config.vesselScopeColumn] = logs[0].vesselId;
-      }
-      const sortedLogs = [...logs].sort((a, b) => {
-        const aTime = a.changedAt instanceof Date ? a.changedAt.getTime() : new Date(String(a.changedAt)).getTime();
-        const bTime = b.changedAt instanceof Date ? b.changedAt.getTime() : new Date(String(b.changedAt)).getTime();
-        return aTime - bTime;
-      });
-      for (const log2 of sortedLogs) {
-        const snakeField = fieldNameToColumn(log2.fieldName);
-        if (meta.identityAlwaysCols.has(snakeField)) continue;
-        if (meta.allCols.size > 0 && !meta.allCols.has(snakeField)) {
-          syncDiag(`FIELD-LOG-INSERT SKIP unknown column ${tableName}.${snakeField} (row ${rowUuid})`);
-          continue;
-        }
-        let value = log2.newValue;
-        if (value !== null && meta.jsonCols.has(snakeField)) {
-          try {
-            JSON.parse(value);
-          } catch {
-            value = "[]";
-          }
-        } else if (value !== null && meta.arrayCols.has(snakeField)) {
-          value = coerceArrayValue(value);
-        }
-        rowData[snakeField] = value;
-      }
-      if (!rowData["created_at"]) rowData["created_at"] = /* @__PURE__ */ new Date();
-      if (!rowData["updated_at"]) rowData["updated_at"] = /* @__PURE__ */ new Date();
-      const waitReason = await resolveParentLinks(pool4, tableName, rowData);
-      if (waitReason) {
-        const msg = `${tableName}.${rowUuid}: waiting for parent \u2014 ${waitReason}; kept pending`;
-        errors.push(msg);
-        failedRowUuids.push(rowUuid);
-        syncDiag(`FIELD-LOG-INSERT PARENT-WAIT: ${msg}`);
-        if (externalClient) {
-          try {
-            await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
-          } catch {
-          }
-        }
-        continue;
-      }
-      if (tableName === "work_orders" && (rowData["id"] === void 0 || rowData["id"] === null)) {
-        rowData["id"] = `WO-SYNC-${rowUuid}`;
-      }
-      if (tableName === "work_orders" && isCompletedWorkOrderStatus(rowData["status"])) {
-        if (!isValidCompletedWorkOrderDate(rowData["date_completed"])) {
-          if (isValidCompletedWorkOrderDate(rowData["completion_date_time"])) {
-            rowData["date_completed"] = rowData["completion_date_time"];
-          } else {
-            const msg = `${tableName}.${rowUuid}: Completed row has no valid date_completed or completion_date_time`;
-            errors.push(msg);
-            needsFullRows.push({ tableName, rowUuid });
-            failedRowUuids.push(rowUuid);
-            syncDiag(`FIELD-LOG-INSERT DEFER COMPLETED: ${msg}`);
-            if (externalClient) {
-              try {
-                await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
-              } catch {
-              }
-            }
-            continue;
-          }
-        }
-      }
-      if (meta && meta.requiredCols.size > 0) {
-        const missingRequired = Array.from(meta.requiredCols).filter(
-          (c) => !meta.identityAlwaysCols.has(c) && rowData[c] == null
-        );
-        if (missingRequired.length > 0) {
-          const healMsg = `${tableName}.${rowUuid}: ${isRecoveryInsert ? "recovery" : "INSERT-shaped"} group for an ABSENT row is missing NOT-NULL column(s) [${missingRequired.join(", ")}] \u2014 partial row NOT fabricated; requesting FULL ROW from sender (self-heal), fragments kept pending`;
-          console.warn(`[FieldLogInsert] \u{1FA79} SELF-HEAL REQUEST: ${healMsg}`);
-          syncDiag(`FIELD-LOG-INSERT SELF-HEAL REQUEST: ${healMsg}`);
-          errors.push(healMsg);
-          needsFullRows.push({ tableName, rowUuid });
-          failedRowUuids.push(rowUuid);
-          if (externalClient) {
-            try {
-              await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
-            } catch {
-            }
-          }
-          continue;
-        }
-      }
-      const columns = [];
-      const placeholders = [];
-      const values = [];
-      let paramIdx = 1;
-      for (const [col, val] of Object.entries(rowData)) {
-        if (meta.identityAlwaysCols.has(col)) continue;
-        columns.push(`"${col}"`);
-        placeholders.push(`$${paramIdx}`);
-        if (val !== null && meta.jsonCols.has(col)) {
-          values.push(val);
-        } else if (val instanceof Date) {
-          values.push(val);
-        } else {
-          values.push(val);
-        }
-        paramIdx++;
-      }
-      if (columns.length === 0) {
-        errors.push(`${tableName}.${rowUuid}: no columns to insert`);
-        failedRowUuids.push(rowUuid);
-        continue;
-      }
-      const insertSQL = `INSERT INTO "${tableName}" (${columns.join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
-      await pool4.query(insertSQL, values);
-      insertedRows++;
-      syncDiag(`FIELD-LOG-INSERT OK: ${tableName} row=${rowUuid} (${columns.length} columns)`);
-      console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
-      if (tableName === "running_hours_audit" && rowData["component_id"]) {
-        try {
-          const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
-          const updated = await applyWinningRhToComponent2(pool4, rowData["component_id"], "sync-insert");
-          syncDiag(`RH-APPLY INSERT (derive): component=${rowData["component_id"]} audit=${rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
-        } catch (rhErr) {
-          syncDiag(`RH-APPLY INSERT ERROR: component=${rowData["component_id"]} audit=${rowUuid}: ${rhErr.message}`);
-        }
-      }
-      if (tableName === "rotation_history") {
-        await applyRotationToComponent(pool4, rowData, rowUuid);
-      }
-      if ((tableName === "spare_location_stock" || tableName === "inventory_transactions") && rowData["location_uuid"]) {
-        try {
-          const locLookup = await pool4.query(
-            `SELECT id FROM locations WHERE luuid = $1 LIMIT 1`,
-            [rowData["location_uuid"]]
-          );
-          if (locLookup.rows.length > 0) {
-            await pool4.query(
-              `UPDATE "${tableName}" SET "location_id" = $1 WHERE "${identityCol}" = $2`,
-              [locLookup.rows[0].id, rowUuid]
-            );
-            syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} location_uuid=${rowData["location_uuid"]} \u2192 local location_id=${locLookup.rows[0].id}`);
-          } else {
-            syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} location_uuid=${rowData["location_uuid"]} \u2014 location not yet synced`);
-          }
-        } catch (fkErr) {
-          syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
-        }
-      }
-      if (externalClient) {
-        try {
-          await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
-        } catch {
-        }
-      }
-    } catch (err2) {
-      if (externalClient) {
-        try {
-          await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-        } catch {
-        }
-      }
-      if (err2.code === "23505") {
-        syncDiag(`FIELD-LOG-INSERT CONFLICT (23505): ${tableName} row=${rowUuid} constraint=${err2.constraint || "unknown"} detail=${err2.detail || "none"} \u2014 attempting fallback UPDATE`);
-        console.warn(
-          `[FieldLogInsert] Unique constraint hit for ${tableName}.${rowUuid} \u2014 falling back to field-level UPDATE (constraint: ${err2.constraint || "unknown"})`
-        );
-        try {
-          if (!meta) meta = await getColumnMeta(pool4, tableName);
-          const vesselScopeCol = config.vesselScopeColumn;
-          const vesselIdVal = logs[0].vesselId;
-          let existingIdentity = null;
-          const detailMatch = err2.detail?.match(/Key \(([^)]+)\)=\(([^)]+)\)/);
-          if (detailMatch) {
-            const constraintCols = detailMatch[1].split(",").map((c) => c.trim());
-            const constraintVals = detailMatch[2].split(",").map((v) => v.trim());
-            syncDiag(`FIELD-LOG-INSERT CONFLICT LOOKUP: using constraint cols=[${constraintCols.join(",")}] vals=[${constraintVals.join(",")}]`);
-            if (constraintCols.length > 0 && constraintCols.length === constraintVals.length) {
-              const whereParts = constraintCols.map((col, i) => `"${col}" = $${i + 1}`);
-              const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${whereParts.join(" AND ")} LIMIT 1`;
-              const constraintResult = await pool4.query(lookupSQL, constraintVals);
-              if (constraintResult.rows.length > 0) {
-                existingIdentity = constraintResult.rows[0][identityCol];
-                syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via constraint columns`);
-              }
-            }
-          }
-          if (!existingIdentity && vesselScopeCol && vesselIdVal) {
-            const lookupResult = await pool4.query(
-              `SELECT "${identityCol}" FROM "${tableName}" WHERE "${vesselScopeCol}" = $1 LIMIT 2`,
-              [vesselIdVal]
-            );
-            if (lookupResult.rows.length === 1) {
-              existingIdentity = lookupResult.rows[0][identityCol];
-              syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via single vessel-scope row`);
-            } else {
-              const lookupCols = [];
-              const lookupVals = [];
-              let pIdx = 1;
-              for (const [col, val] of Object.entries(rowData)) {
-                if (col === identityCol || val === null || val === void 0) continue;
-                if (["created_at", "updated_at"].includes(col)) continue;
-                lookupCols.push(`"${col}" = $${pIdx}`);
-                lookupVals.push(val);
-                pIdx++;
-                if (pIdx > 5) break;
-              }
-              if (lookupCols.length > 0) {
-                const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${lookupCols.join(" AND ")} LIMIT 1`;
-                const specificResult = await pool4.query(lookupSQL, lookupVals);
-                if (specificResult.rows.length > 0) {
-                  existingIdentity = specificResult.rows[0][identityCol];
-                }
-              }
-            }
-          }
-          if (existingIdentity && existingIdentity !== rowUuid && NEVER_MERGE_ON_CONFLICT.has(tableName)) {
-            const msg = `${tableName}.${rowUuid}: ${err2.detail || "unique key already used"} by a DIFFERENT record (${identityCol} ${existingIdentity}) \u2014 not merged, nothing overwritten; incoming record kept pending`;
-            console.error(`[FieldLogInsert] \u26A0\uFE0F NUMBER CLASH: ${msg}`);
-            syncDiag(`FIELD-LOG-INSERT NUMBER-CLASH: ${msg}`);
-            errors.push(msg);
-            failedRowUuids.push(rowUuid);
-          } else if (existingIdentity) {
-            let fieldsApplied = 0;
-            for (const log2 of logs) {
-              const fieldSnake = fieldNameToColumn(log2.fieldName);
-              if (fieldSnake === identityCol || fieldSnake === "created_at" || fieldSnake === "updated_at") continue;
-              if (meta.identityAlwaysCols.has(fieldSnake)) continue;
-              if (meta.allCols.size > 0 && !meta.allCols.has(fieldSnake)) continue;
-              if (log2.newValue === null) continue;
-              let valueToApply = log2.newValue;
-              if (meta.jsonCols.has(fieldSnake)) {
-                try {
-                  JSON.parse(valueToApply);
-                } catch {
-                  valueToApply = "[]";
-                }
-              }
-              try {
-                const logTs = log2.changedAt instanceof Date ? log2.changedAt : log2.changedAt ? new Date(String(log2.changedAt)) : /* @__PURE__ */ new Date();
-                await pool4.query(
-                  `UPDATE "${tableName}" SET "${fieldSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
-                  [valueToApply, existingIdentity, logTs]
-                );
-                fieldsApplied++;
-              } catch (updateErr) {
-                console.warn(`[FieldLogInsert] Conflict fallback UPDATE failed for ${tableName}.${fieldSnake}: ${updateErr.message}`);
-              }
-            }
-            if (existingIdentity !== rowUuid) {
-              try {
-                await pool4.query(
-                  `UPDATE "${tableName}" SET "${identityCol}" = $1 WHERE "${identityCol}" = $2`,
-                  [rowUuid, existingIdentity]
-                );
-                console.log(`[FieldLogInsert] Identity converged: ${tableName} "${identityCol}" ${existingIdentity} \u2192 ${rowUuid}`);
-              } catch (convergeErr) {
-                console.warn(`[FieldLogInsert] Identity convergence failed for ${tableName}: ${convergeErr.message}`);
-              }
-            }
-            if (fieldsApplied > 0) {
-              insertedRows++;
-              syncDiag(`FIELD-LOG-INSERT CONFLICT RESOLVED: ${tableName} row=${rowUuid} \u2192 updated ${fieldsApplied} fields on existing row (identity: ${existingIdentity}\u2192${rowUuid})`);
-              console.log(`[FieldLogInsert] Conflict resolved: updated ${fieldsApplied} fields on existing ${tableName} row (identity: ${existingIdentity})`);
-            }
-          } else {
-            syncDiag(`FIELD-LOG-INSERT CONFLICT FAILED: ${tableName} row=${rowUuid} \u2014 could not locate existing row despite 23505 conflict`);
-            errors.push(`${tableName}.${rowUuid}: unique constraint conflict but could not find existing row`);
-            failedRowUuids.push(rowUuid);
-          }
-        } catch (fallbackErr) {
-          errors.push(`${tableName}.${rowUuid}: conflict fallback failed: ${fallbackErr.message}`);
-          failedRowUuids.push(rowUuid);
-          console.error(`[FieldLogInsert] Conflict fallback error for ${tableName}.${rowUuid}:`, fallbackErr.message);
-        }
-      } else if (err2.code === "23503") {
-        if (tableName === "component_maintenance_history") {
-          const message = `${tableName}.${rowUuid}: parent not yet available; immutable history kept pending`;
-          errors.push(message);
-          failedRowUuids.push(rowUuid);
-          syncDiag(`FIELD-LOG-INSERT HISTORY-PARENT-DEFER: ${message}`);
-          continue;
-        }
-        const constraintName = err2.constraint || "";
-        syncDiag(`FIELD-LOG-INSERT FK-VIOLATION (23503): ${tableName} row=${rowUuid} constraint=${constraintName} \u2014 attempting NULL-FK retry`);
-        let fkColumn = null;
-        if (constraintName.startsWith(`${tableName}_`) && constraintName.endsWith("_fk")) {
-          const inner = constraintName.slice(tableName.length + 1, -3);
-          const parts = inner.split("_");
-          for (let i = 1; i <= Math.min(3, parts.length - 2); i++) {
-            const candidate = parts.slice(0, i).join("_");
-            if (rowData[candidate] !== void 0) {
-              fkColumn = candidate;
-              break;
-            }
-          }
-        }
-        if (!fkColumn && err2.detail) {
-          const detailMatch = err2.detail.match(/Key \((\w+)\)=/);
-          if (detailMatch) fkColumn = detailMatch[1];
-        }
-        if (!meta) {
-          try {
-            meta = await getColumnMeta(pool4, tableName);
-          } catch {
-          }
-        }
-        if (fkColumn && meta && meta.requiredCols.has(fkColumn)) {
-          const msg = `${tableName}.${rowUuid}: ${fkColumn} points at a row that does not exist here and cannot be left empty; kept pending (${constraintName})`;
-          syncDiag(`FIELD-LOG-INSERT FK-WAIT: ${msg}`);
-          errors.push(msg);
-          failedRowUuids.push(rowUuid);
-        } else if (fkColumn && rowData[fkColumn] !== void 0) {
-          syncDiag(`FK-NULL RETRY: ${tableName} row=${rowUuid} \u2014 setting ${fkColumn}=NULL and retrying INSERT`);
-          try {
-            if (externalClient) {
-              try {
-                await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-              } catch {
-              }
-              try {
-                await pool4.query(`SAVEPOINT ${savepointName}`);
-              } catch {
-              }
-            }
-            rowData[fkColumn] = null;
-            if (!meta) meta = await getColumnMeta(pool4, tableName);
-            const cols2 = [];
-            const phs2 = [];
-            const vals2 = [];
-            let pi2 = 1;
-            for (const [col, val] of Object.entries(rowData)) {
-              if (meta.identityAlwaysCols.has(col)) continue;
-              cols2.push(`"${col}"`);
-              phs2.push(`$${pi2}`);
-              vals2.push(val instanceof Date ? val : val);
-              pi2++;
-            }
-            const retrySQL = `INSERT INTO "${tableName}" (${cols2.join(", ")}) VALUES (${phs2.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
-            await pool4.query(retrySQL, vals2);
-            insertedRows++;
-            syncDiag(`FK-NULL RETRY OK: ${tableName} row=${rowUuid} \u2014 inserted with ${fkColumn}=NULL (will be filled by future sync)`);
-            if (externalClient) {
-              try {
-                await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
-              } catch {
-              }
-            }
-          } catch (retryErr) {
-            if (externalClient) {
-              try {
-                await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-              } catch {
-              }
-            }
-            syncDiag(`FK-NULL RETRY FAIL: ${tableName} row=${rowUuid} \u2014 ${retryErr.message.substring(0, 150)}`);
-            errors.push(`${tableName}.${rowUuid}: FK retry failed: ${retryErr.message}`);
-            failedRowUuids.push(rowUuid);
-          }
-        } else {
-          syncDiag(`FIELD-LOG-INSERT FK-VIOLATION: ${tableName} row=${rowUuid} \u2014 could not identify FK column from constraint=${constraintName}`);
-          errors.push(`${tableName}.${rowUuid}: FK violation: ${err2.message}`);
-          failedRowUuids.push(rowUuid);
-        }
-      } else {
-        if (externalClient) {
-          try {
-            await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-          } catch {
-          }
-        }
-        syncDiag(`FIELD-LOG-INSERT FAIL: ${tableName} row=${rowUuid} \u2014 ${err2.message.substring(0, 150)}`);
-        errors.push(`${tableName}.${rowUuid}: ${err2.message}`);
-        failedRowUuids.push(rowUuid);
-        console.error(`[FieldLogInsert] Failed to insert ${tableName}.${rowUuid}:`, err2.message);
-      }
-    }
-  }
-  const portableUpdateLogs = updateLogs.filter((l) => !isNonPortableParentLinkLog(l));
-  if (portableUpdateLogs.length !== updateLogs.length) {
-    syncDiag(`FIELD-LOG-INSERT: ${updateLogs.length - portableUpdateLogs.length} parent-id field update(s) ignored (local id differs per instance; parent resolved by UUID)`);
-  }
-  if (originalKeyOf.size > 0) {
-    const tablesOf = /* @__PURE__ */ new Map();
-    for (const k of Array.from(originalKeyOf.keys())) {
-      const [t, u] = k.split("::");
-      tablesOf.set(u, t);
-    }
-    for (let i = 0; i < failedRowUuids.length; i++) {
-      const t = tablesOf.get(failedRowUuids[i]);
-      if (t) failedRowUuids[i] = originalKeyOf.get(`${t}::${failedRowUuids[i]}`);
-    }
-    for (const n of needsFullRows) {
-      const orig = originalKeyOf.get(`${n.tableName}::${n.rowUuid}`);
-      if (orig) n.rowUuid = orig;
-    }
-  }
-  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${portableUpdateLogs.length}, errors=${errors.length}, selfHealRequests=${needsFullRows.length}`);
-  return { insertedRows, updateLogs: portableUpdateLogs, errors, failedRowUuids, needsFullRows };
-}
-async function applyFullRowsIfAbsent(tableName, rows) {
-  const out = { inserted: 0, skipped: 0, errors: [] };
-  if (!rows || rows.length === 0) return out;
-  const config = getTableSyncConfig(tableName);
-  if (!config) {
-    out.errors.push(`${tableName}: unknown table`);
-    return out;
-  }
-  const identityCol = config.identityColumn || "id";
-  const pool4 = await getPool();
-  const meta = await getColumnMeta(pool4, tableName);
-  for (const incomingRow of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
-    let row = incomingRow;
-    const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
-    if (!identity) {
-      out.errors.push(`${tableName}: row missing identity ${identityCol}`);
-      continue;
-    }
-    try {
-      const exist = await pool4.query(
-        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-        [identity]
-      );
-      if (exist.rows.length > 0) {
-        out.skipped++;
-        syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
-        continue;
-      }
-      if (tableName === "work_orders" && isCompletedWorkOrderStatus(row.status)) {
-        if (!isValidCompletedWorkOrderDate(row.date_completed ?? row.dateCompleted)) {
-          const executionDate = row.completion_date_time ?? row.completionDateTime;
-          if (!isValidCompletedWorkOrderDate(executionDate)) {
-            out.errors.push(`${tableName}.${identity}: Completed full row has no valid completion date`);
-            syncDiag(`SELF-HEAL DEFER COMPLETED: ${tableName}.${identity} has no valid completion date`);
-            continue;
-          }
-          row = { ...row, date_completed: executionDate };
-        }
-      }
-      if (PARENT_UUID_LINKS[tableName]) {
-        row = { ...row };
-        const waitReason = await resolveParentLinks(pool4, tableName, row);
-        if (waitReason) {
-          out.errors.push(`${tableName}.${identity}: waiting for parent \u2014 ${waitReason}`);
-          syncDiag(`SELF-HEAL PARENT-WAIT: ${tableName}.${identity} \u2014 ${waitReason}`);
-          continue;
-        }
-      }
-      const parts = buildInsertParts(
-        row,
-        meta,
-        /*skipIntegerPK*/
-        true
-      );
-      if (parts.columns.length === 0) {
-        out.errors.push(`${tableName}.${identity}: no insertable columns`);
-        continue;
-      }
-      const sqlText = `INSERT INTO "${tableName}" (${parts.columns.join(", ")}) VALUES (${parts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
-      try {
-        await pool4.query(sqlText, parts.values);
-      } catch (insErr) {
-        if (insErr.code === "23505" && tableName === "work_orders") {
-          const retryRow = { ...row, id: `WO-SYNC-${identity}` };
-          const retryParts = buildInsertParts(retryRow, meta, true);
-          await pool4.query(
-            `INSERT INTO "${tableName}" (${retryParts.columns.join(", ")}) VALUES (${retryParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`,
-            retryParts.values
-          );
-        } else {
-          throw insErr;
-        }
-      }
-      const landed = await pool4.query(
-        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-        [identity]
-      );
-      if (landed.rows.length > 0) {
-        out.inserted++;
-        console.log(`[SelfHeal] \u{1FA79} full row inserted (was absent): ${tableName}.${identity}`);
-        syncDiag(`SELF-HEAL INSERT OK: ${tableName}.${identity}`);
-      } else {
-        out.skipped++;
-        syncDiag(`SELF-HEAL INSERT NO-OP (conflict, left untouched): ${tableName}.${identity}`);
-      }
-    } catch (err2) {
-      out.errors.push(`${tableName}.${identity}: ${err2.message}`);
-      syncDiag(`SELF-HEAL INSERT FAIL: ${tableName}.${identity} \u2014 ${String(err2.message).substring(0, 150)}`);
-    }
-  }
-  if (rows.length > SELF_HEAL_MAX_ROWS_PER_CYCLE) {
-    syncDiag(`SELF-HEAL: ${rows.length - SELF_HEAL_MAX_ROWS_PER_CYCLE} row(s) over the per-cycle cap deferred (will regenerate)`);
-  }
-  return out;
-}
-async function gatherFullRows(requests) {
-  const out = [];
-  const pool4 = await getPool();
-  let budget = SELF_HEAL_MAX_ROWS_PER_CYCLE;
-  for (const req of requests) {
-    if (budget <= 0) break;
-    const config = getTableSyncConfig(req.tableName);
-    if (!config || !req.rowUuids?.length) continue;
-    const identityCol = config.identityColumn || "id";
-    const uuids = req.rowUuids.slice(0, budget);
-    try {
-      const r = await pool4.query(
-        `SELECT * FROM "${req.tableName}" WHERE "${identityCol}" = ANY($1)`,
-        [uuids]
-      );
-      if (r.rows.length > 0) {
-        out.push({ tableName: req.tableName, rows: r.rows });
-        budget -= r.rows.length;
-        syncDiag(`SELF-HEAL GATHER: ${req.tableName} \u2014 ${r.rows.length}/${uuids.length} full row(s)`);
-      }
-    } catch (err2) {
-      syncDiag(`SELF-HEAL GATHER FAIL: ${req.tableName} \u2014 ${String(err2.message).substring(0, 120)}`);
-    }
-  }
-  return out;
-}
-function getInsertLogSkipCount() {
-  return insertLogSkipsSession;
-}
-async function evaluateInsertOriginGuard(client2, log2) {
-  if (log2.oldValue !== null && log2.oldValue !== void 0) return { skip: false };
-  const config = getTableSyncConfig(log2.tableName);
-  if (!config) return { skip: false };
-  const identityCol = config.identityColumn || "id";
-  const column = fieldNameToColumn(log2.fieldName);
-  const res = await client2.query(
-    `SELECT ("${column}" IS NOT NULL) AS populated FROM "${log2.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-    [log2.rowUuid]
-  );
-  if (res.rows.length === 0) return { skip: false };
-  if (!res.rows[0].populated) return { skip: false };
-  insertLogSkipsSession++;
-  const reason = `re-delivered INSERT-origin log for an EXISTING row whose "${column}" is already populated \u2014 not applied (a creation-time log is the oldest possible state of the row and cannot be newer)`;
-  syncDiag(`INSERT-LOG SKIP (terminal-ack): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 ${reason}`);
-  return { skip: true, reason };
-}
-async function evaluateStaleSkipGuard(client2, log2, receiverInstanceId, opts = {}) {
-  const fieldCheck = await client2.query(
-    `SELECT changed_at, instance_id FROM sync_field_log
-      WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
-        AND instance_id = $4 AND changed_at > $5
-      ORDER BY changed_at DESC LIMIT 1`,
-    [log2.tableName, log2.rowUuid, log2.fieldName, receiverInstanceId, log2.changedAt]
-  );
-  if (fieldCheck.rows.length === 0) return { skip: false };
-  const winnerChangedAt = new Date(fieldCheck.rows[0].changed_at);
-  const config = getTableSyncConfig(log2.tableName);
-  const identityCol = config?.identityColumn || "id";
-  const fieldNameSnake = fieldNameToColumn(log2.fieldName);
-  let currentValue = null;
-  try {
-    const curRow = await client2.query(
-      `SELECT "${fieldNameSnake}" FROM "${log2.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-      [log2.rowUuid]
-    );
-    if (curRow.rows.length > 0) {
-      const raw = curRow.rows[0][fieldNameSnake];
-      currentValue = raw === null || raw === void 0 ? null : String(raw);
-    }
-  } catch {
-  }
-  try {
-    await client2.query(
-      `INSERT INTO sync_conflict_log
-         (batch_uuid, table_name, row_uuid, field_name,
-          incoming_sender_instance, incoming_changed_at,
-          incoming_old_value, incoming_new_value,
-          receiver_winner_instance, receiver_winner_changed_at,
-          receiver_current_value)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [
-        opts.batchUuid ?? null,
-        log2.tableName,
-        log2.rowUuid,
-        log2.fieldName,
-        log2.instanceId ?? null,
-        log2.changedAt,
-        log2.oldValue ?? null,
-        log2.newValue ?? null,
-        receiverInstanceId,
-        winnerChangedAt,
-        currentValue
-      ]
-    );
-  } catch (clErr) {
-    console.error(`[Sync] Failed to write sync_conflict_log: ${clErr.message}`);
-  }
-  syncDiag(
-    `STALE-SKIP: ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 incoming ${log2.changedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`
-  );
-  return { skip: true, winnerChangedAt, currentValue };
-}
-var columnMetaCache, JOB_TRACKING_COLUMNS, SYNC_COLUMN_ALIASES, SKIP_UPDATE_COLUMNS, PARENT_UUID_LINKS, LEGACY_ID_KEYED, NEVER_MERGE_ON_CONFLICT, SELF_HEAL_MAX_ROWS_PER_CYCLE, insertLogSkipsSession;
-var init_oneWayApplier = __esm({
-  "server/modules/sync/oneWayApplier.ts"() {
+var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
+var init_workOrderStatus = __esm({
+  "server/utils/workOrderStatus.ts"() {
     "use strict";
-    init_db();
-    init_syncConfig();
-    init_syncDiagLogger();
-    init_completedWorkOrderDate();
-    columnMetaCache = /* @__PURE__ */ new Map();
-    JOB_TRACKING_COLUMNS = [
-      "last_done_date",
-      "next_due_date",
-      "last_done_rh",
-      "next_due_rh",
-      "rh_estimated_due_date",
-      "rh_average_per_day",
-      "rh_estimate_basis"
-    ];
-    SYNC_COLUMN_ALIASES = { location2: "location_2" };
-    SKIP_UPDATE_COLUMNS = /* @__PURE__ */ new Set(["id", "created_at", "createdAt"]);
-    PARENT_UUID_LINKS = {
-      change_request_approval: [
-        { fkCol: "change_request_id", uuidCol: "change_request_uuid", parentTable: "change_request", parentUuidCol: "cruuid" }
-      ],
-      change_request_comment: [
-        { fkCol: "change_request_id", uuidCol: "change_request_uuid", parentTable: "change_request", parentUuidCol: "cruuid", optional: true }
-      ],
-      change_request_attachment: [
-        { fkCol: "change_request_id", uuidCol: "change_request_uuid", parentTable: "change_request", parentUuidCol: "cruuid", optional: true }
-      ]
-    };
-    LEGACY_ID_KEYED = {
-      component_documents: {
-        // = migration 182 backfill (n = 1): stored file + component — the same on both sides for the same document. NOT the
-        // sender's integer id: a document that synced under the old code has different ids on shore and ship.
-        derive: (_senderId, logs) => {
-          const fileKey = latestLogValue(logs, "file_key");
-          const componentId = latestLogValue(logs, "component_id");
-          return fileKey && componentId ? md5Uuid(`component_documents:${fileKey}:${componentId}:1`) : null;
-        }
-      }
-    };
-    NEVER_MERGE_ON_CONFLICT = /* @__PURE__ */ new Set(["defects"]);
-    SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
-    insertLogSkipsSession = 0;
+    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "active",
+      "due",
+      "due (grace p)",
+      "due (grace)",
+      "overdue",
+      "pending approval",
+      "pending_approval",
+      "pendingapproval",
+      "postponed",
+      "in progress",
+      "in_progress",
+      "inprogress",
+      "open",
+      "rejected",
+      // Rejected WOs block new generation - work needs rework before cycle can advance
+      "awaiting office approval",
+      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
+      "postponement approved"
+      // Postponement approved — WO is still active, scanner must not re-generate
+    ]);
+    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
+      "completed",
+      "closed",
+      "approved",
+      "cancelled",
+      "canceled"
+    ]);
   }
 });
 
@@ -10404,6 +8906,2293 @@ var init_repository = __esm({
   }
 });
 
+// server/modules/sync/syncRole.ts
+var syncRole_exports = {};
+__export(syncRole_exports, {
+  getEffectiveInstanceId: () => getEffectiveInstanceId,
+  getInstanceRole: () => getInstanceRole,
+  isShipInstance: () => isShipInstance,
+  isShipInstanceId: () => isShipInstanceId
+});
+function isShipInstanceId(instanceId2) {
+  return instanceId2.toUpperCase().startsWith("SHIP-");
+}
+async function getEffectiveInstanceId() {
+  let dbInstanceId = null;
+  try {
+    dbInstanceId = await getSetting("instance_id");
+  } catch {
+  }
+  return dbInstanceId && dbInstanceId.trim() || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+}
+async function isShipInstance() {
+  const id = await getEffectiveInstanceId();
+  return isShipInstanceId(id);
+}
+async function getInstanceRole() {
+  return await isShipInstance() ? "ship" : "shore";
+}
+var init_syncRole = __esm({
+  "server/modules/sync/syncRole.ts"() {
+    "use strict";
+    init_repository();
+  }
+});
+
+// server/modules/running-hours/utils/readingDate.ts
+var readingDate_exports = {};
+__export(readingDate_exports, {
+  InvalidReadingDateError: () => InvalidReadingDateError,
+  canonicalReadingDay: () => canonicalReadingDay,
+  canonicalizeReadingDateInput: () => canonicalizeReadingDateInput,
+  formatReadingDay: () => formatReadingDay,
+  parseReadingDayStrict: () => parseReadingDayStrict,
+  requireReadingDayInput: () => requireReadingDayInput,
+  todayReadingDay: () => todayReadingDay
+});
+function daysInMonth(yearNum, monthIdx) {
+  return new Date(Date.UTC(yearNum, monthIdx + 1, 0)).getUTCDate();
+}
+function utcDay(y, mIdx, d) {
+  if (mIdx < 0 || mIdx > 11) return null;
+  if (d < 1 || d > daysInMonth(y, mIdx)) return null;
+  return new Date(Date.UTC(y, mIdx, d));
+}
+function parseReadingDayStrict(value) {
+  if (value === null || value === void 0) return null;
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  }
+  const str = String(value).trim();
+  if (!str) return null;
+  const iso = str.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
+  if (iso) {
+    return utcDay(parseInt(iso[1], 10), parseInt(iso[2], 10) - 1, parseInt(iso[3], 10));
+  }
+  const legacy = str.match(
+    /^([0-9]{1,2})[-\s]+([A-Za-z]{3,})[-\s]+([0-9]{4})(?:[-\s]+([0-9]{1,2}):([0-9]{1,2}))?/
+  );
+  if (legacy) {
+    const monthIdx = MONTH_INDEX[legacy[2].slice(0, 3).toLowerCase()];
+    if (monthIdx === void 0) return null;
+    if (legacy[4] !== void 0) {
+      const hh = parseInt(legacy[4], 10);
+      const mi = parseInt(legacy[5], 10);
+      if (hh > 23 || mi > 59) return null;
+    }
+    return utcDay(parseInt(legacy[3], 10), monthIdx, parseInt(legacy[1], 10));
+  }
+  return null;
+}
+function formatReadingDay(d) {
+  return d.toISOString().slice(0, 10);
+}
+function canonicalReadingDay(value) {
+  const d = parseReadingDayStrict(value);
+  return d ? formatReadingDay(d) : null;
+}
+function canonicalizeReadingDateInput(value) {
+  const strict = canonicalReadingDay(value);
+  if (strict) return strict;
+  if (typeof value !== "string") return null;
+  const m = value.trim().match(/^([0-9]{1,2})[-\/]([0-9]{1,2})[-\/]([0-9]{4})/);
+  if (m) {
+    const d = utcDay(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+    return d ? formatReadingDay(d) : null;
+  }
+  return null;
+}
+function todayReadingDay() {
+  return formatReadingDay(/* @__PURE__ */ new Date());
+}
+function requireReadingDayInput(value, field = "reading date") {
+  if (value === null || value === void 0) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const canonical = canonicalizeReadingDateInput(value);
+  if (!canonical) throw new InvalidReadingDateError(value, field);
+  return canonical;
+}
+var MONTH_INDEX, InvalidReadingDateError;
+var init_readingDate = __esm({
+  "server/modules/running-hours/utils/readingDate.ts"() {
+    "use strict";
+    MONTH_INDEX = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11
+    };
+    InvalidReadingDateError = class extends Error {
+      status = 400;
+      code = "RH_INVALID_READING_DATE";
+      constructor(value, field = "reading date") {
+        super(`Invalid ${field} "${String(value)}". Use a real calendar date (e.g. ${todayReadingDay()}).`);
+        this.name = "ValidationError";
+      }
+    };
+  }
+});
+
+// server/modules/running-hours/rhEventComparator.ts
+var rhEventComparator_exports = {};
+__export(rhEventComparator_exports, {
+  RH_GUARD_STRIP_COLUMNS: () => RH_GUARD_STRIP_COLUMNS,
+  applyWinningRhToComponent: () => applyWinningRhToComponent,
+  canApplyWinningRHToCurrent: () => canApplyWinningRHToCurrent,
+  claimWoRhSync: () => claimWoRhSync,
+  compareRhEvents: () => compareRhEvents,
+  effectiveReadingDay: () => effectiveReadingDay,
+  incomingRhStamp: () => incomingRhStamp,
+  localRhClaimDay: () => localRhClaimDay,
+  originRank: () => originRank,
+  parseReadingDay: () => parseReadingDay,
+  releaseWoRhSync: () => releaseWoRhSync,
+  resolveRhBaselineDay: () => resolveRhBaselineDay,
+  selectWinningRhEvent: () => selectWinningRhEvent,
+  selfHealInheritedRhCaches: () => selfHealInheritedRhCaches,
+  selfHealRhComponents: () => selfHealRhComponents,
+  shouldStripIncomingRh: () => shouldStripIncomingRh
+});
+function parseReadingDay(dateStr) {
+  if (!dateStr) return null;
+  return parseReadingDayStrict(String(dateStr));
+}
+function originRank(originSide) {
+  const o = (originSide || "").toLowerCase();
+  if (o === "ship") return 0;
+  if (o === "shore") return 2;
+  return 1;
+}
+function enteredAtMs(e) {
+  const v = e.enteredAtUTC instanceof Date ? e.enteredAtUTC : e.enteredAtUTC ? new Date(String(e.enteredAtUTC)) : null;
+  return v && !isNaN(v.getTime()) ? v.getTime() : 0;
+}
+function effectiveReadingDay(e) {
+  const d = parseReadingDay(e.dateUpdatedLocal);
+  if (d) return d;
+  const ms = enteredAtMs(e);
+  if (!ms) return null;
+  const t = new Date(ms);
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+}
+function compareRhEvents(a, b) {
+  const pa = parseReadingDay(a.dateUpdatedLocal);
+  const pb = parseReadingDay(b.dateUpdatedLocal);
+  if (!!pa !== !!pb) return pa ? 1 : -1;
+  const da = effectiveReadingDay(a)?.getTime() ?? -Infinity;
+  const db12 = effectiveReadingDay(b)?.getTime() ?? -Infinity;
+  if (da !== db12) return da - db12 > 0 ? 1 : -1;
+  const ra = originRank(a.originSide);
+  const rb = originRank(b.originSide);
+  if (ra !== rb) return rb - ra > 0 ? 1 : -1;
+  const ea = enteredAtMs(a);
+  const eb = enteredAtMs(b);
+  if (ea !== eb) return ea - eb > 0 ? 1 : -1;
+  return a.rhauuid > b.rhauuid ? 1 : -1;
+}
+function incomingRhStamp(row) {
+  return row["rh_master_updated_at"] ?? row["rhMasterUpdatedAt"] ?? row["rh_inherited_updated_at"] ?? row["rhInheritedUpdatedAt"] ?? row["last_updated"] ?? row["lastUpdated"];
+}
+function localRhClaimDay(winnerDay, localCacheStampRaw) {
+  const cacheDay = localCacheStampRaw ? parseReadingDay(String(localCacheStampRaw instanceof Date ? localCacheStampRaw.toISOString() : localCacheStampRaw)) : null;
+  if (winnerDay && cacheDay) return winnerDay.getTime() >= cacheDay.getTime() ? winnerDay : cacheDay;
+  return winnerDay ?? cacheDay ?? null;
+}
+function shouldStripIncomingRh(incomingStampRaw, localWinnerDay) {
+  const incomingDay = incomingStampRaw ? parseReadingDay(String(incomingStampRaw instanceof Date ? incomingStampRaw.toISOString() : incomingStampRaw)) : null;
+  return !incomingDay || incomingDay.getTime() <= localWinnerDay.getTime();
+}
+async function latestRotationDay(conn, componentId) {
+  try {
+    const r = await conn.query(
+      `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`,
+      [componentId]
+    );
+    const v = r.rows[0]?.latest;
+    if (!v) return null;
+    const d = v instanceof Date ? v : new Date(String(v));
+    if (isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  } catch {
+    return null;
+  }
+}
+function canApplyWinningRHToCurrent(currentRH, winnerRH, approvedReset = false) {
+  return approvedReset || currentRH === null || currentRH === void 0 || !Number.isFinite(currentRH) || winnerRH >= currentRH;
+}
+async function selectWinningRhEvent(conn, componentId) {
+  const rotDay = await latestRotationDay(conn, componentId);
+  const params = [componentId];
+  let rotClause = "";
+  if (rotDay) {
+    rotClause = ` AND ${READING_DAY_SQL} >= $2::date`;
+    params.push(rotDay.toISOString().split("T")[0]);
+  }
+  const r = await conn.query(
+    `SELECT rhauuid, component_id, cumulative_rh, new_rh, date_updated_local, entered_at_utc, origin_side,
+            meter_replaced, is_renewal_reset
+       FROM running_hours_audit
+      WHERE component_id = $1 AND (is_deleted = false OR is_deleted IS NULL)
+        AND (cumulative_rh IS NOT NULL OR new_rh IS NOT NULL)${rotClause}
+      ORDER BY ${PARSED_DAY_SQL} DESC NULLS LAST,
+               ${READING_DAY_SQL} DESC,
+               (CASE WHEN lower(origin_side) = 'ship' THEN 0 WHEN origin_side IS NULL OR origin_side = '' THEN 1 ELSE 2 END) ASC,
+               entered_at_utc DESC,
+               rhauuid DESC
+      LIMIT 1`,
+    params
+  );
+  const row = r.rows[0];
+  if (!row) return null;
+  const rhRaw = row.cumulative_rh ?? row.new_rh;
+  const rh = parseFloat(String(rhRaw));
+  if (rhRaw === null || rhRaw === void 0 || isNaN(rh)) return null;
+  const day = effectiveReadingDay({
+    rhauuid: row.rhauuid,
+    dateUpdatedLocal: row.date_updated_local,
+    enteredAtUTC: row.entered_at_utc,
+    originSide: row.origin_side
+  });
+  if (!day) return null;
+  return {
+    rhauuid: row.rhauuid,
+    rh,
+    readingDay: day,
+    dateUpdatedLocal: row.date_updated_local,
+    originSide: row.origin_side ?? null,
+    approvedReset: row.meter_replaced === true || row.is_renewal_reset === true
+  };
+}
+async function applyWinningRhToComponent(conn, componentId, context) {
+  const winner = await selectWinningRhEvent(conn, componentId);
+  if (!winner) return false;
+  const lastUpdatedText = canonicalReadingDay(winner.dateUpdatedLocal) || formatReadingDay(winner.readingDay);
+  let comp = null;
+  try {
+    const c = await conn.query(
+      `SELECT id, rh_counter_type, rh_master_component_id, rh_counter_source,
+              meter_replaced_last_rh, component_code, vessel_id,
+              current_cumulative_rh, rh_current_inherited_cached, rh_inherited_updated_at, last_updated,
+              rh_current_master, rh_master_updated_at
+         FROM components WHERE cuuid = $1 LIMIT 1`,
+      [componentId]
+    );
+    comp = c.rows[0] || null;
+  } catch {
+  }
+  const counterType = String(comp?.rh_counter_type || "").toUpperCase();
+  const masterRef = comp?.rh_master_component_id || comp?.rh_counter_source || null;
+  const currentLiveRH = parseFloat(String(
+    counterType === "MASTER" ? comp?.rh_current_master ?? comp?.current_cumulative_rh ?? "0" : comp?.current_cumulative_rh ?? "0"
+  ));
+  if (comp && !canApplyWinningRHToCurrent(currentLiveRH, winner.rh, winner.approvedReset)) {
+    console.warn(
+      `[RH-Derive:${context}] rejected lower non-reset winner for component=${componentId}: current=${currentLiveRH}, incoming=${winner.rh}, event=${winner.rhauuid}, reading=${winner.readingDay.toISOString().split("T")[0]}`
+    );
+    return "unchanged";
+  }
+  if (counterType === "INHERITED" && masterRef) {
+    let cache3 = null;
+    let cacheDay = null;
+    try {
+      const m = await conn.query(
+        `SELECT cuuid, meter_replaced_last_rh, rh_current_master, current_cumulative_rh FROM components
+          WHERE (cuuid = $1 OR ((component_code = $1 OR id = $1) AND vessel_id = $2))
+            AND (is_deleted = false OR is_deleted IS NULL)
+          ORDER BY (cuuid = $1) DESC LIMIT 1`,
+        [masterRef, comp.vessel_id]
+      );
+      const master = m.rows[0];
+      if (master) {
+        const baseline = parseFloat(master.meter_replaced_last_rh || "0") || 0;
+        const masterWinner = await selectWinningRhEvent(conn, master.cuuid);
+        const currentMasterRH = parseFloat(master.rh_current_master ?? master.current_cumulative_rh ?? "0");
+        if (masterWinner && canApplyWinningRHToCurrent(currentMasterRH, masterWinner.rh, masterWinner.approvedReset)) {
+          cache3 = (baseline + masterWinner.rh).toFixed(2);
+          cacheDay = masterWinner.readingDay;
+        } else if (masterWinner) {
+          console.warn(
+            `[RH-Derive:${context}] preserved INHERITED cache because master winner would roll back master=${master.cuuid}: current=${currentMasterRH}, incoming=${masterWinner.rh}`
+          );
+        }
+      }
+    } catch (e) {
+      console.log(`[RH-Derive:${context}] INHERITED cache lookup failed for master=${masterRef}: ${String(e?.message || e).substring(0, 120)} \u2014 cache preserved`);
+    }
+    const num = (v) => v === null || v === void 0 ? null : parseFloat(String(v));
+    const day = (v) => v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null;
+    const childLastUpdatedText = cacheDay && cacheDay.getTime() > winner.readingDay.getTime() ? formatReadingDay(cacheDay) : lastUpdatedText;
+    const unchanged = num(comp.current_cumulative_rh) === num(winner.rh.toFixed(2)) && (cache3 === null || num(comp.rh_current_inherited_cached) === num(cache3)) && (cacheDay === null || day(comp.rh_inherited_updated_at) === cacheDay.getTime()) && String(comp.last_updated ?? "") === childLastUpdatedText;
+    if (unchanged) {
+      return "unchanged";
+    }
+    await conn.query(
+      `UPDATE components SET current_cumulative_rh = $1,
+          rh_current_inherited_cached = COALESCE($2, rh_current_inherited_cached),
+          rh_inherited_updated_at = COALESCE($3, rh_inherited_updated_at),
+          last_updated = $4, updated_at = NOW()
+        WHERE cuuid = $5`,
+      [winner.rh.toFixed(2), cache3, cacheDay, childLastUpdatedText, componentId]
+    );
+    console.log(`[RH-Derive:${context}] INHERITED component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} cache=${cache3 ?? "preserved"} cacheDay=${cacheDay ? cacheDay.toISOString().split("T")[0] : "preserved"} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+    return true;
+  }
+  const numM = (v) => v === null || v === void 0 ? null : parseFloat(String(v));
+  const dayM = (v) => v ? parseReadingDay(String(v instanceof Date ? v.toISOString() : v))?.getTime() ?? null : null;
+  const masterUnchanged = comp && numM(comp.current_cumulative_rh) === numM(winner.rh.toFixed(2)) && numM(comp.rh_current_master) === numM(winner.rh.toFixed(2)) && dayM(comp.rh_master_updated_at) === winner.readingDay.getTime() && String(comp.last_updated ?? "") === lastUpdatedText;
+  if (!masterUnchanged) {
+    await conn.query(
+      `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1,
+          rh_master_updated_at = $2, last_updated = $3, updated_at = NOW()
+        WHERE cuuid = $4`,
+      [winner.rh.toFixed(2), winner.readingDay, lastUpdatedText, componentId]
+    );
+    console.log(`[RH-Derive:${context}] component=${componentId} set to winner event ${winner.rhauuid} rh=${winner.rh} reading=${winner.readingDay.toISOString().split("T")[0]} origin=${winner.originSide || "legacy"}`);
+  }
+  let childrenRefreshed = 0;
+  if (counterType === "MASTER") {
+    try {
+      const baseline = parseFloat(comp?.meter_replaced_last_rh || "0") || 0;
+      const total = (baseline + winner.rh).toFixed(2);
+      const r = await conn.query(
+        `UPDATE components SET rh_current_inherited_cached = $1,
+            rh_inherited_updated_at = $2,
+            -- Task #427 convergence: only ADVANCE the child's last_updated to the
+            -- master's reading day; a child whose own reading day is newer keeps
+            -- its stamp (the INHERITED derive stamps max(child day, master day)).
+            last_updated = CASE
+              WHEN safe_rh_reading_day(last_updated) IS NULL
+                OR safe_rh_reading_day(last_updated) < ($2 AT TIME ZONE 'UTC')::date THEN $3
+              ELSE last_updated END,
+            updated_at = NOW()
+          WHERE (rh_master_component_id = $4
+                 OR (vessel_id = $6 AND (
+                      ($5::text IS NOT NULL AND (rh_master_component_id = $5 OR rh_counter_source = $5))
+                      OR ($7::text IS NOT NULL AND rh_master_component_id = $7))))
+            AND upper(rh_counter_type) = 'INHERITED'
+            AND (is_deleted = false OR is_deleted IS NULL)
+            AND (rh_current_inherited_cached IS DISTINCT FROM $1::decimal
+                 OR rh_inherited_updated_at IS DISTINCT FROM $2
+                 OR ((safe_rh_reading_day(last_updated) IS NULL
+                      OR safe_rh_reading_day(last_updated) < ($2 AT TIME ZONE 'UTC')::date)
+                     AND last_updated IS DISTINCT FROM $3))`,
+        [total, winner.readingDay, lastUpdatedText, componentId, comp?.component_code ?? null, comp?.vessel_id ?? null, comp?.id ?? null]
+      );
+      if (r.rowCount) {
+        childrenRefreshed = r.rowCount;
+        console.log(`[RH-Derive:${context}] master=${componentId} refreshed inherited cache on ${r.rowCount} child component(s) total=${total}`);
+      }
+    } catch (e) {
+      console.log(`[RH-Derive:${context}] inherited-children cache refresh failed for master=${componentId}: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
+  if (masterUnchanged && childrenRefreshed === 0) return "unchanged";
+  return true;
+}
+async function selfHealInheritedRhCaches(conn) {
+  const r = await conn.query(
+    `SELECT cuuid FROM components
+      WHERE upper(rh_counter_type) = 'INHERITED'
+        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
+        AND (is_deleted = false OR is_deleted IS NULL)`
+  );
+  let healed = 0;
+  for (const row of r.rows) {
+    try {
+      const res = await applyWinningRhToComponent(conn, row.cuuid, "self-heal");
+      if (res === true) healed++;
+    } catch (e) {
+      console.log(`[RH-SelfHeal] component=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
+    }
+  }
+  return { scanned: r.rows.length, healed };
+}
+async function selfHealRhComponents(conn, opts) {
+  const started = Date.now();
+  const batchSize = opts?.batchSize ?? 100;
+  const vesselClause = opts?.vesselId ? ` AND vessel_id = $1` : "";
+  const vesselParams = opts?.vesselId ? [opts.vesselId] : [];
+  const metrics = {
+    mastersScanned: 0,
+    childrenScanned: 0,
+    mastersHealed: 0,
+    childrenHealed: 0,
+    rhDecreases: 0,
+    errors: 0,
+    durationMs: 0
+  };
+  const healSet = async (rows, kind) => {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const oldRh = row.current_cumulative_rh !== null && row.current_cumulative_rh !== void 0 ? parseFloat(String(row.current_cumulative_rh)) : null;
+        const res = await applyWinningRhToComponent(conn, row.cuuid, "self-heal");
+        if (res === true) {
+          if (kind === "master") metrics.mastersHealed++;
+          else metrics.childrenHealed++;
+          const after = await conn.query(`SELECT current_cumulative_rh FROM components WHERE cuuid = $1`, [row.cuuid]);
+          const newRh = after.rows?.[0]?.current_cumulative_rh != null ? parseFloat(String(after.rows[0].current_cumulative_rh)) : null;
+          if (oldRh !== null && newRh !== null && newRh < oldRh) {
+            metrics.rhDecreases++;
+            console.warn(`[RH-SelfHeal] \u26A0\uFE0F RH DECREASE on ${kind} ${row.component_code || row.cuuid}: ${oldRh} \u2192 ${newRh} (rotation-guard/winner change \u2014 audit if unexpected)`);
+          }
+        }
+      } catch (e) {
+        metrics.errors++;
+        console.log(`[RH-SelfHeal] ${kind}=${row.cuuid} failed: ${String(e?.message || e).substring(0, 120)}`);
+      }
+      if ((i + 1) % batchSize === 0) {
+        console.log(`[RH-SelfHeal] progress: ${i + 1}/${rows.length} ${kind}s processed`);
+      }
+    }
+  };
+  const masters = await conn.query(
+    `SELECT cuuid, component_code, current_cumulative_rh FROM components
+      WHERE upper(rh_counter_type) = 'MASTER'
+        AND (is_deleted = false OR is_deleted IS NULL)${vesselClause}`,
+    vesselParams
+  );
+  metrics.mastersScanned = masters.rows.length;
+  await healSet(masters.rows, "master");
+  const children = await conn.query(
+    `SELECT cuuid, component_code, current_cumulative_rh FROM components
+      WHERE upper(rh_counter_type) = 'INHERITED'
+        AND (rh_master_component_id IS NOT NULL OR rh_counter_source IS NOT NULL)
+        AND (is_deleted = false OR is_deleted IS NULL)${vesselClause}`,
+    vesselParams
+  );
+  metrics.childrenScanned = children.rows.length;
+  await healSet(children.rows, "child");
+  metrics.durationMs = Date.now() - started;
+  return metrics;
+}
+async function resolveRhBaselineDay(conn, componentId, componentStampFallback) {
+  try {
+    const winner = await selectWinningRhEvent(conn, componentId);
+    if (winner) return winner.readingDay;
+  } catch {
+  }
+  if (componentStampFallback && !isNaN(componentStampFallback.getTime())) {
+    return new Date(Date.UTC(
+      componentStampFallback.getUTCFullYear(),
+      componentStampFallback.getUTCMonth(),
+      componentStampFallback.getUTCDate()
+    ));
+  }
+  return null;
+}
+async function claimWoRhSync(conn, wouuid) {
+  const r = await conn.query(
+    `UPDATE work_orders SET rh_synced_at = NOW() WHERE wouuid = $1 AND rh_synced_at IS NULL RETURNING wouuid`,
+    [wouuid]
+  );
+  return r.rows.length > 0;
+}
+async function releaseWoRhSync(conn, wouuid) {
+  try {
+    await conn.query(`UPDATE work_orders SET rh_synced_at = NULL WHERE wouuid = $1`, [wouuid]);
+  } catch (e) {
+    console.error(`[RH-Claim] release failed for WO ${wouuid}: ${e?.message || e}`);
+  }
+}
+var READING_DAY_SQL, PARSED_DAY_SQL, RH_GUARD_STRIP_COLUMNS;
+var init_rhEventComparator = __esm({
+  "server/modules/running-hours/rhEventComparator.ts"() {
+    "use strict";
+    init_readingDate();
+    READING_DAY_SQL = `COALESCE(safe_rh_reading_day(date_updated_local), (entered_at_utc AT TIME ZONE 'UTC' AT TIME ZONE 'UTC')::date)`;
+    PARSED_DAY_SQL = `safe_rh_reading_day(date_updated_local)`;
+    RH_GUARD_STRIP_COLUMNS = [
+      "current_cumulative_rh",
+      "currentCumulativeRH",
+      "rh_current_master",
+      "rhCurrentMaster",
+      "rh_master_updated_at",
+      "rhMasterUpdatedAt",
+      "rh_master_update_source",
+      "rhMasterUpdateSource",
+      "last_updated",
+      "lastUpdated",
+      "rh_current_inherited_cached",
+      "rhCurrentInheritedCached",
+      "rh_inherited_updated_at",
+      "rhInheritedUpdatedAt"
+    ];
+  }
+});
+
+// server/modules/sync/dualCompletionResolver.ts
+var dualCompletionResolver_exports = {};
+__export(dualCompletionResolver_exports, {
+  DUAL_COMPLETION_KIND: () => DUAL_COMPLETION_KIND,
+  RESOLUTION_ACTOR: () => RESOLUTION_ACTOR,
+  WO_COMPLETION_FIELDS_SNAKE: () => WO_COMPLETION_FIELDS_SNAKE,
+  chooseInterimSide: () => chooseInterimSide,
+  collectIncomingWoCompletionDates: () => collectIncomingWoCompletionDates,
+  evaluateDualCompletion: () => evaluateDualCompletion,
+  findWouuidsWithOpenDualConflicts: () => findWouuidsWithOpenDualConflicts,
+  isWoCompletionField: () => isWoCompletionField
+});
+function isWoCompletionField(fieldNameSnake) {
+  return WO_COMPLETION_FIELDS_SNAKE.has(fieldNameSnake);
+}
+function chooseInterimSide(local, incoming) {
+  const ld = parseReadingDay(local.completionDate)?.getTime() ?? null;
+  const id = parseReadingDay(incoming.completionDate)?.getTime() ?? null;
+  if (ld !== null && id !== null && ld !== id) return ld > id ? "local" : "incoming";
+  if (ld !== null && id === null) return "local";
+  if (ld === null && id !== null) return "incoming";
+  if (local.isShip !== incoming.isShip) return local.isShip ? "local" : "incoming";
+  return "local";
+}
+function collectIncomingWoCompletionDates(logs) {
+  const primary = /* @__PURE__ */ new Map();
+  const fallback = /* @__PURE__ */ new Map();
+  for (const log2 of logs) {
+    if (log2.tableName !== "work_orders" || !log2.newValue) continue;
+    const f = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+    if (f === "date_completed") primary.set(log2.rowUuid, log2.newValue);
+    else if (f === "completion_date_time") fallback.set(log2.rowUuid, log2.newValue);
+  }
+  const out = /* @__PURE__ */ new Map();
+  fallback.forEach((v, k) => out.set(k, v));
+  primary.forEach((v, k) => out.set(k, v));
+  return out;
+}
+async function findWouuidsWithOpenDualConflicts(client2, wouuids) {
+  if (wouuids.length === 0) return /* @__PURE__ */ new Set();
+  try {
+    const res = await client2.query(
+      `SELECT DISTINCT row_uuid FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = 'work_orders'
+          AND is_resolved = false AND row_uuid = ANY($2)`,
+      [DUAL_COMPLETION_KIND, wouuids]
+    );
+    return new Set(res.rows.map((r) => String(r.row_uuid)));
+  } catch (err2) {
+    syncDiag(`DUAL-COMPLETION OPEN-CONFLICT CHECK FAILED (treating none as open): ${String(err2?.message || err2).substring(0, 120)}`);
+    return /* @__PURE__ */ new Set();
+  }
+}
+async function evaluateDualCompletion(client2, log2, ctx) {
+  if (log2.tableName !== "work_orders") return NOT_DUAL;
+  const fieldSnake = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+  if (!isWoCompletionField(fieldSnake)) return NOT_DUAL;
+  try {
+    if (log2.changedByUserId === RESOLUTION_ACTOR) {
+      await client2.query(
+        `UPDATE sync_conflict_log
+            SET is_resolved = true, resolved_at = NOW(),
+                resolved_by = $1, resolved_action = 'REMOTE_RESOLUTION'
+          WHERE conflict_kind = $2 AND table_name = 'work_orders'
+            AND row_uuid = $3 AND field_name IN ($4, $5) AND is_resolved = false`,
+        [RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName, fieldSnake]
+      );
+      syncDiag(`DUAL-COMPLETION REMOTE-RESOLUTION: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 force-applying resolved value, local mirror conflict closed`);
+      return { dualConflict: false, applyIncoming: true, remoteResolution: true };
+    }
+    const rowRes = await client2.query(
+      `SELECT status, date_completed, completion_date_time, "${fieldSnake}" AS current_value
+         FROM work_orders WHERE wouuid = $1 LIMIT 1`,
+      [log2.rowUuid]
+    );
+    if (rowRes.rows.length === 0) return NOT_DUAL;
+    const row = rowRes.rows[0];
+    if (!isCompletedStatus(row.status)) return NOT_DUAL;
+    if (fieldSnake === "status" && !isCompletedStatus(log2.newValue ?? null)) return NOT_DUAL;
+    const currentValue = row.current_value === null || row.current_value === void 0 ? null : String(row.current_value);
+    const incomingValue = log2.newValue === null || log2.newValue === void 0 ? null : String(log2.newValue);
+    if (currentValue === incomingValue) return NOT_DUAL;
+    if (currentValue !== null && incomingValue !== null) {
+      const cn = Number(currentValue), inn = Number(incomingValue);
+      if (currentValue.trim() !== "" && incomingValue.trim() !== "" && Number.isFinite(cn) && Number.isFinite(inn) && cn === inn) return NOT_DUAL;
+    }
+    const receiverId = ctx.receiverInstanceId;
+    if (!receiverId || receiverId === "UNKNOWN") return NOT_DUAL;
+    if (log2.instanceId && log2.instanceId === receiverId) return NOT_DUAL;
+    const localStatus = await client2.query(
+      `SELECT new_value, changed_at FROM sync_field_log
+        WHERE table_name = 'work_orders' AND row_uuid = $1
+          AND instance_id = $2 AND field_name IN ('status')
+        ORDER BY changed_at DESC LIMIT 1`,
+      [log2.rowUuid, receiverId]
+    );
+    if (localStatus.rows.length === 0 || !isCompletedStatus(localStatus.rows[0].new_value)) {
+      return NOT_DUAL;
+    }
+    const localCompletion = await client2.query(
+      `SELECT changed_at FROM sync_field_log
+        WHERE table_name = 'work_orders' AND row_uuid = $1
+          AND instance_id = $2 AND field_name = ANY($3)
+        ORDER BY changed_at DESC LIMIT 1`,
+      [log2.rowUuid, receiverId, COMPLETION_FIELD_NAME_VARIANTS]
+    );
+    if (localCompletion.rows.length === 0) return NOT_DUAL;
+    const existing = await client2.query(
+      `SELECT id FROM sync_conflict_log
+        WHERE conflict_kind = $1 AND table_name = 'work_orders'
+          AND row_uuid = $2 AND field_name = $3 AND is_resolved = false LIMIT 1`,
+      [DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName]
+    );
+    if (existing.rows.length === 0) {
+      await client2.query(
+        `INSERT INTO sync_conflict_log
+           (batch_uuid, table_name, row_uuid, field_name, conflict_kind,
+            incoming_sender_instance, incoming_changed_at, incoming_old_value, incoming_new_value,
+            receiver_winner_instance, receiver_winner_changed_at, receiver_current_value)
+         VALUES ($1,'work_orders',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          ctx.batchUuid ?? null,
+          log2.rowUuid,
+          log2.fieldName,
+          DUAL_COMPLETION_KIND,
+          log2.instanceId ?? null,
+          log2.changedAt,
+          log2.oldValue ?? null,
+          incomingValue,
+          receiverId,
+          new Date(localCompletion.rows[0].changed_at),
+          currentValue
+        ]
+      );
+    }
+    const localDate = row.date_completed || row.completion_date_time || null;
+    const incomingDate = ctx.incomingCompletionDateByRow?.get(log2.rowUuid) ?? (fieldSnake === "date_completed" || fieldSnake === "completion_date_time" ? incomingValue : null);
+    const winner = chooseInterimSide(
+      { completionDate: localDate, isShip: isShipInstanceId(receiverId) },
+      { completionDate: incomingDate ?? null, isShip: log2.instanceId ? isShipInstanceId(log2.instanceId) : false }
+    );
+    const applyIncoming = winner === "incoming";
+    syncDiag(
+      `DUAL-COMPLETION CONFLICT: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 completed on BOTH sides (local ${localDate ?? "no-date"} vs incoming ${incomingDate ?? "no-date"}); interim=${winner}, ${applyIncoming ? "incoming value applied" : "local value kept"}; recorded for review`
+    );
+    return { dualConflict: true, applyIncoming, remoteResolution: false };
+  } catch (err2) {
+    syncDiag(`DUAL-COMPLETION DETECT ERROR (fail-open to legacy guards): work_orders.${fieldSnake} row=${log2.rowUuid}: ${String(err2?.message || err2).substring(0, 150)}`);
+    return NOT_DUAL;
+  }
+}
+var RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, WO_COMPLETION_FIELDS_SNAKE, snakeToCamel, COMPLETION_FIELD_NAME_VARIANTS, NOT_DUAL;
+var init_dualCompletionResolver = __esm({
+  "server/modules/sync/dualCompletionResolver.ts"() {
+    "use strict";
+    init_workOrderStatus();
+    init_syncRole();
+    init_rhEventComparator();
+    init_syncDiagLogger();
+    RESOLUTION_ACTOR = "sync-conflict-resolution";
+    DUAL_COMPLETION_KIND = "dual_completion";
+    WO_COMPLETION_FIELDS_SNAKE = /* @__PURE__ */ new Set([
+      "status",
+      "date_completed",
+      "completion_date_time",
+      "performed_by",
+      "completion_remarks",
+      "completion_rh",
+      "wo_completion_rh",
+      "completion_rh_source",
+      "completion_rh_validated",
+      "completion_rh_validation_details",
+      "rh_justification",
+      "rh_justification_provided_by",
+      "rh_justification_date",
+      "rh_backdated_entry",
+      "current_reading",
+      "current_reading_date",
+      "previous_reading",
+      "reading_date"
+    ]);
+    snakeToCamel = (s) => s.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+    COMPLETION_FIELD_NAME_VARIANTS = Array.from(WO_COMPLETION_FIELDS_SNAKE).flatMap((f) => [f, snakeToCamel(f)]);
+    NOT_DUAL = { dualConflict: false, applyIncoming: true, remoteResolution: false };
+  }
+});
+
+// server/modules/sync/spareClassificationConflict.ts
+var spareClassificationConflict_exports = {};
+__export(spareClassificationConflict_exports, {
+  isSpareClassificationConflict: () => isSpareClassificationConflict,
+  resolveSparePairConflict: () => resolveSparePairConflict
+});
+async function resolveSparePairConflict(pool4, conflict, source, userId, incoming, side = "ship") {
+  const client2 = await pool4.connect();
+  const table = source === "log" ? "sync_conflict_log" : "sync_conflicts";
+  try {
+    await client2.query("BEGIN");
+    const savedResult = await client2.query("SELECT * FROM spares WHERE suuid=$1 FOR UPDATE", [conflict.row_uuid]);
+    const saved = savedResult.rows[0];
+    if (!saved) throw Object.assign(new Error("Spare no longer exists."), { statusCode: 404 });
+    const open = source === "log" ? await client2.query(
+      `SELECT * FROM sync_conflict_log WHERE table_name='spares' AND row_uuid=$1 AND is_resolved=false
+          AND incoming_changed_at IS NOT DISTINCT FROM $2
+          AND incoming_sender_instance IS NOT DISTINCT FROM $3
+          AND field_name IN ('spareCategory','optimumQty','spare_category','optimum_qty') ORDER BY id FOR UPDATE`,
+      [conflict.row_uuid, conflict.incoming_changed_at, conflict.incoming_sender_instance]
+    ) : await client2.query(
+      `SELECT * FROM sync_conflicts WHERE table_name='spares' AND row_uuid=$1 AND resolution IS NULL
+          AND sync_batch_id IS NOT DISTINCT FROM $2
+          AND ${side === "ship" ? "ship_changed_at" : "shore_changed_at"} IS NOT DISTINCT FROM $3
+          AND field_name IN ('spareCategory','optimumQty','spare_category','optimum_qty') ORDER BY id FOR UPDATE`,
+      [conflict.row_uuid, conflict.sync_batch_id, side === "ship" ? conflict.ship_changed_at : conflict.shore_changed_at]
+    );
+    if (!open.rows.length) throw Object.assign(new Error("Conflict is already resolved."), { statusCode: 409 });
+    const patch = {};
+    for (const field of open.rows) {
+      const key = /category/i.test(field.field_name) ? "spare_category" : "optimum_qty";
+      patch[key] = incoming ? source === "log" ? field.incoming_new_value : field[`${side}_value`] : saved[key];
+    }
+    const pair = await validateIncomingSparePair(client2, patch, saved);
+    if (incoming) {
+      await client2.query(
+        "UPDATE spares SET spare_category=$1,optimum_qty=$2,updated_at=NOW() WHERE suuid=$3",
+        [pair.spareCategory, pair.optimumQty, conflict.row_uuid]
+      );
+    }
+    const instanceId2 = await initFieldLoggerInstanceId();
+    const resolutionTime = /* @__PURE__ */ new Date();
+    for (const key of ["spare_category", "optimum_qty"]) {
+      const value = key === "spare_category" ? pair.spareCategory : pair.optimumQty;
+      await client2.query(
+        `INSERT INTO sync_field_log
+        (table_name,row_uuid,field_name,old_value,new_value,vessel_id,changed_by_user_id,changed_by_display,
+         instance_id,is_synced,is_sync,changed_at)
+        VALUES('spares',$1,$2,$3,$4,$5,$6,$7,$8,false,false,$9)`,
+        [
+          conflict.row_uuid,
+          key,
+          saved[key] == null ? null : String(saved[key]),
+          value == null ? null : String(value),
+          saved.vessel_id,
+          RESOLUTION_ACTOR,
+          userId,
+          instanceId2,
+          resolutionTime
+        ]
+      );
+    }
+    for (const field of open.rows) {
+      const col = /category/i.test(field.field_name) ? "spare_category" : "optimum_qty";
+      const value = col === "spare_category" ? pair.spareCategory : pair.optimumQty;
+      if (source === "log") {
+        await client2.query(
+          `UPDATE ${table} SET is_resolved=true,resolved_at=NOW(),resolved_by=$1,resolved_action=$2 WHERE id=$3`,
+          [userId, incoming ? "apply_incoming" : "keep_current", field.id]
+        );
+      } else {
+        await client2.query(
+          `UPDATE ${table} SET resolution=$1,resolved_value=$2,resolved_at=NOW(),resolved_by=$3 WHERE id=$4`,
+          [incoming ? `${side}_wins` : side === "ship" ? "shore_wins" : "ship_wins", value, userId, field.id]
+        );
+      }
+    }
+    await client2.query("COMMIT");
+  } catch (error) {
+    await client2.query("ROLLBACK");
+    if (!error.statusCode) error.statusCode = 400;
+    throw error;
+  } finally {
+    client2.release();
+  }
+}
+var isSpareClassificationConflict;
+var init_spareClassificationConflict = __esm({
+  "server/modules/sync/spareClassificationConflict.ts"() {
+    "use strict";
+    init_spareClassificationSync();
+    init_fieldLogger();
+    init_dualCompletionResolver();
+    isSpareClassificationConflict = (conflict) => conflict.table_name === "spares" && ["spareCategory", "optimumQty", "spare_category", "optimum_qty"].includes(conflict.field_name);
+  }
+});
+
+// server/modules/sync/spareClassificationSync.ts
+var spareClassificationSync_exports = {};
+__export(spareClassificationSync_exports, {
+  applyClassificationEvent: () => applyClassificationEvent,
+  applySparePairLogs: () => applySparePairLogs,
+  classificationEvent: () => classificationEvent,
+  classificationPatch: () => classificationPatch,
+  isSpareClassificationLog: () => isSpareClassificationLog,
+  isSparePairLog: () => isSparePairLog,
+  resolveClassificationConflict: () => resolveClassificationConflict,
+  validateFullRowClassification: () => validateFullRowClassification,
+  validateIncomingSparePair: () => validateIncomingSparePair
+});
+function classificationPatch(row) {
+  const patch = {};
+  if (Object.hasOwn(row, "spare_category")) patch.spareCategory = row.spare_category;
+  else if (Object.hasOwn(row, "spareCategory")) patch.spareCategory = row.spareCategory;
+  if (Object.hasOwn(row, "optimum_qty")) patch.optimumQty = row.optimum_qty;
+  else if (Object.hasOwn(row, "optimumQty")) patch.optimumQty = row.optimumQty;
+  return patch;
+}
+async function validateIncomingSparePair(conn, row, saved) {
+  const pair = mergeSpareClassification(saved ? {
+    spareCategory: saved.spare_category,
+    optimumQty: saved.optimum_qty
+  } : void 0, classificationPatch(row));
+  if (pair.spareCategory && pair.spareCategory !== saved?.spare_category) {
+    const found = await conn.query(
+      `SELECT 1 FROM master_lists WHERE list_type = 'spareCategory' AND list_key = $1 AND is_deleted IS NOT TRUE`,
+      [pair.spareCategory]
+    );
+    if (!found.rows.length) throw new Error(`Unknown Spare Category '${pair.spareCategory}'; synchronize Master Lists first.`);
+  }
+  return pair;
+}
+async function applySparePairLogs(conn, logs, instanceId2, batchUuid) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const log2 of logs.filter(isSparePairLog)) {
+    const key = JSON.stringify([log2.rowUuid, new Date(log2.changedAt).getTime(), log2.instanceId]);
+    const group = groups.get(key) || [];
+    group.push(log2);
+    groups.set(key, group);
+  }
+  const failedRows = /* @__PURE__ */ new Set();
+  const errors = [];
+  let applied = 0;
+  let index3 = 0;
+  for (const group of Array.from(groups.values()).sort((a, b) => new Date(a[0].changedAt).getTime() - new Date(b[0].changedAt).getTime())) {
+    const uuid2 = group[0].rowUuid;
+    const sp = `spare_pair_${index3++}`;
+    await conn.query(`SAVEPOINT ${sp}`);
+    try {
+      const current = await conn.query("SELECT * FROM spares WHERE suuid = $1 FOR UPDATE", [uuid2]);
+      const saved = current.rows[0];
+      if (!saved) throw new Error(`Spare ${uuid2} missing on receiver; classification kept pending.`);
+      if (group.some((l) => l.vesselId && l.vesselId !== saved.vessel_id)) {
+        throw new Error("Spare classification vessel scope does not match canonical spare identity.");
+      }
+      group.sort((a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime());
+      const patch = {};
+      const resolution = group.every((log2) => log2.changedByUserId === RESOLUTION_ACTOR);
+      if (resolution && !["spare_category", "optimum_qty"].every((column) => group.some((log2) => (/category/i.test(log2.fieldName) ? "spare_category" : "optimum_qty") === column))) {
+        throw new Error("Classification resolution requires the complete category/quantity pair; keep pending.");
+      }
+      const pairLocal = resolution ? { rows: [] } : await conn.query(
+        `SELECT field_name FROM sync_field_log WHERE table_name='spares' AND row_uuid=$1
+          AND field_name IN ('spareCategory','optimumQty','spare_category','optimum_qty')
+          AND instance_id=$2 AND changed_at>$3 LIMIT 1`,
+        [uuid2, instanceId2, group[0].changedAt]
+      );
+      let held = pairLocal.rows.length > 0;
+      for (const log2 of group) {
+        const guarded = { ...log2, changedAt: new Date(log2.changedAt) };
+        const decision = resolution ? { skip: false } : log2.oldValue == null ? await evaluateInsertOriginGuard(conn, log2) : await evaluateStaleSkipGuard(conn, guarded, instanceId2, { batchUuid });
+        const col = /category/i.test(log2.fieldName) ? "spare_category" : "optimum_qty";
+        if (decision.skip && String(saved[col] ?? "") !== String(log2.newValue ?? "")) held = true;
+        patch[col] = log2.newValue;
+      }
+      if (!held) {
+        const pair = await validateIncomingSparePair(conn, patch, saved);
+        const latest = group[group.length - 1];
+        await conn.query(
+          "UPDATE spares SET spare_category = $1, optimum_qty = $2, updated_at = $3 WHERE suuid = $4 AND vessel_id IS NOT DISTINCT FROM $5",
+          [pair.spareCategory, pair.optimumQty, latest.changedAt, uuid2, saved.vessel_id]
+        );
+        if (resolution) {
+          await conn.query(
+            `UPDATE sync_conflict_log SET is_resolved=true,resolved_at=NOW(),
+            resolved_by=$1,resolved_action='REMOTE_RESOLUTION' WHERE table_name='spares' AND row_uuid=$2
+            AND is_resolved=false AND field_name IN ('spareCategory','optimumQty','spare_category','optimum_qty')`,
+            [RESOLUTION_ACTOR, uuid2]
+          );
+          await conn.query(
+            `UPDATE sync_conflicts SET resolution='remote_resolution',resolved_at=NOW(),
+            resolved_by=$1,updated_at=NOW(),resolved_value=CASE WHEN field_name IN ('spareCategory','spare_category') THEN $3 ELSE $4 END
+            WHERE table_name='spares' AND row_uuid=$2 AND resolution IS NULL
+            AND field_name IN ('spareCategory','optimumQty','spare_category','optimum_qty')`,
+            [RESOLUTION_ACTOR, uuid2, pair.spareCategory, pair.optimumQty == null ? null : String(pair.optimumQty)]
+          );
+        }
+        applied += group.length;
+      } else {
+        for (const log2 of group) {
+          const col = /category/i.test(log2.fieldName) ? "spare_category" : "optimum_qty";
+          await conn.query(
+            `INSERT INTO sync_conflict_log
+              (batch_uuid,table_name,row_uuid,field_name,incoming_sender_instance,incoming_changed_at,
+               incoming_old_value,incoming_new_value,receiver_winner_instance,receiver_winner_changed_at,receiver_current_value)
+             SELECT $1,'spares',$2,$3,$4,$5,$6,$7,$8,NOW(),$9
+             WHERE NOT EXISTS (SELECT 1 FROM sync_conflict_log WHERE table_name='spares' AND row_uuid=$2
+               AND field_name=$3 AND incoming_changed_at=$5 AND is_resolved=false)`,
+            [
+              batchUuid,
+              uuid2,
+              log2.fieldName,
+              log2.instanceId,
+              log2.changedAt,
+              log2.oldValue,
+              log2.newValue,
+              instanceId2,
+              saved[col] == null ? null : String(saved[col])
+            ]
+          );
+        }
+      }
+      await conn.query(`RELEASE SAVEPOINT ${sp}`);
+    } catch (error) {
+      await conn.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+      await conn.query(`RELEASE SAVEPOINT ${sp}`);
+      failedRows.add(uuid2);
+      errors.push(`spares.${uuid2}: ${error.message}`);
+    }
+  }
+  return { failedRows, errors, applied };
+}
+function classificationEvent(log2, logs) {
+  return logs.filter((other) => isSparePairLog(other) && other.rowUuid === log2.rowUuid && new Date(other.changedAt).getTime() === new Date(log2.changedAt).getTime() && other.instanceId === log2.instanceId);
+}
+async function applyClassificationEvent(conn, log2, logs, receiver, batchUuid, _staleGuard) {
+  if (!isSparePairLog(log2)) return false;
+  const event = classificationEvent(log2, logs);
+  if (event[0] !== log2) return true;
+  const result = await applySparePairLogs(conn, event, receiver, batchUuid);
+  if (result.errors.length) throw new Error(result.errors.join("; "));
+  return true;
+}
+async function resolveClassificationConflict(pool4, conflict, userId, incoming) {
+  const { resolveSparePairConflict: resolveSparePairConflict2 } = await Promise.resolve().then(() => (init_spareClassificationConflict(), spareClassificationConflict_exports));
+  return resolveSparePairConflict2(pool4, conflict, "log", userId, incoming);
+}
+async function validateFullRowClassification(conn, table, incoming, saved) {
+  const { hasClassification: hasClassification2 } = await Promise.resolve().then(() => (init_spareClassification(), spareClassification_exports));
+  if (!["spares", "fleet_spares"].includes(table) || !hasClassification2(incoming)) return;
+  const result = await conn.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='public'
+    AND table_name=$1 AND column_name IN ('spare_category','optimum_qty')`, [table]);
+  if (result.rows.length !== 2) throw new Error(`Retryable classification schema missing on ${table}; run migration 184.`);
+  await validateIncomingSparePair(conn, incoming, saved);
+}
+var isSparePairLog, isSpareClassificationLog;
+var init_spareClassificationSync = __esm({
+  "server/modules/sync/spareClassificationSync.ts"() {
+    "use strict";
+    init_spareClassification();
+    init_oneWayApplier();
+    init_dualCompletionResolver();
+    isSparePairLog = (log2) => log2.tableName === "spares" && ["spareCategory", "optimumQty", "spare_category", "optimum_qty"].includes(log2.fieldName);
+    isSpareClassificationLog = isSparePairLog;
+  }
+});
+
+// server/modules/sync/oneWayApplier.ts
+import { createHash } from "crypto";
+function getSoftDeleteSetClause(tableName) {
+  return tableName === "jobs" || tableName === "components" || tableName === "spares" ? "is_deleted = true, is_active = false, updated_at = NOW()" : "is_deleted = true, updated_at = NOW()";
+}
+async function getColumnMeta(pool4, tableName) {
+  const cached2 = columnMetaCache.get(tableName);
+  if (cached2 && (!(tableName === "spares" || tableName === "fleet_spares") || cached2.allCols.has("spare_category") && cached2.allCols.has("optimum_qty"))) return cached2;
+  let identityAlwaysCols = /* @__PURE__ */ new Set();
+  let jsonCols = /* @__PURE__ */ new Set();
+  let allCols = /* @__PURE__ */ new Set();
+  let arrayCols = /* @__PURE__ */ new Set();
+  let requiredCols = /* @__PURE__ */ new Set();
+  try {
+    const identityResult = await pool4.query(
+      `SELECT a.attname FROM pg_attribute a
+       JOIN pg_class c ON a.attrelid = c.oid
+       JOIN pg_namespace n ON c.relnamespace = n.oid
+       WHERE n.nspname = 'public' AND c.relname = $1 AND a.attidentity IN ('a', 'd')`,
+      [tableName]
+    );
+    identityAlwaysCols = new Set((identityResult.rows || []).map((r) => r.attname));
+    const serialResult = await pool4.query(
+      `SELECT a.attname FROM pg_attribute a
+       JOIN pg_class c ON a.attrelid = c.oid
+       JOIN pg_namespace n ON c.relnamespace = n.oid
+       JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+       WHERE n.nspname = 'public' AND c.relname = $1
+       AND pg_get_expr(d.adbin, d.adrelid) LIKE 'nextval(%'`,
+      [tableName]
+    );
+    for (const r of serialResult.rows || []) {
+      identityAlwaysCols.add(r.attname);
+    }
+  } catch {
+  }
+  try {
+    const jsonResult = await pool4.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1
+       AND data_type IN ('json', 'jsonb')`,
+      [tableName]
+    );
+    jsonCols = new Set((jsonResult.rows || []).map((r) => r.column_name));
+  } catch {
+  }
+  try {
+    const colResult = await pool4.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1`,
+      [tableName]
+    );
+    allCols = new Set((colResult.rows || []).map((r) => r.column_name));
+  } catch {
+  }
+  try {
+    const arrResult = await pool4.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1 AND data_type = 'ARRAY'`,
+      [tableName]
+    );
+    arrayCols = new Set((arrResult.rows || []).map((r) => r.column_name));
+  } catch {
+  }
+  try {
+    const reqResult = await pool4.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1
+       AND is_nullable = 'NO' AND column_default IS NULL`,
+      [tableName]
+    );
+    requiredCols = new Set((reqResult.rows || []).map((r) => r.column_name));
+  } catch {
+  }
+  const meta = { identityAlwaysCols, jsonCols, allCols, arrayCols, requiredCols };
+  columnMetaCache.set(tableName, meta);
+  return meta;
+}
+async function getLatestRotationDate(conn, componentId, excludeRhruuid) {
+  try {
+    const params = [componentId];
+    let sql34 = `SELECT MAX(rotation_date) AS latest FROM rotation_history WHERE component_id = $1 AND is_deleted = FALSE`;
+    if (excludeRhruuid) {
+      sql34 += ` AND rhruuid <> $2`;
+      params.push(excludeRhruuid);
+    }
+    const res = await conn.query(sql34, params);
+    const v = res.rows[0]?.latest;
+    if (!v) return null;
+    const d = v instanceof Date ? v : new Date(String(v));
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+async function applyRotationToComponent(conn, rowData, rowUuid) {
+  const compId = rowData["component_id"];
+  const inStamp = rowData["in_stamp"];
+  const inRh = rowData["in_rh"];
+  if (!compId || !inStamp || inRh === void 0 || inRh === null) return;
+  const rotRaw = rowData["rotation_date"];
+  const rotDate = rotRaw instanceof Date ? rotRaw : new Date(String(rotRaw || ""));
+  if (isNaN(rotDate.getTime())) return;
+  try {
+    const latestOther = await getLatestRotationDate(conn, compId, rowUuid);
+    if (latestOther && latestOther.getTime() > rotDate.getTime()) {
+      syncDiag(`ROTATION-APPLY SKIP (stale): component=${compId} rotation=${rowUuid} (${rotDate.toISOString()}) older than latest local rotation ${latestOther.toISOString()}`);
+      return;
+    }
+    await conn.query(
+      `UPDATE components SET current_stamp = $1, current_cumulative_rh = $2, rh_current_master = $2,
+         rh_master_updated_at = $3, rh_master_update_source = 'ROTATION', last_updated = $4, updated_at = NOW()
+       WHERE cuuid = $5`,
+      [inStamp, String(inRh), rotDate, rotDate.toISOString(), compId]
+    );
+    syncDiag(`ROTATION-APPLY: component=${compId} stamp=${inStamp} baseline=${inRh} from rotation ${rowUuid}`);
+  } catch (rotErr) {
+    syncDiag(`ROTATION-APPLY ERROR: component=${compId} rotation=${rowUuid}: ${rotErr.message}`);
+  }
+}
+function toTimeOrNull(v) {
+  if (v === null || v === void 0 || v === "") return null;
+  const d = v instanceof Date ? v : new Date(String(v));
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+function evaluateJobTrackingGuard(localRow, incomingRow) {
+  const incomingStamp = toTimeOrNull(incomingRow["tracking_rebaselined_at"] ?? incomingRow["trackingRebaselinedAt"]);
+  const localStamp = toTimeOrNull(localRow["tracking_rebaselined_at"] ?? localRow["trackingRebaselinedAt"]);
+  if (incomingStamp !== null && (localStamp === null || incomingStamp > localStamp)) {
+    return [];
+  }
+  const strip = [];
+  for (const col of JOB_TRACKING_COLUMNS) {
+    const localVal = localRow[col];
+    if (localVal !== null && localVal !== void 0 && localVal !== "") {
+      strip.push(col);
+    }
+  }
+  const estimateColumns = ["rh_estimated_due_date", "rh_average_per_day", "rh_estimate_basis"];
+  const localRhCycleInitialized = [
+    "last_done_rh",
+    ...estimateColumns
+  ].some((col) => {
+    const value = localRow[col];
+    return value !== null && value !== void 0 && value !== "";
+  });
+  if (localRhCycleInitialized) {
+    for (const col of estimateColumns) {
+      if (!strip.includes(col)) strip.push(col);
+    }
+  }
+  if (strip.length > 0) strip.push("tracking_rebaselined_at");
+  return strip;
+}
+async function applyOneWayRows(tableName, rows) {
+  if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
+  syncDiag(`ONE-WAY-APPLY START: ${tableName} \u2014 ${rows.length} rows`);
+  const config = getTableSyncConfig(tableName);
+  if (!config) {
+    return {
+      inserted: 0,
+      updated: 0,
+      softDeleted: 0,
+      silentNoOps: 0,
+      errors: [{ rowIndex: -1, error: `Unknown table: ${tableName}` }]
+    };
+  }
+  const identityCol = config.identityColumn;
+  const lookupColumn = identityCol || "id";
+  const pool4 = await getPool();
+  const meta = await getColumnMeta(pool4, tableName);
+  if ((tableName === "spares" || tableName === "fleet_spares") && rows.some((r) => ["spareCategory", "optimumQty", "spare_category", "optimum_qty"].some((k) => Object.hasOwn(r, k))) && (!meta.allCols.has("spare_category") || !meta.allCols.has("optimum_qty"))) {
+    throw new Error(`Retryable ${tableName} classification schema missing; apply the file-based migration first.`);
+  }
+  const COMPOSITE_KEY_TABLES = {
+    vessel_certificate_applicability: ["vessel_id", "master_id"],
+    vessel_survey_applicability: ["vessel_id", "master_id"],
+    // RBAC permissions — UNIQUE on (role_ruid, menu_muid)
+    adm_role_menu_access: ["role_ruid", "menu_muid"],
+    // Vessel department config — UNIQUE on (vessel_id, department)
+    vessel_department_config: ["vessel_id", "department"],
+    // Master lists — UNIQUE on (list_type, list_key)
+    master_lists: ["list_type", "list_key"],
+    // Job-component links — UNIQUE on (job_id, component_id)
+    job_component_links: ["job_id", "component_id"],
+    // Labels config — logical key (config_type, key), no formal UNIQUE constraint
+    ship_certificates_labels_config: ["config_type", "key"],
+    ship_surveys_labels_config: ["config_type", "key"],
+    // Alert config — one per vessel
+    alert_config: ["vessel_id"],
+    // Component class regulatory — match by (component_id, survey_type, classification_society)
+    component_class_regulatory: ["component_id", "survey_type", "classification_society"],
+    // Approval workflow config — UNIQUE (function_id, variable_name). SEEDED ON BOTH SIDES
+    // by migration 126 with per-instance random awcuuid, so identity (awcuuid) matching would
+    // MISS the ship's seeded row and the INSERT would 23505 on the natural unique EVERY cycle.
+    // Natural-key matching UPDATEs the seeded row's values instead (the local awcuuid is kept —
+    // buildUpdatePairs excludes the lookup column — so this table matches by natural key
+    // permanently). Requires FORCE_COMPOSITE below (table HAS an identityCol).
+    approval_workflow_config: ["function_id", "variable_name"]
+  };
+  const FORCE_COMPOSITE = /* @__PURE__ */ new Set(["approval_workflow_config"]);
+  const compositeKeys = COMPOSITE_KEY_TABLES[tableName] || null;
+  const useCompositeKey = compositeKeys !== null && (!identityCol || FORCE_COMPOSITE.has(tableName));
+  const result = { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    try {
+      const isDeleted = row.is_deleted === true || row.isDeleted === true;
+      let existCheck;
+      let whereClause;
+      let whereValues;
+      if (useCompositeKey) {
+        const conditions = [];
+        whereValues = [];
+        let pIdx = 1;
+        for (const keyCol of compositeKeys) {
+          const val = row[keyCol] || row[toCamelCase(keyCol)];
+          if (!val) {
+            break;
+          }
+          conditions.push(`"${keyCol}" = $${pIdx}`);
+          whereValues.push(val);
+          pIdx++;
+        }
+        if (conditions.length !== compositeKeys.length) {
+          const lookupValue = row[lookupColumn] || row[toCamelCase(lookupColumn)];
+          if (!lookupValue) {
+            result.errors.push({ rowIndex: i, error: `Missing composite key columns for "${tableName}"` });
+            continue;
+          }
+          whereClause = `"${lookupColumn}" = $1`;
+          whereValues = [lookupValue];
+        } else {
+          whereClause = conditions.join(" AND ");
+        }
+        existCheck = await pool4.query(
+          `SELECT "id" FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
+          whereValues
+        );
+      } else {
+        const lookupValue = row[lookupColumn] || row[toCamelCase(lookupColumn)];
+        if (!lookupValue) {
+          result.errors.push({ rowIndex: i, error: `Missing identity column "${lookupColumn}"` });
+          continue;
+        }
+        whereClause = `"${lookupColumn}" = $1`;
+        whereValues = [lookupValue];
+        existCheck = await pool4.query(
+          `SELECT 1 FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
+          whereValues
+        );
+      }
+      if (existCheck.rows.length > 0 && config.immutable) {
+        syncDiag(`ONE-WAY-APPLY IMMUTABLE: ${tableName} row already present \u2014 acknowledged, not updated`);
+        continue;
+      }
+      if (existCheck.rows.length > 0) {
+        if (isDeleted) {
+          await pool4.query(
+            `UPDATE "${tableName}" SET ${getSoftDeleteSetClause(tableName)} WHERE ${whereClause}`,
+            whereValues
+          );
+          result.softDeleted++;
+        } else {
+          let rowToApply = row;
+          if (tableName === "fleet_spares" || tableName === "spares") {
+            const local = await pool4.query(`SELECT * FROM "${tableName}" WHERE ${whereClause} LIMIT 1`, whereValues);
+            const { validateIncomingSparePair: validateIncomingSparePair2 } = await Promise.resolve().then(() => (init_spareClassificationSync(), spareClassificationSync_exports));
+            await validateIncomingSparePair2(pool4, row, local.rows[0]);
+          }
+          if (tableName === "jobs") {
+            try {
+              const localRes = await pool4.query(
+                `SELECT last_done_date, next_due_date, last_done_rh, next_due_rh, tracking_rebaselined_at
+                   FROM "${tableName}" WHERE ${whereClause} LIMIT 1`,
+                whereValues
+              );
+              if (localRes.rows.length > 0) {
+                const strip = evaluateJobTrackingGuard(localRes.rows[0], row);
+                if (strip.length > 0) {
+                  rowToApply = { ...row };
+                  for (const col of strip) {
+                    delete rowToApply[col];
+                    delete rowToApply[toCamelCase(col)];
+                  }
+                  syncDiag(`JOB-TRACKING-GUARD: ${tableName} row preserved local tracking columns [${strip.join(",")}] \u2014 incoming shore values stripped (no newer rebaseline stamp)`);
+                }
+              }
+            } catch (guardErr) {
+              syncDiag(`JOB-TRACKING-GUARD lookup failed for ${tableName}: ${String(guardErr?.message || guardErr).substring(0, 120)}`);
+            }
+          }
+          if (tableName === "components") {
+            const cuuid = row["cuuid"] || row["Cuuid"] || row[toCamelCase("cuuid")];
+            if (cuuid) {
+              const latestRotation = await getLatestRotationDate(pool4, cuuid);
+              if (latestRotation) {
+                const incomingUpdatedRaw = row["updated_at"] ?? row["updatedAt"];
+                const incomingUpdated = incomingUpdatedRaw instanceof Date ? incomingUpdatedRaw : new Date(String(incomingUpdatedRaw || ""));
+                if (isNaN(incomingUpdated.getTime()) || incomingUpdated.getTime() < latestRotation.getTime()) {
+                  rowToApply = { ...row };
+                  for (const col of [
+                    "current_stamp",
+                    "currentStamp",
+                    "current_cumulative_rh",
+                    "currentCumulativeRH",
+                    "rh_current_master",
+                    "rhCurrentMaster",
+                    "rh_master_updated_at",
+                    "rhMasterUpdatedAt",
+                    "rh_master_update_source",
+                    "rhMasterUpdateSource",
+                    "last_updated",
+                    "lastUpdated",
+                    "rh_current_inherited_cached",
+                    "rhCurrentInheritedCached",
+                    "rh_inherited_updated_at",
+                    "rhInheritedUpdatedAt"
+                  ]) {
+                    delete rowToApply[col];
+                  }
+                  syncDiag(`ROTATION-GUARD: components.${cuuid} incoming row (updated_at=${incomingUpdatedRaw}) predates local rotation ${latestRotation.toISOString()} \u2014 stamp/RH columns preserved`);
+                }
+              }
+              try {
+                const { selectWinningRhEvent: selectWinningRhEvent2, incomingRhStamp: incomingRhStamp2, shouldStripIncomingRh: shouldStripIncomingRh2, localRhClaimDay: localRhClaimDay2, RH_GUARD_STRIP_COLUMNS: RH_GUARD_STRIP_COLUMNS2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+                const localWinner = await selectWinningRhEvent2(pool4, cuuid);
+                let localCacheStamp = null;
+                try {
+                  const cs = await pool4.query(
+                    `SELECT rh_inherited_updated_at FROM components WHERE cuuid = $1 LIMIT 1`,
+                    [cuuid]
+                  );
+                  localCacheStamp = cs.rows[0]?.rh_inherited_updated_at ?? null;
+                } catch {
+                }
+                const claimDay = localRhClaimDay2(localWinner?.readingDay ?? null, localCacheStamp);
+                if (claimDay) {
+                  const incomingRhStampRaw = incomingRhStamp2(row);
+                  if (shouldStripIncomingRh2(incomingRhStampRaw, claimDay)) {
+                    if (rowToApply === row) rowToApply = { ...row };
+                    for (const col of RH_GUARD_STRIP_COLUMNS2) {
+                      delete rowToApply[col];
+                    }
+                    syncDiag(`RH-LATEST-GUARD: components.${cuuid} incoming RH stamp (${incomingRhStampRaw ?? "none"}) does not beat local RH claim ${claimDay.toISOString().split("T")[0]} \u2014 RH columns preserved`);
+                  }
+                }
+              } catch (rhGuardErr) {
+                syncDiag(`RH-LATEST-GUARD lookup failed for components.${cuuid}: ${String(rhGuardErr?.message || rhGuardErr).substring(0, 120)}`);
+              }
+            }
+          }
+          const updatePairs = buildUpdatePairs(rowToApply, lookupColumn, meta);
+          if (updatePairs.setClauses.length > 0) {
+            const offset = updatePairs.values.length;
+            const reindexedWhere = whereClause.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + offset}`);
+            const updateSQL = `UPDATE "${tableName}" SET ${updatePairs.setClauses.join(", ")}, updated_at = NOW() WHERE ${reindexedWhere}`;
+            await pool4.query(updateSQL, [...updatePairs.values, ...whereValues]);
+          }
+          result.updated++;
+        }
+      } else {
+        if (isDeleted) {
+          result.softDeleted++;
+          continue;
+        }
+        if (tableName === "fleet_spares" || tableName === "spares") {
+          const { validateIncomingSparePair: validateIncomingSparePair2 } = await Promise.resolve().then(() => (init_spareClassificationSync(), spareClassificationSync_exports));
+          await validateIncomingSparePair2(pool4, row);
+        }
+        const insertParts = buildInsertParts(row, meta, useCompositeKey);
+        if (insertParts.columns.length > 0) {
+          const insertSQL = `INSERT INTO "${tableName}" (${insertParts.columns.join(", ")}) VALUES (${insertParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
+          const ins = await pool4.query(insertSQL, insertParts.values);
+          if ((ins.rowCount ?? 0) > 0) {
+            result.inserted++;
+          } else {
+            result.silentNoOps++;
+            let detail = "row did not land (ON CONFLICT DO NOTHING absorbed a unique/PK collision)";
+            try {
+              const pkVal = row["id"] ?? row["ID"];
+              if (pkVal !== void 0 && pkVal !== null && lookupColumn) {
+                const clash = await pool4.query(
+                  `SELECT "${lookupColumn}" AS existing FROM "${tableName}" WHERE "id" = $1 LIMIT 1`,
+                  [pkVal]
+                );
+                if (clash.rows.length > 0) {
+                  detail = `PK id=${pkVal} already held by a DIFFERENT ${lookupColumn} (ship="${clash.rows[0].existing}", shore="${row[lookupColumn] ?? row[toCamelCase(lookupColumn)]}") \u2014 independently seeded table, shore row discarded`;
+                }
+              }
+            } catch {
+            }
+            result.errors.push({ rowIndex: i, error: detail });
+            syncDiag(`ONE-WAY-APPLY SILENT NO-OP: ${tableName} row[${i}]: ${detail}`);
+          }
+        }
+      }
+    } catch (err2) {
+      syncDiag(`ONE-WAY-APPLY ROW ERROR: ${tableName} row[${i}]: ${err2.message.substring(0, 150)}`);
+      result.errors.push({ rowIndex: i, error: err2.message });
+    }
+  }
+  syncDiag(
+    `ONE-WAY-APPLY DONE: ${tableName} \u2014 inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, silentNoOps=${result.silentNoOps}, errors=${result.errors.length}`
+  );
+  if (meta.identityAlwaysCols.size > 0) {
+    for (const col of Array.from(meta.identityAlwaysCols)) {
+      try {
+        await pool4.query(
+          `SELECT setval(pg_get_serial_sequence('"${tableName}"', '${col}'), GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableName}"), 0), 1))`
+        );
+      } catch (e) {
+        console.warn(`[OneWayApplier] Could not advance sequence for ${tableName}.${col}: ${e.message}`);
+      }
+    }
+  }
+  if (result.errors.length > 0) {
+    console.error(`[OneWayApplier] ${result.errors.length} errors applying ${tableName}:`);
+    result.errors.slice(0, 5).forEach(
+      (e) => console.error(`  - row ${e.rowIndex}: ${e.error}`)
+    );
+    if (result.errors.length > 5) {
+      console.error(`  ... and ${result.errors.length - 5} more`);
+    }
+  }
+  return result;
+}
+function toCamelCase(str) {
+  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+function toSnakeCase(str) {
+  return str.replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+}
+function fieldNameToColumn(fieldName) {
+  return SYNC_COLUMN_ALIASES[fieldName] ?? toSnakeCase(fieldName);
+}
+function coerceArrayValue(value) {
+  if (value === null || value === void 0) return null;
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    const s = value.trim();
+    if (s.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+      }
+    }
+    return value;
+  }
+  return value;
+}
+function coerceValue(value, snakeKey, meta) {
+  if (value === null || value === void 0) return null;
+  if (meta.jsonCols.has(snakeKey)) {
+    if (typeof value === "string") {
+      try {
+        JSON.parse(value);
+        return value;
+      } catch {
+        return JSON.stringify(value);
+      }
+    }
+    if (typeof value === "object" && !(value instanceof Date)) {
+      return JSON.stringify(value);
+    }
+    return JSON.stringify(value);
+  }
+  if (meta.arrayCols.has(snakeKey)) {
+    return coerceArrayValue(value);
+  }
+  if (typeof value === "object" && !(value instanceof Date)) {
+    return JSON.stringify(value);
+  }
+  return value;
+}
+function buildUpdatePairs(row, identityCol, meta) {
+  const setClauses = [];
+  const values = [];
+  let paramIndex = 1;
+  for (const [key, value] of Object.entries(row)) {
+    const snakeKey = toSnakeCase(key);
+    if (SKIP_UPDATE_COLUMNS.has(key) || SKIP_UPDATE_COLUMNS.has(snakeKey)) continue;
+    if (meta.identityAlwaysCols.has(key) || meta.identityAlwaysCols.has(snakeKey)) continue;
+    if (key === identityCol || snakeKey === identityCol) continue;
+    if (key === "updated_at" || key === "updatedAt") continue;
+    if (meta.allCols.size > 0 && !meta.allCols.has(snakeKey)) continue;
+    setClauses.push(`"${snakeKey}" = $${paramIndex}`);
+    values.push(coerceValue(value, snakeKey, meta));
+    paramIndex++;
+  }
+  return { setClauses, values };
+}
+function buildInsertParts(row, meta, skipIntegerPK = false) {
+  const columns = [];
+  const placeholders = [];
+  const values = [];
+  let paramIndex = 1;
+  for (const [key, value] of Object.entries(row)) {
+    const snakeKey = toSnakeCase(key);
+    if (meta.identityAlwaysCols.has(key) || meta.identityAlwaysCols.has(snakeKey)) continue;
+    if (skipIntegerPK && snakeKey === "id" && typeof value === "number") continue;
+    if (meta.allCols.size > 0 && !meta.allCols.has(snakeKey)) continue;
+    columns.push(`"${snakeKey}"`);
+    placeholders.push(`$${paramIndex}`);
+    values.push(coerceValue(value, snakeKey, meta));
+    paramIndex++;
+  }
+  return { columns, placeholders, values };
+}
+async function resolveParentLinks(pool4, tableName, row) {
+  for (const link of PARENT_UUID_LINKS[tableName] || []) {
+    const parentUuid = row[link.uuidCol] ?? row[toCamelCase(link.uuidCol)];
+    if (!parentUuid) {
+      if (link.optional) continue;
+      return `no ${link.uuidCol} \u2014 cannot tell which ${link.parentTable} it belongs to`;
+    }
+    const r = await pool4.query(`SELECT id FROM "${link.parentTable}" WHERE "${link.parentUuidCol}" = $1 LIMIT 1`, [parentUuid]);
+    if (r.rows.length === 0) return `${link.parentTable} ${parentUuid} has not arrived on this instance yet`;
+    row[link.fkCol] = r.rows[0].id;
+    if (toCamelCase(link.fkCol) in row) row[toCamelCase(link.fkCol)] = r.rows[0].id;
+  }
+  return null;
+}
+function md5Uuid(text8) {
+  const h = createHash("md5").update(text8, "utf8").digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+function latestLogValue(logs, column) {
+  let best = null;
+  for (const l of logs) {
+    if (fieldNameToColumn(l.fieldName) !== column || l.newValue == null) continue;
+    const t = new Date(String(l.changedAt)).getTime() || 0;
+    if (!best || t >= best.t) best = { t, v: String(l.newValue) };
+  }
+  return best ? best.v : null;
+}
+function isNonPortableParentLinkLog(log2) {
+  const links = PARENT_UUID_LINKS[log2.tableName];
+  if (!links) return false;
+  const col = fieldNameToColumn(log2.fieldName);
+  return links.some((l) => l.fkCol === col);
+}
+async function applyFieldLogInserts(fieldLogs, externalClient) {
+  if (fieldLogs.length === 0) {
+    return { insertedRows: 0, updateLogs: [], errors: [], failedRowUuids: [], needsFullRows: [] };
+  }
+  syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
+  const pool4 = externalClient || await getPool();
+  let insertedRows = 0;
+  const updateLogs = [];
+  const errors = [];
+  const failedRowUuids = [];
+  const needsFullRows = [];
+  const originalKeyOf = /* @__PURE__ */ new Map();
+  let workingLogs = fieldLogs;
+  if (fieldLogs.some((l) => LEGACY_ID_KEYED[l.tableName] && /^\d+$/.test(String(l.rowUuid)))) {
+    const legacyGroups = /* @__PURE__ */ new Map();
+    workingLogs = [];
+    for (const log2 of fieldLogs) {
+      if (LEGACY_ID_KEYED[log2.tableName] && /^\d+$/.test(String(log2.rowUuid))) {
+        const k = `${log2.tableName}::${log2.rowUuid}`;
+        if (!legacyGroups.has(k)) legacyGroups.set(k, []);
+        legacyGroups.get(k).push(log2);
+      } else {
+        workingLogs.push(log2);
+      }
+    }
+    for (const logs of Array.from(legacyGroups.values())) {
+      const { tableName, rowUuid: senderId } = logs[0];
+      const uuid2 = LEGACY_ID_KEYED[tableName].derive(String(senderId), logs);
+      if (!uuid2) {
+        const msg = `${tableName}.${senderId}: changed on an instance still running the previous version \u2014 applies after its next update; kept pending`;
+        errors.push(msg);
+        failedRowUuids.push(String(senderId));
+        syncDiag(`FIELD-LOG-INSERT LEGACY-WAIT: ${msg}`);
+        continue;
+      }
+      originalKeyOf.set(`${tableName}::${uuid2}`, String(senderId));
+      syncDiag(`FIELD-LOG-INSERT LEGACY-KEY: ${tableName} sender id ${senderId} \u2192 ${uuid2}`);
+      for (const l of logs) workingLogs.push({ ...l, rowUuid: uuid2 });
+    }
+  }
+  const groups = /* @__PURE__ */ new Map();
+  for (const log2 of workingLogs) {
+    const key = `${log2.tableName}::${log2.rowUuid}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(log2);
+  }
+  syncDiag(`FIELD-LOG-INSERT: ${groups.size} groups from ${fieldLogs.length} logs`);
+  const groupKeys = Array.from(groups.keys());
+  for (const groupKey of groupKeys) {
+    const logs = groups.get(groupKey);
+    const isInsertGroup = logs.every((l) => l.oldValue == null);
+    const hasAnyInsertLogs = logs.some((l) => l.oldValue == null);
+    const tableName = logs[0].tableName;
+    const rowUuid = logs[0].rowUuid;
+    const config = getTableSyncConfig(tableName);
+    if (!config) {
+      errors.push(`${tableName}: unknown table`);
+      updateLogs.push(...logs);
+      continue;
+    }
+    const identityCol = config.identityColumn || "id";
+    const isImmutable = !!config.immutable;
+    let isRecoveryInsert = false;
+    if (!isInsertGroup && !hasAnyInsertLogs) {
+      try {
+        const exist = await pool4.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
+        if (exist.rows.length > 0) {
+          if (isImmutable) {
+            syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver \u2014 re-delivered log acked as already-applied (immutable; no UPDATE issued)`);
+            continue;
+          }
+          updateLogs.push(...logs);
+          continue;
+        }
+        const msg = `${tableName}.${rowUuid}: UPDATE-shaped group (${logs.length} logs) for a row that does NOT exist on receiver \u2014 attempting recovery INSERT from newValues`;
+        console.warn(`[FieldLogInsert] ${msg}`);
+        syncDiag(`FIELD-LOG-INSERT RECOVERY: ${msg}`);
+        isRecoveryInsert = true;
+      } catch (existErr) {
+        errors.push(`${tableName}.${rowUuid}: exist-check failed (${existErr.message})`);
+        updateLogs.push(...logs);
+        continue;
+      }
+    }
+    let meta = null;
+    let rowData = {};
+    const savepointName = `ins_${tableName.replace(/[^a-z0-9_]/gi, "")}_${rowUuid.replace(/[^a-z0-9]/gi, "").substring(0, 8)}`;
+    if (externalClient) {
+      try {
+        await pool4.query(`SAVEPOINT ${savepointName}`);
+      } catch {
+      }
+    }
+    try {
+      const existCheck = await pool4.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+        [rowUuid]
+      );
+      if (existCheck.rows.length > 0) {
+        if (isImmutable) {
+          if (externalClient) {
+            try {
+              await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+            } catch {
+            }
+          }
+          syncDiag(`FIELD-LOG-INSERT IMMUTABLE-ACK: ${tableName}.${rowUuid} exists on receiver \u2014 re-delivered INSERT-origin log acked as already-applied (immutable; no UPDATE issued)`);
+          continue;
+        }
+        updateLogs.push(...logs);
+        continue;
+      }
+      meta = await getColumnMeta(pool4, tableName);
+      rowData = {};
+      rowData[identityCol] = rowUuid;
+      if (config.vesselScopeColumn && logs[0].vesselId) {
+        rowData[config.vesselScopeColumn] = logs[0].vesselId;
+      }
+      const sortedLogs = [...logs].sort((a, b) => {
+        const aTime = a.changedAt instanceof Date ? a.changedAt.getTime() : new Date(String(a.changedAt)).getTime();
+        const bTime = b.changedAt instanceof Date ? b.changedAt.getTime() : new Date(String(b.changedAt)).getTime();
+        return aTime - bTime;
+      });
+      for (const log2 of sortedLogs) {
+        const snakeField = fieldNameToColumn(log2.fieldName);
+        if (meta.identityAlwaysCols.has(snakeField)) continue;
+        if (meta.allCols.size > 0 && !meta.allCols.has(snakeField)) {
+          if (tableName === "spares" && ["spare_category", "optimum_qty"].includes(snakeField)) {
+            throw new Error("Retryable spare classification column missing; migrate receiver first.");
+          }
+          syncDiag(`FIELD-LOG-INSERT SKIP unknown column ${tableName}.${snakeField} (row ${rowUuid})`);
+          continue;
+        }
+        let value = log2.newValue;
+        if (value !== null && meta.jsonCols.has(snakeField)) {
+          try {
+            JSON.parse(value);
+          } catch {
+            value = "[]";
+          }
+        } else if (value !== null && meta.arrayCols.has(snakeField)) {
+          value = coerceArrayValue(value);
+        }
+        rowData[snakeField] = value;
+      }
+      if (tableName === "spares") {
+        const { validateIncomingSparePair: validateIncomingSparePair2 } = await Promise.resolve().then(() => (init_spareClassificationSync(), spareClassificationSync_exports));
+        await validateIncomingSparePair2(pool4, rowData);
+      }
+      if (!rowData["created_at"]) rowData["created_at"] = /* @__PURE__ */ new Date();
+      if (!rowData["updated_at"]) rowData["updated_at"] = /* @__PURE__ */ new Date();
+      const waitReason = await resolveParentLinks(pool4, tableName, rowData);
+      if (waitReason) {
+        const msg = `${tableName}.${rowUuid}: waiting for parent \u2014 ${waitReason}; kept pending`;
+        errors.push(msg);
+        failedRowUuids.push(rowUuid);
+        syncDiag(`FIELD-LOG-INSERT PARENT-WAIT: ${msg}`);
+        if (externalClient) {
+          try {
+            await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+          } catch {
+          }
+        }
+        continue;
+      }
+      if (tableName === "work_orders" && (rowData["id"] === void 0 || rowData["id"] === null)) {
+        rowData["id"] = `WO-SYNC-${rowUuid}`;
+      }
+      if (tableName === "work_orders" && isCompletedWorkOrderStatus(rowData["status"])) {
+        if (!isValidCompletedWorkOrderDate(rowData["date_completed"])) {
+          if (isValidCompletedWorkOrderDate(rowData["completion_date_time"])) {
+            rowData["date_completed"] = rowData["completion_date_time"];
+          } else {
+            const msg = `${tableName}.${rowUuid}: Completed row has no valid date_completed or completion_date_time`;
+            errors.push(msg);
+            needsFullRows.push({ tableName, rowUuid });
+            failedRowUuids.push(rowUuid);
+            syncDiag(`FIELD-LOG-INSERT DEFER COMPLETED: ${msg}`);
+            if (externalClient) {
+              try {
+                await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+              } catch {
+              }
+            }
+            continue;
+          }
+        }
+      }
+      if (meta && meta.requiredCols.size > 0) {
+        const missingRequired = Array.from(meta.requiredCols).filter(
+          (c) => !meta.identityAlwaysCols.has(c) && rowData[c] == null
+        );
+        if (missingRequired.length > 0) {
+          const healMsg = `${tableName}.${rowUuid}: ${isRecoveryInsert ? "recovery" : "INSERT-shaped"} group for an ABSENT row is missing NOT-NULL column(s) [${missingRequired.join(", ")}] \u2014 partial row NOT fabricated; requesting FULL ROW from sender (self-heal), fragments kept pending`;
+          console.warn(`[FieldLogInsert] \u{1FA79} SELF-HEAL REQUEST: ${healMsg}`);
+          syncDiag(`FIELD-LOG-INSERT SELF-HEAL REQUEST: ${healMsg}`);
+          errors.push(healMsg);
+          needsFullRows.push({ tableName, rowUuid });
+          failedRowUuids.push(rowUuid);
+          if (externalClient) {
+            try {
+              await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+            } catch {
+            }
+          }
+          continue;
+        }
+      }
+      const columns = [];
+      const placeholders = [];
+      const values = [];
+      let paramIdx = 1;
+      for (const [col, val] of Object.entries(rowData)) {
+        if (meta.identityAlwaysCols.has(col)) continue;
+        columns.push(`"${col}"`);
+        placeholders.push(`$${paramIdx}`);
+        if (val !== null && meta.jsonCols.has(col)) {
+          values.push(val);
+        } else if (val instanceof Date) {
+          values.push(val);
+        } else {
+          values.push(val);
+        }
+        paramIdx++;
+      }
+      if (columns.length === 0) {
+        errors.push(`${tableName}.${rowUuid}: no columns to insert`);
+        failedRowUuids.push(rowUuid);
+        continue;
+      }
+      const insertSQL = `INSERT INTO "${tableName}" (${columns.join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
+      await pool4.query(insertSQL, values);
+      insertedRows++;
+      syncDiag(`FIELD-LOG-INSERT OK: ${tableName} row=${rowUuid} (${columns.length} columns)`);
+      console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
+      if (tableName === "running_hours_audit" && rowData["component_id"]) {
+        try {
+          const { applyWinningRhToComponent: applyWinningRhToComponent2 } = await Promise.resolve().then(() => (init_rhEventComparator(), rhEventComparator_exports));
+          const updated = await applyWinningRhToComponent2(pool4, rowData["component_id"], "sync-insert");
+          syncDiag(`RH-APPLY INSERT (derive): component=${rowData["component_id"]} audit=${rowUuid} \u2192 ${updated ? "component recomputed from winning event" : "no usable winner (component untouched)"}`);
+        } catch (rhErr) {
+          syncDiag(`RH-APPLY INSERT ERROR: component=${rowData["component_id"]} audit=${rowUuid}: ${rhErr.message}`);
+        }
+      }
+      if (tableName === "rotation_history") {
+        await applyRotationToComponent(pool4, rowData, rowUuid);
+      }
+      if ((tableName === "spare_location_stock" || tableName === "inventory_transactions") && rowData["location_uuid"]) {
+        try {
+          const locLookup = await pool4.query(
+            `SELECT id FROM locations WHERE luuid = $1 LIMIT 1`,
+            [rowData["location_uuid"]]
+          );
+          if (locLookup.rows.length > 0) {
+            await pool4.query(
+              `UPDATE "${tableName}" SET "location_id" = $1 WHERE "${identityCol}" = $2`,
+              [locLookup.rows[0].id, rowUuid]
+            );
+            syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} location_uuid=${rowData["location_uuid"]} \u2192 local location_id=${locLookup.rows[0].id}`);
+          } else {
+            syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} location_uuid=${rowData["location_uuid"]} \u2014 location not yet synced`);
+          }
+        } catch (fkErr) {
+          syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
+        }
+      }
+      if (externalClient) {
+        try {
+          await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+        } catch {
+        }
+      }
+    } catch (err2) {
+      if (externalClient) {
+        try {
+          await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+        } catch {
+        }
+      }
+      if (err2.code === "23505") {
+        syncDiag(`FIELD-LOG-INSERT CONFLICT (23505): ${tableName} row=${rowUuid} constraint=${err2.constraint || "unknown"} detail=${err2.detail || "none"} \u2014 attempting fallback UPDATE`);
+        console.warn(
+          `[FieldLogInsert] Unique constraint hit for ${tableName}.${rowUuid} \u2014 falling back to field-level UPDATE (constraint: ${err2.constraint || "unknown"})`
+        );
+        try {
+          if (!meta) meta = await getColumnMeta(pool4, tableName);
+          const vesselScopeCol = config.vesselScopeColumn;
+          const vesselIdVal = logs[0].vesselId;
+          let existingIdentity = null;
+          const detailMatch = err2.detail?.match(/Key \(([^)]+)\)=\(([^)]+)\)/);
+          if (detailMatch) {
+            const constraintCols = detailMatch[1].split(",").map((c) => c.trim());
+            const constraintVals = detailMatch[2].split(",").map((v) => v.trim());
+            syncDiag(`FIELD-LOG-INSERT CONFLICT LOOKUP: using constraint cols=[${constraintCols.join(",")}] vals=[${constraintVals.join(",")}]`);
+            if (constraintCols.length > 0 && constraintCols.length === constraintVals.length) {
+              const whereParts = constraintCols.map((col, i) => `"${col}" = $${i + 1}`);
+              const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${whereParts.join(" AND ")} LIMIT 1`;
+              const constraintResult = await pool4.query(lookupSQL, constraintVals);
+              if (constraintResult.rows.length > 0) {
+                existingIdentity = constraintResult.rows[0][identityCol];
+                syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via constraint columns`);
+              }
+            }
+          }
+          if (!existingIdentity && vesselScopeCol && vesselIdVal) {
+            const lookupResult = await pool4.query(
+              `SELECT "${identityCol}" FROM "${tableName}" WHERE "${vesselScopeCol}" = $1 LIMIT 2`,
+              [vesselIdVal]
+            );
+            if (lookupResult.rows.length === 1) {
+              existingIdentity = lookupResult.rows[0][identityCol];
+              syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via single vessel-scope row`);
+            } else {
+              const lookupCols = [];
+              const lookupVals = [];
+              let pIdx = 1;
+              for (const [col, val] of Object.entries(rowData)) {
+                if (col === identityCol || val === null || val === void 0) continue;
+                if (["created_at", "updated_at"].includes(col)) continue;
+                lookupCols.push(`"${col}" = $${pIdx}`);
+                lookupVals.push(val);
+                pIdx++;
+                if (pIdx > 5) break;
+              }
+              if (lookupCols.length > 0) {
+                const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${lookupCols.join(" AND ")} LIMIT 1`;
+                const specificResult = await pool4.query(lookupSQL, lookupVals);
+                if (specificResult.rows.length > 0) {
+                  existingIdentity = specificResult.rows[0][identityCol];
+                }
+              }
+            }
+          }
+          if (existingIdentity && existingIdentity !== rowUuid && NEVER_MERGE_ON_CONFLICT.has(tableName)) {
+            const msg = `${tableName}.${rowUuid}: ${err2.detail || "unique key already used"} by a DIFFERENT record (${identityCol} ${existingIdentity}) \u2014 not merged, nothing overwritten; incoming record kept pending`;
+            console.error(`[FieldLogInsert] \u26A0\uFE0F NUMBER CLASH: ${msg}`);
+            syncDiag(`FIELD-LOG-INSERT NUMBER-CLASH: ${msg}`);
+            errors.push(msg);
+            failedRowUuids.push(rowUuid);
+          } else if (existingIdentity) {
+            let fieldsApplied = 0;
+            for (const log2 of logs) {
+              const fieldSnake = fieldNameToColumn(log2.fieldName);
+              if (fieldSnake === identityCol || fieldSnake === "created_at" || fieldSnake === "updated_at") continue;
+              if (meta.identityAlwaysCols.has(fieldSnake)) continue;
+              if (meta.allCols.size > 0 && !meta.allCols.has(fieldSnake)) continue;
+              if (log2.newValue === null) continue;
+              let valueToApply = log2.newValue;
+              if (meta.jsonCols.has(fieldSnake)) {
+                try {
+                  JSON.parse(valueToApply);
+                } catch {
+                  valueToApply = "[]";
+                }
+              }
+              try {
+                const logTs = log2.changedAt instanceof Date ? log2.changedAt : log2.changedAt ? new Date(String(log2.changedAt)) : /* @__PURE__ */ new Date();
+                await pool4.query(
+                  `UPDATE "${tableName}" SET "${fieldSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
+                  [valueToApply, existingIdentity, logTs]
+                );
+                fieldsApplied++;
+              } catch (updateErr) {
+                console.warn(`[FieldLogInsert] Conflict fallback UPDATE failed for ${tableName}.${fieldSnake}: ${updateErr.message}`);
+              }
+            }
+            if (existingIdentity !== rowUuid) {
+              try {
+                await pool4.query(
+                  `UPDATE "${tableName}" SET "${identityCol}" = $1 WHERE "${identityCol}" = $2`,
+                  [rowUuid, existingIdentity]
+                );
+                console.log(`[FieldLogInsert] Identity converged: ${tableName} "${identityCol}" ${existingIdentity} \u2192 ${rowUuid}`);
+              } catch (convergeErr) {
+                console.warn(`[FieldLogInsert] Identity convergence failed for ${tableName}: ${convergeErr.message}`);
+              }
+            }
+            if (fieldsApplied > 0) {
+              insertedRows++;
+              syncDiag(`FIELD-LOG-INSERT CONFLICT RESOLVED: ${tableName} row=${rowUuid} \u2192 updated ${fieldsApplied} fields on existing row (identity: ${existingIdentity}\u2192${rowUuid})`);
+              console.log(`[FieldLogInsert] Conflict resolved: updated ${fieldsApplied} fields on existing ${tableName} row (identity: ${existingIdentity})`);
+            }
+          } else {
+            syncDiag(`FIELD-LOG-INSERT CONFLICT FAILED: ${tableName} row=${rowUuid} \u2014 could not locate existing row despite 23505 conflict`);
+            errors.push(`${tableName}.${rowUuid}: unique constraint conflict but could not find existing row`);
+            failedRowUuids.push(rowUuid);
+          }
+        } catch (fallbackErr) {
+          errors.push(`${tableName}.${rowUuid}: conflict fallback failed: ${fallbackErr.message}`);
+          failedRowUuids.push(rowUuid);
+          console.error(`[FieldLogInsert] Conflict fallback error for ${tableName}.${rowUuid}:`, fallbackErr.message);
+        }
+      } else if (err2.code === "23503") {
+        if (tableName === "component_maintenance_history") {
+          const message = `${tableName}.${rowUuid}: parent not yet available; immutable history kept pending`;
+          errors.push(message);
+          failedRowUuids.push(rowUuid);
+          syncDiag(`FIELD-LOG-INSERT HISTORY-PARENT-DEFER: ${message}`);
+          continue;
+        }
+        const constraintName = err2.constraint || "";
+        syncDiag(`FIELD-LOG-INSERT FK-VIOLATION (23503): ${tableName} row=${rowUuid} constraint=${constraintName} \u2014 attempting NULL-FK retry`);
+        let fkColumn = null;
+        if (constraintName.startsWith(`${tableName}_`) && constraintName.endsWith("_fk")) {
+          const inner = constraintName.slice(tableName.length + 1, -3);
+          const parts = inner.split("_");
+          for (let i = 1; i <= Math.min(3, parts.length - 2); i++) {
+            const candidate = parts.slice(0, i).join("_");
+            if (rowData[candidate] !== void 0) {
+              fkColumn = candidate;
+              break;
+            }
+          }
+        }
+        if (!fkColumn && err2.detail) {
+          const detailMatch = err2.detail.match(/Key \((\w+)\)=/);
+          if (detailMatch) fkColumn = detailMatch[1];
+        }
+        if (!meta) {
+          try {
+            meta = await getColumnMeta(pool4, tableName);
+          } catch {
+          }
+        }
+        if (fkColumn && meta && meta.requiredCols.has(fkColumn)) {
+          const msg = `${tableName}.${rowUuid}: ${fkColumn} points at a row that does not exist here and cannot be left empty; kept pending (${constraintName})`;
+          syncDiag(`FIELD-LOG-INSERT FK-WAIT: ${msg}`);
+          errors.push(msg);
+          failedRowUuids.push(rowUuid);
+        } else if (fkColumn && rowData[fkColumn] !== void 0) {
+          syncDiag(`FK-NULL RETRY: ${tableName} row=${rowUuid} \u2014 setting ${fkColumn}=NULL and retrying INSERT`);
+          try {
+            if (externalClient) {
+              try {
+                await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+              } catch {
+              }
+              try {
+                await pool4.query(`SAVEPOINT ${savepointName}`);
+              } catch {
+              }
+            }
+            rowData[fkColumn] = null;
+            if (!meta) meta = await getColumnMeta(pool4, tableName);
+            const cols2 = [];
+            const phs2 = [];
+            const vals2 = [];
+            let pi2 = 1;
+            for (const [col, val] of Object.entries(rowData)) {
+              if (meta.identityAlwaysCols.has(col)) continue;
+              cols2.push(`"${col}"`);
+              phs2.push(`$${pi2}`);
+              vals2.push(val instanceof Date ? val : val);
+              pi2++;
+            }
+            const retrySQL = `INSERT INTO "${tableName}" (${cols2.join(", ")}) VALUES (${phs2.join(", ")}) ON CONFLICT ("${identityCol}") DO NOTHING`;
+            await pool4.query(retrySQL, vals2);
+            insertedRows++;
+            syncDiag(`FK-NULL RETRY OK: ${tableName} row=${rowUuid} \u2014 inserted with ${fkColumn}=NULL (will be filled by future sync)`);
+            if (externalClient) {
+              try {
+                await pool4.query(`RELEASE SAVEPOINT ${savepointName}`);
+              } catch {
+              }
+            }
+          } catch (retryErr) {
+            if (externalClient) {
+              try {
+                await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+              } catch {
+              }
+            }
+            syncDiag(`FK-NULL RETRY FAIL: ${tableName} row=${rowUuid} \u2014 ${retryErr.message.substring(0, 150)}`);
+            errors.push(`${tableName}.${rowUuid}: FK retry failed: ${retryErr.message}`);
+            failedRowUuids.push(rowUuid);
+          }
+        } else {
+          syncDiag(`FIELD-LOG-INSERT FK-VIOLATION: ${tableName} row=${rowUuid} \u2014 could not identify FK column from constraint=${constraintName}`);
+          errors.push(`${tableName}.${rowUuid}: FK violation: ${err2.message}`);
+          failedRowUuids.push(rowUuid);
+        }
+      } else {
+        if (externalClient) {
+          try {
+            await pool4.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          } catch {
+          }
+        }
+        syncDiag(`FIELD-LOG-INSERT FAIL: ${tableName} row=${rowUuid} \u2014 ${err2.message.substring(0, 150)}`);
+        errors.push(`${tableName}.${rowUuid}: ${err2.message}`);
+        failedRowUuids.push(rowUuid);
+        console.error(`[FieldLogInsert] Failed to insert ${tableName}.${rowUuid}:`, err2.message);
+      }
+    }
+  }
+  const portableUpdateLogs = updateLogs.filter((l) => !isNonPortableParentLinkLog(l));
+  if (portableUpdateLogs.length !== updateLogs.length) {
+    syncDiag(`FIELD-LOG-INSERT: ${updateLogs.length - portableUpdateLogs.length} parent-id field update(s) ignored (local id differs per instance; parent resolved by UUID)`);
+  }
+  if (originalKeyOf.size > 0) {
+    const tablesOf = /* @__PURE__ */ new Map();
+    for (const k of Array.from(originalKeyOf.keys())) {
+      const [t, u] = k.split("::");
+      tablesOf.set(u, t);
+    }
+    for (let i = 0; i < failedRowUuids.length; i++) {
+      const t = tablesOf.get(failedRowUuids[i]);
+      if (t) failedRowUuids[i] = originalKeyOf.get(`${t}::${failedRowUuids[i]}`);
+    }
+    for (const n of needsFullRows) {
+      const orig = originalKeyOf.get(`${n.tableName}::${n.rowUuid}`);
+      if (orig) n.rowUuid = orig;
+    }
+  }
+  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${portableUpdateLogs.length}, errors=${errors.length}, selfHealRequests=${needsFullRows.length}`);
+  return { insertedRows, updateLogs: portableUpdateLogs, errors, failedRowUuids, needsFullRows };
+}
+async function applyFullRowsIfAbsent(tableName, rows) {
+  const out = { inserted: 0, skipped: 0, errors: [] };
+  if (!rows || rows.length === 0) return out;
+  const config = getTableSyncConfig(tableName);
+  if (!config) {
+    out.errors.push(`${tableName}: unknown table`);
+    return out;
+  }
+  const identityCol = config.identityColumn || "id";
+  const pool4 = await getPool();
+  const meta = await getColumnMeta(pool4, tableName);
+  for (const incomingRow of rows.slice(0, SELF_HEAL_MAX_ROWS_PER_CYCLE)) {
+    let row = incomingRow;
+    const identity = row[identityCol] ?? row[toCamelCase(identityCol)];
+    if (!identity) {
+      out.errors.push(`${tableName}: row missing identity ${identityCol}`);
+      continue;
+    }
+    try {
+      const exist = await pool4.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+        [identity]
+      );
+      if (exist.rows.length > 0) {
+        out.skipped++;
+        syncDiag(`SELF-HEAL SKIP (already present): ${tableName}.${identity}`);
+        continue;
+      }
+      if (tableName === "spares") {
+        const { validateIncomingSparePair: validateIncomingSparePair2 } = await Promise.resolve().then(() => (init_spareClassificationSync(), spareClassificationSync_exports));
+        await validateIncomingSparePair2(pool4, row);
+      }
+      if (tableName === "work_orders" && isCompletedWorkOrderStatus(row.status)) {
+        if (!isValidCompletedWorkOrderDate(row.date_completed ?? row.dateCompleted)) {
+          const executionDate = row.completion_date_time ?? row.completionDateTime;
+          if (!isValidCompletedWorkOrderDate(executionDate)) {
+            out.errors.push(`${tableName}.${identity}: Completed full row has no valid completion date`);
+            syncDiag(`SELF-HEAL DEFER COMPLETED: ${tableName}.${identity} has no valid completion date`);
+            continue;
+          }
+          row = { ...row, date_completed: executionDate };
+        }
+      }
+      if (PARENT_UUID_LINKS[tableName]) {
+        row = { ...row };
+        const waitReason = await resolveParentLinks(pool4, tableName, row);
+        if (waitReason) {
+          out.errors.push(`${tableName}.${identity}: waiting for parent \u2014 ${waitReason}`);
+          syncDiag(`SELF-HEAL PARENT-WAIT: ${tableName}.${identity} \u2014 ${waitReason}`);
+          continue;
+        }
+      }
+      const parts = buildInsertParts(
+        row,
+        meta,
+        /*skipIntegerPK*/
+        true
+      );
+      if (parts.columns.length === 0) {
+        out.errors.push(`${tableName}.${identity}: no insertable columns`);
+        continue;
+      }
+      const sqlText = `INSERT INTO "${tableName}" (${parts.columns.join(", ")}) VALUES (${parts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`;
+      try {
+        await pool4.query(sqlText, parts.values);
+      } catch (insErr) {
+        if (insErr.code === "23505" && tableName === "work_orders") {
+          const retryRow = { ...row, id: `WO-SYNC-${identity}` };
+          const retryParts = buildInsertParts(retryRow, meta, true);
+          await pool4.query(
+            `INSERT INTO "${tableName}" (${retryParts.columns.join(", ")}) VALUES (${retryParts.placeholders.join(", ")}) ON CONFLICT DO NOTHING`,
+            retryParts.values
+          );
+        } else {
+          throw insErr;
+        }
+      }
+      const landed = await pool4.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+        [identity]
+      );
+      if (landed.rows.length > 0) {
+        out.inserted++;
+        console.log(`[SelfHeal] \u{1FA79} full row inserted (was absent): ${tableName}.${identity}`);
+        syncDiag(`SELF-HEAL INSERT OK: ${tableName}.${identity}`);
+      } else {
+        out.skipped++;
+        syncDiag(`SELF-HEAL INSERT NO-OP (conflict, left untouched): ${tableName}.${identity}`);
+      }
+    } catch (err2) {
+      out.errors.push(`${tableName}.${identity}: ${err2.message}`);
+      syncDiag(`SELF-HEAL INSERT FAIL: ${tableName}.${identity} \u2014 ${String(err2.message).substring(0, 150)}`);
+    }
+  }
+  if (rows.length > SELF_HEAL_MAX_ROWS_PER_CYCLE) {
+    syncDiag(`SELF-HEAL: ${rows.length - SELF_HEAL_MAX_ROWS_PER_CYCLE} row(s) over the per-cycle cap deferred (will regenerate)`);
+  }
+  return out;
+}
+async function gatherFullRows(requests) {
+  const out = [];
+  const pool4 = await getPool();
+  let budget = SELF_HEAL_MAX_ROWS_PER_CYCLE;
+  for (const req of requests) {
+    if (budget <= 0) break;
+    const config = getTableSyncConfig(req.tableName);
+    if (!config || !req.rowUuids?.length) continue;
+    const identityCol = config.identityColumn || "id";
+    const uuids = req.rowUuids.slice(0, budget);
+    try {
+      const r = await pool4.query(
+        `SELECT * FROM "${req.tableName}" WHERE "${identityCol}" = ANY($1)`,
+        [uuids]
+      );
+      if (r.rows.length > 0) {
+        out.push({ tableName: req.tableName, rows: r.rows });
+        budget -= r.rows.length;
+        syncDiag(`SELF-HEAL GATHER: ${req.tableName} \u2014 ${r.rows.length}/${uuids.length} full row(s)`);
+      }
+    } catch (err2) {
+      syncDiag(`SELF-HEAL GATHER FAIL: ${req.tableName} \u2014 ${String(err2.message).substring(0, 120)}`);
+    }
+  }
+  return out;
+}
+function getInsertLogSkipCount() {
+  return insertLogSkipsSession;
+}
+async function evaluateInsertOriginGuard(client2, log2) {
+  if (log2.oldValue !== null && log2.oldValue !== void 0) return { skip: false };
+  const config = getTableSyncConfig(log2.tableName);
+  if (!config) return { skip: false };
+  const identityCol = config.identityColumn || "id";
+  const column = fieldNameToColumn(log2.fieldName);
+  const res = await client2.query(
+    `SELECT ("${column}" IS NOT NULL) AS populated FROM "${log2.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+    [log2.rowUuid]
+  );
+  if (res.rows.length === 0) return { skip: false };
+  if (!res.rows[0].populated) return { skip: false };
+  insertLogSkipsSession++;
+  const reason = `re-delivered INSERT-origin log for an EXISTING row whose "${column}" is already populated \u2014 not applied (a creation-time log is the oldest possible state of the row and cannot be newer)`;
+  syncDiag(`INSERT-LOG SKIP (terminal-ack): ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 ${reason}`);
+  return { skip: true, reason };
+}
+async function evaluateStaleSkipGuard(client2, log2, receiverInstanceId, opts = {}) {
+  const fieldCheck = await client2.query(
+    `SELECT changed_at, instance_id FROM sync_field_log
+      WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+        AND instance_id = $4 AND changed_at > $5
+      ORDER BY changed_at DESC LIMIT 1`,
+    [log2.tableName, log2.rowUuid, log2.fieldName, receiverInstanceId, log2.changedAt]
+  );
+  if (fieldCheck.rows.length === 0) return { skip: false };
+  const winnerChangedAt = new Date(fieldCheck.rows[0].changed_at);
+  const config = getTableSyncConfig(log2.tableName);
+  const identityCol = config?.identityColumn || "id";
+  const fieldNameSnake = fieldNameToColumn(log2.fieldName);
+  let currentValue = null;
+  try {
+    const curRow = await client2.query(
+      `SELECT "${fieldNameSnake}" FROM "${log2.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+      [log2.rowUuid]
+    );
+    if (curRow.rows.length > 0) {
+      const raw = curRow.rows[0][fieldNameSnake];
+      currentValue = raw === null || raw === void 0 ? null : String(raw);
+    }
+  } catch {
+  }
+  try {
+    await client2.query(
+      `INSERT INTO sync_conflict_log
+         (batch_uuid, table_name, row_uuid, field_name,
+          incoming_sender_instance, incoming_changed_at,
+          incoming_old_value, incoming_new_value,
+          receiver_winner_instance, receiver_winner_changed_at,
+          receiver_current_value)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        opts.batchUuid ?? null,
+        log2.tableName,
+        log2.rowUuid,
+        log2.fieldName,
+        log2.instanceId ?? null,
+        log2.changedAt,
+        log2.oldValue ?? null,
+        log2.newValue ?? null,
+        receiverInstanceId,
+        winnerChangedAt,
+        currentValue
+      ]
+    );
+  } catch (clErr) {
+    console.error(`[Sync] Failed to write sync_conflict_log: ${clErr.message}`);
+  }
+  syncDiag(
+    `STALE-SKIP: ${log2.tableName}.${log2.fieldName} row=${log2.rowUuid} \u2014 incoming ${log2.changedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`
+  );
+  return { skip: true, winnerChangedAt, currentValue };
+}
+var columnMetaCache, JOB_TRACKING_COLUMNS, SYNC_COLUMN_ALIASES, SKIP_UPDATE_COLUMNS, PARENT_UUID_LINKS, LEGACY_ID_KEYED, NEVER_MERGE_ON_CONFLICT, SELF_HEAL_MAX_ROWS_PER_CYCLE, insertLogSkipsSession;
+var init_oneWayApplier = __esm({
+  "server/modules/sync/oneWayApplier.ts"() {
+    "use strict";
+    init_db();
+    init_syncConfig();
+    init_syncDiagLogger();
+    init_completedWorkOrderDate();
+    columnMetaCache = /* @__PURE__ */ new Map();
+    JOB_TRACKING_COLUMNS = [
+      "last_done_date",
+      "next_due_date",
+      "last_done_rh",
+      "next_due_rh",
+      "rh_estimated_due_date",
+      "rh_average_per_day",
+      "rh_estimate_basis"
+    ];
+    SYNC_COLUMN_ALIASES = { location2: "location_2" };
+    SKIP_UPDATE_COLUMNS = /* @__PURE__ */ new Set(["id", "created_at", "createdAt"]);
+    PARENT_UUID_LINKS = {
+      change_request_approval: [
+        { fkCol: "change_request_id", uuidCol: "change_request_uuid", parentTable: "change_request", parentUuidCol: "cruuid" }
+      ],
+      change_request_comment: [
+        { fkCol: "change_request_id", uuidCol: "change_request_uuid", parentTable: "change_request", parentUuidCol: "cruuid", optional: true }
+      ],
+      change_request_attachment: [
+        { fkCol: "change_request_id", uuidCol: "change_request_uuid", parentTable: "change_request", parentUuidCol: "cruuid", optional: true }
+      ]
+    };
+    LEGACY_ID_KEYED = {
+      component_documents: {
+        // = migration 182 backfill (n = 1): stored file + component — the same on both sides for the same document. NOT the
+        // sender's integer id: a document that synced under the old code has different ids on shore and ship.
+        derive: (_senderId, logs) => {
+          const fileKey = latestLogValue(logs, "file_key");
+          const componentId = latestLogValue(logs, "component_id");
+          return fileKey && componentId ? md5Uuid(`component_documents:${fileKey}:${componentId}:1`) : null;
+        }
+      }
+    };
+    NEVER_MERGE_ON_CONFLICT = /* @__PURE__ */ new Set(["defects"]);
+    SELF_HEAL_MAX_ROWS_PER_CYCLE = 50;
+    insertLogSkipsSession = 0;
+  }
+});
+
 // server/modules/sync/fieldLogger.ts
 var fieldLogger_exports = {};
 __export(fieldLogger_exports, {
@@ -10791,182 +11580,6 @@ var init_level = __esm({
   }
 });
 
-// server/utils/workOrderStatus.ts
-var workOrderStatus_exports = {};
-__export(workOrderStatus_exports, {
-  buildCalendarCycleWOMap: () => buildCalendarCycleWOMap,
-  buildJobsWithActiveWOSet: () => buildJobsWithActiveWOSet,
-  buildRhCycleWOMap: () => buildRhCycleWOMap,
-  extractJobNoFromWorkOrderNo: () => extractJobNoFromWorkOrderNo,
-  findBlockingWOForJob: () => findBlockingWOForJob,
-  isBlockingStatus: () => isBlockingStatus,
-  isCompletedStatus: () => isCompletedStatus,
-  isUnplannedWorkOrderNo: () => isUnplannedWorkOrderNo
-});
-function isBlockingStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return BLOCKING_STATUSES_EXACT.has(normalizedStatus);
-}
-function isCompletedStatus(status) {
-  if (!status) return false;
-  const normalizedStatus = status.toLowerCase().trim();
-  return COMPLETED_STATUSES_EXACT.has(normalizedStatus);
-}
-function extractJobNoFromWorkOrderNo(workOrderNo, vesselCode) {
-  if (!workOrderNo) return null;
-  if (isUnplannedWorkOrderNo(workOrderNo)) return null;
-  const knownVesselCode = vesselCode?.trim();
-  const numberWithoutKnownVesselPrefix = knownVesselCode && workOrderNo.startsWith(`${knownVesselCode}-`) ? workOrderNo.slice(knownVesselCode.length + 1) : workOrderNo;
-  const vesselPrefixedMkrMatch = numberWithoutKnownVesselPrefix.match(
-    /^(?:.+-)?(MKR-[^-]+-\d+)-\d+\.\d+.*-\d{4}-\d+$/
-  );
-  if (vesselPrefixedMkrMatch) {
-    return vesselPrefixedMkrMatch[1];
-  }
-  const newFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-  if (newFormatMatch) {
-    return newFormatMatch[1];
-  }
-  const woSuffixMatch = numberWithoutKnownVesselPrefix.match(/^(.+?)\.WO-\d{4}-\d+$/);
-  if (woSuffixMatch) {
-    return woSuffixMatch[1];
-  }
-  const oldFormatMatch = numberWithoutKnownVesselPrefix.match(/^(.+)-\d{4}-\d+$/);
-  if (oldFormatMatch) {
-    return oldFormatMatch[1];
-  }
-  return null;
-}
-function isUnplannedWorkOrderNo(workOrderNo) {
-  if (!workOrderNo) return false;
-  return /(?:^|-)UWO-[^-]+-\d{4}-\d+$/.test(workOrderNo.trim());
-}
-function buildJobsWithActiveWOSet(workOrders2, vesselId) {
-  const byJobId = /* @__PURE__ */ new Set();
-  const byJobNo = /* @__PURE__ */ new Set();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (isBlockingStatus(wo.status)) {
-      if (wo.jobId) {
-        byJobId.add(wo.jobId);
-      }
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        byJobNo.add(`${woVesselId}|${jobNo}`);
-      }
-    }
-  });
-  return { byJobId, byJobNo };
-}
-function buildRhCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueRhSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function buildCalendarCycleWOMap(workOrders2, vesselId) {
-  const cycleMap = /* @__PURE__ */ new Map();
-  workOrders2.forEach((wo) => {
-    if (wo.isDeleted === true) {
-      return;
-    }
-    const normalizedStatus = wo.status?.toLowerCase().trim() || "";
-    if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
-      return;
-    }
-    if (vesselId && wo.vesselId !== vesselId) {
-      return;
-    }
-    if (wo.cycleDueDateSnapshot) {
-      const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      if (jobNo) {
-        const woVesselId = wo.vesselId || "unknown";
-        const compCode = wo.componentCode || "";
-        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
-        cycleMap.set(cycleKey, wo);
-        if (!compCode) {
-          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
-          cycleMap.set(legacyCycleKey, wo);
-        }
-      }
-    }
-  });
-  return cycleMap;
-}
-function findBlockingWOForJob(workOrders2, jobId, jobNo) {
-  return workOrders2.find((wo) => {
-    if (wo.isDeleted === true) return false;
-    if (!isBlockingStatus(wo.status)) return false;
-    if (wo.jobId === jobId) return true;
-    const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-    return woJobNo === jobNo;
-  });
-}
-var BLOCKING_STATUSES_EXACT, COMPLETED_STATUSES_EXACT;
-var init_workOrderStatus = __esm({
-  "server/utils/workOrderStatus.ts"() {
-    "use strict";
-    BLOCKING_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "active",
-      "due",
-      "due (grace p)",
-      "due (grace)",
-      "overdue",
-      "pending approval",
-      "pending_approval",
-      "pendingapproval",
-      "postponed",
-      "in progress",
-      "in_progress",
-      "inprogress",
-      "open",
-      "rejected",
-      // Rejected WOs block new generation - work needs rework before cycle can advance
-      "awaiting office approval",
-      // Postponement / Re-Postponement pending — scanner must not generate duplicate WO
-      "postponement approved"
-      // Postponement approved — WO is still active, scanner must not re-generate
-    ]);
-    COMPLETED_STATUSES_EXACT = /* @__PURE__ */ new Set([
-      "completed",
-      "closed",
-      "approved",
-      "cancelled",
-      "canceled"
-    ]);
-  }
-});
-
 // server/utils/defectNumberSeries.ts
 function defectSeriesPrefix(vesselCode, yearShort, side) {
   const vc = String(vesselCode).padStart(3, "0");
@@ -10996,39 +11609,6 @@ var init_defectNumberSeries = __esm({
   "server/utils/defectNumberSeries.ts"() {
     "use strict";
     OFFICE_DEFECT_SERIES_MARK = "O";
-  }
-});
-
-// server/modules/sync/syncRole.ts
-var syncRole_exports = {};
-__export(syncRole_exports, {
-  getEffectiveInstanceId: () => getEffectiveInstanceId,
-  getInstanceRole: () => getInstanceRole,
-  isShipInstance: () => isShipInstance,
-  isShipInstanceId: () => isShipInstanceId
-});
-function isShipInstanceId(instanceId2) {
-  return instanceId2.toUpperCase().startsWith("SHIP-");
-}
-async function getEffectiveInstanceId() {
-  let dbInstanceId = null;
-  try {
-    dbInstanceId = await getSetting("instance_id");
-  } catch {
-  }
-  return dbInstanceId && dbInstanceId.trim() || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-}
-async function isShipInstance() {
-  const id = await getEffectiveInstanceId();
-  return isShipInstanceId(id);
-}
-async function getInstanceRole() {
-  return await isShipInstance() ? "ship" : "shore";
-}
-var init_syncRole = __esm({
-  "server/modules/sync/syncRole.ts"() {
-    "use strict";
-    init_repository();
   }
 });
 
@@ -11968,193 +12548,6 @@ var init_alertsRepository = __esm({
   "server/modules/alerts/repositories/alertsRepository.ts"() {
     "use strict";
     init_storage();
-  }
-});
-
-// server/modules/sync/dualCompletionResolver.ts
-var dualCompletionResolver_exports = {};
-__export(dualCompletionResolver_exports, {
-  DUAL_COMPLETION_KIND: () => DUAL_COMPLETION_KIND,
-  RESOLUTION_ACTOR: () => RESOLUTION_ACTOR,
-  WO_COMPLETION_FIELDS_SNAKE: () => WO_COMPLETION_FIELDS_SNAKE,
-  chooseInterimSide: () => chooseInterimSide,
-  collectIncomingWoCompletionDates: () => collectIncomingWoCompletionDates,
-  evaluateDualCompletion: () => evaluateDualCompletion,
-  findWouuidsWithOpenDualConflicts: () => findWouuidsWithOpenDualConflicts,
-  isWoCompletionField: () => isWoCompletionField
-});
-function isWoCompletionField(fieldNameSnake) {
-  return WO_COMPLETION_FIELDS_SNAKE.has(fieldNameSnake);
-}
-function chooseInterimSide(local, incoming) {
-  const ld = parseReadingDay(local.completionDate)?.getTime() ?? null;
-  const id = parseReadingDay(incoming.completionDate)?.getTime() ?? null;
-  if (ld !== null && id !== null && ld !== id) return ld > id ? "local" : "incoming";
-  if (ld !== null && id === null) return "local";
-  if (ld === null && id !== null) return "incoming";
-  if (local.isShip !== incoming.isShip) return local.isShip ? "local" : "incoming";
-  return "local";
-}
-function collectIncomingWoCompletionDates(logs) {
-  const primary = /* @__PURE__ */ new Map();
-  const fallback = /* @__PURE__ */ new Map();
-  for (const log2 of logs) {
-    if (log2.tableName !== "work_orders" || !log2.newValue) continue;
-    const f = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
-    if (f === "date_completed") primary.set(log2.rowUuid, log2.newValue);
-    else if (f === "completion_date_time") fallback.set(log2.rowUuid, log2.newValue);
-  }
-  const out = /* @__PURE__ */ new Map();
-  fallback.forEach((v, k) => out.set(k, v));
-  primary.forEach((v, k) => out.set(k, v));
-  return out;
-}
-async function findWouuidsWithOpenDualConflicts(client2, wouuids) {
-  if (wouuids.length === 0) return /* @__PURE__ */ new Set();
-  try {
-    const res = await client2.query(
-      `SELECT DISTINCT row_uuid FROM sync_conflict_log
-        WHERE conflict_kind = $1 AND table_name = 'work_orders'
-          AND is_resolved = false AND row_uuid = ANY($2)`,
-      [DUAL_COMPLETION_KIND, wouuids]
-    );
-    return new Set(res.rows.map((r) => String(r.row_uuid)));
-  } catch (err2) {
-    syncDiag(`DUAL-COMPLETION OPEN-CONFLICT CHECK FAILED (treating none as open): ${String(err2?.message || err2).substring(0, 120)}`);
-    return /* @__PURE__ */ new Set();
-  }
-}
-async function evaluateDualCompletion(client2, log2, ctx) {
-  if (log2.tableName !== "work_orders") return NOT_DUAL;
-  const fieldSnake = log2.fieldName.includes("_") ? log2.fieldName : log2.fieldName.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
-  if (!isWoCompletionField(fieldSnake)) return NOT_DUAL;
-  try {
-    if (log2.changedByUserId === RESOLUTION_ACTOR) {
-      await client2.query(
-        `UPDATE sync_conflict_log
-            SET is_resolved = true, resolved_at = NOW(),
-                resolved_by = $1, resolved_action = 'REMOTE_RESOLUTION'
-          WHERE conflict_kind = $2 AND table_name = 'work_orders'
-            AND row_uuid = $3 AND field_name IN ($4, $5) AND is_resolved = false`,
-        [RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName, fieldSnake]
-      );
-      syncDiag(`DUAL-COMPLETION REMOTE-RESOLUTION: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 force-applying resolved value, local mirror conflict closed`);
-      return { dualConflict: false, applyIncoming: true, remoteResolution: true };
-    }
-    const rowRes = await client2.query(
-      `SELECT status, date_completed, completion_date_time, "${fieldSnake}" AS current_value
-         FROM work_orders WHERE wouuid = $1 LIMIT 1`,
-      [log2.rowUuid]
-    );
-    if (rowRes.rows.length === 0) return NOT_DUAL;
-    const row = rowRes.rows[0];
-    if (!isCompletedStatus(row.status)) return NOT_DUAL;
-    if (fieldSnake === "status" && !isCompletedStatus(log2.newValue ?? null)) return NOT_DUAL;
-    const currentValue = row.current_value === null || row.current_value === void 0 ? null : String(row.current_value);
-    const incomingValue = log2.newValue === null || log2.newValue === void 0 ? null : String(log2.newValue);
-    if (currentValue === incomingValue) return NOT_DUAL;
-    if (currentValue !== null && incomingValue !== null) {
-      const cn = Number(currentValue), inn = Number(incomingValue);
-      if (currentValue.trim() !== "" && incomingValue.trim() !== "" && Number.isFinite(cn) && Number.isFinite(inn) && cn === inn) return NOT_DUAL;
-    }
-    const receiverId = ctx.receiverInstanceId;
-    if (!receiverId || receiverId === "UNKNOWN") return NOT_DUAL;
-    if (log2.instanceId && log2.instanceId === receiverId) return NOT_DUAL;
-    const localStatus = await client2.query(
-      `SELECT new_value, changed_at FROM sync_field_log
-        WHERE table_name = 'work_orders' AND row_uuid = $1
-          AND instance_id = $2 AND field_name IN ('status')
-        ORDER BY changed_at DESC LIMIT 1`,
-      [log2.rowUuid, receiverId]
-    );
-    if (localStatus.rows.length === 0 || !isCompletedStatus(localStatus.rows[0].new_value)) {
-      return NOT_DUAL;
-    }
-    const localCompletion = await client2.query(
-      `SELECT changed_at FROM sync_field_log
-        WHERE table_name = 'work_orders' AND row_uuid = $1
-          AND instance_id = $2 AND field_name = ANY($3)
-        ORDER BY changed_at DESC LIMIT 1`,
-      [log2.rowUuid, receiverId, COMPLETION_FIELD_NAME_VARIANTS]
-    );
-    if (localCompletion.rows.length === 0) return NOT_DUAL;
-    const existing = await client2.query(
-      `SELECT id FROM sync_conflict_log
-        WHERE conflict_kind = $1 AND table_name = 'work_orders'
-          AND row_uuid = $2 AND field_name = $3 AND is_resolved = false LIMIT 1`,
-      [DUAL_COMPLETION_KIND, log2.rowUuid, log2.fieldName]
-    );
-    if (existing.rows.length === 0) {
-      await client2.query(
-        `INSERT INTO sync_conflict_log
-           (batch_uuid, table_name, row_uuid, field_name, conflict_kind,
-            incoming_sender_instance, incoming_changed_at, incoming_old_value, incoming_new_value,
-            receiver_winner_instance, receiver_winner_changed_at, receiver_current_value)
-         VALUES ($1,'work_orders',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [
-          ctx.batchUuid ?? null,
-          log2.rowUuid,
-          log2.fieldName,
-          DUAL_COMPLETION_KIND,
-          log2.instanceId ?? null,
-          log2.changedAt,
-          log2.oldValue ?? null,
-          incomingValue,
-          receiverId,
-          new Date(localCompletion.rows[0].changed_at),
-          currentValue
-        ]
-      );
-    }
-    const localDate = row.date_completed || row.completion_date_time || null;
-    const incomingDate = ctx.incomingCompletionDateByRow?.get(log2.rowUuid) ?? (fieldSnake === "date_completed" || fieldSnake === "completion_date_time" ? incomingValue : null);
-    const winner = chooseInterimSide(
-      { completionDate: localDate, isShip: isShipInstanceId(receiverId) },
-      { completionDate: incomingDate ?? null, isShip: log2.instanceId ? isShipInstanceId(log2.instanceId) : false }
-    );
-    const applyIncoming = winner === "incoming";
-    syncDiag(
-      `DUAL-COMPLETION CONFLICT: work_orders.${fieldSnake} row=${log2.rowUuid} \u2014 completed on BOTH sides (local ${localDate ?? "no-date"} vs incoming ${incomingDate ?? "no-date"}); interim=${winner}, ${applyIncoming ? "incoming value applied" : "local value kept"}; recorded for review`
-    );
-    return { dualConflict: true, applyIncoming, remoteResolution: false };
-  } catch (err2) {
-    syncDiag(`DUAL-COMPLETION DETECT ERROR (fail-open to legacy guards): work_orders.${fieldSnake} row=${log2.rowUuid}: ${String(err2?.message || err2).substring(0, 150)}`);
-    return NOT_DUAL;
-  }
-}
-var RESOLUTION_ACTOR, DUAL_COMPLETION_KIND, WO_COMPLETION_FIELDS_SNAKE, snakeToCamel, COMPLETION_FIELD_NAME_VARIANTS, NOT_DUAL;
-var init_dualCompletionResolver = __esm({
-  "server/modules/sync/dualCompletionResolver.ts"() {
-    "use strict";
-    init_workOrderStatus();
-    init_syncRole();
-    init_rhEventComparator();
-    init_syncDiagLogger();
-    RESOLUTION_ACTOR = "sync-conflict-resolution";
-    DUAL_COMPLETION_KIND = "dual_completion";
-    WO_COMPLETION_FIELDS_SNAKE = /* @__PURE__ */ new Set([
-      "status",
-      "date_completed",
-      "completion_date_time",
-      "performed_by",
-      "completion_remarks",
-      "completion_rh",
-      "wo_completion_rh",
-      "completion_rh_source",
-      "completion_rh_validated",
-      "completion_rh_validation_details",
-      "rh_justification",
-      "rh_justification_provided_by",
-      "rh_justification_date",
-      "rh_backdated_entry",
-      "current_reading",
-      "current_reading_date",
-      "previous_reading",
-      "reading_date"
-    ]);
-    snakeToCamel = (s) => s.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
-    COMPLETION_FIELD_NAME_VARIANTS = Array.from(WO_COMPLETION_FIELDS_SNAKE).flatMap((f) => [f, snakeToCamel(f)]);
-    NOT_DUAL = { dualConflict: false, applyIncoming: true, remoteResolution: false };
   }
 });
 
@@ -13407,6 +13800,12 @@ async function resolveDualCompletionGroup(pool4, conflict, choice, userId) {
 }
 async function applyIncomingConflict(id, source, userId) {
   const pool4 = await getPool();
+  const classificationSource = source === "log" ? "sync_conflict_log" : "sync_conflicts";
+  const classificationRow = await pool4.query(`SELECT * FROM ${classificationSource} WHERE id=$1`, [id]);
+  if (classificationRow.rows[0] && isSpareClassificationConflict(classificationRow.rows[0])) {
+    await resolveSparePairConflict(pool4, classificationRow.rows[0], source, userId, true);
+    return getConflict2(id, source);
+  }
   if (source === "log") {
     const conflictResult = await pool4.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
@@ -13518,6 +13917,12 @@ async function applyIncomingConflict(id, source, userId) {
 }
 async function dismissConflict(id, source, userId) {
   const pool4 = await getPool();
+  const classificationSource = source === "log" ? "sync_conflict_log" : "sync_conflicts";
+  const classificationRow = await pool4.query(`SELECT * FROM ${classificationSource} WHERE id=$1`, [id]);
+  if (classificationRow.rows[0] && isSpareClassificationConflict(classificationRow.rows[0])) {
+    await resolveSparePairConflict(pool4, classificationRow.rows[0], source, userId, false);
+    return getConflict2(id, source);
+  }
   if (source === "log") {
     const conflictResult = await pool4.query(
       `SELECT * FROM sync_conflict_log WHERE id = $1`,
@@ -13586,12 +13991,13 @@ var init_conflictReviewRepository = __esm({
     init_syncDiagLogger();
     init_syncRole();
     init_dualCompletionResolver();
+    init_spareClassificationConflict();
   }
 });
 
 // server/modules/sync/unknownColumnRetryPolicy.ts
 function shouldRetryUnknownSyncColumn(tableName, columnName) {
-  return tableName === "vessel_certificate_data" && columnName === "certificate_number";
+  return tableName === "vessel_certificate_data" && columnName === "certificate_number" || ["spares", "fleet_spares"].includes(tableName) && ["spare_category", "optimum_qty"].includes(columnName);
 }
 var init_unknownColumnRetryPolicy = __esm({
   "server/modules/sync/unknownColumnRetryPolicy.ts"() {
@@ -13847,7 +14253,8 @@ async function initiateSyncSession(instanceId2, vesselId, lastCheckpoint) {
   console.log(`[Sync] Initiated batch ${batch.batchUuid} for ${instanceId2} / ${vesselId}`);
   return {
     batchUuid: batch.batchUuid,
-    serverTimestamp: (/* @__PURE__ */ new Date()).toISOString()
+    serverTimestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    capabilities: ["spare_classification_pair"]
   };
 }
 async function refreshRhEstimatesSafely(client2, auditIds, batchUuid, refresh) {
@@ -14030,7 +14437,12 @@ async function receivePushData(batchUuid, vesselId, payload) {
         };
         const dualConflictWouuids = /* @__PURE__ */ new Set();
         let pushUpdIdx = 0;
+        const { applySparePairLogs: applySparePairLogs2, isSparePairLog: isSparePairLog2 } = await Promise.resolve().then(() => (init_spareClassificationSync(), spareClassificationSync_exports));
+        const pairResult = await applySparePairLogs2(client2, insertResult.updateLogs, receiverInstanceId, batchUuid);
+        pairResult.failedRows.forEach((uuid2) => droppedRowUuids.add(uuid2));
+        applyErrorMessages.push(...pairResult.errors);
         for (const log2 of insertResult.updateLogs) {
+          if (isSparePairLog2(log2)) continue;
           const config = getTableSyncConfig(log2.tableName);
           if (!config) continue;
           const identityCol = config.identityColumn || "id";
@@ -14542,6 +14954,9 @@ async function preparePullData(batchUuid, vesselId, shipInstanceId, lastCheckpoi
     vesselCode
   );
   let shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
+  if (!capabilities?.includes("spare_classification_pair") && (shoreFieldLogs.some((log2) => log2.tableName === "spares" && ["spareCategory", "optimumQty", "spare_category", "optimum_qty"].includes(log2.fieldName)) || oneWayRows.some((batch2) => batch2.tableName === "fleet_spares" && batch2.rows.length > 0))) {
+    throw Object.assign(new Error("Spare classification synchronization is pending: upgrade and migrate this vessel before retrying. No classification changes have been acknowledged."), { statusCode: 409 });
+  }
   {
     const held = holdBackForOldShip(shoreFieldLogs, capabilities);
     if (held.heldBack > 0) {
@@ -14656,6 +15071,54 @@ async function resolveConflictAction(conflictUuid, resolution, resolvedValue, re
     winningValue = conflict.shoreValue;
   } else {
     winningValue = resolvedValue;
+  }
+  if (conflict.tableName === "spares" && ["spareCategory", "optimumQty", "spare_category", "optimum_qty"].includes(conflict.fieldName)) {
+    const pool4 = await getPool();
+    if (resolution !== "manual") {
+      const raw = await pool4.query("SELECT * FROM sync_conflicts WHERE conflict_uuid=$1", [conflictUuid]);
+      const { resolveSparePairConflict: resolveSparePairConflict2 } = await Promise.resolve().then(() => (init_spareClassificationConflict(), spareClassificationConflict_exports));
+      await resolveSparePairConflict2(pool4, raw.rows[0], "old", resolvedBy, true, resolution === "ship_wins" ? "ship" : "shore");
+      return getConflict(conflictUuid);
+    }
+    const client2 = await pool4.connect();
+    try {
+      await client2.query("BEGIN");
+      const saved = await client2.query("SELECT * FROM spares WHERE suuid=$1 FOR UPDATE", [conflict.rowUuid]);
+      if (!saved.rows[0]) throw new Error("Spare not found");
+      const { validateIncomingSparePair: validateIncomingSparePair2 } = await Promise.resolve().then(() => (init_spareClassificationSync(), spareClassificationSync_exports));
+      const col = /category/i.test(conflict.fieldName) ? "spare_category" : "optimum_qty";
+      const pair = await validateIncomingSparePair2(client2, { [col]: winningValue }, saved.rows[0]);
+      await client2.query(
+        "UPDATE spares SET spare_category=$1,optimum_qty=$2,updated_at=NOW() WHERE suuid=$3",
+        [pair.spareCategory, pair.optimumQty, conflict.rowUuid]
+      );
+      const { initFieldLoggerInstanceId: initFieldLoggerInstanceId2 } = await Promise.resolve().then(() => (init_fieldLogger(), fieldLogger_exports));
+      await client2.query(
+        `INSERT INTO sync_field_log
+        (table_name,row_uuid,field_name,old_value,new_value,vessel_id,changed_by_user_id,instance_id,is_synced,is_sync)
+        VALUES('spares',$1,$2,$3,$4,$5,$6,$7,false,false)`,
+        [
+          conflict.rowUuid,
+          conflict.fieldName,
+          saved.rows[0][col] == null ? null : String(saved.rows[0][col]),
+          winningValue,
+          saved.rows[0].vessel_id,
+          resolvedBy,
+          await initFieldLoggerInstanceId2()
+        ]
+      );
+      await client2.query(
+        `UPDATE sync_conflicts SET resolution=$1,resolved_value=$2,resolved_at=NOW(),resolved_by=$3 WHERE conflict_uuid=$4`,
+        [resolution, winningValue, resolvedBy, conflictUuid]
+      );
+      await client2.query("COMMIT");
+      return getConflict(conflictUuid);
+    } catch (error) {
+      await client2.query("ROLLBACK");
+      throw Object.assign(error, { statusCode: 400 });
+    } finally {
+      client2.release();
+    }
   }
   const config = getTableSyncConfig(conflict.tableName);
   if (config) {
@@ -19755,6 +20218,7 @@ var init_syncEngine = __esm({
     SYNC_DRAIN_MAX_MS = parseInt(process.env.SYNC_DRAIN_MAX_MS || "", 10) || 6e4;
     SyncEngine = class {
       instanceId;
+      remoteSupportsSparePair = false;
       shoreBaseUrl;
       syncApiKey;
       // Phase 4a: per-instance tunables, resolved DB-then-env in loadSettings().
@@ -19887,6 +20351,7 @@ var init_syncEngine = __esm({
             lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null
           });
           batchUuid = initResult.batchUuid;
+          this.remoteSupportsSparePair = Array.isArray(initResult.capabilities) && initResult.capabilities.includes("spare_classification_pair");
           console.log(`[SyncEngine] Batch initiated: ${batchUuid}`);
           try {
             const localPool = await getPool();
@@ -20196,6 +20661,9 @@ var init_syncEngine = __esm({
         const vesselCode = await this.getVesselCode(vesselId);
         syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
         let fieldLogs = isShip2 ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode, this.pushBatchSize) : [];
+        if (!this.remoteSupportsSparePair && fieldLogs.some((log2) => log2.tableName === "spares" && ["spareCategory", "optimumQty", "spare_category", "optimum_qty"].includes(log2.fieldName))) {
+          throw new Error("Spare classification sync is pending: upgrade and migrate shore before retrying. Local changes remain unsynced.");
+        }
         if (fieldLogs.length > 0) {
           const part = partitionNonSyncedTableLogs(fieldLogs.map((l) => ({ ...l, tableName: l.tableName ?? l.table_name })));
           if (part.retired.length > 0) {
@@ -20367,7 +20835,7 @@ var init_syncEngine = __esm({
           instanceId: this.instanceId,
           lastCheckpoint: floor ? floor.toISOString() : null,
           // 13-Oct-2026: this ship matches component_documents on cduuid (mig 182) — the shore may send UUID-keyed changes.
-          capabilities: ["component_documents_uuid"],
+          capabilities: ["component_documents_uuid", "spare_classification_pair"],
           ...havePerTable ? {
             tableCheckpoints: Object.fromEntries(
               Object.entries(tableCheckpoints).map(([t, d]) => [t, d.toISOString()])
@@ -20443,7 +20911,14 @@ var init_syncEngine = __esm({
             let updateApplied = 0;
             let updateErrors = 0;
             let updSpIdx = 0;
+            const { applySparePairLogs: applySparePairLogs2, isSparePairLog: isSparePairLog2 } = await Promise.resolve().then(() => (init_spareClassificationSync(), spareClassificationSync_exports));
+            const pairResult = await applySparePairLogs2(client2, insertResult.updateLogs, this.instanceId, batchUuid);
+            pairResult.failedRows.forEach((uuid2) => failedRowUuids.add(uuid2));
+            allErrors.push(...pairResult.errors);
+            totalApplyErrors += pairResult.errors.length;
+            totalPulled += pairResult.applied;
             for (const log2 of insertResult.updateLogs) {
+              if (isSparePairLog2(log2)) continue;
               const updSp = `pull_upd_${updSpIdx++}`;
               try {
                 await client2.query(`SAVEPOINT ${updSp}`);
@@ -34637,7 +35112,7 @@ async function sweepDefectsForApproval(vesselId) {
   const ctx = getCurrentTenantContext2();
   const db12 = ctx ? ctx.db : getPostgresClient3().db;
   const { defects: defects2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and46, eq: eq55, or: or12, isNull: isNull10, sql: sql34 } = await import("drizzle-orm");
+  const { and: and47, eq: eq56, or: or12, isNull: isNull10, sql: sql34 } = await import("drizzle-orm");
   let submitted = 0;
   const rows = await db12.select({
     duuid: defects2.duuid,
@@ -34645,9 +35120,9 @@ async function sweepDefectsForApproval(vesselId) {
     targetDateExtensions: defects2.targetDateExtensions,
     confirmCompleted: defects2.confirmCompleted,
     verified: defects2.verified
-  }).from(defects2).where(and46(
-    eq55(defects2.vesselId, vesselId),
-    or12(eq55(defects2.isDeleted, false), isNull10(defects2.isDeleted)),
+  }).from(defects2).where(and47(
+    eq56(defects2.vesselId, vesselId),
+    or12(eq56(defects2.isDeleted, false), isNull10(defects2.isDeleted)),
     sql34`(
       ${defects2.targetDateExtensions}::jsonb @> '[{"status":"Requested"}]'::jsonb
       OR (${defects2.confirmCompleted} IS TRUE AND ${defects2.verified} IS NOT TRUE)
@@ -36327,7 +36802,7 @@ async function approvalArrivalSweep(vesselId) {
   const { getPostgresClient: getPostgresClient3 } = await Promise.resolve().then(() => (init_postgresClient(), postgresClient_exports));
   const { db: db12 } = getPostgresClient3();
   const { changeRequest: changeRequest2, workOrders: workOrders2, workOrderPostponements: workOrderPostponements2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and46, eq: eq55 } = await import("drizzle-orm");
+  const { and: and47, eq: eq56 } = await import("drizzle-orm");
   let submitted = 0;
   try {
     const { processOpenWithdrawals: processOpenWithdrawals2 } = await Promise.resolve().then(() => (init_approvalWithdrawalService(), approvalWithdrawalService_exports));
@@ -36336,16 +36811,16 @@ async function approvalArrivalSweep(vesselId) {
   } catch (e) {
     console.error(`[approvals] withdrawal sweep failed for vessel ${vesselId} (non-fatal):`, e);
   }
-  const crs = await db12.select().from(changeRequest2).where(and46(eq55(changeRequest2.vesselId, vesselId), eq55(changeRequest2.status, "submitted")));
+  const crs = await db12.select().from(changeRequest2).where(and47(eq56(changeRequest2.vesselId, vesselId), eq56(changeRequest2.status, "submitted")));
   for (const cr of crs) {
     const cls = await (await Promise.resolve().then(() => (init_changeRequestsService(), changeRequestsService_exports))).classifyChangeRequestScope(cr);
     if (!cls.functionId) continue;
     const requuid = await maybeEngineSubmit(cls.functionId, cr.cruuid, { kind: "cr", targetType: cr.targetType, targetId: cr.targetId }, cr.vesselId, cr.requestedByUserId);
     if (requuid) submitted++;
   }
-  const wos = await db12.select().from(workOrders2).where(and46(eq55(workOrders2.vesselId, vesselId), eq55(workOrders2.status, "Awaiting Office Approval")));
+  const wos = await db12.select().from(workOrders2).where(and47(eq56(workOrders2.vesselId, vesselId), eq56(workOrders2.status, "Awaiting Office Approval")));
   for (const wo of wos) {
-    const rows = await db12.select().from(workOrderPostponements2).where(eq55(workOrderPostponements2.workOrderId, wo.wouuid));
+    const rows = await db12.select().from(workOrderPostponements2).where(eq56(workOrderPostponements2.workOrderId, wo.wouuid));
     const awaitingRows = rows.filter((r) => r.status === "Awaiting Approval");
     if (awaitingRows.length === 0) continue;
     const isRe = rows.some((r) => r.status === "Approved");
@@ -37345,18 +37820,18 @@ var init_auth = __esm({
         try {
           const uuid2 = req.user.userUuid;
           if (uuid2) {
-            const [{ getPostgresClient: getPostgresClient3 }, { mocApprovers: mocApprovers3 }, { and: and46, eq: eq55 }, { getCurrentTenantContext: getCurrentTenantContext2 }] = await Promise.all([
+            const [{ getPostgresClient: getPostgresClient3 }, { mocApprovers: mocApprovers3 }, { and: and47, eq: eq56 }, { getCurrentTenantContext: getCurrentTenantContext2 }] = await Promise.all([
               Promise.resolve().then(() => (init_postgresClient(), postgresClient_exports)),
               Promise.resolve().then(() => (init_schema(), schema_exports)),
               import("drizzle-orm"),
               Promise.resolve().then(() => (init_asyncLocalStorage(), asyncLocalStorage_exports))
             ]);
             const db12 = getCurrentTenantContext2()?.db ?? getPostgresClient3().db;
-            const rows = await db12.select({ id: mocApprovers3.id }).from(mocApprovers3).where(and46(
-              eq55(mocApprovers3.userUuid, uuid2),
-              eq55(mocApprovers3.isActive, 1),
-              eq55(mocApprovers3.isDeleted, false),
-              eq55(mocApprovers3.modulename, "Technical")
+            const rows = await db12.select({ id: mocApprovers3.id }).from(mocApprovers3).where(and47(
+              eq56(mocApprovers3.userUuid, uuid2),
+              eq56(mocApprovers3.isActive, 1),
+              eq56(mocApprovers3.isDeleted, false),
+              eq56(mocApprovers3.modulename, "Technical")
             )).limit(1);
             if (rows.length > 0) return next();
           }
@@ -37601,6 +38076,37 @@ var init_sync = __esm({
   }
 });
 
+// server/modules/spares/classification.ts
+var classification_exports = {};
+__export(classification_exports, {
+  classificationForWrite: () => classificationForWrite
+});
+import { and as and13, eq as eq16 } from "drizzle-orm";
+async function classificationForWrite(patch, saved, required = false, connection) {
+  if (saved && !required && patch.spareCategory === void 0 && patch.optimumQty === void 0) {
+    return mergeSpareClassification(saved, {});
+  }
+  const db12 = connection || await getDb();
+  const categories = await db12.select().from(masterLists).where(and13(
+    eq16(masterLists.listType, SPARE_CATEGORY_TYPE),
+    eq16(masterLists.isActive, true),
+    eq16(masterLists.isDeleted, false)
+  ));
+  const keys = new Set(categories.map((c) => c.listKey));
+  if (saved?.spareCategory && (patch.spareCategory === void 0 || patch.spareCategory === saved.spareCategory)) {
+    keys.add(saved.spareCategory);
+  }
+  return mergeSpareClassification(saved, patch, { required, categoryKeys: keys });
+}
+var init_classification = __esm({
+  "server/modules/spares/classification.ts"() {
+    "use strict";
+    init_schema();
+    init_spareClassification();
+    init_db();
+  }
+});
+
 // server/modules/rotational-items/repositories/rotationalItemRepository.ts
 var rotationalItemRepository_exports = {};
 __export(rotationalItemRepository_exports, {
@@ -37617,28 +38123,28 @@ __export(rotationalItemRepository_exports, {
   softDelete: () => softDelete,
   update: () => update3
 });
-import { and as and13, eq as eq16, isNotNull, sql as sql15 } from "drizzle-orm";
+import { and as and14, eq as eq17, isNotNull, sql as sql15 } from "drizzle-orm";
 async function listByVessel(vesselId, status) {
   const db12 = await getDb();
-  const conditions = [eq16(rotationalItems.vesselId, vesselId), notDeleted];
-  if (status) conditions.push(eq16(rotationalItems.status, status));
-  return db12.select().from(rotationalItems).where(and13(...conditions)).orderBy(rotationalItems.stamp);
+  const conditions = [eq17(rotationalItems.vesselId, vesselId), notDeleted];
+  if (status) conditions.push(eq17(rotationalItems.status, status));
+  return db12.select().from(rotationalItems).where(and14(...conditions)).orderBy(rotationalItems.stamp);
 }
 async function listByVesselWithHolder(vesselId, status) {
   const db12 = await getDb();
-  const conditions = [eq16(rotationalItems.vesselId, vesselId), notDeleted];
-  if (status) conditions.push(eq16(rotationalItems.status, status));
+  const conditions = [eq17(rotationalItems.vesselId, vesselId), notDeleted];
+  if (status) conditions.push(eq17(rotationalItems.status, status));
   const rows = await db12.select({
     item: rotationalItems,
     holderCuuid: components.cuuid,
     holderCode: components.componentCode,
     holderName: components.name
-  }).from(rotationalItems).leftJoin(components, and13(
-    eq16(components.vesselId, rotationalItems.vesselId),
-    eq16(components.currentStamp, rotationalItems.stamp),
-    eq16(components.rotationalItem, true),
-    eq16(components.isDeleted, false)
-  )).where(and13(...conditions)).orderBy(rotationalItems.stamp);
+  }).from(rotationalItems).leftJoin(components, and14(
+    eq17(components.vesselId, rotationalItems.vesselId),
+    eq17(components.currentStamp, rotationalItems.stamp),
+    eq17(components.rotationalItem, true),
+    eq17(components.isDeleted, false)
+  )).where(and14(...conditions)).orderBy(rotationalItems.stamp);
   return rows.map((r) => ({
     ...r.item,
     installedOnCuuid: r.holderCuuid ?? null,
@@ -37648,27 +38154,27 @@ async function listByVesselWithHolder(vesselId, status) {
 }
 async function getByRiuuid(riuuid) {
   const db12 = await getDb();
-  const rows = await db12.select().from(rotationalItems).where(and13(eq16(rotationalItems.riuuid, riuuid), notDeleted)).limit(1);
+  const rows = await db12.select().from(rotationalItems).where(and14(eq17(rotationalItems.riuuid, riuuid), notDeleted)).limit(1);
   return rows[0];
 }
 async function getByStamp(vesselId, stamp) {
   const db12 = await getDb();
-  const rows = await db12.select().from(rotationalItems).where(and13(
-    eq16(rotationalItems.vesselId, vesselId),
+  const rows = await db12.select().from(rotationalItems).where(and14(
+    eq17(rotationalItems.vesselId, vesselId),
     // stamp comparison is case-preserving but whitespace-trimmed at the service layer
-    eq16(rotationalItems.stamp, stamp),
+    eq17(rotationalItems.stamp, stamp),
     notDeleted
   )).limit(1);
   return rows[0];
 }
 async function getInstalledByComponentCuuid(componentCuuid) {
   const db12 = await getDb();
-  const rows = await db12.select({ item: rotationalItems }).from(rotationalItems).innerJoin(components, and13(
-    eq16(components.cuuid, componentCuuid),
-    eq16(components.vesselId, rotationalItems.vesselId),
-    eq16(components.currentStamp, rotationalItems.stamp)
-  )).where(and13(
-    eq16(rotationalItems.status, "Installed"),
+  const rows = await db12.select({ item: rotationalItems }).from(rotationalItems).innerJoin(components, and14(
+    eq17(components.cuuid, componentCuuid),
+    eq17(components.vesselId, rotationalItems.vesselId),
+    eq17(components.currentStamp, rotationalItems.stamp)
+  )).where(and14(
+    eq17(rotationalItems.status, "Installed"),
     notDeleted
   )).limit(1);
   return rows[0]?.item;
@@ -37679,11 +38185,11 @@ async function getComponentHoldingStamp(vesselId, stamp) {
     cuuid: components.cuuid,
     componentCode: components.componentCode,
     name: components.name
-  }).from(components).where(and13(
-    eq16(components.vesselId, vesselId),
-    eq16(components.currentStamp, stamp),
-    eq16(components.rotationalItem, true),
-    eq16(components.isDeleted, false),
+  }).from(components).where(and14(
+    eq17(components.vesselId, vesselId),
+    eq17(components.currentStamp, stamp),
+    eq17(components.rotationalItem, true),
+    eq17(components.isDeleted, false),
     isNotNull(components.currentStamp)
   )).limit(1);
   return rows[0];
@@ -37694,10 +38200,10 @@ async function getComponentsWithStamps(vesselId) {
     cuuid: components.cuuid,
     componentCode: components.componentCode,
     currentStamp: components.currentStamp
-  }).from(components).where(and13(
-    eq16(components.vesselId, vesselId),
-    eq16(components.rotationalItem, true),
-    eq16(components.isDeleted, false),
+  }).from(components).where(and14(
+    eq17(components.vesselId, vesselId),
+    eq17(components.rotationalItem, true),
+    eq17(components.isDeleted, false),
     isNotNull(components.currentStamp)
   ));
 }
@@ -37708,8 +38214,8 @@ async function create3(data) {
 }
 async function claimStamp(riuuid, userUuid) {
   const db12 = await getDb();
-  const rows = await db12.update(rotationalItems).set({ status: "Installed", updatedByUuid: userUuid ?? void 0, updatedAt: sql15`NOW()` }).where(and13(
-    eq16(rotationalItems.riuuid, riuuid),
+  const rows = await db12.update(rotationalItems).set({ status: "Installed", updatedByUuid: userUuid ?? void 0, updatedAt: sql15`NOW()` }).where(and14(
+    eq17(rotationalItems.riuuid, riuuid),
     notDeleted,
     sql15`${rotationalItems.status} IN ('Spare', 'In Store')`
   )).returning();
@@ -37723,21 +38229,21 @@ async function releaseStamp(riuuid, rhSnapshot, userUuid) {
     ...rhSnapshot.currentRh != null ? { currentRh: rhSnapshot.currentRh } : {},
     ...rhSnapshot.rhLastUpdated != null ? { rhLastUpdated: rhSnapshot.rhLastUpdated } : {},
     updatedAt: sql15`NOW()`
-  }).where(and13(
-    eq16(rotationalItems.riuuid, riuuid),
+  }).where(and14(
+    eq17(rotationalItems.riuuid, riuuid),
     notDeleted,
-    eq16(rotationalItems.status, "Installed")
+    eq17(rotationalItems.status, "Installed")
   )).returning();
   return rows[0];
 }
 async function update3(riuuid, data) {
   const db12 = await getDb();
-  const rows = await db12.update(rotationalItems).set({ ...data, updatedAt: sql15`NOW()` }).where(and13(eq16(rotationalItems.riuuid, riuuid), notDeleted)).returning();
+  const rows = await db12.update(rotationalItems).set({ ...data, updatedAt: sql15`NOW()` }).where(and14(eq17(rotationalItems.riuuid, riuuid), notDeleted)).returning();
   return rows[0];
 }
 async function softDelete(riuuid, userUuid) {
   const db12 = await getDb();
-  const rows = await db12.update(rotationalItems).set({ isDeleted: true, updatedByUuid: userUuid ?? void 0, updatedAt: sql15`NOW()` }).where(and13(eq16(rotationalItems.riuuid, riuuid), notDeleted)).returning();
+  const rows = await db12.update(rotationalItems).set({ isDeleted: true, updatedByUuid: userUuid ?? void 0, updatedAt: sql15`NOW()` }).where(and14(eq17(rotationalItems.riuuid, riuuid), notDeleted)).returning();
   return rows[0];
 }
 var notDeleted;
@@ -37746,7 +38252,7 @@ var init_rotationalItemRepository = __esm({
     "use strict";
     init_db();
     init_schema();
-    notDeleted = eq16(rotationalItems.isDeleted, false);
+    notDeleted = eq17(rotationalItems.isDeleted, false);
   }
 });
 
@@ -37767,7 +38273,7 @@ __export(rotationalItemService_exports, {
   replaceRotationalItem: () => replaceRotationalItem,
   updateRotationalItem: () => updateRotationalItem
 });
-import { and as and14, eq as eq17 } from "drizzle-orm";
+import { and as and15, eq as eq18 } from "drizzle-orm";
 function currentUserUuid() {
   return getRequestContext()?.userId ?? null;
 }
@@ -37915,7 +38421,7 @@ async function replaceRotationalItem(params) {
     }
   }
   return db12.transaction(async (tx) => {
-    const compRows = await tx.select().from(components).where(eq17(components.cuuid, params.componentCuuid)).limit(1).for("update");
+    const compRows = await tx.select().from(components).where(eq18(components.cuuid, params.componentCuuid)).limit(1).for("update");
     const component = compRows[0];
     if (!component) throw new NotFoundError("Component not found");
     if (!component.rotationalItem) {
@@ -37925,16 +38431,16 @@ async function replaceRotationalItem(params) {
     const vesselId = component.vesselId;
     let incomingExisting;
     if (wantsNew) {
-      const clashRows = await tx.select().from(rotationalItems).where(and14(
-        eq17(rotationalItems.vesselId, vesselId),
-        eq17(rotationalItems.stamp, newStamp),
-        eq17(rotationalItems.isDeleted, false)
+      const clashRows = await tx.select().from(rotationalItems).where(and15(
+        eq18(rotationalItems.vesselId, vesselId),
+        eq18(rotationalItems.stamp, newStamp),
+        eq18(rotationalItems.isDeleted, false)
       )).limit(1);
       if (clashRows[0]) {
         throw new RotationalItemValidationError(`Stamp "${newStamp}" already exists on this vessel (status: ${clashRows[0].status})`);
       }
     } else {
-      const incomingRows = await tx.select().from(rotationalItems).where(eq17(rotationalItems.riuuid, params.incomingRiuuid)).limit(1).for("update");
+      const incomingRows = await tx.select().from(rotationalItems).where(eq18(rotationalItems.riuuid, params.incomingRiuuid)).limit(1).for("update");
       incomingExisting = incomingRows[0];
       if (!incomingExisting || incomingExisting.isDeleted) throw new NotFoundError("Incoming rotational item not found");
       if (incomingExisting.vesselId !== vesselId) {
@@ -37947,11 +38453,11 @@ async function replaceRotationalItem(params) {
         throw new RotationalItemValidationError(`Stamp "${incomingExisting.stamp}" is retired and cannot be installed`);
       }
     }
-    const outgoingRows = component.currentStamp ? await tx.select().from(rotationalItems).where(and14(
-      eq17(rotationalItems.vesselId, vesselId),
-      eq17(rotationalItems.stamp, component.currentStamp),
-      eq17(rotationalItems.status, "Installed"),
-      eq17(rotationalItems.isDeleted, false)
+    const outgoingRows = component.currentStamp ? await tx.select().from(rotationalItems).where(and15(
+      eq18(rotationalItems.vesselId, vesselId),
+      eq18(rotationalItems.stamp, component.currentStamp),
+      eq18(rotationalItems.status, "Installed"),
+      eq18(rotationalItems.isDeleted, false)
     )).limit(1).for("update") : [];
     const outgoing = outgoingRows[0];
     const outgoingRh = outgoing?.currentRh != null ? String(outgoing.currentRh) : "0";
@@ -37961,10 +38467,10 @@ async function replaceRotationalItem(params) {
         status: "Spare",
         updatedByUuid: userUuid,
         updatedAt: now
-      }).where(and14(
-        eq17(rotationalItems.riuuid, outgoing.riuuid),
-        eq17(rotationalItems.status, "Installed"),
-        eq17(rotationalItems.isDeleted, false)
+      }).where(and15(
+        eq18(rotationalItems.riuuid, outgoing.riuuid),
+        eq18(rotationalItems.status, "Installed"),
+        eq18(rotationalItems.isDeleted, false)
       )).returning();
       if (!rows[0]) throw new ConflictError("Outgoing rotational item changed concurrently \u2014 please retry");
       outgoingAfter = rows[0];
@@ -37989,10 +38495,10 @@ async function replaceRotationalItem(params) {
         status: "Installed",
         updatedByUuid: userUuid,
         updatedAt: now
-      }).where(and14(
-        eq17(rotationalItems.riuuid, incomingExisting.riuuid),
-        eq17(rotationalItems.isDeleted, false),
-        eq17(rotationalItems.status, incomingExisting.status)
+      }).where(and15(
+        eq18(rotationalItems.riuuid, incomingExisting.riuuid),
+        eq18(rotationalItems.isDeleted, false),
+        eq18(rotationalItems.status, incomingExisting.status)
         // guarded: fails if installed elsewhere meanwhile
       )).returning();
       if (!rows[0]) throw new ConflictError("Incoming rotational item changed concurrently \u2014 please retry");
@@ -38008,7 +38514,7 @@ async function replaceRotationalItem(params) {
       rhMasterUpdateSource: "ROTATION",
       lastUpdated: now.toISOString(),
       updatedAt: now
-    }).where(eq17(components.cuuid, component.cuuid)).returning();
+    }).where(eq18(components.cuuid, component.cuuid)).returning();
     if (!compUpd[0]) throw new NotFoundError("Component disappeared during swap");
     const audit = await tx.insert(runningHoursAudit).values({
       vesselId,
@@ -38069,7 +38575,7 @@ var init_rotationalItemService = __esm({
 });
 
 // server/modules/components/repositories/componentRepository.ts
-import { eq as eq18 } from "drizzle-orm";
+import { eq as eq19 } from "drizzle-orm";
 async function augmentWithSortOrder(components2) {
   if (components2.length === 0) return components2;
   const { pool: pool4 } = getPostgresClient();
@@ -38325,12 +38831,12 @@ async function updateEquipmentCategory(id, data) {
   if (data.name !== void 0) updates.name = data.name.trim();
   if (data.sortOrder !== void 0) updates.sortOrder = data.sortOrder;
   if (data.isActive !== void 0) updates.isActive = data.isActive;
-  const [category] = await db12.update(equipmentCategories).set(updates).where(eq18(equipmentCategories.id, id)).returning();
+  const [category] = await db12.update(equipmentCategories).set(updates).where(eq19(equipmentCategories.id, id)).returning();
   return category;
 }
 async function deleteEquipmentCategory(id) {
   const { db: db12 } = getPostgresClient();
-  const [deleted] = await db12.delete(equipmentCategories).where(eq18(equipmentCategories.id, id)).returning();
+  const [deleted] = await db12.delete(equipmentCategories).where(eq19(equipmentCategories.id, id)).returning();
   return deleted;
 }
 var init_componentRepository = __esm({
@@ -38371,7 +38877,7 @@ __export(componentService_exports, {
   update: () => update5,
   updateSortOrder: () => updateSortOrder2
 });
-import { eq as eq19, and as and15, ilike as ilike2 } from "drizzle-orm";
+import { eq as eq20, and as and16, ilike as ilike2 } from "drizzle-orm";
 function normalizeRotationalPayload(data) {
   if ("stamp" in data && !("currentStamp" in data)) {
     data.currentStamp = data.stamp;
@@ -38512,7 +39018,7 @@ async function auditComponent(params) {
 }
 async function getActiveComponentCategories() {
   const db12 = await getDb();
-  const items = await db12.select({ listValue: masterLists.listValue }).from(masterLists).where(and15(eq19(masterLists.listType, "componentCategory"), eq19(masterLists.isActive, true)));
+  const items = await db12.select({ listValue: masterLists.listValue }).from(masterLists).where(and16(eq20(masterLists.listType, "componentCategory"), eq20(masterLists.isActive, true)));
   return items.map((i) => i.listValue);
 }
 async function validateMaker(makerName, makerCode) {
@@ -38521,9 +39027,9 @@ async function validateMaker(makerName, makerCode) {
   const hasCode = makerCode && makerCode.trim();
   if (!hasName && !hasCode) return;
   if (hasName && hasCode) {
-    const matches = await db12.select().from(makerList).where(and15(
+    const matches = await db12.select().from(makerList).where(and16(
       ilike2(makerList.makerName, makerName.trim()),
-      eq19(makerList.makerCode, makerCode.trim())
+      eq20(makerList.makerCode, makerCode.trim())
     ));
     if (matches.length === 0) {
       throw new ValidationError("Maker and Maker Code combination not found in Maker List. Please select a valid Maker.");
@@ -38534,7 +39040,7 @@ async function validateMaker(makerName, makerCode) {
       throw new ValidationError("Maker not found in Maker List. Please select a valid Maker.");
     }
   } else if (hasCode) {
-    const matches = await db12.select().from(makerList).where(eq19(makerList.makerCode, makerCode.trim()));
+    const matches = await db12.select().from(makerList).where(eq20(makerList.makerCode, makerCode.trim()));
     if (matches.length === 0) {
       throw new ValidationError("Maker Code not found in Maker List.");
     }
@@ -38938,7 +39444,7 @@ var init_componentService = __esm({
 
 // server/postgresStorage.ts
 import { randomUUID as randomUUID4 } from "crypto";
-import { eq as eq20, and as and16, desc as desc5, sql as sql16, inArray as inArray6, or as or6, ilike as ilike3, asc as asc5, gte as gte2, lte as lte2, lt, gt as gt2, isNull as isNull4, getTableColumns } from "drizzle-orm";
+import { eq as eq21, and as and17, desc as desc5, sql as sql16, inArray as inArray6, or as or6, ilike as ilike3, asc as asc5, gte as gte2, lte as lte2, lt, gt as gt2, isNull as isNull4, getTableColumns } from "drizzle-orm";
 function enforceFreshRHMonotonicity(input) {
   const result = validateRHMonotonicity(input);
   if (!result.allowed) {
@@ -38975,21 +39481,21 @@ function getWorkOrderNumericFields() {
   return _woNumericFields;
 }
 async function reopenDefectAfterVerificationReturnTx(tx, input) {
-  const existingHistory = (await tx.select().from(defectClosureHistory).where(eq20(defectClosureHistory.approvalRequestUuid, input.approvalRequestUuid)).limit(1))[0];
+  const existingHistory = (await tx.select().from(defectClosureHistory).where(eq21(defectClosureHistory.approvalRequestUuid, input.approvalRequestUuid)).limit(1))[0];
   if (existingHistory) {
-    const current2 = (await tx.select().from(defects).where(eq20(defects.duuid, input.defectDuuid)).limit(1))[0];
+    const current2 = (await tx.select().from(defects).where(eq21(defects.duuid, input.defectDuuid)).limit(1))[0];
     if (!current2) throw new Error(`Defect ${input.defectDuuid} not found`);
     return { history: existingHistory, defect: current2, alreadyApplied: true };
   }
-  const current = (await tx.select().from(defects).where(eq20(defects.duuid, input.defectDuuid)).limit(1).for("update"))[0];
+  const current = (await tx.select().from(defects).where(eq21(defects.duuid, input.defectDuuid)).limit(1).for("update"))[0];
   if (!current) throw new Error(`Defect ${input.defectDuuid} not found`);
-  const afterLockHistory = (await tx.select().from(defectClosureHistory).where(eq20(defectClosureHistory.approvalRequestUuid, input.approvalRequestUuid)).limit(1))[0];
+  const afterLockHistory = (await tx.select().from(defectClosureHistory).where(eq21(defectClosureHistory.approvalRequestUuid, input.approvalRequestUuid)).limit(1))[0];
   if (afterLockHistory) {
     return { history: afterLockHistory, defect: current, alreadyApplied: true };
   }
   const [{ nextAttempt }] = await tx.select({
     nextAttempt: sql16`coalesce(max(${defectClosureHistory.attemptNumber}), 0) + 1`
-  }).from(defectClosureHistory).where(eq20(defectClosureHistory.defectDuuid, input.defectDuuid));
+  }).from(defectClosureHistory).where(eq21(defectClosureHistory.defectDuuid, input.defectDuuid));
   const history2 = (await tx.insert(defectClosureHistory).values({
     defectDuuid: current.duuid,
     vesselId: current.vesselId,
@@ -39036,7 +39542,7 @@ async function reopenDefectAfterVerificationReturnTx(tx, input) {
     updatedByUuid: input.rejectedByUserUuid,
     updatedAt: /* @__PURE__ */ new Date()
     // isDeferred and targetCloseDate intentionally remain unchanged.
-  }).where(eq20(defects.duuid, current.duuid)).returning())[0];
+  }).where(eq21(defects.duuid, current.duuid)).returning())[0];
   if (!reopened) throw new Error(`Defect ${input.defectDuuid} could not be reopened`);
   const actor2 = getAuditActor();
   await tx.insert(auditLog).values({
@@ -39081,6 +39587,7 @@ var init_postgresStorage = __esm({
     "use strict";
     init_maintenanceHistoryPersistence();
     init_officeReviewer();
+    init_schema();
     init_level();
     init_db();
     init_workOrderStatus();
@@ -39130,12 +39637,12 @@ var init_postgresStorage = __esm({
       // ============= USERS (Module 1) =============
       async getUser(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(users).where(eq20(users.id, id));
+        const result = await db12.select().from(users).where(eq21(users.id, id));
         return result[0];
       }
       async getUserByUsername(username) {
         const db12 = await getDb();
-        const result = await db12.select().from(users).where(eq20(users.username, username));
+        const result = await db12.select().from(users).where(eq21(users.username, username));
         return result[0];
       }
       async createUser(user) {
@@ -39149,7 +39656,7 @@ var init_postgresStorage = __esm({
       }
       async updateUser(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(users).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(users.id, id)).returning();
+        const result = await db12.update(users).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(users.id, id)).returning();
         if (!result[0]) {
           throw new Error(`User ${id} not found`);
         }
@@ -39157,7 +39664,7 @@ var init_postgresStorage = __esm({
       }
       async deleteUser(id) {
         const db12 = await getDb();
-        await db12.delete(users).where(eq20(users.id, id));
+        await db12.delete(users).where(eq21(users.id, id));
       }
       // ============= FLEETS (Module 1) =============
       async getFleets() {
@@ -39166,12 +39673,12 @@ var init_postgresStorage = __esm({
       }
       async getFleet(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleets).where(eq20(fleets.id, id));
+        const result = await db12.select().from(fleets).where(eq21(fleets.id, id));
         return result[0];
       }
       async getFleetByCode(code) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleets).where(eq20(fleets.code, code));
+        const result = await db12.select().from(fleets).where(eq21(fleets.code, code));
         return result[0];
       }
       async createFleet(fleet) {
@@ -39181,7 +39688,7 @@ var init_postgresStorage = __esm({
       }
       async updateFleet(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(fleets).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(fleets.id, id)).returning();
+        const result = await db12.update(fleets).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(fleets.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Fleet ${id} not found`);
         }
@@ -39189,12 +39696,12 @@ var init_postgresStorage = __esm({
       }
       async deleteFleet(id) {
         const db12 = await getDb();
-        await db12.delete(fleets).where(eq20(fleets.id, id));
+        await db12.delete(fleets).where(eq21(fleets.id, id));
       }
       // ============= FLEET CLASSES (Module 1) =============
       async getFleetClasses(fleetId) {
         const db12 = await getDb();
-        return await db12.select().from(fleetClasses).where(and16(eq20(fleetClasses.fleetId, fleetId), eq20(fleetClasses.isDeleted, false)));
+        return await db12.select().from(fleetClasses).where(and17(eq21(fleetClasses.fleetId, fleetId), eq21(fleetClasses.isDeleted, false)));
       }
       async createFleetClass(data) {
         const db12 = await getDb();
@@ -39203,7 +39710,7 @@ var init_postgresStorage = __esm({
       }
       async updateFleetClass(fcuuid, data) {
         const db12 = await getDb();
-        const result = await db12.update(fleetClasses).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and16(eq20(fleetClasses.fcuuid, fcuuid), eq20(fleetClasses.isDeleted, false))).returning();
+        const result = await db12.update(fleetClasses).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and17(eq21(fleetClasses.fcuuid, fcuuid), eq21(fleetClasses.isDeleted, false))).returning();
         if (!result[0]) {
           throw new Error(`Fleet class ${fcuuid} not found`);
         }
@@ -39211,38 +39718,38 @@ var init_postgresStorage = __esm({
       }
       async deleteFleetClass(fcuuid) {
         const db12 = await getDb();
-        const existing = await db12.select().from(fleetClasses).where(and16(eq20(fleetClasses.fcuuid, fcuuid), eq20(fleetClasses.isDeleted, false)));
+        const existing = await db12.select().from(fleetClasses).where(and17(eq21(fleetClasses.fcuuid, fcuuid), eq21(fleetClasses.isDeleted, false)));
         if (!existing[0]) {
           throw new Error(`Fleet class ${fcuuid} not found`);
         }
-        await db12.update(fleetClasses).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(fleetClasses.fcuuid, fcuuid));
-        await db12.update(vessels).set({ classId: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(vessels.classId, fcuuid));
+        await db12.update(fleetClasses).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(fleetClasses.fcuuid, fcuuid));
+        await db12.update(vessels).set({ classId: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(vessels.classId, fcuuid));
       }
       async assignVesselToClass(vesselId, classId) {
         const db12 = await getDb();
-        const vesselResult = await db12.select().from(vessels).where(eq20(vessels.vuuid, vesselId));
+        const vesselResult = await db12.select().from(vessels).where(eq21(vessels.vuuid, vesselId));
         if (!vesselResult[0]) {
           throw new Error(`Vessel ${vesselId} not found`);
         }
         const vessel = vesselResult[0];
         if (classId) {
-          const classResult = await db12.select().from(fleetClasses).where(and16(eq20(fleetClasses.fcuuid, classId), eq20(fleetClasses.isDeleted, false)));
+          const classResult = await db12.select().from(fleetClasses).where(and17(eq21(fleetClasses.fcuuid, classId), eq21(fleetClasses.isDeleted, false)));
           if (!classResult[0]) {
             throw new Error(`Fleet class ${classId} not found`);
           }
           const fc = classResult[0];
-          const fleetResult = await db12.select().from(fleets).where(eq20(fleets.fuuid, fc.fleetId));
+          const fleetResult = await db12.select().from(fleets).where(eq21(fleets.fuuid, fc.fleetId));
           if (!fleetResult[0] || fleetResult[0].id !== vessel.fleetId) {
             throw new Error(`Class does not belong to the vessel's fleet`);
           }
         }
-        const result = await db12.update(vessels).set({ classId, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(vessels.vuuid, vesselId)).returning();
+        const result = await db12.update(vessels).set({ classId, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(vessels.vuuid, vesselId)).returning();
         return result[0];
       }
       // ============= VESSELS (Module 1) =============
       async getVessels(options = {}) {
         const db12 = await getDb();
-        const result = options.includeDeleted ? await db12.select().from(vessels) : await db12.select().from(vessels).where(or6(eq20(vessels.isDeleted, false), isNull4(vessels.isDeleted)));
+        const result = options.includeDeleted ? await db12.select().from(vessels) : await db12.select().from(vessels).where(or6(eq21(vessels.isDeleted, false), isNull4(vessels.isDeleted)));
         return result.map((v) => ({
           id: v.id,
           vuuid: v.vuuid,
@@ -39255,17 +39762,17 @@ var init_postgresStorage = __esm({
       }
       async getVessel(id, options = {}) {
         const db12 = await getDb();
-        const result = await db12.select().from(vessels).where(options.includeDeleted ? eq20(vessels.vuuid, id) : and16(eq20(vessels.vuuid, id), or6(eq20(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
+        const result = await db12.select().from(vessels).where(options.includeDeleted ? eq21(vessels.vuuid, id) : and17(eq21(vessels.vuuid, id), or6(eq21(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
         return result[0];
       }
       async getVesselByCode(code, options = {}) {
         const db12 = await getDb();
-        const result = await db12.select().from(vessels).where(options.includeDeleted ? eq20(vessels.code, code) : and16(eq20(vessels.code, code), or6(eq20(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
+        const result = await db12.select().from(vessels).where(options.includeDeleted ? eq21(vessels.code, code) : and17(eq21(vessels.code, code), or6(eq21(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
         return result[0];
       }
       async getVesselIdByName(vesselName, options = {}) {
         const db12 = await getDb();
-        const result = await db12.select().from(vessels).where(options.includeDeleted ? eq20(vessels.name, vesselName) : and16(eq20(vessels.name, vesselName), or6(eq20(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
+        const result = await db12.select().from(vessels).where(options.includeDeleted ? eq21(vessels.name, vesselName) : and17(eq21(vessels.name, vesselName), or6(eq21(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
         return result[0]?.vuuid;
       }
       async createVessel(vessel) {
@@ -39275,7 +39782,7 @@ var init_postgresStorage = __esm({
       }
       async updateVessel(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(vessels).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(vessels.vuuid, id)).returning();
+        const result = await db12.update(vessels).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(vessels.vuuid, id)).returning();
         if (!result[0]) {
           throw new Error(`Vessel ${id} not found`);
         }
@@ -39283,12 +39790,12 @@ var init_postgresStorage = __esm({
       }
       async deleteVessel(id) {
         const db12 = await getDb();
-        await db12.delete(vessels).where(eq20(vessels.vuuid, id));
+        await db12.delete(vessels).where(eq21(vessels.vuuid, id));
       }
       // ============= PMS VESSEL SETTINGS (Module 1) =============
       async getPmsVesselSettings(vesselId) {
         const db12 = await getDb();
-        const result = await db12.select().from(pmsVesselSettings).where(eq20(pmsVesselSettings.vesselId, vesselId));
+        const result = await db12.select().from(pmsVesselSettings).where(eq21(pmsVesselSettings.vesselId, vesselId));
         return result[0];
       }
       async getAllPmsVesselSettings() {
@@ -39302,7 +39809,7 @@ var init_postgresStorage = __esm({
       }
       async updatePmsVesselSettings(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(pmsVesselSettings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(pmsVesselSettings.id, id)).returning();
+        const result = await db12.update(pmsVesselSettings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(pmsVesselSettings.id, id)).returning();
         if (!result[0]) {
           throw new Error(`PMS Vessel Settings ${id} not found`);
         }
@@ -39318,7 +39825,7 @@ var init_postgresStorage = __esm({
       }
       async deletePmsVesselSettings(id) {
         const db12 = await getDb();
-        await db12.delete(pmsVesselSettings).where(eq20(pmsVesselSettings.id, id));
+        await db12.delete(pmsVesselSettings).where(eq21(pmsVesselSettings.id, id));
       }
       // ============= MODULE 2: MAKERS (using maker_list table) =============
       async getMakers(search) {
@@ -39335,7 +39842,7 @@ var init_postgresStorage = __esm({
       }
       async getMakerById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(makerList).where(eq20(makerList.id, id));
+        const result = await db12.select().from(makerList).where(eq21(makerList.id, id));
         return result[0];
       }
       async createMaker(maker) {
@@ -39354,7 +39861,7 @@ var init_postgresStorage = __esm({
       }
       async updateMaker(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(makerList).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(makerList.id, id)).returning();
+        const result = await db12.update(makerList).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(makerList.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Maker with id ${id} not found`);
         }
@@ -39362,19 +39869,19 @@ var init_postgresStorage = __esm({
       }
       async deleteMaker(id) {
         const db12 = await getDb();
-        await db12.delete(makerList).where(eq20(makerList.id, id));
+        await db12.delete(makerList).where(eq21(makerList.id, id));
       }
       // ============= MODULE 2: MASTER LISTS =============
       async getMasterLists(listType) {
         const db12 = await getDb();
         if (listType) {
-          return await db12.select().from(masterLists).where(and16(eq20(masterLists.listType, listType), eq20(masterLists.isActive, true))).orderBy(asc5(masterLists.listType), asc5(masterLists.displayOrder));
+          return await db12.select().from(masterLists).where(and17(eq21(masterLists.listType, listType), eq21(masterLists.isActive, true))).orderBy(asc5(masterLists.listType), asc5(masterLists.displayOrder));
         }
-        return await db12.select().from(masterLists).where(eq20(masterLists.isActive, true)).orderBy(asc5(masterLists.listType), asc5(masterLists.displayOrder));
+        return await db12.select().from(masterLists).where(eq21(masterLists.isActive, true)).orderBy(asc5(masterLists.listType), asc5(masterLists.displayOrder));
       }
       async getMasterListById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(masterLists).where(eq20(masterLists.id, id));
+        const result = await db12.select().from(masterLists).where(eq21(masterLists.id, id));
         return result[0];
       }
       async getMasterListsByType(listType) {
@@ -39387,7 +39894,11 @@ var init_postgresStorage = __esm({
       }
       async updateMasterList(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(masterLists).set(data).where(eq20(masterLists.id, id)).returning();
+        const [saved] = await db12.select().from(masterLists).where(eq21(masterLists.id, id));
+        if (saved?.listType === "spareCategory" && (data.listKey !== void 0 && data.listKey !== saved.listKey || data.listType !== void 0 && data.listType !== saved.listType)) {
+          throw Object.assign(new Error("Spare Category keys are permanent. Edit the display label instead."), { statusCode: 400 });
+        }
+        const result = await db12.update(masterLists).set(data).where(eq21(masterLists.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Master list with id ${id} not found`);
         }
@@ -39395,31 +39906,39 @@ var init_postgresStorage = __esm({
       }
       async deleteMasterList(id) {
         const db12 = await getDb();
-        await db12.delete(masterLists).where(eq20(masterLists.id, id));
+        const [saved] = await db12.select().from(masterLists).where(eq21(masterLists.id, id));
+        if (saved?.listType === "spareCategory") {
+          const used = await db12.select({ id: spares.id }).from(spares).where(eq21(spares.spareCategory, saved.listKey)).limit(1);
+          const fleetUsed = await db12.select({ id: fleetSpares.id }).from(fleetSpares).where(eq21(fleetSpares.spareCategory, saved.listKey)).limit(1);
+          if (used.length || fleetUsed.length || ["essential", "optimum", "general"].includes(saved.listKey)) {
+            throw Object.assign(new Error("This Spare Category is a policy category or is in use. Deactivate it instead of deleting it."), { statusCode: 400 });
+          }
+        }
+        await db12.delete(masterLists).where(eq21(masterLists.id, id));
       }
       // ============= MODULE 2: MASTER LIST TYPES =============
       // DB-backed registry of list types (replaces hardcoded LIST_TYPES constant).
       // All queries filter out soft-deleted rows unless explicitly asked.
       async getMasterListTypes(section) {
         const db12 = await getDb();
-        const conds = [eq20(masterListTypes.isDeleted, false), eq20(masterListTypes.isActive, true)];
-        if (section) conds.push(eq20(masterListTypes.section, section));
-        return await db12.select().from(masterListTypes).where(and16(...conds)).orderBy(asc5(masterListTypes.section), asc5(masterListTypes.displayOrder), asc5(masterListTypes.label));
+        const conds = [eq21(masterListTypes.isDeleted, false), eq21(masterListTypes.isActive, true)];
+        if (section) conds.push(eq21(masterListTypes.section, section));
+        return await db12.select().from(masterListTypes).where(and17(...conds)).orderBy(asc5(masterListTypes.section), asc5(masterListTypes.displayOrder), asc5(masterListTypes.label));
       }
       async getAllMasterListTypesIncludingInactive(section) {
         const db12 = await getDb();
-        const conds = [eq20(masterListTypes.isDeleted, false)];
-        if (section) conds.push(eq20(masterListTypes.section, section));
-        return await db12.select().from(masterListTypes).where(and16(...conds)).orderBy(asc5(masterListTypes.section), asc5(masterListTypes.displayOrder), asc5(masterListTypes.label));
+        const conds = [eq21(masterListTypes.isDeleted, false)];
+        if (section) conds.push(eq21(masterListTypes.section, section));
+        return await db12.select().from(masterListTypes).where(and17(...conds)).orderBy(asc5(masterListTypes.section), asc5(masterListTypes.displayOrder), asc5(masterListTypes.label));
       }
       async getMasterListTypeById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(masterListTypes).where(and16(eq20(masterListTypes.id, id), eq20(masterListTypes.isDeleted, false)));
+        const result = await db12.select().from(masterListTypes).where(and17(eq21(masterListTypes.id, id), eq21(masterListTypes.isDeleted, false)));
         return result[0];
       }
       async getMasterListTypeByKey(key) {
         const db12 = await getDb();
-        const result = await db12.select().from(masterListTypes).where(and16(eq20(masterListTypes.listTypeKey, key), eq20(masterListTypes.isDeleted, false)));
+        const result = await db12.select().from(masterListTypes).where(and17(eq21(masterListTypes.listTypeKey, key), eq21(masterListTypes.isDeleted, false)));
         return result[0];
       }
       async createMasterListType(data) {
@@ -39429,7 +39948,7 @@ var init_postgresStorage = __esm({
       }
       async updateMasterListType(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(masterListTypes).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(masterListTypes.id, id)).returning();
+        const result = await db12.update(masterListTypes).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(masterListTypes.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Master list type with id ${id} not found`);
         }
@@ -39437,26 +39956,26 @@ var init_postgresStorage = __esm({
       }
       async softDeleteMasterListType(id, userUuid) {
         const db12 = await getDb();
-        await db12.update(masterListTypes).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: userUuid ?? null }).where(eq20(masterListTypes.id, id));
+        await db12.update(masterListTypes).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: userUuid ?? null }).where(eq21(masterListTypes.id, id));
       }
       async countMasterListItemsByType(listTypeKey) {
         const db12 = await getDb();
-        const result = await db12.select({ count: sql16`count(*)::int` }).from(masterLists).where(eq20(masterLists.listType, listTypeKey));
+        const result = await db12.select({ count: sql16`count(*)::int` }).from(masterLists).where(eq21(masterLists.listType, listTypeKey));
         return Number(result[0]?.count || 0);
       }
       // ============= MODULE 2: MAKER LIST =============
       async getMakerList() {
         const db12 = await getDb();
-        return await db12.select().from(makerList).where(eq20(makerList.isActive, true));
+        return await db12.select().from(makerList).where(eq21(makerList.isActive, true));
       }
       async getMakerListItem(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(makerList).where(eq20(makerList.id, id));
+        const result = await db12.select().from(makerList).where(eq21(makerList.id, id));
         return result[0];
       }
       async getMakerListByCode(makerCode) {
         const db12 = await getDb();
-        const result = await db12.select().from(makerList).where(eq20(makerList.makerCode, makerCode));
+        const result = await db12.select().from(makerList).where(eq21(makerList.makerCode, makerCode));
         return result[0];
       }
       async createMakerListItem(maker) {
@@ -39472,7 +39991,7 @@ var init_postgresStorage = __esm({
       }
       async updateMakerListItem(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(makerList).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(makerList.id, id)).returning();
+        const result = await db12.update(makerList).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(makerList.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Maker list item with id ${id} not found`);
         }
@@ -39480,21 +39999,21 @@ var init_postgresStorage = __esm({
       }
       async deleteMakerListItem(id) {
         const db12 = await getDb();
-        await db12.update(makerList).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(makerList.id, id));
+        await db12.update(makerList).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(makerList.id, id));
       }
       // ============= MODULE 2A: FLEET COMPONENTS =============
       async getFleetComponents() {
         const db12 = await getDb();
-        return await db12.select().from(fleetComponents).where(and16(eq20(fleetComponents.isActive, true), eq20(fleetComponents.isDeleted, false)));
+        return await db12.select().from(fleetComponents).where(and17(eq21(fleetComponents.isActive, true), eq21(fleetComponents.isDeleted, false)));
       }
       async getFleetComponent(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleetComponents).where(eq20(fleetComponents.id, id));
+        const result = await db12.select().from(fleetComponents).where(eq21(fleetComponents.id, id));
         return result[0];
       }
       async getFleetComponentByCode(fleetEquipmentCode) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleetComponents).where(eq20(fleetComponents.fleetEquipmentCode, fleetEquipmentCode));
+        const result = await db12.select().from(fleetComponents).where(eq21(fleetComponents.fleetEquipmentCode, fleetEquipmentCode));
         return result[0];
       }
       async createFleetComponent(data) {
@@ -39523,7 +40042,7 @@ var init_postgresStorage = __esm({
       }
       async updateFleetComponent(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(fleetComponents).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(fleetComponents.id, id)).returning();
+        const result = await db12.update(fleetComponents).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(fleetComponents.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Fleet component with id ${id} not found`);
         }
@@ -39531,21 +40050,21 @@ var init_postgresStorage = __esm({
       }
       async deleteFleetComponent(id) {
         const db12 = await getDb();
-        await db12.update(fleetComponents).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(fleetComponents.id, id));
+        await db12.update(fleetComponents).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(fleetComponents.id, id));
       }
       // ============= FLEET JOBS =============
       async getFleetJobs() {
         const db12 = await getDb();
-        return await db12.select().from(fleetJobs).where(and16(eq20(fleetJobs.isActive, true), eq20(fleetJobs.isDeleted, false)));
+        return await db12.select().from(fleetJobs).where(and17(eq21(fleetJobs.isActive, true), eq21(fleetJobs.isDeleted, false)));
       }
       async getFleetJob(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleetJobs).where(eq20(fleetJobs.id, id));
+        const result = await db12.select().from(fleetJobs).where(eq21(fleetJobs.id, id));
         return result[0];
       }
       async getFleetJobByCode(jobCode) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleetJobs).where(eq20(fleetJobs.jobCode, jobCode));
+        const result = await db12.select().from(fleetJobs).where(eq21(fleetJobs.jobCode, jobCode));
         return result[0];
       }
       async createFleetJob(data) {
@@ -39604,7 +40123,7 @@ var init_postgresStorage = __esm({
           "requiredTools"
         ];
         return await db12.transaction(async (tx) => {
-          const [existing] = await tx.select().from(fleetJobs).where(eq20(fleetJobs.id, id));
+          const [existing] = await tx.select().from(fleetJobs).where(eq21(fleetJobs.id, id));
           if (!existing) {
             throw new Error(`Fleet job with id ${id} not found`);
           }
@@ -39615,28 +40134,28 @@ var init_postgresStorage = __esm({
               globalUpdate[field] = data[field];
             }
           }
-          const results = await tx.update(fleetJobs).set(globalUpdate).where(eq20(fleetJobs.jobCode, jobCode)).returning();
+          const results = await tx.update(fleetJobs).set(globalUpdate).where(eq21(fleetJobs.jobCode, jobCode)).returning();
           const updatedJob = results.find((r) => r.id === id) || results[0];
           return { updatedJob, affectedCount: results.length };
         });
       }
       async deleteFleetJob(id) {
         const db12 = await getDb();
-        await db12.update(fleetJobs).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(fleetJobs.id, id));
+        await db12.update(fleetJobs).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(fleetJobs.id, id));
       }
       // ============= MODULE 2: SFI DETAILS =============
       async getSfiDetails() {
         const db12 = await getDb();
-        return await db12.select().from(sfiDetails).where(eq20(sfiDetails.isActive, true));
+        return await db12.select().from(sfiDetails).where(eq21(sfiDetails.isActive, true));
       }
       async getSfiDetail(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(sfiDetails).where(eq20(sfiDetails.id, id));
+        const result = await db12.select().from(sfiDetails).where(eq21(sfiDetails.id, id));
         return result[0];
       }
       async getSfiByCode(componentCode) {
         const db12 = await getDb();
-        const result = await db12.select().from(sfiDetails).where(eq20(sfiDetails.componentCode, componentCode));
+        const result = await db12.select().from(sfiDetails).where(eq21(sfiDetails.componentCode, componentCode));
         return result[0];
       }
       async createSfiDetail(sfi) {
@@ -39651,7 +40170,7 @@ var init_postgresStorage = __esm({
       }
       async updateSfiDetail(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(sfiDetails).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(sfiDetails.id, id)).returning();
+        const result = await db12.update(sfiDetails).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(sfiDetails.id, id)).returning();
         if (!result[0]) {
           throw new Error(`SFI Detail with id ${id} not found`);
         }
@@ -39659,26 +40178,26 @@ var init_postgresStorage = __esm({
       }
       async deleteSfiDetail(id) {
         const db12 = await getDb();
-        await db12.update(sfiDetails).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(sfiDetails.id, id));
+        await db12.update(sfiDetails).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(sfiDetails.id, id));
       }
       // ============= MODULE 2: MASTER DATA =============
       async getMasterDataList() {
         const db12 = await getDb();
-        return await db12.select().from(masterData).where(eq20(masterData.isActive, true));
+        return await db12.select().from(masterData).where(eq21(masterData.isActive, true));
       }
       async getMasterDataItem(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(masterData).where(eq20(masterData.id, id));
+        const result = await db12.select().from(masterData).where(eq21(masterData.id, id));
         return result[0];
       }
       async getMasterDataByFleetCode(fleetEquipmentCode) {
         const db12 = await getDb();
-        const result = await db12.select().from(masterData).where(eq20(masterData.fleetEquipmentCode, fleetEquipmentCode));
+        const result = await db12.select().from(masterData).where(eq21(masterData.fleetEquipmentCode, fleetEquipmentCode));
         return result[0];
       }
       async getMasterDataByMakerModel(makerCode, model) {
         const db12 = await getDb();
-        const result = await db12.select().from(masterData).where(and16(eq20(masterData.makerCode, makerCode), eq20(masterData.model, model)));
+        const result = await db12.select().from(masterData).where(and17(eq21(masterData.makerCode, makerCode), eq21(masterData.model, model)));
         return result[0];
       }
       async createMasterData(data) {
@@ -39703,7 +40222,7 @@ var init_postgresStorage = __esm({
       }
       async updateMasterData(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(masterData).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(masterData.id, id)).returning();
+        const result = await db12.update(masterData).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(masterData.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Master Data with id ${id} not found`);
         }
@@ -39711,11 +40230,11 @@ var init_postgresStorage = __esm({
       }
       async deleteMasterData(id) {
         const db12 = await getDb();
-        await db12.update(masterData).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(masterData.id, id));
+        await db12.update(masterData).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(masterData.id, id));
       }
       async generateFleetEquipmentCode(sfiCode) {
         const db12 = await getDb();
-        const existingCodes = await db12.select({ fleetEquipmentCode: masterData.fleetEquipmentCode }).from(masterData).where(eq20(masterData.sfiCode, sfiCode));
+        const existingCodes = await db12.select({ fleetEquipmentCode: masterData.fleetEquipmentCode }).from(masterData).where(eq21(masterData.sfiCode, sfiCode));
         const codes = existingCodes.map((r) => r.fleetEquipmentCode);
         const seqNumbers = codes.map((code) => {
           const parts = code.split(".");
@@ -39735,40 +40254,40 @@ var init_postgresStorage = __esm({
       async getComponents(vesselId, vesselIds) {
         const db12 = await getDb();
         if (vesselIds && vesselIds.length > 0) {
-          return await db12.select().from(components).where(and16(
+          return await db12.select().from(components).where(and17(
             inArray6(components.vesselId, vesselIds),
-            eq20(components.dataScope, "vessel"),
-            or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+            eq21(components.dataScope, "vessel"),
+            or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
           ));
         }
         if (!vesselId || vesselId === "all") {
-          return await db12.select().from(components).where(and16(
-            eq20(components.dataScope, "vessel"),
-            or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+          return await db12.select().from(components).where(and17(
+            eq21(components.dataScope, "vessel"),
+            or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
           ));
         }
-        return await db12.select().from(components).where(and16(
-          eq20(components.vesselId, vesselId),
-          eq20(components.dataScope, "vessel"),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        return await db12.select().from(components).where(and17(
+          eq21(components.vesselId, vesselId),
+          eq21(components.dataScope, "vessel"),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         ));
       }
       async getComponent(id) {
         const db12 = await getDb();
         const result = await db12.select().from(components).where(
-          and16(
-            or6(eq20(components.cuuid, id), eq20(components.id, id)),
-            or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+          and17(
+            or6(eq21(components.cuuid, id), eq21(components.id, id)),
+            or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
           )
         );
         return result[0];
       }
       async getComponentByCode(componentCode, vesselId) {
         const db12 = await getDb();
-        const result = await db12.select().from(components).where(and16(
-          eq20(components.componentCode, componentCode),
-          eq20(components.vesselId, vesselId),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        const result = await db12.select().from(components).where(and17(
+          eq21(components.componentCode, componentCode),
+          eq21(components.vesselId, vesselId),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         ));
         return result[0];
       }
@@ -39785,9 +40304,9 @@ var init_postgresStorage = __esm({
       }
       async updateComponent(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(components).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and16(
-          or6(eq20(components.cuuid, id), eq20(components.id, id)),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        const result = await db12.update(components).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and17(
+          or6(eq21(components.cuuid, id), eq21(components.id, id)),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         )).returning();
         if (!result[0]) {
           throw new Error(`Component ${id} not found`);
@@ -39797,9 +40316,9 @@ var init_postgresStorage = __esm({
       async deleteComponent(id, userId) {
         const db12 = await getDb();
         await db12.transaction(async (tx) => {
-          const existing = await tx.select().from(components).where(and16(
-            or6(eq20(components.cuuid, id), eq20(components.id, id)),
-            or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+          const existing = await tx.select().from(components).where(and17(
+            or6(eq21(components.cuuid, id), eq21(components.id, id)),
+            or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
           )).limit(1);
           const component = existing[0];
           if (!component) {
@@ -39807,14 +40326,14 @@ var init_postgresStorage = __esm({
           }
           const currentStamp = component.currentStamp;
           if (component.vesselId && currentStamp) {
-            const installed = await tx.select().from(rotationalItems).where(and16(
-              eq20(rotationalItems.vesselId, component.vesselId),
-              eq20(rotationalItems.stamp, currentStamp),
-              eq20(rotationalItems.status, "Installed"),
-              eq20(rotationalItems.isDeleted, false)
+            const installed = await tx.select().from(rotationalItems).where(and17(
+              eq21(rotationalItems.vesselId, component.vesselId),
+              eq21(rotationalItems.stamp, currentStamp),
+              eq21(rotationalItems.status, "Installed"),
+              eq21(rotationalItems.isDeleted, false)
             )).limit(1);
             if (installed[0]) {
-              const released = await tx.update(rotationalItems).set({ status: "Spare", updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: userId }).where(eq20(rotationalItems.riuuid, installed[0].riuuid)).returning();
+              const released = await tx.update(rotationalItems).set({ status: "Spare", updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: userId }).where(eq21(rotationalItems.riuuid, installed[0].riuuid)).returning();
               if (!released[0]) {
                 throw new Error(`Unable to release rotational item for component ${id}`);
               }
@@ -39829,7 +40348,7 @@ var init_postgresStorage = __esm({
               );
             }
           }
-          const result = await tx.update(components).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(components.cuuid, component.cuuid)).returning();
+          const result = await tx.update(components).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(components.cuuid, component.cuuid)).returning();
           if (!result[0]) {
             throw new Error(`Component ${id} not found`);
           }
@@ -39837,10 +40356,10 @@ var init_postgresStorage = __esm({
       }
       async inactivateComponent(id, vesselId, userId, apply = true) {
         const db12 = await getDb();
-        const componentResult = await db12.select().from(components).where(and16(
-          or6(eq20(components.cuuid, id), eq20(components.id, id)),
-          eq20(components.vesselId, vesselId),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        const componentResult = await db12.select().from(components).where(and17(
+          or6(eq21(components.cuuid, id), eq21(components.id, id)),
+          eq21(components.vesselId, vesselId),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         )).limit(1);
         if (componentResult.length === 0) {
           return {
@@ -39850,11 +40369,11 @@ var init_postgresStorage = __esm({
           };
         }
         const component = componentResult[0];
-        const activeChildren = await db12.select().from(components).where(and16(
-          or6(eq20(components.parentId, component.cuuid), eq20(components.parentId, component.id)),
-          eq20(components.isActive, true),
-          eq20(components.vesselId, vesselId),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        const activeChildren = await db12.select().from(components).where(and17(
+          or6(eq21(components.parentId, component.cuuid), eq21(components.parentId, component.id)),
+          eq21(components.isActive, true),
+          eq21(components.vesselId, vesselId),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         ));
         if (activeChildren.length > 0) {
           return {
@@ -39867,15 +40386,15 @@ var init_postgresStorage = __esm({
         }
         const activeJobIds = /* @__PURE__ */ new Set();
         const componentCode = component.componentCode;
-        const directJobs = await db12.select().from(jobs).where(and16(
+        const directJobs = await db12.select().from(jobs).where(and17(
           or6(
-            eq20(jobs.componentId, component.cuuid),
-            eq20(jobs.componentId, component.id),
-            ...componentCode ? [eq20(jobs.componentCode, componentCode)] : []
+            eq21(jobs.componentId, component.cuuid),
+            eq21(jobs.componentId, component.id),
+            ...componentCode ? [eq21(jobs.componentCode, componentCode)] : []
           ),
-          eq20(jobs.isActive, true),
-          eq20(jobs.vesselId, vesselId),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+          eq21(jobs.isActive, true),
+          eq21(jobs.vesselId, vesselId),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
         ));
         for (const job of directJobs) {
           activeJobIds.add(job.juuid);
@@ -39888,11 +40407,11 @@ var init_postgresStorage = __esm({
         }
         const linkedJobs = Array.from(linkedJobsMap.values());
         for (const link of linkedJobs) {
-          const jobResult = await db12.select().from(jobs).where(and16(
-            eq20(jobs.juuid, link.jobId),
-            eq20(jobs.isActive, true),
-            eq20(jobs.vesselId, vesselId),
-            or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+          const jobResult = await db12.select().from(jobs).where(and17(
+            eq21(jobs.juuid, link.jobId),
+            eq21(jobs.isActive, true),
+            eq21(jobs.vesselId, vesselId),
+            or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
           )).limit(1);
           if (jobResult.length > 0) {
             activeJobIds.add(link.jobId);
@@ -39908,29 +40427,29 @@ var init_postgresStorage = __esm({
           };
         }
         const activeSpareIds = /* @__PURE__ */ new Set();
-        const directSpares = await db12.select({ id: spares.id }).from(spares).where(and16(
+        const directSpares = await db12.select({ id: spares.id }).from(spares).where(and17(
           or6(
-            eq20(spares.componentId, component.cuuid),
-            ...componentCode ? [eq20(spares.componentCode, componentCode)] : []
+            eq21(spares.componentId, component.cuuid),
+            ...componentCode ? [eq21(spares.componentCode, componentCode)] : []
           ),
-          eq20(spares.isActive, true),
-          eq20(spares.vesselId, vesselId),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+          eq21(spares.isActive, true),
+          eq21(spares.vesselId, vesselId),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
         ));
         for (const s of directSpares) {
           activeSpareIds.add(s.id);
         }
-        const linkedActiveSpares = await db12.select({ id: spares.id }).from(spareComponentLinks).innerJoin(spares, and16(
+        const linkedActiveSpares = await db12.select({ id: spares.id }).from(spareComponentLinks).innerJoin(spares, and17(
           or6(
-            eq20(spares.suuid, spareComponentLinks.spareUuid),
-            eq20(spares.id, spareComponentLinks.spareId)
+            eq21(spares.suuid, spareComponentLinks.spareUuid),
+            eq21(spares.id, spareComponentLinks.spareId)
           ),
-          eq20(spares.isActive, true),
-          eq20(spares.vesselId, vesselId),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+          eq21(spares.isActive, true),
+          eq21(spares.vesselId, vesselId),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
         )).where(or6(
-          eq20(spareComponentLinks.componentId, component.cuuid),
-          ...component.id !== component.cuuid ? [eq20(spareComponentLinks.componentId, component.id)] : []
+          eq21(spareComponentLinks.componentId, component.cuuid),
+          ...component.id !== component.cuuid ? [eq21(spareComponentLinks.componentId, component.id)] : []
         ));
         for (const row of linkedActiveSpares) {
           activeSpareIds.add(row.id);
@@ -39946,9 +40465,9 @@ var init_postgresStorage = __esm({
         }
         let activeWorkOrdersCount = 0;
         if (componentCode) {
-          const woResults = await db12.select().from(workOrders).where(and16(
-            eq20(workOrders.componentCode, componentCode),
-            eq20(workOrders.vesselId, vesselId)
+          const woResults = await db12.select().from(workOrders).where(and17(
+            eq21(workOrders.componentCode, componentCode),
+            eq21(workOrders.vesselId, vesselId)
           ));
           const { isBlockingStatus: isBlockingStatus2 } = await Promise.resolve().then(() => (init_workOrderStatus(), workOrderStatus_exports));
           activeWorkOrdersCount = woResults.filter((wo) => isBlockingStatus2(wo.status)).length;
@@ -39961,9 +40480,9 @@ var init_postgresStorage = __esm({
             activeWorkOrdersCount
           };
         }
-        await db12.update(components).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(and16(
-          eq20(components.cuuid, component.cuuid),
-          eq20(components.vesselId, vesselId)
+        await db12.update(components).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(and17(
+          eq21(components.cuuid, component.cuuid),
+          eq21(components.vesselId, vesselId)
         ));
         return {
           success: true,
@@ -39975,17 +40494,17 @@ var init_postgresStorage = __esm({
       // Fleet-Scoped Components (legacy - queries components table with dataScope='fleet')
       async getFleetScopedComponents() {
         const db12 = await getDb();
-        return await db12.select().from(components).where(and16(
-          eq20(components.dataScope, "fleet"),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        return await db12.select().from(components).where(and17(
+          eq21(components.dataScope, "fleet"),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         ));
       }
       async getFleetScopedComponent(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(components).where(and16(
-          or6(eq20(components.cuuid, id), eq20(components.id, id)),
-          eq20(components.dataScope, "fleet"),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        const result = await db12.select().from(components).where(and17(
+          or6(eq21(components.cuuid, id), eq21(components.id, id)),
+          eq21(components.dataScope, "fleet"),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         ));
         return result[0];
       }
@@ -40009,11 +40528,11 @@ var init_postgresStorage = __esm({
       // Get all MASTER components for a vessel (for RH source selection dropdown)
       async getMasterComponents(vesselId) {
         const db12 = await getDb();
-        return await db12.select().from(components).where(and16(
-          eq20(components.vesselId, vesselId),
-          eq20(components.rhCounterType, "MASTER"),
-          eq20(components.dataScope, "vessel"),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+        return await db12.select().from(components).where(and17(
+          eq21(components.vesselId, vesselId),
+          eq21(components.rhCounterType, "MASTER"),
+          eq21(components.dataScope, "vessel"),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         ));
       }
       // Get all INHERITED components linked to a specific MASTER
@@ -40023,9 +40542,9 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         let masterComponent = await this.getComponent(masterComponentId);
         if (!masterComponent) {
-          const byCode = await db12.select().from(components).where(and16(
-            eq20(components.componentCode, masterComponentId),
-            or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+          const byCode = await db12.select().from(components).where(and17(
+            eq21(components.componentCode, masterComponentId),
+            or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
           )).limit(1);
           masterComponent = byCode[0] || null;
         }
@@ -40036,16 +40555,16 @@ var init_postgresStorage = __esm({
           console.warn(`\u26A0\uFE0F [getInheritedComponents] Cannot determine vesselId for master "${masterComponentId}" - returning empty to prevent cross-vessel leak`);
           return [];
         }
-        return await db12.select().from(components).where(and16(
-          eq20(components.rhCounterType, "INHERITED"),
-          eq20(components.vesselId, effectiveVesselId),
+        return await db12.select().from(components).where(and17(
+          eq21(components.rhCounterType, "INHERITED"),
+          eq21(components.vesselId, effectiveVesselId),
           or6(
-            eq20(components.rhMasterComponentId, masterComponentFullId),
-            eq20(components.rhMasterComponentId, masterComponentCode),
-            eq20(components.rhMasterComponentId, masterComponentId),
-            eq20(components.rhCounterSource, masterComponentCode)
+            eq21(components.rhMasterComponentId, masterComponentFullId),
+            eq21(components.rhMasterComponentId, masterComponentCode),
+            eq21(components.rhMasterComponentId, masterComponentId),
+            eq21(components.rhCounterSource, masterComponentCode)
           ),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
         ));
       }
       // Update RH counter type configuration for a component
@@ -40090,7 +40609,7 @@ var init_postgresStorage = __esm({
           updateData.rhCurrentInheritedCached = null;
           updateData.rhInheritedUpdatedAt = null;
         }
-        const result = await db12.update(components).set(updateData).where(eq20(components.cuuid, params.componentId)).returning();
+        const result = await db12.update(components).set(updateData).where(eq21(components.cuuid, params.componentId)).returning();
         if (!result[0]) {
           throw new Error(`Component ${params.componentId} not found`);
         }
@@ -40105,16 +40624,16 @@ var init_postgresStorage = __esm({
       // (rotational_items is BOTH_EDITABLE — unlogged writes never sync ship↔shore).
       async accrueStampRhDelta(tx, vesselId, currentStamp, delta, readingDateIso, userId) {
         if (!vesselId || !currentStamp || !Number.isFinite(delta) || delta === 0) return;
-        const rows = await tx.select().from(rotationalItems).where(and16(
-          eq20(rotationalItems.vesselId, vesselId),
-          eq20(rotationalItems.stamp, currentStamp),
-          eq20(rotationalItems.status, "Installed"),
-          eq20(rotationalItems.isDeleted, false)
+        const rows = await tx.select().from(rotationalItems).where(and17(
+          eq21(rotationalItems.vesselId, vesselId),
+          eq21(rotationalItems.stamp, currentStamp),
+          eq21(rotationalItems.status, "Installed"),
+          eq21(rotationalItems.isDeleted, false)
         ));
         const before = rows[0];
         if (!before) return;
         const newRh = Math.max(0, parseFloat(before.currentRh || "0") + delta);
-        const after = await tx.update(rotationalItems).set({ currentRh: newRh.toFixed(2), rhLastUpdated: readingDateIso, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(rotationalItems.riuuid, before.riuuid)).returning();
+        const after = await tx.update(rotationalItems).set({ currentRh: newRh.toFixed(2), rhLastUpdated: readingDateIso, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(rotationalItems.riuuid, before.riuuid)).returning();
         if (after[0]) {
           await logFieldChanges("rotational_items", before.riuuid, vesselId, before, after[0], userId, tx);
         }
@@ -40138,7 +40657,7 @@ var init_postgresStorage = __esm({
         const rhStr = params.newRHValue.toFixed(2);
         return db12.transaction(async (tx) => {
           await tx.execute(sql16`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
-          const freshRows = await tx.select().from(components).where(eq20(components.cuuid, component.cuuid)).limit(1);
+          const freshRows = await tx.select().from(components).where(eq21(components.cuuid, component.cuuid)).limit(1);
           const fresh = freshRows[0] || component;
           const previousRH = parseFloat(fresh.currentCumulativeRH || "0");
           const monotonicity = enforceFreshRHMonotonicity({
@@ -40155,7 +40674,7 @@ var init_postgresStorage = __esm({
             runningHours: rhStr,
             lastUpdated: params.lastUpdated,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(components.cuuid, component.cuuid));
+          }).where(eq21(components.cuuid, component.cuuid));
           await this.accrueStampRhDelta(tx, fresh.vesselId, fresh.currentStamp, params.newRHValue - previousRH, params.readingDateIso, params.userId);
           return { previousRH, changed: true };
         });
@@ -40180,7 +40699,7 @@ var init_postgresStorage = __esm({
         }
         const txResult = await db12.transaction(async (tx) => {
           await tx.execute(sql16`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
-          const freshMaster = await tx.select().from(components).where(eq20(components.cuuid, component.cuuid)).limit(1);
+          const freshMaster = await tx.select().from(components).where(eq21(components.cuuid, component.cuuid)).limit(1);
           const freshComponent = freshMaster[0] || component;
           const previousMasterRH = parseFloat(freshComponent.rhCurrentMaster || freshComponent.currentCumulativeRH || "0");
           const delta = params.newRHValue - previousMasterRH;
@@ -40225,7 +40744,7 @@ var init_postgresStorage = __esm({
             rhMasterUpdateSource: params.updateSource,
             lastUpdated: readingDateLocal,
             updatedAt: now
-          }).where(eq20(components.cuuid, component.cuuid)).returning();
+          }).where(eq21(components.cuuid, component.cuuid)).returning();
           if (!masterResult[0]) {
             throw new Error(`Failed to update MASTER component ${params.componentId}`);
           }
@@ -40278,7 +40797,7 @@ var init_postgresStorage = __esm({
               rhInheritedUpdatedAt: readingDate,
               lastUpdated: readingDateLocal,
               updatedAt: now
-            }).where(eq20(components.cuuid, inherited.cuuid));
+            }).where(eq21(components.cuuid, inherited.cuuid));
             const childNotes = params.comments ? `${params.comments} (cascade from master ${masterComponentCode})` : `Cascade from master ${masterComponentCode}`;
             const childRhaResult = await tx.insert(runningHoursAudit).values({
               vesselId: inherited.vesselId || masterVesselId,
@@ -40331,7 +40850,7 @@ var init_postgresStorage = __esm({
         let inheritedComponentsPre = component.rhCounterType === "MASTER" && component.vesselId ? await this.getInheritedComponents(component.cuuid, component.vesselId) : [];
         return db12.transaction(async (tx) => {
           await tx.execute(sql16`SELECT pg_advisory_xact_lock(hashtext(${component.cuuid}))`);
-          const freshRows = await tx.select().from(components).where(eq20(components.cuuid, component.cuuid)).limit(1);
+          const freshRows = await tx.select().from(components).where(eq21(components.cuuid, component.cuuid)).limit(1);
           const freshComponent = freshRows[0] || component;
           if (inheritedComponentsPre.length > 0) {
             inheritedComponentsPre = await tx.select().from(components).where(inArray6(components.cuuid, inheritedComponentsPre.map((i) => i.cuuid)));
@@ -40356,7 +40875,7 @@ var init_postgresStorage = __esm({
               rhMasterUpdateSource: params.updateSource,
               lastUpdated: lastUpdatedValue,
               updatedAt: now
-            }).where(eq20(components.cuuid, component.cuuid)).returning();
+            }).where(eq21(components.cuuid, component.cuuid)).returning();
             if (!result[0]) {
               throw new Error(`Failed to update MASTER component ${params.componentId}`);
             }
@@ -40377,7 +40896,7 @@ var init_postgresStorage = __esm({
                 rhInheritedUpdatedAt: now,
                 lastUpdated: lastUpdatedValue,
                 updatedAt: now
-              }).where(eq20(components.cuuid, inherited.cuuid));
+              }).where(eq21(components.cuuid, inherited.cuuid));
               await this.accrueStampRhDelta(tx, inherited.vesselId || component.vesselId, inherited.currentStamp, delta, readingIso, params.userId);
               inheritedUpdated++;
             }
@@ -40398,7 +40917,7 @@ var init_postgresStorage = __esm({
               rhInheritedUpdatedAt: now,
               lastUpdated: lastUpdatedValue,
               updatedAt: now
-            }).where(eq20(components.cuuid, component.cuuid)).returning();
+            }).where(eq21(components.cuuid, component.cuuid)).returning();
             if (!result[0]) {
               throw new Error(`Failed to update INHERITED component ${params.componentId}`);
             }
@@ -40420,7 +40939,7 @@ var init_postgresStorage = __esm({
               currentCumulativeRH: rhValueStr,
               lastUpdated: lastUpdatedValue,
               updatedAt: now
-            }).where(eq20(components.cuuid, component.cuuid)).returning();
+            }).where(eq21(components.cuuid, component.cuuid)).returning();
             if (!result[0]) {
               throw new Error(`Failed to update component ${params.componentId}`);
             }
@@ -40433,11 +40952,11 @@ var init_postgresStorage = __esm({
       // ============= MODULE 3: COMPONENT DOCUMENTS =============
       async getComponentDocuments(componentId) {
         const db12 = await getDb();
-        return await db12.select().from(componentDocuments).where(eq20(componentDocuments.componentId, componentId));
+        return await db12.select().from(componentDocuments).where(eq21(componentDocuments.componentId, componentId));
       }
       async getComponentDocument(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(componentDocuments).where(eq20(componentDocuments.id, id));
+        const result = await db12.select().from(componentDocuments).where(eq21(componentDocuments.id, id));
         return result[0];
       }
       async createComponentDocument(doc) {
@@ -40452,8 +40971,8 @@ var init_postgresStorage = __esm({
       }
       async updateComponentDocument(id, data) {
         const db12 = await getDb();
-        const existingDoc = await db12.select().from(componentDocuments).where(eq20(componentDocuments.id, id)).limit(1);
-        const result = await db12.update(componentDocuments).set(data).where(eq20(componentDocuments.id, id)).returning();
+        const existingDoc = await db12.select().from(componentDocuments).where(eq21(componentDocuments.id, id)).limit(1);
+        const result = await db12.update(componentDocuments).set(data).where(eq21(componentDocuments.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Component document ${id} not found`);
         }
@@ -40468,23 +40987,23 @@ var init_postgresStorage = __esm({
       }
       async deleteComponentDocument(id) {
         const db12 = await getDb();
-        await db12.delete(componentDocuments).where(eq20(componentDocuments.id, id));
+        await db12.delete(componentDocuments).where(eq21(componentDocuments.id, id));
       }
       // ── Job Work Instructions (mig 183) ─────────────────────────────────────────────────────────────
       // Every write is field-logged so it reaches the ships (ONE_WAY_SHORE_TO_SHIP, identity = the uuid).
       async getJobWorkInstructionFiles(vesselId) {
         const db12 = await getDb();
-        return db12.select().from(jobWorkInstructionFiles).where(and16(eq20(jobWorkInstructionFiles.vesselId, vesselId), eq20(jobWorkInstructionFiles.isDeleted, false))).orderBy(asc5(jobWorkInstructionFiles.fileName));
+        return db12.select().from(jobWorkInstructionFiles).where(and17(eq21(jobWorkInstructionFiles.vesselId, vesselId), eq21(jobWorkInstructionFiles.isDeleted, false))).orderBy(asc5(jobWorkInstructionFiles.fileName));
       }
       async getJobWorkInstructionFile(jwfuuid) {
         const db12 = await getDb();
-        return (await db12.select().from(jobWorkInstructionFiles).where(eq20(jobWorkInstructionFiles.jwfuuid, jwfuuid)).limit(1))[0];
+        return (await db12.select().from(jobWorkInstructionFiles).where(eq21(jobWorkInstructionFiles.jwfuuid, jwfuuid)).limit(1))[0];
       }
       async findJobWorkInstructionFileByName(vesselId, fileName) {
         const db12 = await getDb();
-        return (await db12.select().from(jobWorkInstructionFiles).where(and16(
-          eq20(jobWorkInstructionFiles.vesselId, vesselId),
-          eq20(jobWorkInstructionFiles.isDeleted, false),
+        return (await db12.select().from(jobWorkInstructionFiles).where(and17(
+          eq21(jobWorkInstructionFiles.vesselId, vesselId),
+          eq21(jobWorkInstructionFiles.isDeleted, false),
           sql16`lower(${jobWorkInstructionFiles.fileName}) = lower(${fileName})`
         )).limit(1))[0];
       }
@@ -40500,16 +41019,26 @@ var init_postgresStorage = __esm({
       }
       async getJobWorkInstructionLinks(jobId, includeRemoved = false) {
         const db12 = await getDb();
-        const rows = await db12.select({ link: jobWorkInstructionLinks, file: jobWorkInstructionFiles }).from(jobWorkInstructionLinks).leftJoin(jobWorkInstructionFiles, eq20(jobWorkInstructionFiles.jwfuuid, jobWorkInstructionLinks.fileUuid)).where(includeRemoved ? eq20(jobWorkInstructionLinks.jobId, jobId) : and16(eq20(jobWorkInstructionLinks.jobId, jobId), eq20(jobWorkInstructionLinks.isDeleted, false))).orderBy(asc5(jobWorkInstructionLinks.attachedAt));
+        const rows = await db12.select({ link: jobWorkInstructionLinks, file: jobWorkInstructionFiles }).from(jobWorkInstructionLinks).leftJoin(jobWorkInstructionFiles, eq21(jobWorkInstructionFiles.jwfuuid, jobWorkInstructionLinks.fileUuid)).where(includeRemoved ? eq21(jobWorkInstructionLinks.jobId, jobId) : and17(eq21(jobWorkInstructionLinks.jobId, jobId), eq21(jobWorkInstructionLinks.isDeleted, false))).orderBy(asc5(jobWorkInstructionLinks.attachedAt));
         return rows.map((r) => ({ ...r.link, file: r.file }));
+      }
+      /** Display names for user ids (master_users.id = the SAILERP user id carried in x-user-id). Unknown ids are absent. */
+      async getMasterUserNamesByIds(ids) {
+        const unique2 = Array.from(new Set(ids.filter((x) => typeof x === "string" && x.length > 0)));
+        const out = /* @__PURE__ */ new Map();
+        if (unique2.length === 0) return out;
+        const db12 = await getDb();
+        const rows = await db12.select({ id: masterUsers.id, name: masterUsers.fullName }).from(masterUsers).where(inArray6(masterUsers.id, unique2));
+        for (const r of rows) if (r.name?.trim()) out.set(r.id, r.name.trim());
+        return out;
       }
       async getJobWorkInstructionLink(jwluuid) {
         const db12 = await getDb();
-        return (await db12.select().from(jobWorkInstructionLinks).where(eq20(jobWorkInstructionLinks.jwluuid, jwluuid)).limit(1))[0];
+        return (await db12.select().from(jobWorkInstructionLinks).where(eq21(jobWorkInstructionLinks.jwluuid, jwluuid)).limit(1))[0];
       }
       async findActiveJobWorkInstructionLink(jobId, fileUuid) {
         const db12 = await getDb();
-        return (await db12.select().from(jobWorkInstructionLinks).where(and16(eq20(jobWorkInstructionLinks.jobId, jobId), eq20(jobWorkInstructionLinks.fileUuid, fileUuid), eq20(jobWorkInstructionLinks.isDeleted, false))).limit(1))[0];
+        return (await db12.select().from(jobWorkInstructionLinks).where(and17(eq21(jobWorkInstructionLinks.jobId, jobId), eq21(jobWorkInstructionLinks.fileUuid, fileUuid), eq21(jobWorkInstructionLinks.isDeleted, false))).limit(1))[0];
       }
       async createJobWorkInstructionLink(data) {
         const db12 = await getDb();
@@ -40525,7 +41054,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const before = await this.getJobWorkInstructionLink(jwluuid);
         if (!before) throw new Error(`Work Instruction link ${jwluuid} not found`);
-        const [row] = await db12.update(jobWorkInstructionLinks).set({ isDeleted, updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: actorUuid2 }).where(eq20(jobWorkInstructionLinks.jwluuid, jwluuid)).returning();
+        const [row] = await db12.update(jobWorkInstructionLinks).set({ isDeleted, updatedAt: /* @__PURE__ */ new Date(), updatedByUuid: actorUuid2 }).where(eq21(jobWorkInstructionLinks.jwluuid, jwluuid)).returning();
         try {
           await logFieldChanges("job_work_instruction_links", row.jwluuid, row.vesselId, before, row, actorUuid2 || "system");
         } catch (e) {
@@ -40536,11 +41065,11 @@ var init_postgresStorage = __esm({
       // ============= MODULE 3: COMPONENT CLASS REGULATORY =============
       async getComponentClassRegulatory(componentId) {
         const db12 = await getDb();
-        return await db12.select().from(componentClassRegulatory).where(eq20(componentClassRegulatory.componentId, componentId));
+        return await db12.select().from(componentClassRegulatory).where(eq21(componentClassRegulatory.componentId, componentId));
       }
       async getComponentClassRegulatoryItem(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(componentClassRegulatory).where(eq20(componentClassRegulatory.id, id));
+        const result = await db12.select().from(componentClassRegulatory).where(eq21(componentClassRegulatory.id, id));
         return result[0];
       }
       async createComponentClassRegulatory(item) {
@@ -40550,7 +41079,7 @@ var init_postgresStorage = __esm({
       }
       async updateComponentClassRegulatory(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(componentClassRegulatory).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(componentClassRegulatory.id, id)).returning();
+        const result = await db12.update(componentClassRegulatory).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(componentClassRegulatory.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Component class regulatory ${id} not found`);
         }
@@ -40558,57 +41087,57 @@ var init_postgresStorage = __esm({
       }
       async deleteComponentClassRegulatory(id) {
         const db12 = await getDb();
-        await db12.delete(componentClassRegulatory).where(eq20(componentClassRegulatory.id, id));
+        await db12.delete(componentClassRegulatory).where(eq21(componentClassRegulatory.id, id));
       }
       // ============= MODULE 3: COMPONENT MAINTENANCE HISTORY (IMMUTABLE) =============
       async getAllComponentMaintenanceHistory(vesselCode) {
         const db12 = await getDb();
         if (vesselCode) {
-          return await db12.select().from(componentMaintenanceHistory).where(and16(visibleMaintenanceHistory, eq20(componentMaintenanceHistory.vesselCode, vesselCode))).orderBy(desc5(componentMaintenanceHistory.createdAt));
+          return await db12.select().from(componentMaintenanceHistory).where(and17(visibleMaintenanceHistory, eq21(componentMaintenanceHistory.vesselCode, vesselCode))).orderBy(desc5(componentMaintenanceHistory.createdAt));
         }
         return await db12.select().from(componentMaintenanceHistory).where(visibleMaintenanceHistory).orderBy(desc5(componentMaintenanceHistory.createdAt));
       }
       async getComponentMaintenanceHistory(componentId) {
         const db12 = await getDb();
-        return await db12.select().from(componentMaintenanceHistory).where(and16(visibleMaintenanceHistory, eq20(componentMaintenanceHistory.componentId, componentId))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
+        return await db12.select().from(componentMaintenanceHistory).where(and17(visibleMaintenanceHistory, eq21(componentMaintenanceHistory.componentId, componentId))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
       }
       async getComponentMaintenanceHistoryByCode(componentCode, vesselCode) {
         const db12 = await getDb();
-        return await db12.select().from(componentMaintenanceHistory).where(and16(
+        return await db12.select().from(componentMaintenanceHistory).where(and17(
           visibleMaintenanceHistory,
-          eq20(componentMaintenanceHistory.componentCode, componentCode),
-          eq20(componentMaintenanceHistory.vesselCode, vesselCode)
+          eq21(componentMaintenanceHistory.componentCode, componentCode),
+          eq21(componentMaintenanceHistory.vesselCode, vesselCode)
         )).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
       }
       async getMaintenanceHistoryByJobId(jobId) {
         const db12 = await getDb();
-        return await db12.select().from(componentMaintenanceHistory).where(and16(visibleMaintenanceHistory, eq20(componentMaintenanceHistory.jobId, jobId))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
+        return await db12.select().from(componentMaintenanceHistory).where(and17(visibleMaintenanceHistory, eq21(componentMaintenanceHistory.jobId, jobId))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
       }
       async getMaintenanceHistoryByJobCode(jobCode) {
         const db12 = await getDb();
-        return await db12.select().from(componentMaintenanceHistory).where(and16(visibleMaintenanceHistory, eq20(componentMaintenanceHistory.jobCode, jobCode))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
+        return await db12.select().from(componentMaintenanceHistory).where(and17(visibleMaintenanceHistory, eq21(componentMaintenanceHistory.jobCode, jobCode))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
       }
       async getComponentMaintenanceHistoryItem(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(componentMaintenanceHistory).where(and16(visibleMaintenanceHistory, eq20(componentMaintenanceHistory.id, id)));
+        const result = await db12.select().from(componentMaintenanceHistory).where(and17(visibleMaintenanceHistory, eq21(componentMaintenanceHistory.id, id)));
         return result[0];
       }
       async getMaintenanceHistoryByWorkOrderId(workOrderId) {
         const db12 = await getDb();
-        const result = await db12.select().from(componentMaintenanceHistory).where(and16(visibleMaintenanceHistory, eq20(componentMaintenanceHistory.workOrderId, workOrderId)));
+        const result = await db12.select().from(componentMaintenanceHistory).where(and17(visibleMaintenanceHistory, eq21(componentMaintenanceHistory.workOrderId, workOrderId)));
         return result[0];
       }
       async getMaintenanceHistoryByVessel(vesselId) {
         const db12 = await getDb();
-        const history2 = await db12.select().from(componentMaintenanceHistory).where(and16(visibleMaintenanceHistory, eq20(componentMaintenanceHistory.vesselCode, vesselId))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
+        const history2 = await db12.select().from(componentMaintenanceHistory).where(and17(visibleMaintenanceHistory, eq21(componentMaintenanceHistory.vesselCode, vesselId))).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
         if (history2.length === 0) return [];
         const workOrderIds = Array.from(new Set(history2.map((h) => h.workOrderId)));
         const anomalies = await db12.select({
           workOrderId: workOrderAnomalies.workOrderId,
           daysLate: workOrderAnomalies.daysLate
         }).from(workOrderAnomalies).where(
-          and16(
-            eq20(workOrderAnomalies.anomalyType, "BACKDATING"),
+          and17(
+            eq21(workOrderAnomalies.anomalyType, "BACKDATING"),
             sql16`${workOrderAnomalies.workOrderId} = ANY(ARRAY[${sql16.join(workOrderIds.map((id) => sql16`${id}`), sql16`, `)}]::text[])`
           )
         );
@@ -40629,18 +41158,18 @@ var init_postgresStorage = __esm({
       // ============= MODULE 3: COMPONENT REQUISITIONS =============
       async getComponentRequisitions(componentId) {
         const db12 = await getDb();
-        return await db12.select().from(componentRequisitions).where(eq20(componentRequisitions.componentId, componentId)).orderBy(desc5(componentRequisitions.createdAt));
+        return await db12.select().from(componentRequisitions).where(eq21(componentRequisitions.componentId, componentId)).orderBy(desc5(componentRequisitions.createdAt));
       }
       async getAllComponentRequisitions(vesselCode) {
         const db12 = await getDb();
         if (vesselCode) {
-          return await db12.select().from(componentRequisitions).where(eq20(componentRequisitions.vesselCode, vesselCode)).orderBy(desc5(componentRequisitions.createdAt));
+          return await db12.select().from(componentRequisitions).where(eq21(componentRequisitions.vesselCode, vesselCode)).orderBy(desc5(componentRequisitions.createdAt));
         }
         return await db12.select().from(componentRequisitions).orderBy(desc5(componentRequisitions.createdAt));
       }
       async getComponentRequisitionItem(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(componentRequisitions).where(eq20(componentRequisitions.id, id));
+        const result = await db12.select().from(componentRequisitions).where(eq21(componentRequisitions.id, id));
         return result[0];
       }
       async createComponentRequisition(item) {
@@ -40656,7 +41185,7 @@ var init_postgresStorage = __esm({
       async updateComponentRequisition(id, data) {
         const db12 = await getDb();
         const existingReq = await this.getComponentRequisitionItem(id);
-        const result = await db12.update(componentRequisitions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(componentRequisitions.id, id)).returning();
+        const result = await db12.update(componentRequisitions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(componentRequisitions.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Component requisition ${id} not found`);
         }
@@ -40671,7 +41200,7 @@ var init_postgresStorage = __esm({
       }
       async deleteComponentRequisition(id) {
         const db12 = await getDb();
-        await db12.delete(componentRequisitions).where(eq20(componentRequisitions.id, id));
+        await db12.delete(componentRequisitions).where(eq21(componentRequisitions.id, id));
       }
       // ============= MODULE 3: RUNNING HOURS AUDIT =============
       async createRunningHoursAudit(audit) {
@@ -40700,7 +41229,7 @@ var init_postgresStorage = __esm({
       }
       async refreshRhJobEstimatesForMaster(componentId) {
         const db12 = await getDb();
-        const [master] = await db12.select().from(components).where(or6(eq20(components.cuuid, componentId), eq20(components.id, componentId))).limit(1);
+        const [master] = await db12.select().from(components).where(or6(eq21(components.cuuid, componentId), eq21(components.id, componentId))).limit(1);
         if (!master || master.rhCounterType !== "MASTER" || !master.vesselId) return;
         const candidateColumns = {
           juuid: jobs.juuid,
@@ -40712,43 +41241,43 @@ var init_postgresStorage = __esm({
           counterSource: components.rhCounterSource
         };
         const masterMatches = or6(
-          eq20(components.cuuid, master.cuuid),
-          eq20(components.rhMasterComponentId, master.cuuid),
-          eq20(components.rhMasterComponentId, master.id),
-          master.componentCode ? eq20(components.rhCounterSource, master.componentCode) : sql16`false`
+          eq21(components.cuuid, master.cuuid),
+          eq21(components.rhMasterComponentId, master.cuuid),
+          eq21(components.rhMasterComponentId, master.id),
+          master.componentCode ? eq21(components.rhCounterSource, master.componentCode) : sql16`false`
         );
-        const candidates = await db12.select(candidateColumns).from(jobs).innerJoin(components, and16(
-          eq20(components.vesselId, jobs.vesselId),
+        const candidates = await db12.select(candidateColumns).from(jobs).innerJoin(components, and17(
+          eq21(components.vesselId, jobs.vesselId),
           or6(
-            eq20(components.cuuid, jobs.componentId),
-            eq20(components.id, jobs.componentId)
+            eq21(components.cuuid, jobs.componentId),
+            eq21(components.id, jobs.componentId)
           )
-        )).where(and16(
-          eq20(jobs.vesselId, master.vesselId),
+        )).where(and17(
+          eq21(jobs.vesselId, master.vesselId),
           inArray6(jobs.maintenanceBasis, ["Running Hours", "Dual Frequency"]),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
           masterMatches
         ));
-        const linkedCandidates = await db12.select(candidateColumns).from(jobComponentLinks).innerJoin(jobs, eq20(jobComponentLinks.jobId, jobs.juuid)).innerJoin(components, and16(
-          eq20(jobComponentLinks.componentId, components.cuuid),
-          eq20(components.vesselId, jobs.vesselId)
-        )).where(and16(
-          eq20(jobs.vesselId, master.vesselId),
-          eq20(jobComponentLinks.vesselId, master.vesselId),
+        const linkedCandidates = await db12.select(candidateColumns).from(jobComponentLinks).innerJoin(jobs, eq21(jobComponentLinks.jobId, jobs.juuid)).innerJoin(components, and17(
+          eq21(jobComponentLinks.componentId, components.cuuid),
+          eq21(components.vesselId, jobs.vesselId)
+        )).where(and17(
+          eq21(jobs.vesselId, master.vesselId),
+          eq21(jobComponentLinks.vesselId, master.vesselId),
           inArray6(jobs.maintenanceBasis, ["Running Hours", "Dual Frequency"]),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
-          or6(eq20(jobComponentLinks.isDeleted, false), isNull4(jobComponentLinks.isDeleted)),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
+          or6(eq21(jobComponentLinks.isDeleted, false), isNull4(jobComponentLinks.isDeleted)),
           masterMatches
         ));
-        const codeOnlyCandidates = await db12.select(candidateColumns).from(jobs).innerJoin(components, and16(
-          eq20(components.vesselId, jobs.vesselId),
-          eq20(components.componentCode, jobs.componentCode),
-          or6(eq20(components.isDeleted, false), isNull4(components.isDeleted))
-        )).where(and16(
-          eq20(jobs.vesselId, master.vesselId),
+        const codeOnlyCandidates = await db12.select(candidateColumns).from(jobs).innerJoin(components, and17(
+          eq21(components.vesselId, jobs.vesselId),
+          eq21(components.componentCode, jobs.componentCode),
+          or6(eq21(components.isDeleted, false), isNull4(components.isDeleted))
+        )).where(and17(
+          eq21(jobs.vesselId, master.vesselId),
           isNull4(jobs.componentId),
           inArray6(jobs.maintenanceBasis, ["Running Hours", "Dual Frequency"]),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
           masterMatches,
           sql16`NOT EXISTS (
           SELECT 1 FROM job_component_links jcl
@@ -40789,11 +41318,11 @@ var init_postgresStorage = __esm({
         for (const juuid of Array.from(eligibleJobIds)) {
           try {
             await db12.transaction(async (tx) => {
-              const [job] = await tx.select().from(jobs).where(eq20(jobs.juuid, juuid)).for("update");
+              const [job] = await tx.select().from(jobs).where(eq21(jobs.juuid, juuid)).for("update");
               if (!job?.lastDoneDate || job.lastDoneRH == null || job.nextDueRH == null) return;
-              const audits = await tx.select().from(runningHoursAudit).where(and16(
-                eq20(runningHoursAudit.componentId, master.cuuid),
-                or6(eq20(runningHoursAudit.isDeleted, false), isNull4(runningHoursAudit.isDeleted))
+              const audits = await tx.select().from(runningHoursAudit).where(and17(
+                eq21(runningHoursAudit.componentId, master.cuuid),
+                or6(eq21(runningHoursAudit.isDeleted, false), isNull4(runningHoursAudit.isDeleted))
               ));
               const estimate = estimateRhDueDate(job.lastDoneDate, job.intervalRunningHour, audits);
               const rate = estimate.averagePerDay == null ? null : String(estimate.averagePerDay);
@@ -40803,7 +41332,7 @@ var init_postgresStorage = __esm({
                 rhAveragePerDay: rate,
                 rhEstimateBasis: estimate.basis,
                 updatedAt: /* @__PURE__ */ new Date()
-              }).where(eq20(jobs.juuid, juuid));
+              }).where(eq21(jobs.juuid, juuid));
             });
           } catch (err2) {
             console.error(`[RH estimate] Could not refresh Job ${juuid}:`, err2);
@@ -40812,16 +41341,16 @@ var init_postgresStorage = __esm({
       }
       async getEarliestAuditTimestamp(vesselId) {
         const db12 = await getDb();
-        const result = await db12.select({ earliest: sql16`MIN(${runningHoursAudit.enteredAtUTC})` }).from(runningHoursAudit).where(eq20(runningHoursAudit.vesselId, vesselId));
+        const result = await db12.select({ earliest: sql16`MIN(${runningHoursAudit.enteredAtUTC})` }).from(runningHoursAudit).where(eq21(runningHoursAudit.vesselId, vesselId));
         return result[0]?.earliest || null;
       }
       async getRunningHoursAudits(componentId, limit) {
         const db12 = await getDb();
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
-        let query = db12.select().from(runningHoursAudit).where(and16(
-          or6(eq20(runningHoursAudit.componentId, resolvedId), eq20(runningHoursAudit.componentId, componentId)),
-          or6(eq20(runningHoursAudit.isDeleted, false), isNull4(runningHoursAudit.isDeleted))
+        let query = db12.select().from(runningHoursAudit).where(and17(
+          or6(eq21(runningHoursAudit.componentId, resolvedId), eq21(runningHoursAudit.componentId, componentId)),
+          or6(eq21(runningHoursAudit.isDeleted, false), isNull4(runningHoursAudit.isDeleted))
         )).orderBy(desc5(runningHoursAudit.enteredAtUTC));
         if (limit) {
           return await query.limit(limit);
@@ -40832,8 +41361,8 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const comp = await this.getComponent(componentId);
         const resolvedId = comp ? comp.cuuid : componentId;
-        return await db12.select().from(runningHoursAudit).where(and16(
-          or6(eq20(runningHoursAudit.componentId, resolvedId), eq20(runningHoursAudit.componentId, componentId)),
+        return await db12.select().from(runningHoursAudit).where(and17(
+          or6(eq21(runningHoursAudit.componentId, resolvedId), eq21(runningHoursAudit.componentId, componentId)),
           gte2(runningHoursAudit.enteredAtUTC, startDate),
           lte2(runningHoursAudit.enteredAtUTC, endDate)
         )).orderBy(desc5(runningHoursAudit.enteredAtUTC));
@@ -40844,8 +41373,8 @@ var init_postgresStorage = __esm({
         const resolvedId = comp ? comp.cuuid : componentId;
         const result = await db12.select({
           total: sql16`COALESCE(SUM(CASE WHEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) > 0 THEN (CAST(${runningHoursAudit.newRH} AS numeric) - CAST(${runningHoursAudit.previousRH} AS numeric)) ELSE 0 END), 0)`
-        }).from(runningHoursAudit).where(and16(
-          or6(eq20(runningHoursAudit.componentId, resolvedId), eq20(runningHoursAudit.componentId, componentId)),
+        }).from(runningHoursAudit).where(and17(
+          or6(eq21(runningHoursAudit.componentId, resolvedId), eq21(runningHoursAudit.componentId, componentId)),
           gte2(runningHoursAudit.enteredAtUTC, startDate),
           lte2(runningHoursAudit.enteredAtUTC, endDate)
         ));
@@ -40857,11 +41386,11 @@ var init_postgresStorage = __esm({
         const resolvedId = comp ? comp.cuuid : componentId;
         const parsedDateExpr = readingDayLocalExpr();
         const targetDay = targetReadingDay(targetDate);
-        const idCondition = or6(eq20(runningHoursAudit.componentId, resolvedId), eq20(runningHoursAudit.componentId, componentId));
+        const idCondition = or6(eq21(runningHoursAudit.componentId, resolvedId), eq21(runningHoursAudit.componentId, componentId));
         const result = await db12.select({
           runningHours: runningHoursAudit.cumulativeRH,
           enteredAtUTC: runningHoursAudit.enteredAtUTC
-        }).from(runningHoursAudit).where(and16(
+        }).from(runningHoursAudit).where(and17(
           idCondition,
           sql16`${parsedDateExpr} <= ${targetDay}::date`
         )).orderBy(sql16`${parsedDateExpr} DESC`).limit(1);
@@ -40875,7 +41404,7 @@ var init_postgresStorage = __esm({
         const fallback = await db12.select({
           runningHours: runningHoursAudit.cumulativeRH,
           enteredAtUTC: runningHoursAudit.enteredAtUTC
-        }).from(runningHoursAudit).where(and16(
+        }).from(runningHoursAudit).where(and17(
           idCondition,
           sql16`${parsedDateExpr} > ${targetDay}::date`
         )).orderBy(sql16`${parsedDateExpr} ASC`).limit(1);
@@ -40891,19 +41420,19 @@ var init_postgresStorage = __esm({
       // ============= MODULE 4: JOBS =============
       async getJobs(vesselId, componentId, vesselIds) {
         const db12 = await getDb();
-        const notDeleted2 = or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted));
+        const notDeleted2 = or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted));
         if (vesselIds && vesselIds.length > 0) {
-          return await db12.select().from(jobs).where(and16(
+          return await db12.select().from(jobs).where(and17(
             inArray6(jobs.vesselId, vesselIds),
-            eq20(jobs.dataScope, "vessel"),
+            eq21(jobs.dataScope, "vessel"),
             notDeleted2
           )).orderBy(asc5(jobs.jobNo));
         }
         if (vesselId && vesselId !== "all" && componentId) {
-          const directJobs = await db12.select().from(jobs).where(and16(
-            eq20(jobs.vesselId, vesselId),
-            eq20(jobs.componentId, componentId),
-            eq20(jobs.dataScope, "vessel"),
+          const directJobs = await db12.select().from(jobs).where(and17(
+            eq21(jobs.vesselId, vesselId),
+            eq21(jobs.componentId, componentId),
+            eq21(jobs.dataScope, "vessel"),
             notDeleted2
           )).orderBy(asc5(jobs.jobNo));
           const linkedJobIds = await this.getJobComponentLinksByComponent(componentId);
@@ -40928,29 +41457,29 @@ var init_postgresStorage = __esm({
           );
         }
         if (vesselId && vesselId !== "all") {
-          return await db12.select().from(jobs).where(and16(
-            eq20(jobs.vesselId, vesselId),
-            eq20(jobs.dataScope, "vessel"),
+          return await db12.select().from(jobs).where(and17(
+            eq21(jobs.vesselId, vesselId),
+            eq21(jobs.dataScope, "vessel"),
             notDeleted2
           )).orderBy(asc5(jobs.jobNo));
         }
-        return await db12.select().from(jobs).where(and16(eq20(jobs.dataScope, "vessel"), notDeleted2)).orderBy(asc5(jobs.jobNo));
+        return await db12.select().from(jobs).where(and17(eq21(jobs.dataScope, "vessel"), notDeleted2)).orderBy(asc5(jobs.jobNo));
       }
       async getJob(id) {
         const db12 = await getDb();
         const result = await db12.select().from(jobs).where(
-          and16(
-            or6(eq20(jobs.juuid, id), eq20(jobs.id, id)),
-            or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+          and17(
+            or6(eq21(jobs.juuid, id), eq21(jobs.id, id)),
+            or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
           )
         );
         return result[0];
       }
       async getJobByJobNo(jobNo) {
         const db12 = await getDb();
-        const result = await db12.select().from(jobs).where(and16(
-          eq20(jobs.jobNo, jobNo),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+        const result = await db12.select().from(jobs).where(and17(
+          eq21(jobs.jobNo, jobNo),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
         ));
         return result[0];
       }
@@ -40975,9 +41504,9 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const safeData = { ...data };
         if (Object.prototype.hasOwnProperty.call(safeData, "officeReviewerRoleRuids")) {
-          const existing = (await db12.select().from(jobs).where(and16(
-            or6(eq20(jobs.juuid, id), eq20(jobs.id, id)),
-            or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+          const existing = (await db12.select().from(jobs).where(and17(
+            or6(eq21(jobs.juuid, id), eq21(jobs.id, id)),
+            or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
           )).limit(1))[0];
           if (!existing) throw new Error(`Job ${id} not found`);
           safeData.officeReviewerRoleRuids = await this.validateJobReviewerSelection(
@@ -40989,9 +41518,9 @@ var init_postgresStorage = __esm({
             safeData.level2ReviewerRankId = null;
           }
         }
-        const result = await db12.update(jobs).set({ ...safeData, updatedAt: /* @__PURE__ */ new Date() }).where(and16(
-          or6(eq20(jobs.juuid, id), eq20(jobs.id, id)),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+        const result = await db12.update(jobs).set({ ...safeData, updatedAt: /* @__PURE__ */ new Date() }).where(and17(
+          or6(eq21(jobs.juuid, id), eq21(jobs.id, id)),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
         )).returning();
         if (!result[0]) {
           throw new Error(`Job ${id} not found`);
@@ -41003,9 +41532,9 @@ var init_postgresStorage = __esm({
         try {
           const retained = new Set(normalizeOfficeReviewerRoles(existing));
           const additions = Array.isArray(value) ? value.filter((id) => !retained.has(id)) : [];
-          const active = additions.length ? await db12.select({ ruid: admnRoleMaster.ruid }).from(admnRoleMaster).where(and16(
-            eq20(admnRoleMaster.isActive, true),
-            or6(eq20(admnRoleMaster.isDeleted, false), isNull4(admnRoleMaster.isDeleted))
+          const active = additions.length ? await db12.select({ ruid: admnRoleMaster.ruid }).from(admnRoleMaster).where(and17(
+            eq21(admnRoleMaster.isActive, true),
+            or6(eq21(admnRoleMaster.isDeleted, false), isNull4(admnRoleMaster.isDeleted))
           )) : [];
           return validateOfficeReviewerRoles(value, existing, active.map((role) => role.ruid));
         } catch (error) {
@@ -41015,9 +41544,9 @@ var init_postgresStorage = __esm({
       /** Atomic cycle-and-estimate write; retry against a fresh Job on a failed CAS. */
       async updateJobIfRhCycleUnchanged(id, previous, data) {
         const db12 = await getDb();
-        const result = await db12.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and16(
-          eq20(jobs.juuid, id),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
+        const result = await db12.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(and17(
+          eq21(jobs.juuid, id),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted)),
           sql16`${jobs.lastDoneDate} IS NOT DISTINCT FROM ${previous.lastDoneDate ?? null}`,
           sql16`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${previous.lastDoneRH ?? null}`,
           sql16`${jobs.nextDueRH} IS NOT DISTINCT FROM ${previous.nextDueRH ?? null}`,
@@ -41030,15 +41559,15 @@ var init_postgresStorage = __esm({
       async deleteJob(id) {
         const db12 = await getDb();
         const existing = await db12.select().from(jobs).where(
-          and16(
-            or6(eq20(jobs.juuid, id), eq20(jobs.id, id)),
-            or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+          and17(
+            or6(eq21(jobs.juuid, id), eq21(jobs.id, id)),
+            or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
           )
         );
         if (!existing[0]) {
           throw new Error(`Job ${id} not found`);
         }
-        const result = await db12.update(jobs).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(jobs.juuid, existing[0].juuid)).returning();
+        const result = await db12.update(jobs).set({ isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(jobs.juuid, existing[0].juuid)).returning();
         if (!result[0]) {
           throw new Error(`Job ${id} not found`);
         }
@@ -41063,7 +41592,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const results = [];
         for (const { jobNo, data } of updates) {
-          const result = await db12.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(jobs.jobNo, jobNo)).returning();
+          const result = await db12.update(jobs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(jobs.jobNo, jobNo)).returning();
           if (result[0]) {
             results.push(result[0]);
           }
@@ -41077,7 +41606,7 @@ var init_postgresStorage = __esm({
         for (const job of jobList) {
           const existing = job.jobNo ? await this.getJobByJobNo(job.jobNo) : null;
           if (existing) {
-            await db12.update(jobs).set({ ...job, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(jobs.juuid, existing.juuid));
+            await db12.update(jobs).set({ ...job, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(jobs.juuid, existing.juuid));
             updated++;
           } else {
             const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -41097,15 +41626,15 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         let result;
         if (vesselId) {
-          result = await db12.select().from(jobs).where(and16(
+          result = await db12.select().from(jobs).where(and17(
             inArray6(jobs.jobNo, jobNos),
-            eq20(jobs.vesselId, vesselId),
-            or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+            eq21(jobs.vesselId, vesselId),
+            or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
           ));
         } else {
-          result = await db12.select().from(jobs).where(and16(
+          result = await db12.select().from(jobs).where(and17(
             inArray6(jobs.jobNo, jobNos),
-            or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+            or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
           ));
         }
         const map = /* @__PURE__ */ new Map();
@@ -41119,45 +41648,45 @@ var init_postgresStorage = __esm({
       // Full-row getWorkOrders here cost ~930 rows read per WO generated (perf probe 02-Sep-2026).
       async getWorkOrderNumbers(vesselId) {
         const db12 = await getDb();
-        const rows = vesselId ? await db12.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders).where(eq20(workOrders.vesselId, vesselId)) : await db12.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders);
+        const rows = vesselId ? await db12.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders).where(eq21(workOrders.vesselId, vesselId)) : await db12.select({ workOrderNo: workOrders.workOrderNo }).from(workOrders);
         return rows.map((r) => r.workOrderNo).filter((n) => !!n);
       }
       async getWorkOrders(vesselId, vesselIds) {
         const db12 = await getDb();
         if (vesselIds && vesselIds.length > 0) {
-          return await db12.select().from(workOrders).where(and16(
+          return await db12.select().from(workOrders).where(and17(
             inArray6(workOrders.vesselId, vesselIds),
-            eq20(workOrders.dataScope, "vessel")
+            eq21(workOrders.dataScope, "vessel")
           )).orderBy(desc5(workOrders.createdAt));
         }
         if (vesselId && vesselId !== "all") {
-          return await db12.select().from(workOrders).where(and16(
-            eq20(workOrders.vesselId, vesselId),
-            eq20(workOrders.dataScope, "vessel")
+          return await db12.select().from(workOrders).where(and17(
+            eq21(workOrders.vesselId, vesselId),
+            eq21(workOrders.dataScope, "vessel")
           )).orderBy(desc5(workOrders.createdAt));
         }
-        return await db12.select().from(workOrders).where(eq20(workOrders.dataScope, "vessel")).orderBy(desc5(workOrders.createdAt));
+        return await db12.select().from(workOrders).where(eq21(workOrders.dataScope, "vessel")).orderBy(desc5(workOrders.createdAt));
       }
       async getWorkOrder(id) {
         const db12 = await getDb();
         const result = await db12.select().from(workOrders).where(
-          or6(eq20(workOrders.wouuid, id), eq20(workOrders.id, id))
+          or6(eq21(workOrders.wouuid, id), eq21(workOrders.id, id))
         );
         return result[0];
       }
       async getWorkOrderByWorkOrderNo(workOrderNo) {
         const db12 = await getDb();
-        const result = await db12.select().from(workOrders).where(eq20(workOrders.workOrderNo, workOrderNo));
+        const result = await db12.select().from(workOrders).where(eq21(workOrders.workOrderNo, workOrderNo));
         return result[0];
       }
       async getWorkOrderByCode(code) {
         const db12 = await getDb();
-        const result = await db12.select().from(workOrders).where(eq20(workOrders.workOrderNo, code));
+        const result = await db12.select().from(workOrders).where(eq21(workOrders.workOrderNo, code));
         return result[0];
       }
       async getWorkOrdersByJobId(jobId) {
         const db12 = await getDb();
-        return await db12.select().from(workOrders).where(eq20(workOrders.jobId, jobId)).orderBy(desc5(workOrders.createdAt));
+        return await db12.select().from(workOrders).where(eq21(workOrders.jobId, jobId)).orderBy(desc5(workOrders.createdAt));
       }
       async createWorkOrder(wo) {
         const db12 = await getDb();
@@ -41178,7 +41707,7 @@ var init_postgresStorage = __esm({
             sanitizedData[field] = null;
           }
         }
-        const result = await db12.update(workOrders).set({ ...sanitizedData, updatedAt: /* @__PURE__ */ new Date() }).where(or6(eq20(workOrders.wouuid, id), eq20(workOrders.id, id))).returning();
+        const result = await db12.update(workOrders).set({ ...sanitizedData, updatedAt: /* @__PURE__ */ new Date() }).where(or6(eq21(workOrders.wouuid, id), eq21(workOrders.id, id))).returning();
         if (!result[0]) {
           throw new Error(`Work order ${id} not found`);
         }
@@ -41186,7 +41715,7 @@ var init_postgresStorage = __esm({
       }
       async deleteWorkOrder(id) {
         const db12 = await getDb();
-        await db12.delete(workOrders).where(or6(eq20(workOrders.wouuid, id), eq20(workOrders.id, id)));
+        await db12.delete(workOrders).where(or6(eq21(workOrders.wouuid, id), eq21(workOrders.id, id)));
       }
       async bulkCreateWorkOrders(woList) {
         if (woList.length === 0) return [];
@@ -41209,9 +41738,9 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         let results;
         if (vesselId) {
-          results = await db12.select().from(workOrders).where(and16(
+          results = await db12.select().from(workOrders).where(and17(
             inArray6(workOrders.templateId, templateIds),
-            eq20(workOrders.vesselId, vesselId)
+            eq21(workOrders.vesselId, vesselId)
           ));
         } else {
           results = await db12.select().from(workOrders).where(inArray6(workOrders.templateId, templateIds));
@@ -41227,13 +41756,13 @@ var init_postgresStorage = __esm({
       // Fleet Work Orders
       async getFleetWorkOrders() {
         const db12 = await getDb();
-        return await db12.select().from(workOrders).where(eq20(workOrders.dataScope, "fleet")).orderBy(desc5(workOrders.createdAt));
+        return await db12.select().from(workOrders).where(eq21(workOrders.dataScope, "fleet")).orderBy(desc5(workOrders.createdAt));
       }
       async getFleetWorkOrder(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(workOrders).where(and16(
-          or6(eq20(workOrders.wouuid, id), eq20(workOrders.id, id)),
-          eq20(workOrders.dataScope, "fleet")
+        const result = await db12.select().from(workOrders).where(and17(
+          or6(eq21(workOrders.wouuid, id), eq21(workOrders.id, id)),
+          eq21(workOrders.dataScope, "fleet")
         ));
         return result[0];
       }
@@ -41257,40 +41786,40 @@ var init_postgresStorage = __esm({
       // ============= MODULE 7: SPARES =============
       async getAllSpares() {
         const db12 = await getDb();
-        return await db12.select().from(spares).where(and16(
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+        return await db12.select().from(spares).where(and17(
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
         ));
       }
       async getSpares(vesselId, vesselIds) {
         const db12 = await getDb();
         if (vesselIds && vesselIds.length > 0) {
-          return await db12.select().from(spares).where(and16(
+          return await db12.select().from(spares).where(and17(
             inArray6(spares.vesselId, vesselIds),
-            eq20(spares.dataScope, "vessel"),
-            eq20(spares.deleted, false),
-            or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+            eq21(spares.dataScope, "vessel"),
+            eq21(spares.deleted, false),
+            or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
           ));
         }
         if (!vesselId || vesselId === "all") {
-          return await db12.select().from(spares).where(and16(
-            eq20(spares.dataScope, "vessel"),
-            eq20(spares.deleted, false),
-            or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+          return await db12.select().from(spares).where(and17(
+            eq21(spares.dataScope, "vessel"),
+            eq21(spares.deleted, false),
+            or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
           ));
         }
-        return await db12.select().from(spares).where(and16(
-          eq20(spares.vesselId, vesselId),
-          eq20(spares.dataScope, "vessel"),
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+        return await db12.select().from(spares).where(and17(
+          eq21(spares.vesselId, vesselId),
+          eq21(spares.dataScope, "vessel"),
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
         ));
       }
       async getSpare(id) {
         const db12 = await getDb();
         const numId = Number(id);
         const result = await db12.select().from(spares).where(
-          or6(eq20(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq20(spares.id, numId)] : [])
+          or6(eq21(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(spares.id, numId)] : [])
         );
         return result[0];
       }
@@ -41303,25 +41832,27 @@ var init_postgresStorage = __esm({
       }
       async createSpare(spare, skipSiblingSync = false) {
         const db12 = await getDb();
+        const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+        const classification = await classificationForWrite2(spare);
         const robA = spare.robLocationA ?? 0;
         const robB = spare.robLocationB ?? 0;
         const ihmSynced = spare.ihm === "Yes" ? "YES" : spare.ihm === "No" ? "NO" : spare.ihmPresence;
-        const result = await db12.insert(spares).values({
-          ...spare,
-          suuid: randomUUID4(),
-          dataScope: spare.dataScope || "vessel",
-          rob: spare.rob ?? 0,
-          robLocationA: robA,
-          robLocationB: robB,
-          min: spare.min ?? 0,
-          ihmPresence: ihmSynced || "UNKNOWN"
-        }).returning();
+        const result = await db12.transaction(async (tx) => {
+          const rows = await tx.insert(spares).values({
+            ...spare,
+            ...classification,
+            suuid: randomUUID4(),
+            dataScope: spare.dataScope || "vessel",
+            rob: spare.rob ?? 0,
+            robLocationA: robA,
+            robLocationB: robB,
+            min: spare.min ?? 0,
+            ihmPresence: ihmSynced || "UNKNOWN"
+          }).returning();
+          await logFieldChanges("spares", rows[0].suuid, rows[0].vesselId || null, null, rows[0], "system", tx);
+          return rows;
+        });
         const createdSpare = result[0];
-        try {
-          await logFieldChanges("spares", createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, "system");
-        } catch (e) {
-          console.error("[FieldLogger] spare create:", e);
-        }
         if (!skipSiblingSync && createdSpare.componentId && createdSpare.vesselId) {
           try {
             const existingLinks = await this.getSpareComponentLinksBySpare(createdSpare.id);
@@ -41363,6 +41894,10 @@ var init_postgresStorage = __esm({
       async updateSpare(id, data, skipSiblingSync = false) {
         const db12 = await getDb();
         const existingSpare = await this.getSpare(id);
+        const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+        const classificationPatch2 = data;
+        const touchesClassification = data.spareCategory !== void 0 || data.optimumQty !== void 0;
+        if (touchesClassification) await classificationForWrite2(data, existingSpare);
         const { partCode, ...restData } = data;
         const updateData = partCode != null ? { ...restData, partCode, updatedAt: /* @__PURE__ */ new Date() } : { ...restData, updatedAt: /* @__PURE__ */ new Date() };
         if (updateData.ihm === "Yes") updateData.ihmPresence = "YES";
@@ -41394,7 +41929,14 @@ var init_postgresStorage = __esm({
           stockTargets = await this.resolveLegacyStockTargets(effectiveSpare);
         }
         const updatedSpare = await db12.transaction(async (tx) => {
-          const result = await tx.update(spares).set(updateData).where(or6(eq20(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq20(spares.id, numId)] : [])).returning();
+          let auditSpare = existingSpare;
+          if (touchesClassification) {
+            const [locked] = await tx.select().from(spares).where(or6(eq21(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(spares.id, numId)] : [])).for("update");
+            if (!locked) throw new Error(`Spare ${id} not found`);
+            Object.assign(updateData, await classificationForWrite2(classificationPatch2, locked, false, tx));
+            auditSpare = locked;
+          }
+          const result = await tx.update(spares).set(updateData).where(or6(eq21(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(spares.id, numId)] : [])).returning();
           if (!result[0]) {
             throw new Error(`Spare ${id} not found`);
           }
@@ -41409,32 +41951,36 @@ var init_postgresStorage = __esm({
             );
             if (locationChanged && stockTargets.length > 0) {
               const activeLocationIds = stockTargets.map((t) => t.locationId);
-              const allStockRows = await tx.select().from(spareLocationStock).where(eq20(spareLocationStock.spareId, updated.id));
+              const allStockRows = await tx.select().from(spareLocationStock).where(eq21(spareLocationStock.spareId, updated.id));
               for (const row of allStockRows) {
                 if (activeLocationIds.includes(row.locationId)) continue;
-                const evidence = await tx.select({ id: inventoryTransactions.id }).from(inventoryTransactions).where(and16(
-                  eq20(inventoryTransactions.spareId, updated.id),
-                  eq20(inventoryTransactions.locationId, row.locationId)
+                const evidence = await tx.select({ id: inventoryTransactions.id }).from(inventoryTransactions).where(and17(
+                  eq21(inventoryTransactions.spareId, updated.id),
+                  eq21(inventoryTransactions.locationId, row.locationId)
                 )).limit(1);
                 if (evidence.length > 0) continue;
                 await tx.delete(spareLocationStock).where(
-                  and16(
-                    eq20(spareLocationStock.spareId, updated.id),
-                    eq20(spareLocationStock.locationId, row.locationId)
+                  and17(
+                    eq21(spareLocationStock.spareId, updated.id),
+                    eq21(spareLocationStock.locationId, row.locationId)
                   )
                 );
               }
             }
           }
+          if (auditSpare) {
+            await logFieldChanges(
+              "spares",
+              auditSpare.suuid,
+              auditSpare.vesselId || null,
+              auditSpare,
+              updated,
+              data.updatedBy || "system",
+              tx
+            );
+          }
           return updated;
         });
-        if (existingSpare) {
-          try {
-            await logFieldChanges("spares", existingSpare.suuid, existingSpare.vesselId || null, existingSpare, updatedSpare, data.updatedBy || "system");
-          } catch (err2) {
-            console.error("[FieldLogger] Spare update:", err2);
-          }
-        }
         if (!skipSiblingSync && data.componentId && updatedSpare.vesselId) {
           try {
             const existingLinks = await this.getSpareComponentLinksBySpare(updatedSpare.id);
@@ -41461,7 +42007,7 @@ var init_postgresStorage = __esm({
           throw new Error(`Spare ${id} not found`);
         }
         const numId = Number(id);
-        await db12.update(spares).set({ deleted: true, isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(or6(eq20(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq20(spares.id, numId)] : []));
+        await db12.update(spares).set({ deleted: true, isDeleted: true, isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(or6(eq21(spares.suuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(spares.id, numId)] : []));
         if (existingSpare) {
           try {
             await logSoftDelete("spares", existingSpare.suuid, existingSpare.vesselId || null, userId);
@@ -41528,7 +42074,7 @@ var init_postgresStorage = __esm({
             rob: newRob,
             robLocationA: newRobA < 0 ? 0 : newRobA,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(spares.suuid, spare.suuid)).returning();
+          }).where(eq21(spares.suuid, spare.suuid)).returning();
           await this.createSpareHistory({
             timestampUTC: /* @__PURE__ */ new Date(),
             vesselId: spare.vesselId || "V001",
@@ -41590,7 +42136,7 @@ var init_postgresStorage = __esm({
             robLocationA: newRobA,
             robLocationB: newRobB,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(spares.suuid, spare.suuid)).returning();
+          }).where(eq21(spares.suuid, spare.suuid)).returning();
           await this.createSpareHistory({
             timestampUTC: /* @__PURE__ */ new Date(),
             vesselId: spare.vesselId || "V001",
@@ -41649,7 +42195,7 @@ var init_postgresStorage = __esm({
             robLocationB: newRobB,
             lastOrderDate: dateLocal ?? null,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(spares.suuid, spare.suuid)).returning();
+          }).where(eq21(spares.suuid, spare.suuid)).returning();
           await this.createSpareHistory({
             timestampUTC: /* @__PURE__ */ new Date(),
             vesselId: spare.vesselId || "V001",
@@ -41713,7 +42259,7 @@ var init_postgresStorage = __esm({
             robLocationA: newLocA,
             robLocationB: newLocB,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(spares.suuid, spare.suuid)).returning();
+          }).where(eq21(spares.suuid, spare.suuid)).returning();
           await this.createSpareHistory({
             timestampUTC: /* @__PURE__ */ new Date(),
             vesselId: spare.vesselId || "V001",
@@ -41773,7 +42319,7 @@ var init_postgresStorage = __esm({
             robLocationA: newLocA,
             robLocationB: newLocB,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(spares.suuid, spare.suuid)).returning();
+          }).where(eq21(spares.suuid, spare.suuid)).returning();
           if (isTrueTransfer) {
             const transferQty = Math.abs(deltaA);
             const fromLocation = deltaA < 0 ? "A" : "B";
@@ -41858,7 +42404,7 @@ var init_postgresStorage = __esm({
             robLocationA: newRobA,
             lastOrderDate: dateLocal ?? null,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(spares.suuid, spare.suuid)).returning();
+          }).where(eq21(spares.suuid, spare.suuid)).returning();
           await this.createSpareHistory({
             timestampUTC: /* @__PURE__ */ new Date(),
             vesselId: spare.vesselId || "V001",
@@ -41903,7 +42449,7 @@ var init_postgresStorage = __esm({
             rob: newRob,
             robLocationA: newRobA,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(spares.suuid, spare.suuid)).returning();
+          }).where(eq21(spares.suuid, spare.suuid)).returning();
           await this.createSpareHistory({
             timestampUTC: /* @__PURE__ */ new Date(),
             vesselId: spare.vesselId || "V001",
@@ -41966,68 +42512,64 @@ var init_postgresStorage = __esm({
       // Fleet Spares - New fleet_spares table methods
       async getFleetSparesFromTable() {
         const db12 = await getDb();
-        return await db12.select().from(fleetSpares).where(eq20(fleetSpares.isDeleted, false));
+        return await db12.select().from(fleetSpares).where(eq21(fleetSpares.isDeleted, false));
       }
       async getFleetSpareFromTable(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleetSpares).where(and16(
-          eq20(fleetSpares.id, id),
-          eq20(fleetSpares.isDeleted, false)
+        const result = await db12.select().from(fleetSpares).where(and17(
+          eq21(fleetSpares.id, id),
+          eq21(fleetSpares.isDeleted, false)
         ));
         return result[0];
       }
       async createFleetSpareInTable(spare) {
         const db12 = await getDb();
+        const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+        const classification = await classificationForWrite2(spare);
         const result = await db12.insert(fleetSpares).values({
-          ...spare
+          ...spare,
+          ...classification
         }).returning();
         return result[0];
       }
       async updateFleetSpareInTable(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(fleetSpares).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(fleetSpares.id, id)).returning();
+        const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+        const [saved] = await db12.select().from(fleetSpares).where(eq21(fleetSpares.id, id));
+        const classification = await classificationForWrite2(data, saved);
+        const result = await db12.update(fleetSpares).set({ ...data, ...classification, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(fleetSpares.id, id)).returning();
         return result[0];
       }
       async deleteFleetSpareFromTable(id) {
         const db12 = await getDb();
-        await db12.update(fleetSpares).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(fleetSpares.id, id));
+        await db12.update(fleetSpares).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(fleetSpares.id, id));
       }
       async getFleetSpareByPartCode(partCode) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleetSpares).where(and16(
-          eq20(fleetSpares.partCode, partCode),
-          eq20(fleetSpares.isDeleted, false)
+        const result = await db12.select().from(fleetSpares).where(and17(
+          eq21(fleetSpares.partCode, partCode),
+          eq21(fleetSpares.isDeleted, false)
         ));
         return result[0];
       }
       // Legacy Fleet Spares (spares table with dataScope='fleet')
       async getFleetSpares() {
         const db12 = await getDb();
-        return await db12.select().from(spares).where(and16(
-          eq20(spares.dataScope, "fleet"),
-          eq20(spares.deleted, false)
+        return await db12.select().from(spares).where(and17(
+          eq21(spares.dataScope, "fleet"),
+          eq21(spares.deleted, false)
         ));
       }
       async getFleetSpare(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(spares).where(and16(
-          or6(eq20(spares.id, id), eq20(spares.suuid, String(id))),
-          eq20(spares.dataScope, "fleet")
+        const result = await db12.select().from(spares).where(and17(
+          or6(eq21(spares.id, id), eq21(spares.suuid, String(id))),
+          eq21(spares.dataScope, "fleet")
         ));
         return result[0];
       }
       async createFleetSpare(spare) {
-        const db12 = await getDb();
-        const result = await db12.insert(spares).values({
-          ...spare,
-          suuid: randomUUID4(),
-          dataScope: "fleet",
-          rob: spare.rob ?? 0,
-          robLocationA: spare.robLocationA ?? 0,
-          robLocationB: spare.robLocationB ?? 0,
-          min: spare.min ?? 0
-        }).returning();
-        return result[0];
+        return this.createSpare({ ...spare, dataScope: "fleet" }, true);
       }
       async updateFleetSpare(id, data) {
         return this.updateSpare(id, data);
@@ -42040,24 +42582,26 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const results = [];
         for (const spare of sparesList) {
+          const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+          const classification = await classificationForWrite2(spare);
           const robA = spare.robLocationA ?? 0;
           const robB = spare.robLocationB ?? 0;
-          const result = await db12.insert(spares).values({
-            ...spare,
-            suuid: randomUUID4(),
-            dataScope: spare.dataScope || "vessel",
-            rob: spare.rob ?? 0,
-            robLocationA: robA,
-            robLocationB: robB,
-            min: spare.min ?? 0
-          }).returning();
+          const result = await db12.transaction(async (tx) => {
+            const rows = await tx.insert(spares).values({
+              ...spare,
+              ...classification,
+              suuid: randomUUID4(),
+              dataScope: spare.dataScope || "vessel",
+              rob: spare.rob ?? 0,
+              robLocationA: robA,
+              robLocationB: robB,
+              min: spare.min ?? 0
+            }).returning();
+            await logFieldChanges("spares", rows[0].suuid, rows[0].vesselId || null, null, rows[0], "system", tx);
+            return rows;
+          });
           const createdSpare = result[0];
           results.push(createdSpare);
-          try {
-            await logFieldChanges("spares", createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, "system");
-          } catch (e) {
-            console.error("[FieldLogger] spare bulk create:", e);
-          }
           if (createdSpare.vesselId) {
             const vesselId = createdSpare.vesselId;
             if (createdSpare.location) {
@@ -42085,23 +42629,22 @@ var init_postgresStorage = __esm({
         let created = 0;
         let updated = 0;
         for (const spare of sparesList) {
-          const existing = spare.partCode && spare.vesselId ? await db12.select().from(spares).where(and16(
-            eq20(spares.partCode, spare.partCode),
-            eq20(spares.vesselId, spare.vesselId),
-            eq20(spares.deleted, false)
+          const existing = spare.partCode && spare.vesselId ? await db12.select().from(spares).where(and17(
+            eq21(spares.partCode, spare.partCode),
+            eq21(spares.vesselId, spare.vesselId),
+            eq21(spares.deleted, false)
           )).then((r) => r[0]) : null;
           if (existing) {
             const { partCode, ...restSpare } = spare;
-            const updateData = partCode != null ? { ...restSpare, partCode, updatedAt: /* @__PURE__ */ new Date() } : { ...restSpare, updatedAt: /* @__PURE__ */ new Date() };
+            const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+            const pair = await classificationForWrite2(spare, existing);
+            const updateData = partCode != null ? { ...restSpare, ...pair, partCode, updatedAt: /* @__PURE__ */ new Date() } : { ...restSpare, ...pair, updatedAt: /* @__PURE__ */ new Date() };
             const oldSpare = { ...existing };
-            await db12.update(spares).set(updateData).where(eq20(spares.suuid, existing.suuid));
+            await db12.transaction(async (tx) => {
+              const [updatedSpare] = await tx.update(spares).set(updateData).where(eq21(spares.suuid, existing.suuid)).returning();
+              await logFieldChanges("spares", existing.suuid, existing.vesselId || null, oldSpare, updatedSpare, "system", tx);
+            });
             updated++;
-            try {
-              const updatedSpare = await db12.select().from(spares).where(eq20(spares.suuid, existing.suuid)).then((r) => r[0]);
-              if (updatedSpare) await logFieldChanges("spares", existing.suuid, existing.vesselId || null, oldSpare, updatedSpare, "system");
-            } catch (e) {
-              console.error("[FieldLogger] spare bulk upsert update:", e);
-            }
             const newRobA = spare.robLocationA ?? existing.robLocationA ?? 0;
             const newRobB = spare.robLocationB ?? existing.robLocationB ?? 0;
             if (spare.vesselId && (spare.robLocationA !== void 0 || spare.robLocationB !== void 0)) {
@@ -42130,24 +42673,24 @@ var init_postgresStorage = __esm({
             }
             const robA = spare.robLocationA ?? 0;
             const robB = spare.robLocationB ?? 0;
-            const result = await db12.insert(spares).values({
-              ...spare,
-              suuid: randomUUID4(),
-              dataScope: spare.dataScope || "vessel",
-              rob: spare.rob ?? 0,
-              robLocationA: robA,
-              robLocationB: robB,
-              min: spare.min ?? 0
-            }).returning();
+            const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+            const pair = await classificationForWrite2(spare);
+            const result = await db12.transaction(async (tx) => {
+              const rows = await tx.insert(spares).values({
+                ...spare,
+                ...pair,
+                suuid: randomUUID4(),
+                dataScope: spare.dataScope || "vessel",
+                rob: spare.rob ?? 0,
+                robLocationA: robA,
+                robLocationB: robB,
+                min: spare.min ?? 0
+              }).returning();
+              await logFieldChanges("spares", rows[0].suuid, rows[0].vesselId || null, null, rows[0], "system", tx);
+              return rows;
+            });
             created++;
             const createdSpare = result[0];
-            if (createdSpare) {
-              try {
-                await logFieldChanges("spares", createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, "system");
-              } catch (e) {
-                console.error("[FieldLogger] spare bulk upsert create:", e);
-              }
-            }
             if (createdSpare?.vesselId) {
               const vesselId = createdSpare.vesselId;
               if (createdSpare.location) {
@@ -42178,12 +42721,12 @@ var init_postgresStorage = __esm({
         if (vesselIds && vesselIds.length > 0) {
           condition = inArray6(sparesHistory.vesselId, vesselIds);
         } else if (vesselId && vesselId !== "all") {
-          condition = eq20(sparesHistory.vesselId, vesselId);
+          condition = eq21(sparesHistory.vesselId, vesselId);
         }
         const query = db12.select({
           history: sparesHistory,
           partNumber: spares.partNumber
-        }).from(sparesHistory).leftJoin(spares, eq20(sparesHistory.spareUuid, spares.suuid)).orderBy(desc5(sparesHistory.timestampUTC));
+        }).from(sparesHistory).leftJoin(spares, eq21(sparesHistory.spareUuid, spares.suuid)).orderBy(desc5(sparesHistory.timestampUTC));
         const rows = condition ? await query.where(condition) : await query;
         return rows.map((r) => ({
           ...r.history,
@@ -42195,7 +42738,7 @@ var init_postgresStorage = __esm({
         const rows = await db12.select({
           history: sparesHistory,
           partNumber: spares.partNumber
-        }).from(sparesHistory).leftJoin(spares, eq20(sparesHistory.spareUuid, spares.suuid)).where(eq20(sparesHistory.spareId, spareId)).orderBy(desc5(sparesHistory.timestampUTC));
+        }).from(sparesHistory).leftJoin(spares, eq21(sparesHistory.spareUuid, spares.suuid)).where(eq21(sparesHistory.spareId, spareId)).orderBy(desc5(sparesHistory.timestampUTC));
         return rows.map((r) => ({
           ...r.history,
           partNumber: r.partNumber ?? null
@@ -42223,22 +42766,22 @@ var init_postgresStorage = __esm({
       // ============= MODULE 8: STORES ITEMS =============
       async getStoresItems(vesselId, itemType, vesselIds) {
         const db12 = await getDb();
-        const vesselCondition = vesselIds && vesselIds.length > 0 ? inArray6(storesItems.vesselId, vesselIds) : vesselId && vesselId !== "all" ? eq20(storesItems.vesselId, vesselId) : void 0;
+        const vesselCondition = vesselIds && vesselIds.length > 0 ? inArray6(storesItems.vesselId, vesselIds) : vesselId && vesselId !== "all" ? eq21(storesItems.vesselId, vesselId) : void 0;
         if (itemType) {
-          const conditions2 = [eq20(storesItems.itemType, itemType), eq20(storesItems.deleted, false)];
+          const conditions2 = [eq21(storesItems.itemType, itemType), eq21(storesItems.deleted, false)];
           if (vesselCondition) conditions2.push(vesselCondition);
-          return await db12.select().from(storesItems).where(and16(...conditions2));
+          return await db12.select().from(storesItems).where(and17(...conditions2));
         }
-        const conditions = [eq20(storesItems.deleted, false)];
+        const conditions = [eq21(storesItems.deleted, false)];
         if (vesselCondition) conditions.push(vesselCondition);
-        return await db12.select().from(storesItems).where(and16(...conditions));
+        return await db12.select().from(storesItems).where(and17(...conditions));
       }
       async inactivateStoresItem(id, vesselId) {
         const db12 = await getDb();
         const existingItem = await this.getStoresItem(id);
         const numId = Number(id);
-        const idCondition = or6(eq20(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq20(storesItems.id, numId)] : []);
-        const condition = vesselId ? and16(idCondition, eq20(storesItems.vesselId, vesselId)) : idCondition;
+        const idCondition = or6(eq21(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(storesItems.id, numId)] : []);
+        const condition = vesselId ? and17(idCondition, eq21(storesItems.vesselId, vesselId)) : idCondition;
         const [result] = await db12.update(storesItems).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(condition).returning();
         if (existingItem && result) {
           try {
@@ -42252,7 +42795,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const numId = Number(id);
         const result = await db12.select().from(storesItems).where(
-          or6(eq20(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq20(storesItems.id, numId)] : [])
+          or6(eq21(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(storesItems.id, numId)] : [])
         );
         return result[0];
       }
@@ -42313,7 +42856,7 @@ var init_postgresStorage = __esm({
         }
         const existingItem = await this.getStoresItem(id);
         const numId = Number(id);
-        const idCondition = or6(eq20(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq20(storesItems.id, numId)] : []);
+        const idCondition = or6(eq21(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(storesItems.id, numId)] : []);
         const result = await db12.update(storesItems).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(idCondition).returning();
         if (!result[0]) {
           throw new Error(`Stores item with id ${id} not found`);
@@ -42331,7 +42874,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const existingItem = await this.getStoresItem(id);
         const numId = Number(id);
-        await db12.update(storesItems).set({ deleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(or6(eq20(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq20(storesItems.id, numId)] : []));
+        await db12.update(storesItems).set({ deleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(or6(eq21(storesItems.stuuid, id), ...Number.isInteger(numId) && numId > 0 ? [eq21(storesItems.id, numId)] : []));
         if (existingItem) {
           try {
             await logSoftDelete("stores_items", existingItem.stuuid, existingItem.vesselId || null, "system");
@@ -42356,7 +42899,7 @@ var init_postgresStorage = __esm({
             rob: String(newTotalRob),
             ...location === "A" ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) },
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(storesItems.stuuid, item.stuuid)).returning();
+          }).where(eq21(storesItems.stuuid, item.stuuid)).returning();
           await this.insertStoresLedgerEntry({
             vesselId: item.vesselId,
             section: item.itemType,
@@ -42400,7 +42943,7 @@ var init_postgresStorage = __esm({
             rob: String(newTotalRob),
             ...location === "A" ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) },
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(storesItems.stuuid, item.stuuid)).returning();
+          }).where(eq21(storesItems.stuuid, item.stuuid)).returning();
           await this.insertStoresLedgerEntry({
             vesselId: item.vesselId,
             section: item.itemType,
@@ -42459,7 +43002,7 @@ var init_postgresStorage = __esm({
             robLocationA: String(newLocA),
             robLocationB: String(newLocB),
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(storesItems.stuuid, item.stuuid)).returning();
+          }).where(eq21(storesItems.stuuid, item.stuuid)).returning();
           if (isTrueTransfer) {
             const transferQty = Math.abs(deltaA);
             const fromLocation = deltaA < 0 ? "A" : "B";
@@ -42577,7 +43120,7 @@ var init_postgresStorage = __esm({
             robLocationA: String(newLocA),
             robLocationB: String(newLocB),
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq20(storesItems.stuuid, item.stuuid)).returning();
+          }).where(eq21(storesItems.stuuid, item.stuuid)).returning();
           await this.insertStoresLedgerEntry({
             vesselId: item.vesselId,
             section: item.itemType,
@@ -42609,47 +43152,47 @@ var init_postgresStorage = __esm({
       // ============= MODULE 8: STORES LEDGER =============
       async getStoresTransactionHistory(vesselId, itemType, vesselIds) {
         const db12 = await getDb();
-        const vesselCondition = vesselIds && vesselIds.length > 0 ? inArray6(storesLedger.vesselId, vesselIds) : vesselId && vesselId !== "all" ? eq20(storesLedger.vesselId, vesselId) : void 0;
+        const vesselCondition = vesselIds && vesselIds.length > 0 ? inArray6(storesLedger.vesselId, vesselIds) : vesselId && vesselId !== "all" ? eq21(storesLedger.vesselId, vesselId) : void 0;
         if (itemType) {
-          const conditions = [eq20(storesLedger.section, itemType)];
+          const conditions = [eq21(storesLedger.section, itemType)];
           if (vesselCondition) conditions.push(vesselCondition);
-          return await db12.select().from(storesLedger).where(and16(...conditions)).orderBy(desc5(storesLedger.timestampUTC));
+          return await db12.select().from(storesLedger).where(and17(...conditions)).orderBy(desc5(storesLedger.timestampUTC));
         }
         return vesselCondition ? await db12.select().from(storesLedger).where(vesselCondition).orderBy(desc5(storesLedger.timestampUTC)) : await db12.select().from(storesLedger).orderBy(desc5(storesLedger.timestampUTC));
       }
       async getStoresItemHistory(itemId) {
         const db12 = await getDb();
-        return await db12.select().from(storesLedger).where(eq20(storesLedger.storeUuid, itemId)).orderBy(desc5(storesLedger.timestampUTC));
+        return await db12.select().from(storesLedger).where(eq21(storesLedger.storeUuid, itemId)).orderBy(desc5(storesLedger.timestampUTC));
       }
       // ============= MODULE 9: DEFECTS =============
       async getDefects(filters) {
         const db12 = await getDb();
         const conditions = [];
         if (filters?.vesselId && filters.vesselId !== "all") {
-          conditions.push(eq20(defects.vesselId, filters.vesselId));
+          conditions.push(eq21(defects.vesselId, filters.vesselId));
         }
         if (filters?.statusView === "active") {
           conditions.push(or6(
-            eq20(defects.status, "Open"),
-            eq20(defects.status, "Pending"),
-            eq20(defects.status, "In-Progress"),
-            eq20(defects.status, "Awaiting Parts"),
-            eq20(defects.status, "Deferred")
+            eq21(defects.status, "Open"),
+            eq21(defects.status, "Pending"),
+            eq21(defects.status, "In-Progress"),
+            eq21(defects.status, "Awaiting Parts"),
+            eq21(defects.status, "Deferred")
           ));
         } else if (filters?.statusView === "resolved") {
           conditions.push(or6(
-            eq20(defects.status, "Closed"),
-            eq20(defects.status, "Cancelled")
+            eq21(defects.status, "Closed"),
+            eq21(defects.status, "Cancelled")
           ));
         }
         if (filters?.isCoC !== void 0) {
-          conditions.push(eq20(defects.is_coc, filters.isCoC));
+          conditions.push(eq21(defects.is_coc, filters.isCoC));
         }
         if (filters?.category) {
-          conditions.push(eq20(defects.category, filters.category));
+          conditions.push(eq21(defects.category, filters.category));
         }
         if (filters?.priority) {
-          conditions.push(eq20(defects.priority, filters.priority));
+          conditions.push(eq21(defects.priority, filters.priority));
         }
         if (filters?.dueOverdue === "overdue") {
           const today = /* @__PURE__ */ new Date();
@@ -42666,7 +43209,7 @@ var init_postgresStorage = __esm({
         }
         let query = db12.select().from(defects);
         if (conditions.length > 0) {
-          query = query.where(and16(...conditions));
+          query = query.where(and17(...conditions));
         }
         query = query.orderBy(desc5(defects.issueDate));
         if (filters?.page !== void 0 && filters?.pageSize !== void 0) {
@@ -42679,28 +43222,28 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const conditions = [];
         if (filters?.vesselId && filters.vesselId !== "all") {
-          conditions.push(eq20(defects.vesselId, filters.vesselId));
+          conditions.push(eq21(defects.vesselId, filters.vesselId));
         }
         if (filters?.statusView === "active") {
           conditions.push(or6(
-            eq20(defects.status, "Open"),
-            eq20(defects.status, "Pending"),
-            eq20(defects.status, "In-Progress"),
-            eq20(defects.status, "Awaiting Parts"),
-            eq20(defects.status, "Deferred")
+            eq21(defects.status, "Open"),
+            eq21(defects.status, "Pending"),
+            eq21(defects.status, "In-Progress"),
+            eq21(defects.status, "Awaiting Parts"),
+            eq21(defects.status, "Deferred")
           ));
         } else if (filters?.statusView === "resolved") {
           conditions.push(or6(
-            eq20(defects.status, "Closed"),
-            eq20(defects.status, "Cancelled")
+            eq21(defects.status, "Closed"),
+            eq21(defects.status, "Cancelled")
           ));
         }
         if (filters?.isCoC !== void 0) {
-          conditions.push(eq20(defects.is_coc, filters.isCoC));
+          conditions.push(eq21(defects.is_coc, filters.isCoC));
         }
         let query = db12.select({ count: sql16`count(*)` }).from(defects);
         if (conditions.length > 0) {
-          query = query.where(and16(...conditions));
+          query = query.where(and17(...conditions));
         }
         const result = await query;
         return Number(result[0]?.count || 0);
@@ -42708,13 +43251,13 @@ var init_postgresStorage = __esm({
       async getDefect(id) {
         const db12 = await getDb();
         const result = await db12.select().from(defects).where(
-          or6(eq20(defects.duuid, id), eq20(defects.id, id))
+          or6(eq21(defects.duuid, id), eq21(defects.id, id))
         );
         return result[0];
       }
       async getDefectBySeedId(seedId) {
         const db12 = await getDb();
-        const result = await db12.select().from(defects).where(eq20(defects.seedId, seedId));
+        const result = await db12.select().from(defects).where(eq21(defects.seedId, seedId));
         return result[0];
       }
       async createDefect(defect) {
@@ -42722,12 +43265,12 @@ var init_postgresStorage = __esm({
         const vesselId = defect.vesselId;
         const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
         const yearShort = currentYear % 100;
-        const vesselResult = await db12.select({ vesselSequence: vessels.vesselSequence, vCode: vessels.vCode }).from(vessels).where(eq20(vessels.vuuid, vesselId));
+        const vesselResult = await db12.select({ vesselSequence: vessels.vesselSequence, vCode: vessels.vCode }).from(vessels).where(eq21(vessels.vuuid, vesselId));
         let vesselSeq = vesselResult[0]?.vesselSequence;
         if (vesselResult.length > 0 && !vesselSeq) {
           const maxSeqResult = await db12.select({ max: sql16`COALESCE(MAX(vessel_sequence), 0)` }).from(vessels);
           vesselSeq = (maxSeqResult[0]?.max || 0) + 1;
-          await db12.update(vessels).set({ vesselSequence: vesselSeq }).where(eq20(vessels.vuuid, vesselId));
+          await db12.update(vessels).set({ vesselSequence: vesselSeq }).where(eq21(vessels.vuuid, vesselId));
         }
         if (!vesselSeq) {
           const existingVesselSeqs = await db12.execute(sql16`
@@ -42748,7 +43291,7 @@ var init_postgresStorage = __esm({
         const usedIds = await db12.execute(sql16`SELECT id FROM defects WHERE vessel_id = ${vesselId} AND (id LIKE ${prefix + "%"} OR id LIKE ${legacyPrefix + "%"})`);
         const used = usedIds.rows.map((r) => String(r.id));
         let nextSeq = Math.max(highestInSeries(used, prefix), highestInSeries(used, legacyPrefix)) + 1;
-        const existingSeq = side === "ship" ? await db12.select().from(defectSequences).where(and16(eq20(defectSequences.vesselId, vesselId), eq20(defectSequences.year, currentYear))) : [];
+        const existingSeq = side === "ship" ? await db12.select().from(defectSequences).where(and17(eq21(defectSequences.vesselId, vesselId), eq21(defectSequences.year, currentYear))) : [];
         if (existingSeq.length > 0) nextSeq = Math.max(nextSeq, existingSeq[0].lastSequence + 1);
         let result = [];
         for (let attempt = 0; ; attempt++) {
@@ -42769,7 +43312,7 @@ var init_postgresStorage = __esm({
           if (existingSeq.length === 0) {
             await db12.insert(defectSequences).values({ vesselId, year: currentYear, lastSequence: nextSeq });
           } else if (nextSeq > existingSeq[0].lastSequence) {
-            await db12.update(defectSequences).set({ lastSequence: nextSeq }).where(and16(eq20(defectSequences.vesselId, vesselId), eq20(defectSequences.year, currentYear)));
+            await db12.update(defectSequences).set({ lastSequence: nextSeq }).where(and17(eq21(defectSequences.vesselId, vesselId), eq21(defectSequences.year, currentYear)));
           }
         }
         try {
@@ -42785,7 +43328,7 @@ var init_postgresStorage = __esm({
         if (!existingDefect) {
           throw new Error(`Defect ${id} not found`);
         }
-        const result = await db12.update(defects).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(defects.duuid, existingDefect.duuid)).returning();
+        const result = await db12.update(defects).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(defects.duuid, existingDefect.duuid)).returning();
         if (!result[0]) {
           throw new Error(`Defect ${id} not found`);
         }
@@ -42798,9 +43341,9 @@ var init_postgresStorage = __esm({
       }
       async getDefectClosureHistory(defectDuuid) {
         const db12 = await getDb();
-        return db12.select().from(defectClosureHistory).where(and16(
-          eq20(defectClosureHistory.defectDuuid, defectDuuid),
-          eq20(defectClosureHistory.isDeleted, false)
+        return db12.select().from(defectClosureHistory).where(and17(
+          eq21(defectClosureHistory.defectDuuid, defectDuuid),
+          eq21(defectClosureHistory.isDeleted, false)
         )).orderBy(asc5(defectClosureHistory.attemptNumber));
       }
       async reopenDefectAfterVerificationReturn(input) {
@@ -42813,7 +43356,7 @@ var init_postgresStorage = __esm({
         if (!existingDefect) {
           throw new Error(`Defect ${id} not found`);
         }
-        await db12.delete(defects).where(eq20(defects.duuid, existingDefect.duuid));
+        await db12.delete(defects).where(eq21(defects.duuid, existingDefect.duuid));
         try {
           await logFieldChanges("defects", existingDefect.duuid, existingDefect.vesselId || null, { is_deleted: false }, { is_deleted: true }, "system");
         } catch (e) {
@@ -42835,7 +43378,7 @@ var init_postgresStorage = __esm({
         };
         const existingNotes = Array.isArray(defect.notes) ? defect.notes : [];
         const updatedNotes = [...existingNotes, newNote];
-        const result = await db12.update(defects).set({ notes: updatedNotes, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(defects.duuid, defect.duuid)).returning();
+        const result = await db12.update(defects).set({ notes: updatedNotes, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(defects.duuid, defect.duuid)).returning();
         try {
           await logFieldChanges("defects", defect.duuid, defect.vesselId || null, defect, result[0], note.createdBy || "system");
         } catch (e) {
@@ -42851,7 +43394,7 @@ var init_postgresStorage = __esm({
         }
         const existingLinks = Array.isArray(defect.linkedDefects) ? defect.linkedDefects : [];
         const mergedLinks = Array.from(/* @__PURE__ */ new Set([...existingLinks, ...linkedDefectIds]));
-        const result = await db12.update(defects).set({ linkedDefects: mergedLinks, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(defects.duuid, defect.duuid)).returning();
+        const result = await db12.update(defects).set({ linkedDefects: mergedLinks, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(defects.duuid, defect.duuid)).returning();
         try {
           await logFieldChanges("defects", defect.duuid, defect.vesselId || null, defect, result[0], "system");
         } catch (e) {
@@ -42862,7 +43405,7 @@ var init_postgresStorage = __esm({
       // ============= MODULE 9: DEFECT ACTIONS =============
       async getDefectActions(defectId) {
         const db12 = await getDb();
-        return await db12.select().from(defectActions).where(eq20(defectActions.defectId, defectId)).orderBy(desc5(defectActions.createdAt));
+        return await db12.select().from(defectActions).where(eq21(defectActions.defectId, defectId)).orderBy(desc5(defectActions.createdAt));
       }
       async createDefectAction(action) {
         const db12 = await getDb();
@@ -42877,12 +43420,12 @@ var init_postgresStorage = __esm({
       }
       async updateDefectAction(id, updates) {
         const db12 = await getDb();
-        const existing = await db12.select().from(defectActions).where(eq20(defectActions.id, id)).limit(1);
+        const existing = await db12.select().from(defectActions).where(eq21(defectActions.id, id)).limit(1);
         if (!existing[0]) {
           throw new Error(`Defect action ${id} not found`);
         }
         const existingAction = existing[0];
-        const result = await db12.update(defectActions).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(defectActions.id, id)).returning();
+        const result = await db12.update(defectActions).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(defectActions.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Defect action ${id} not found`);
         }
@@ -42896,12 +43439,12 @@ var init_postgresStorage = __esm({
       }
       async deleteDefectAction(id) {
         const db12 = await getDb();
-        const existing = await db12.select().from(defectActions).where(eq20(defectActions.id, id)).limit(1);
+        const existing = await db12.select().from(defectActions).where(eq21(defectActions.id, id)).limit(1);
         if (!existing[0]) {
           throw new Error(`Defect action ${id} not found`);
         }
         const vIdDel = await this.defVesselId(existing[0].defectId);
-        await db12.delete(defectActions).where(eq20(defectActions.id, id));
+        await db12.delete(defectActions).where(eq21(defectActions.id, id));
         try {
           await logFieldChanges("defect_actions", existing[0].dauuid, vIdDel, { is_deleted: false }, { is_deleted: true }, "system");
         } catch (e) {
@@ -42911,7 +43454,7 @@ var init_postgresStorage = __esm({
       // ============= MODULE 9: DEFECT ATTACHMENTS =============
       async getDefectAttachments(defectId) {
         const db12 = await getDb();
-        return await db12.select().from(defectAttachments).where(eq20(defectAttachments.defectId, defectId));
+        return await db12.select().from(defectAttachments).where(eq21(defectAttachments.defectId, defectId));
       }
       async createDefectAttachment(attachment) {
         const db12 = await getDb();
@@ -42933,15 +43476,15 @@ var init_postgresStorage = __esm({
       }
       async getDefectAttachmentById(id) {
         const db12 = await getDb();
-        return (await db12.select().from(defectAttachments).where(eq20(defectAttachments.id, id)).limit(1))[0];
+        return (await db12.select().from(defectAttachments).where(eq21(defectAttachments.id, id)).limit(1))[0];
       }
       async deleteDefectAttachment(id) {
         const db12 = await getDb();
-        const existing = await db12.select().from(defectAttachments).where(eq20(defectAttachments.id, id)).limit(1);
+        const existing = await db12.select().from(defectAttachments).where(eq21(defectAttachments.id, id)).limit(1);
         if (!existing[0]) {
           throw new Error(`Defect attachment ${id} not found`);
         }
-        await db12.delete(defectAttachments).where(eq20(defectAttachments.id, id));
+        await db12.delete(defectAttachments).where(eq21(defectAttachments.id, id));
         try {
           await logFieldChanges("defect_attachments", existing[0].datuuid, null, { is_deleted: false }, { is_deleted: true }, "system");
         } catch (e) {
@@ -42953,25 +43496,25 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const conditions = [];
         if (filters?.windowMonths !== void 0) {
-          conditions.push(eq20(recurringDefects.windowMonths, filters.windowMonths));
+          conditions.push(eq21(recurringDefects.windowMonths, filters.windowMonths));
         }
         if (filters?.minOccurrences !== void 0) {
           conditions.push(gte2(recurringDefects.occurrenceCount, filters.minOccurrences));
         }
         if (filters?.hasCoc !== void 0) {
-          conditions.push(eq20(recurringDefects.hasCoc, filters.hasCoc));
+          conditions.push(eq21(recurringDefects.hasCoc, filters.hasCoc));
         }
         if (filters?.equipmentKey) {
-          conditions.push(eq20(recurringDefects.equipmentKey, filters.equipmentKey));
+          conditions.push(eq21(recurringDefects.equipmentKey, filters.equipmentKey));
         }
         if (conditions.length > 0) {
-          return await db12.select().from(recurringDefects).where(and16(...conditions)).orderBy(desc5(recurringDefects.occurrenceCount));
+          return await db12.select().from(recurringDefects).where(and17(...conditions)).orderBy(desc5(recurringDefects.occurrenceCount));
         }
         return await db12.select().from(recurringDefects).orderBy(desc5(recurringDefects.occurrenceCount));
       }
       async getRecurringDefect(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(recurringDefects).where(eq20(recurringDefects.id, id));
+        const result = await db12.select().from(recurringDefects).where(eq21(recurringDefects.id, id));
         return result[0];
       }
       async createRecurringDefect(recurring) {
@@ -42981,7 +43524,7 @@ var init_postgresStorage = __esm({
       }
       async updateRecurringDefect(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(recurringDefects).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(recurringDefects.id, id)).returning();
+        const result = await db12.update(recurringDefects).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(recurringDefects.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Recurring defect ${id} not found`);
         }
@@ -42989,12 +43532,12 @@ var init_postgresStorage = __esm({
       }
       async deleteRecurringDefect(id) {
         const db12 = await getDb();
-        await db12.delete(recurringDefects).where(eq20(recurringDefects.id, id));
+        await db12.delete(recurringDefects).where(eq21(recurringDefects.id, id));
       }
       // ============= MODULE 9: RECURRING DEFECT LINKS =============
       async getRecurringDefectLinks(recurringId) {
         const db12 = await getDb();
-        return await db12.select().from(recurringDefectLinks).where(eq20(recurringDefectLinks.recurringId, recurringId));
+        return await db12.select().from(recurringDefectLinks).where(eq21(recurringDefectLinks.recurringId, recurringId));
       }
       async getDefectsForRecurring(recurringId) {
         const db12 = await getDb();
@@ -43012,9 +43555,9 @@ var init_postgresStorage = __esm({
       }
       async deleteRecurringDefectLink(recurringId, defectId) {
         const db12 = await getDb();
-        await db12.delete(recurringDefectLinks).where(and16(
-          eq20(recurringDefectLinks.recurringId, recurringId),
-          eq20(recurringDefectLinks.defectId, defectId)
+        await db12.delete(recurringDefectLinks).where(and17(
+          eq21(recurringDefectLinks.recurringId, recurringId),
+          eq21(recurringDefectLinks.defectId, defectId)
         ));
       }
       // ============= MODULE 10: ALERT POLICIES =============
@@ -43024,7 +43567,7 @@ var init_postgresStorage = __esm({
       }
       async getAlertPolicy(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(alertPolicies).where(eq20(alertPolicies.apuuid, id));
+        const result = await db12.select().from(alertPolicies).where(eq21(alertPolicies.apuuid, id));
         return result[0];
       }
       async createAlertPolicy(policy) {
@@ -43044,7 +43587,7 @@ var init_postgresStorage = __esm({
           updatedAt: _ignoredUpdatedAt,
           ...mutableData
         } = data;
-        const result = await db12.update(alertPolicies).set({ ...mutableData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(alertPolicies.apuuid, id)).returning();
+        const result = await db12.update(alertPolicies).set({ ...mutableData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(alertPolicies.apuuid, id)).returning();
         if (!result[0]) {
           throw new Error(`Alert policy ${id} not found`);
         }
@@ -43052,20 +43595,20 @@ var init_postgresStorage = __esm({
       }
       async deleteAlertPolicy(id) {
         const db12 = await getDb();
-        await db12.delete(alertPolicies).where(eq20(alertPolicies.apuuid, id));
+        await db12.delete(alertPolicies).where(eq21(alertPolicies.apuuid, id));
       }
       // ============= MODULE 10: ALERT EVENTS =============
       async getAlertEvents(filters) {
         const db12 = await getDb();
         const conditions = [];
         if (filters?.policyId !== void 0) {
-          conditions.push(eq20(alertEvents.policyId, filters.policyId));
+          conditions.push(eq21(alertEvents.policyId, filters.policyId));
         }
         if (filters?.alertType) {
-          conditions.push(eq20(alertEvents.alertType, filters.alertType));
+          conditions.push(eq21(alertEvents.alertType, filters.alertType));
         }
         if (filters?.vesselId) {
-          conditions.push(eq20(alertEvents.vesselId, filters.vesselId));
+          conditions.push(eq21(alertEvents.vesselId, filters.vesselId));
         }
         if (filters?.acknowledged !== void 0) {
           if (filters.acknowledged) {
@@ -43075,13 +43618,13 @@ var init_postgresStorage = __esm({
           }
         }
         if (conditions.length > 0) {
-          return await db12.select().from(alertEvents).where(and16(...conditions)).orderBy(desc5(alertEvents.createdAt));
+          return await db12.select().from(alertEvents).where(and17(...conditions)).orderBy(desc5(alertEvents.createdAt));
         }
         return await db12.select().from(alertEvents).orderBy(desc5(alertEvents.createdAt));
       }
       async getAlertEvent(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(alertEvents).where(eq20(alertEvents.aeuuid, id));
+        const result = await db12.select().from(alertEvents).where(eq21(alertEvents.aeuuid, id));
         return result[0];
       }
       async createAlertEvent(event) {
@@ -43094,7 +43637,7 @@ var init_postgresStorage = __esm({
       }
       async acknowledgeAlertEvent(id, userId) {
         const db12 = await getDb();
-        const result = await db12.update(alertEvents).set({ ackBy: userId, ackAt: /* @__PURE__ */ new Date() }).where(eq20(alertEvents.aeuuid, id)).returning();
+        const result = await db12.update(alertEvents).set({ ackBy: userId, ackAt: /* @__PURE__ */ new Date() }).where(eq21(alertEvents.aeuuid, id)).returning();
         if (!result[0]) {
           throw new Error(`Alert event ${id} not found`);
         }
@@ -43103,7 +43646,7 @@ var init_postgresStorage = __esm({
       // ============= MODULE 10: ALERT DELIVERIES =============
       async getAlertDeliveries(eventId) {
         const db12 = await getDb();
-        return await db12.select().from(alertDeliveries).where(eq20(alertDeliveries.eventUuid, eventId)).orderBy(desc5(alertDeliveries.createdAt));
+        return await db12.select().from(alertDeliveries).where(eq21(alertDeliveries.eventUuid, eventId)).orderBy(desc5(alertDeliveries.createdAt));
       }
       async createAlertDelivery(delivery) {
         const db12 = await getDb();
@@ -43122,7 +43665,7 @@ var init_postgresStorage = __esm({
         if (errorMessage !== void 0) {
           updateData.errorMessage = errorMessage;
         }
-        const result = await db12.update(alertDeliveries).set(updateData).where(eq20(alertDeliveries.id, id)).returning();
+        const result = await db12.update(alertDeliveries).set(updateData).where(eq21(alertDeliveries.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Alert delivery ${id} not found`);
         }
@@ -43131,7 +43674,7 @@ var init_postgresStorage = __esm({
       // ============= MODULE 10: ALERT CONFIG =============
       async getAlertConfig(vesselId) {
         const db12 = await getDb();
-        const result = await db12.select().from(alertConfig).where(eq20(alertConfig.vesselId, vesselId));
+        const result = await db12.select().from(alertConfig).where(eq21(alertConfig.vesselId, vesselId));
         return result[0];
       }
       async createOrUpdateAlertConfig(config) {
@@ -43145,7 +43688,7 @@ var init_postgresStorage = __esm({
           ...mutableConfig
         } = config;
         if (existing) {
-          const result = await db12.update(alertConfig).set({ ...mutableConfig, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(alertConfig.id, existing.id)).returning();
+          const result = await db12.update(alertConfig).set({ ...mutableConfig, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(alertConfig.id, existing.id)).returning();
           return result[0];
         } else {
           const result = await db12.insert(alertConfig).values(mutableConfig).returning();
@@ -43155,7 +43698,7 @@ var init_postgresStorage = __esm({
       // ============= MODULE 10: ALERT ACKNOWLEDGEMENTS =============
       async getAlertAcknowledgements(eventUuid) {
         const db12 = await getDb();
-        return await db12.select().from(alertAcknowledgements).where(eq20(alertAcknowledgements.eventUuid, eventUuid)).orderBy(desc5(alertAcknowledgements.createdAt));
+        return await db12.select().from(alertAcknowledgements).where(eq21(alertAcknowledgements.eventUuid, eventUuid)).orderBy(desc5(alertAcknowledgements.createdAt));
       }
       async createAlertAcknowledgement(ack) {
         const db12 = await getDb();
@@ -43173,9 +43716,9 @@ var init_postgresStorage = __esm({
       }
       async getWorkOrdersWithMissedCycles() {
         const db12 = await getDb();
-        return await db12.select().from(workOrders).where(and16(
+        return await db12.select().from(workOrders).where(and17(
           sql16`${workOrders.missedCycles} > 0`,
-          eq20(workOrders.dataScope, "vessel")
+          eq21(workOrders.dataScope, "vessel")
         ));
       }
       // Alert-scan candidate WOs: only rows whose authored status can still compute to a
@@ -43186,8 +43729,8 @@ var init_postgresStorage = __esm({
       // enriches anything. NULL status = candidate.
       async getAlertCandidateWorkOrders() {
         const db12 = await getDb();
-        return await db12.select().from(workOrders).where(and16(
-          eq20(workOrders.dataScope, "vessel"),
+        return await db12.select().from(workOrders).where(and17(
+          eq21(workOrders.dataScope, "vessel"),
           sql16`${workOrders.isDeleted} IS NOT TRUE`,
           sql16`(${workOrders.status} IS NULL OR (
           lower(trim(${workOrders.status})) NOT IN ('completed','approved','closed','cancelled','canceled')
@@ -43207,13 +43750,15 @@ var init_postgresStorage = __esm({
           rob: spares.rob,
           min: spares.min,
           critical: spares.critical,
+          spareCategory: spares.spareCategory,
+          optimumQty: spares.optimumQty,
           componentCode: spares.componentCode,
           componentName: spares.componentName,
           vesselId: spares.vesselId
-        }).from(spares).where(and16(
-          eq20(spares.dataScope, "vessel"),
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted)),
+        }).from(spares).where(and17(
+          eq21(spares.dataScope, "vessel"),
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted)),
           sql16`${spares.vesselId} IS NOT NULL`,
           sql16`lower(${spares.critical}) IN ('critical','yes')`,
           sql16`${spares.min} > 0`,
@@ -43222,10 +43767,10 @@ var init_postgresStorage = __esm({
       }
       async getAllVesselSpares() {
         const db12 = await getDb();
-        return await db12.select().from(spares).where(and16(
-          eq20(spares.dataScope, "vessel"),
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+        return await db12.select().from(spares).where(and17(
+          eq21(spares.dataScope, "vessel"),
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
         ));
       }
       async getUnacknowledgedAlertEventsForRole(userRole, vesselId) {
@@ -43234,9 +43779,9 @@ var init_postgresStorage = __esm({
           sql16`${alertEvents.ackBy} IS NULL`
         ];
         if (vesselId) {
-          conditions.push(eq20(alertEvents.vesselId, vesselId));
+          conditions.push(eq21(alertEvents.vesselId, vesselId));
         }
-        const policies = await db12.select().from(alertPolicies).where(eq20(alertPolicies.enabled, true));
+        const policies = await db12.select().from(alertPolicies).where(eq21(alertPolicies.enabled, true));
         const adminRoles = ["PMS Admin", "Sail Admin", "Super Admin"];
         const isAdmin = adminRoles.includes(userRole);
         const allowedPolicyUuids = [];
@@ -43260,7 +43805,7 @@ var init_postgresStorage = __esm({
         conditions.push(
           sql16`${alertEvents.policyUuid} IN (${sql16.join(allowedPolicyUuids.map((u) => sql16`${u}`), sql16`, `)})`
         );
-        return await db12.select().from(alertEvents).where(and16(...conditions)).orderBy(desc5(alertEvents.createdAt));
+        return await db12.select().from(alertEvents).where(and17(...conditions)).orderBy(desc5(alertEvents.createdAt));
       }
       // ============= MODULE 11: FORM DEFINITIONS =============
       async getFormDefinitions() {
@@ -43269,12 +43814,12 @@ var init_postgresStorage = __esm({
       }
       async getFormDefinition(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(formDefinitions).where(eq20(formDefinitions.fduuid, id));
+        const result = await db12.select().from(formDefinitions).where(eq21(formDefinitions.fduuid, id));
         return result[0];
       }
       async getFormDefinitionByName(name) {
         const db12 = await getDb();
-        const result = await db12.select().from(formDefinitions).where(eq20(formDefinitions.name, name));
+        const result = await db12.select().from(formDefinitions).where(eq21(formDefinitions.name, name));
         return result[0];
       }
       async createFormDefinition(form) {
@@ -43288,18 +43833,18 @@ var init_postgresStorage = __esm({
       // ============= MODULE 11: FORM VERSIONS =============
       async getFormVersions(formId) {
         const db12 = await getDb();
-        return await db12.select().from(formVersions).where(eq20(formVersions.formDefinitionUuid, formId)).orderBy(desc5(formVersions.versionNo));
+        return await db12.select().from(formVersions).where(eq21(formVersions.formDefinitionUuid, formId)).orderBy(desc5(formVersions.versionNo));
       }
       async getFormVersion(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(formVersions).where(eq20(formVersions.fvuuid, id));
+        const result = await db12.select().from(formVersions).where(eq21(formVersions.fvuuid, id));
         return result[0];
       }
       async getLatestPublishedVersion(formId) {
         const db12 = await getDb();
-        const result = await db12.select().from(formVersions).where(and16(
-          eq20(formVersions.formDefinitionUuid, formId),
-          eq20(formVersions.status, "PUBLISHED")
+        const result = await db12.select().from(formVersions).where(and17(
+          eq21(formVersions.formDefinitionUuid, formId),
+          eq21(formVersions.status, "PUBLISHED")
         )).orderBy(desc5(formVersions.versionNo)).limit(1);
         return result[0];
       }
@@ -43318,7 +43863,7 @@ var init_postgresStorage = __esm({
       }
       async updateFormVersion(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(formVersions).set(data).where(eq20(formVersions.fvuuid, id)).returning();
+        const result = await db12.update(formVersions).set(data).where(eq21(formVersions.fvuuid, id)).returning();
         if (!result[0]) {
           throw new Error(`Form version ${id} not found`);
         }
@@ -43331,7 +43876,7 @@ var init_postgresStorage = __esm({
           authorUserId: userId,
           changelog,
           versionDate: /* @__PURE__ */ new Date()
-        }).where(eq20(formVersions.fvuuid, id)).returning();
+        }).where(eq21(formVersions.fvuuid, id)).returning();
         if (!result[0]) {
           throw new Error(`Form version ${id} not found`);
         }
@@ -43339,7 +43884,7 @@ var init_postgresStorage = __esm({
       }
       async discardFormVersion(id) {
         const db12 = await getDb();
-        await db12.delete(formVersions).where(eq20(formVersions.fvuuid, id));
+        await db12.delete(formVersions).where(eq21(formVersions.fvuuid, id));
       }
       // ============= MODULE 11: FORM VERSION USAGE =============
       async createFormVersionUsage(usage) {
@@ -43349,7 +43894,7 @@ var init_postgresStorage = __esm({
       }
       async getFormVersionUsage(formVersionId) {
         const db12 = await getDb();
-        return await db12.select().from(formVersionUsage).where(eq20(formVersionUsage.formVersionUuid, formVersionId));
+        return await db12.select().from(formVersionUsage).where(eq21(formVersionUsage.formVersionUuid, formVersionId));
       }
       async seedForms() {
         const existingForms = await this.getFormDefinitions();
@@ -43373,20 +43918,20 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         let conditions = [];
         if (filters?.category) {
-          conditions.push(eq20(changeRequest.category, filters.category));
+          conditions.push(eq21(changeRequest.category, filters.category));
         }
         if (filters?.status) {
-          conditions.push(eq20(changeRequest.status, filters.status));
+          conditions.push(eq21(changeRequest.status, filters.status));
         }
         if (filters?.vesselId) {
-          conditions.push(eq20(changeRequest.vesselId, filters.vesselId));
+          conditions.push(eq21(changeRequest.vesselId, filters.vesselId));
         }
         if (filters?.q) {
           conditions.push(ilike3(changeRequest.title, `%${filters.q}%`));
         }
         let allRequests;
         if (conditions.length > 0) {
-          allRequests = await db12.select().from(changeRequest).where(and16(...conditions)).orderBy(desc5(changeRequest.createdAt));
+          allRequests = await db12.select().from(changeRequest).where(and17(...conditions)).orderBy(desc5(changeRequest.createdAt));
         } else {
           allRequests = await db12.select().from(changeRequest).orderBy(desc5(changeRequest.createdAt));
         }
@@ -43395,17 +43940,17 @@ var init_postgresStorage = __esm({
           const submittedRequests = allRequests.filter((cr) => cr.status === "submitted");
           const filtered = [];
           for (const cr of submittedRequests) {
-            const steps = await db12.select().from(changeRequestApproval).where(and16(
-              eq20(changeRequestApproval.changeRequestId, cr.id),
-              eq20(changeRequestApproval.isDeleted, false)
+            const steps = await db12.select().from(changeRequestApproval).where(and17(
+              eq21(changeRequestApproval.changeRequestId, cr.id),
+              eq21(changeRequestApproval.isDeleted, false)
             ));
             const activeStep = steps.find((s) => s.status === "Pending");
             if (!activeStep) continue;
-            const rows = await db12.select({ level: mocApprovers.approverLevel }).from(mocApprovers).where(and16(
-              eq20(mocApprovers.isActive, 1),
-              eq20(mocApprovers.isDeleted, false),
-              eq20(mocApprovers.modulename, "Technical"),
-              eq20(mocApprovers.userUuid, approverUuid)
+            const rows = await db12.select({ level: mocApprovers.approverLevel }).from(mocApprovers).where(and17(
+              eq21(mocApprovers.isActive, 1),
+              eq21(mocApprovers.isDeleted, false),
+              eq21(mocApprovers.modulename, "Technical"),
+              eq21(mocApprovers.userUuid, approverUuid)
             ));
             if (rows.some((r) => levelsMatch(r.level, activeStep.approvalLevel))) filtered.push(cr);
           }
@@ -43415,12 +43960,12 @@ var init_postgresStorage = __esm({
       }
       async getChangeRequest(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(changeRequest).where(eq20(changeRequest.id, id));
+        const result = await db12.select().from(changeRequest).where(eq21(changeRequest.id, id));
         return result[0];
       }
       async getChangeRequestByUuid(cruuid) {
         const db12 = await getDb();
-        return (await db12.select().from(changeRequest).where(eq20(changeRequest.cruuid, cruuid)).limit(1))[0];
+        return (await db12.select().from(changeRequest).where(eq21(changeRequest.cruuid, cruuid)).limit(1))[0];
       }
       async createChangeRequest(request) {
         const db12 = await getDb();
@@ -43449,7 +43994,7 @@ var init_postgresStorage = __esm({
         if (existingCR && (Object.prototype.hasOwnProperty.call(data, "proposedChangesJson") || Object.prototype.hasOwnProperty.call(data, "targetType") || Object.prototype.hasOwnProperty.call(data, "targetId"))) {
           await this.validateReviewerChangeRequest(db12, { ...existingCR, ...data });
         }
-        const result = await db12.update(changeRequest).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(changeRequest.id, id)).returning();
+        const result = await db12.update(changeRequest).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(changeRequest.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Change request ${id} not found`);
         }
@@ -43471,9 +44016,9 @@ var init_postgresStorage = __esm({
         if (request.targetType !== "job" || !request.targetId) {
           throw new ValidationError("Office Reviewer configuration must target a Job");
         }
-        const job = (await db12.select().from(jobs).where(and16(
-          or6(eq20(jobs.juuid, request.targetId), eq20(jobs.id, request.targetId)),
-          or6(eq20(jobs.isDeleted, false), isNull4(jobs.isDeleted))
+        const job = (await db12.select().from(jobs).where(and17(
+          or6(eq21(jobs.juuid, request.targetId), eq21(jobs.id, request.targetId)),
+          or6(eq21(jobs.isDeleted, false), isNull4(jobs.isDeleted))
         )).limit(1))[0];
         if (!job) throw new ValidationError("Office Reviewer target Job not found");
         for (const change of changes) {
@@ -43488,7 +44033,7 @@ var init_postgresStorage = __esm({
       }
       async deleteChangeRequest(id) {
         const db12 = await getDb();
-        await db12.delete(changeRequest).where(eq20(changeRequest.id, id));
+        await db12.delete(changeRequest).where(eq21(changeRequest.id, id));
       }
       async submitChangeRequest(id, userId) {
         return this.updateChangeRequest(id, {
@@ -43500,9 +44045,9 @@ var init_postgresStorage = __esm({
       // ── Approval Step CRUD ───────────────────────────────────────────────────
       async getChangeRequestApprovalSteps(changeRequestId) {
         const db12 = await getDb();
-        return db12.select().from(changeRequestApproval).where(and16(
-          eq20(changeRequestApproval.changeRequestId, changeRequestId),
-          eq20(changeRequestApproval.isDeleted, false)
+        return db12.select().from(changeRequestApproval).where(and17(
+          eq21(changeRequestApproval.changeRequestId, changeRequestId),
+          eq21(changeRequestApproval.isDeleted, false)
         )).orderBy(changeRequestApproval.approvalLevel);
       }
       // ── Approval-sync parent-vessel helpers ─────────────────────────────────
@@ -43513,13 +44058,13 @@ var init_postgresStorage = __esm({
       /** The change request's UUID for a local id — stamped on comments/attachments so sync can find the right parent. */
       async crUuid(changeRequestId) {
         const db12 = await getDb();
-        const r = await db12.select({ u: changeRequest.cruuid }).from(changeRequest).where(eq20(changeRequest.id, changeRequestId)).limit(1);
+        const r = await db12.select({ u: changeRequest.cruuid }).from(changeRequest).where(eq21(changeRequest.id, changeRequestId)).limit(1);
         return r[0]?.u ?? null;
       }
       async crVesselId(changeRequestId) {
         try {
           const db12 = await getDb();
-          const r = await db12.select({ v: changeRequest.vesselId }).from(changeRequest).where(eq20(changeRequest.id, changeRequestId)).limit(1);
+          const r = await db12.select({ v: changeRequest.vesselId }).from(changeRequest).where(eq21(changeRequest.id, changeRequestId)).limit(1);
           return r[0]?.v ?? null;
         } catch {
           return null;
@@ -43528,7 +44073,7 @@ var init_postgresStorage = __esm({
       async wopVesselId(postponementId) {
         try {
           const db12 = await getDb();
-          const r = await db12.select({ v: workOrderPostponements.vesselId }).from(workOrderPostponements).where(eq20(workOrderPostponements.id, postponementId)).limit(1);
+          const r = await db12.select({ v: workOrderPostponements.vesselId }).from(workOrderPostponements).where(eq21(workOrderPostponements.id, postponementId)).limit(1);
           return r[0]?.v ?? null;
         } catch {
           return null;
@@ -43538,7 +44083,7 @@ var init_postgresStorage = __esm({
       async defVesselId(defectDuuid) {
         try {
           const db12 = await getDb();
-          const r = await db12.select({ v: defects.vesselId }).from(defects).where(eq20(defects.duuid, defectDuuid)).limit(1);
+          const r = await db12.select({ v: defects.vesselId }).from(defects).where(eq21(defects.duuid, defectDuuid)).limit(1);
           return r[0]?.v ?? null;
         } catch {
           return null;
@@ -43557,8 +44102,8 @@ var init_postgresStorage = __esm({
       }
       async updateChangeRequestApprovalStep(id, data) {
         const db12 = await getDb();
-        const existing = (await db12.select().from(changeRequestApproval).where(eq20(changeRequestApproval.id, id)).limit(1))[0];
-        const result = await db12.update(changeRequestApproval).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(changeRequestApproval.id, id)).returning();
+        const existing = (await db12.select().from(changeRequestApproval).where(eq21(changeRequestApproval.id, id)).limit(1))[0];
+        const result = await db12.update(changeRequestApproval).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(changeRequestApproval.id, id)).returning();
         if (!result[0]) throw new Error(`Approval step ${id} not found`);
         try {
           const vId = await this.crVesselId(result[0].changeRequestId);
@@ -43571,11 +44116,11 @@ var init_postgresStorage = __esm({
       // ── Internal: verify a user is an active approver for a given level ──────
       async verifyApproverForLevel_internal(reviewerId, approvalLevel) {
         const db12 = await getDb();
-        const rows = await db12.select({ level: mocApprovers.approverLevel }).from(mocApprovers).where(and16(
-          eq20(mocApprovers.isActive, 1),
-          eq20(mocApprovers.isDeleted, false),
-          eq20(mocApprovers.modulename, "Technical"),
-          eq20(mocApprovers.userUuid, reviewerId)
+        const rows = await db12.select({ level: mocApprovers.approverLevel }).from(mocApprovers).where(and17(
+          eq21(mocApprovers.isActive, 1),
+          eq21(mocApprovers.isDeleted, false),
+          eq21(mocApprovers.modulename, "Technical"),
+          eq21(mocApprovers.userUuid, reviewerId)
         ));
         return rows.some((r) => levelsMatch(r.level, approvalLevel));
       }
@@ -43591,14 +44136,14 @@ var init_postgresStorage = __esm({
         try {
           const result = await db12.transaction(async (tx) => {
             if (stepId !== null) {
-              const oldStep = (await tx.select().from(changeRequestApproval).where(eq20(changeRequestApproval.id, stepId)).limit(1))[0];
+              const oldStep = (await tx.select().from(changeRequestApproval).where(eq21(changeRequestApproval.id, stepId)).limit(1))[0];
               const updatedStep = (await tx.update(changeRequestApproval).set({
                 status: "Approved",
                 actionByUserId: reviewerId,
                 actionAt: now,
                 remarks: comment,
                 updatedAt: now
-              }).where(eq20(changeRequestApproval.id, stepId)).returning())[0];
+              }).where(eq21(changeRequestApproval.id, stepId)).returning())[0];
               if (updatedStep) {
                 try {
                   await logFieldChanges(
@@ -43683,7 +44228,7 @@ var init_postgresStorage = __esm({
               revisionNumber: newRevisionNumber,
               revisionHistory: updatedHistory,
               updatedAt: now
-            }).where(eq20(changeRequest.id, id)).returning();
+            }).where(eq21(changeRequest.id, id)).returning();
             if (!updateResult[0]) throw new Error("Failed to update change request status");
             return updateResult[0];
           });
@@ -43853,7 +44398,7 @@ var init_postgresStorage = __esm({
        */
       async applyComponentChangesInTx(tx, componentId, updateData) {
         const existing = await tx.select().from(components).where(
-          or6(eq20(components.cuuid, componentId), eq20(components.id, componentId))
+          or6(eq21(components.cuuid, componentId), eq21(components.id, componentId))
         );
         if (!existing[0]) {
           throw new Error(`Component ${componentId} not found`);
@@ -43904,7 +44449,7 @@ var init_postgresStorage = __esm({
         for (const field of Object.keys(safeUpdateData)) {
           console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
         }
-        const result = await tx.update(components).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(components.cuuid, resolvedCuuid)).returning();
+        const result = await tx.update(components).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(components.cuuid, resolvedCuuid)).returning();
         if (!result[0]) {
           throw new Error(`Failed to update component ${componentId} - no rows returned`);
         }
@@ -43930,7 +44475,7 @@ var init_postgresStorage = __esm({
        */
       async applyJobChangesInTx(tx, jobId, updateData) {
         const existing = await tx.select().from(jobs).where(
-          or6(eq20(jobs.juuid, jobId), eq20(jobs.id, jobId))
+          or6(eq21(jobs.juuid, jobId), eq21(jobs.id, jobId))
         );
         if (!existing[0]) {
           throw new Error(`Job ${jobId} not found`);
@@ -43976,7 +44521,7 @@ var init_postgresStorage = __esm({
         }
         if ("jobNo" in safeUpdateData && safeUpdateData.jobNo !== beforeState.jobNo) {
           const vesselId = beforeState.vesselId;
-          const links = await tx.select({ componentId: jobComponentLinks.componentId }).from(jobComponentLinks).where(eq20(jobComponentLinks.jobId, resolvedJuuid));
+          const links = await tx.select({ componentId: jobComponentLinks.componentId }).from(jobComponentLinks).where(eq21(jobComponentLinks.jobId, resolvedJuuid));
           const componentIds = Array.from(
             /* @__PURE__ */ new Set([
               ...links.map((l) => l.componentId),
@@ -43984,18 +44529,18 @@ var init_postgresStorage = __esm({
             ])
           );
           for (const compId of componentIds) {
-            const direct = await tx.select({ juuid: jobs.juuid }).from(jobs).where(and16(
-              eq20(jobs.vesselId, vesselId),
-              eq20(jobs.componentId, compId),
-              eq20(jobs.jobNo, safeUpdateData.jobNo)
+            const direct = await tx.select({ juuid: jobs.juuid }).from(jobs).where(and17(
+              eq21(jobs.vesselId, vesselId),
+              eq21(jobs.componentId, compId),
+              eq21(jobs.jobNo, safeUpdateData.jobNo)
             ));
             if (direct.find((j) => j.juuid !== resolvedJuuid)) {
               throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
             }
-            const siblingLinks = await tx.select({ jobId: jobComponentLinks.jobId }).from(jobComponentLinks).where(eq20(jobComponentLinks.componentId, compId));
+            const siblingLinks = await tx.select({ jobId: jobComponentLinks.jobId }).from(jobComponentLinks).where(eq21(jobComponentLinks.componentId, compId));
             for (const sl of siblingLinks) {
               if (sl.jobId === resolvedJuuid) continue;
-              const linked = await tx.select({ jobNo: jobs.jobNo }).from(jobs).where(eq20(jobs.juuid, sl.jobId));
+              const linked = await tx.select({ jobNo: jobs.jobNo }).from(jobs).where(eq21(jobs.juuid, sl.jobId));
               if (linked[0]?.jobNo === safeUpdateData.jobNo) {
                 throw new Error(`Job code "${safeUpdateData.jobNo}" is already used by another job on this component. Please choose a different code.`);
               }
@@ -44018,7 +44563,7 @@ var init_postgresStorage = __esm({
         for (const field of Object.keys(safeUpdateData)) {
           console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
         }
-        const result = await tx.update(jobs).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(jobs.juuid, resolvedJuuid)).returning();
+        const result = await tx.update(jobs).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(jobs.juuid, resolvedJuuid)).returning();
         if (!result[0]) {
           throw new Error(`Failed to update job ${jobId} - no rows returned`);
         }
@@ -44037,7 +44582,7 @@ var init_postgresStorage = __esm({
        */
       async applyWorkOrderChangesInTx(tx, workOrderId, updateData) {
         const existing = await tx.select().from(workOrders).where(
-          or6(eq20(workOrders.wouuid, workOrderId), eq20(workOrders.id, workOrderId))
+          or6(eq21(workOrders.wouuid, workOrderId), eq21(workOrders.id, workOrderId))
         );
         if (!existing[0]) {
           throw new Error(`Work Order ${workOrderId} not found`);
@@ -44057,7 +44602,7 @@ var init_postgresStorage = __esm({
         for (const field of Object.keys(safeUpdateData)) {
           console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
         }
-        const result = await tx.update(workOrders).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(workOrders.wouuid, resolvedWouuid)).returning();
+        const result = await tx.update(workOrders).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(workOrders.wouuid, resolvedWouuid)).returning();
         if (!result[0]) {
           throw new Error(`Failed to update work order ${workOrderId} - no rows returned`);
         }
@@ -44077,7 +44622,7 @@ var init_postgresStorage = __esm({
       async applySpareChangesInTx(tx, spareId, updateData) {
         const numId = Number(spareId);
         const existing = await tx.select().from(spares).where(
-          or6(eq20(spares.suuid, spareId), ...Number.isInteger(numId) && numId > 0 ? [eq20(spares.id, numId)] : [])
+          or6(eq21(spares.suuid, spareId), ...Number.isInteger(numId) && numId > 0 ? [eq21(spares.id, numId)] : [])
         );
         if (!existing[0]) {
           throw new Error(`Spare ${spareId} not found`);
@@ -44102,7 +44647,7 @@ var init_postgresStorage = __esm({
         for (const field of Object.keys(safeUpdateData)) {
           console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
         }
-        const result = await tx.update(spares).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(spares.suuid, resolvedSuuid)).returning();
+        const result = await tx.update(spares).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(spares.suuid, resolvedSuuid)).returning();
         if (!result[0]) {
           throw new Error(`Failed to update spare ${spareId} - no rows returned`);
         }
@@ -44122,7 +44667,7 @@ var init_postgresStorage = __esm({
       async applyStoreChangesInTx(tx, storeId, updateData) {
         const numId = Number(storeId);
         const existing = await tx.select().from(storesItems).where(
-          or6(eq20(storesItems.stuuid, storeId), ...Number.isInteger(numId) && numId > 0 ? [eq20(storesItems.id, numId)] : [])
+          or6(eq21(storesItems.stuuid, storeId), ...Number.isInteger(numId) && numId > 0 ? [eq21(storesItems.id, numId)] : [])
         );
         if (!existing[0]) {
           throw new Error(`Store item ${storeId} not found`);
@@ -44147,7 +44692,7 @@ var init_postgresStorage = __esm({
         for (const field of Object.keys(safeUpdateData)) {
           console.log(`  - ${field}: "${beforeState[field]}" -> "${safeUpdateData[field]}"`);
         }
-        const result = await tx.update(storesItems).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(storesItems.stuuid, resolvedStuuid)).returning();
+        const result = await tx.update(storesItems).set({ ...safeUpdateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(storesItems.stuuid, resolvedStuuid)).returning();
         if (!result[0]) {
           throw new Error(`Failed to update store item ${storeId} - no rows returned`);
         }
@@ -44226,7 +44771,7 @@ var init_postgresStorage = __esm({
       // ============= MODULE 12: CHANGE REQUEST ATTACHMENTS =============
       async getChangeRequestAttachments(changeRequestId) {
         const db12 = await getDb();
-        return await db12.select().from(changeRequestAttachment).where(eq20(changeRequestAttachment.changeRequestId, changeRequestId));
+        return await db12.select().from(changeRequestAttachment).where(eq21(changeRequestAttachment.changeRequestId, changeRequestId));
       }
       async createChangeRequestAttachment(attachment) {
         const db12 = await getDb();
@@ -44251,7 +44796,7 @@ var init_postgresStorage = __esm({
       // ============= MODULE 12: CHANGE REQUEST COMMENTS =============
       async getChangeRequestComments(changeRequestId) {
         const db12 = await getDb();
-        return await db12.select().from(changeRequestComment).where(eq20(changeRequestComment.changeRequestId, changeRequestId)).orderBy(asc5(changeRequestComment.createdAt));
+        return await db12.select().from(changeRequestComment).where(eq21(changeRequestComment.changeRequestId, changeRequestId)).orderBy(asc5(changeRequestComment.createdAt));
       }
       async createChangeRequestComment(comment) {
         const db12 = await getDb();
@@ -44270,16 +44815,16 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         let result;
         if (type === "component") {
-          result = await db12.select().from(ihmItems).where(eq20(ihmItems.componentId, id));
+          result = await db12.select().from(ihmItems).where(eq21(ihmItems.componentId, id));
         } else {
-          result = await db12.select().from(ihmItems).where(eq20(ihmItems.spareId, id));
+          result = await db12.select().from(ihmItems).where(eq21(ihmItems.spareId, id));
         }
         return result[0];
       }
       async getIhmItems(vesselId) {
         const db12 = await getDb();
         if (vesselId) {
-          return await db12.select().from(ihmItems).where(eq20(ihmItems.vesselId, vesselId));
+          return await db12.select().from(ihmItems).where(eq21(ihmItems.vesselId, vesselId));
         }
         return await db12.select().from(ihmItems);
       }
@@ -44287,14 +44832,14 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         let existing;
         if (item.componentId) {
-          const results = await db12.select().from(ihmItems).where(eq20(ihmItems.componentId, item.componentId));
+          const results = await db12.select().from(ihmItems).where(eq21(ihmItems.componentId, item.componentId));
           existing = results[0];
         } else if (item.spareId) {
-          const results = await db12.select().from(ihmItems).where(eq20(ihmItems.spareId, item.spareId));
+          const results = await db12.select().from(ihmItems).where(eq21(ihmItems.spareId, item.spareId));
           existing = results[0];
         }
         if (existing) {
-          const result = await db12.update(ihmItems).set({ ...item, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(ihmItems.id, existing.id)).returning();
+          const result = await db12.update(ihmItems).set({ ...item, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(ihmItems.id, existing.id)).returning();
           try {
             await logFieldChanges("ihm_items", String(existing.id), existing.vesselId || null, existing, result[0], "system");
           } catch (e) {
@@ -44313,26 +44858,26 @@ var init_postgresStorage = __esm({
       }
       async deleteIhmItem(id) {
         const db12 = await getDb();
-        await db12.delete(ihmItems).where(eq20(ihmItems.id, id));
+        await db12.delete(ihmItems).where(eq21(ihmItems.id, id));
       }
       // ============= MODULE 13: IHM MAINTENANCE LOG =============
       async getIhmMaintenanceLog(filters) {
         const db12 = await getDb();
         let conditions = [];
         if (filters.vesselId) {
-          conditions.push(eq20(ihmMaintenanceLog.vesselId, filters.vesselId));
+          conditions.push(eq21(ihmMaintenanceLog.vesselId, filters.vesselId));
         }
         if (filters.componentId) {
-          conditions.push(eq20(ihmMaintenanceLog.targetComponent, filters.componentId));
+          conditions.push(eq21(ihmMaintenanceLog.targetComponent, filters.componentId));
         }
         if (filters.spareId) {
-          conditions.push(eq20(ihmMaintenanceLog.targetSpare, filters.spareId));
+          conditions.push(eq21(ihmMaintenanceLog.targetSpare, filters.spareId));
         }
         if (filters.workOrderId) {
-          conditions.push(eq20(ihmMaintenanceLog.workOrderId, filters.workOrderId));
+          conditions.push(eq21(ihmMaintenanceLog.workOrderId, filters.workOrderId));
         }
         if (conditions.length > 0) {
-          return await db12.select().from(ihmMaintenanceLog).where(and16(...conditions)).orderBy(desc5(ihmMaintenanceLog.createdAt));
+          return await db12.select().from(ihmMaintenanceLog).where(and17(...conditions)).orderBy(desc5(ihmMaintenanceLog.createdAt));
         }
         return await db12.select().from(ihmMaintenanceLog).orderBy(desc5(ihmMaintenanceLog.createdAt));
       }
@@ -44354,24 +44899,24 @@ var init_postgresStorage = __esm({
         if (!vesselId || vesselId === "all") {
           return await db12.select().from(ihmItems);
         }
-        return await db12.select().from(ihmItems).where(eq20(ihmItems.vesselId, vesselId));
+        return await db12.select().from(ihmItems).where(eq21(ihmItems.vesselId, vesselId));
       }
       // ============= MODULE 14: FLEET VESSEL MAPPING =============
       async getFleetVesselMappings(fleetEquipmentCode) {
         const db12 = await getDb();
         if (fleetEquipmentCode) {
-          return await db12.select().from(fleetVesselMapping).where(and16(
-            eq20(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
-            eq20(fleetVesselMapping.isActive, true)
+          return await db12.select().from(fleetVesselMapping).where(and17(
+            eq21(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
+            eq21(fleetVesselMapping.isActive, true)
           ));
         }
-        return await db12.select().from(fleetVesselMapping).where(eq20(fleetVesselMapping.isActive, true));
+        return await db12.select().from(fleetVesselMapping).where(eq21(fleetVesselMapping.isActive, true));
       }
       async getFleetVesselMappingsByVessel(vesselCode) {
         const db12 = await getDb();
-        return await db12.select().from(fleetVesselMapping).where(and16(
-          eq20(fleetVesselMapping.vesselCode, vesselCode),
-          eq20(fleetVesselMapping.isActive, true)
+        return await db12.select().from(fleetVesselMapping).where(and17(
+          eq21(fleetVesselMapping.vesselCode, vesselCode),
+          eq21(fleetVesselMapping.isActive, true)
         ));
       }
       async createFleetVesselMappingRecord(mapping) {
@@ -44387,24 +44932,24 @@ var init_postgresStorage = __esm({
       }
       async removeFleetVesselMappingRecord(fleetEquipmentCode, vesselCode) {
         const db12 = await getDb();
-        await db12.update(fleetVesselMapping).set({ isActive: false }).where(and16(
-          eq20(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
-          eq20(fleetVesselMapping.vesselCode, vesselCode)
+        await db12.update(fleetVesselMapping).set({ isActive: false }).where(and17(
+          eq21(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
+          eq21(fleetVesselMapping.vesselCode, vesselCode)
         ));
       }
       // ============= MODULE 14: FLEET COMPONENT MAPPING =============
       async getFleetComponentMappings(fleetEquipmentCode) {
         const db12 = await getDb();
-        return await db12.select().from(fleetComponentMapping).where(and16(
-          eq20(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
-          eq20(fleetComponentMapping.isActive, true)
+        return await db12.select().from(fleetComponentMapping).where(and17(
+          eq21(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
+          eq21(fleetComponentMapping.isActive, true)
         ));
       }
       async getFleetComponentMappingsByVessel(vesselCode) {
         const db12 = await getDb();
-        return await db12.select().from(fleetComponentMapping).where(and16(
-          eq20(fleetComponentMapping.vesselCode, vesselCode),
-          eq20(fleetComponentMapping.isActive, true)
+        return await db12.select().from(fleetComponentMapping).where(and17(
+          eq21(fleetComponentMapping.vesselCode, vesselCode),
+          eq21(fleetComponentMapping.isActive, true)
         ));
       }
       async createFleetComponentMappingRecord(mapping) {
@@ -44422,23 +44967,23 @@ var init_postgresStorage = __esm({
       }
       async removeFleetComponentMappingRecord(fleetEquipmentCode, vesselCode, componentCode) {
         const db12 = await getDb();
-        await db12.update(fleetComponentMapping).set({ isActive: false }).where(and16(
-          eq20(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
-          eq20(fleetComponentMapping.vesselCode, vesselCode),
-          eq20(fleetComponentMapping.componentCode, componentCode)
+        await db12.update(fleetComponentMapping).set({ isActive: false }).where(and17(
+          eq21(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
+          eq21(fleetComponentMapping.vesselCode, vesselCode),
+          eq21(fleetComponentMapping.componentCode, componentCode)
         ));
       }
       // ============= MODULE 14: FLEET JOB VESSEL MAPPING =============
       async getFleetJobVesselMappings(fleetEquipmentCode, jobCode) {
         const db12 = await getDb();
-        let conditions = [eq20(fleetJobVesselMapping.isActive, true)];
+        let conditions = [eq21(fleetJobVesselMapping.isActive, true)];
         if (fleetEquipmentCode) {
-          conditions.push(eq20(fleetJobVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+          conditions.push(eq21(fleetJobVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
         }
         if (jobCode) {
-          conditions.push(eq20(fleetJobVesselMapping.jobCode, jobCode));
+          conditions.push(eq21(fleetJobVesselMapping.jobCode, jobCode));
         }
-        return await db12.select().from(fleetJobVesselMapping).where(and16(...conditions));
+        return await db12.select().from(fleetJobVesselMapping).where(and17(...conditions));
       }
       async createFleetJobVesselMappingRecord(mapping) {
         const db12 = await getDb();
@@ -44456,49 +45001,73 @@ var init_postgresStorage = __esm({
       async removeFleetJobVesselMappingRecord(jobCode, vesselCode, jobId) {
         const db12 = await getDb();
         const conditions = [
-          eq20(fleetJobVesselMapping.jobCode, jobCode),
-          eq20(fleetJobVesselMapping.vesselCode, vesselCode)
+          eq21(fleetJobVesselMapping.jobCode, jobCode),
+          eq21(fleetJobVesselMapping.vesselCode, vesselCode)
         ];
         if (jobId) {
-          conditions.push(eq20(fleetJobVesselMapping.jobId, jobId));
+          conditions.push(eq21(fleetJobVesselMapping.jobId, jobId));
         }
-        await db12.update(fleetJobVesselMapping).set({ isActive: false }).where(and16(...conditions));
+        await db12.update(fleetJobVesselMapping).set({ isActive: false }).where(and17(...conditions));
       }
       // ============= MODULE 14: FLEET SPARE VESSEL MAPPING =============
       async getFleetSpareVesselMappings(fleetEquipmentCode, partCode) {
         const db12 = await getDb();
-        let conditions = [eq20(fleetSpareVesselMapping.isActive, true)];
+        let conditions = [eq21(fleetSpareVesselMapping.isActive, true)];
         if (fleetEquipmentCode) {
-          conditions.push(eq20(fleetSpareVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+          conditions.push(eq21(fleetSpareVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
         }
         if (partCode) {
-          conditions.push(eq20(fleetSpareVesselMapping.partCode, partCode));
+          conditions.push(eq21(fleetSpareVesselMapping.partCode, partCode));
         }
-        return await db12.select().from(fleetSpareVesselMapping).where(and16(...conditions));
+        return await db12.select().from(fleetSpareVesselMapping).where(and17(...conditions));
       }
       async createFleetSpareVesselMappingRecord(mapping) {
         const db12 = await getDb();
-        const result = await db12.insert(fleetSpareVesselMapping).values({
-          fleetEquipmentCode: mapping.fleetEquipmentCode,
-          partCode: mapping.partCode,
-          spareId: mapping.spareId ?? null,
-          vesselCode: mapping.vesselCode,
-          vesselName: mapping.vesselName ?? null,
-          mappedBy: mapping.mappedBy,
-          isActive: mapping.isActive ?? true
-        }).returning();
-        return result[0];
+        return db12.transaction(async (tx) => {
+          const [fleet] = await tx.select().from(fleetSpares).where(and17(
+            eq21(fleetSpares.partCode, mapping.partCode),
+            eq21(fleetSpares.fleetEquipmentCode, mapping.fleetEquipmentCode),
+            eq21(fleetSpares.isDeleted, false)
+          ));
+          const [saved] = mapping.spareId ? await tx.select().from(spares).where(and17(
+            eq21(spares.suuid, mapping.spareId),
+            eq21(spares.vesselId, mapping.vesselCode)
+          )).for("update") : [];
+          if (!fleet || !saved) throw Object.assign(new Error("Fleet spare or vessel spare not found within the mapping scope."), { statusCode: 400 });
+          const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+          const pair = await classificationForWrite2({ spareCategory: fleet.spareCategory, optimumQty: fleet.optimumQty }, saved, false, tx);
+          const [existingMapping] = await tx.select().from(fleetSpareVesselMapping).where(and17(
+            eq21(fleetSpareVesselMapping.spareId, saved.suuid),
+            eq21(fleetSpareVesselMapping.partCode, mapping.partCode),
+            eq21(fleetSpareVesselMapping.vesselCode, mapping.vesselCode),
+            eq21(fleetSpareVesselMapping.fleetEquipmentCode, mapping.fleetEquipmentCode),
+            eq21(fleetSpareVesselMapping.isActive, true)
+          ));
+          if (existingMapping) return existingMapping;
+          const [updated] = await tx.update(spares).set({ ...pair, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(spares.suuid, saved.suuid)).returning();
+          await logFieldChanges("spares", saved.suuid, saved.vesselId, saved, updated, "system", tx);
+          const result = await tx.insert(fleetSpareVesselMapping).values({
+            fleetEquipmentCode: mapping.fleetEquipmentCode,
+            partCode: mapping.partCode,
+            spareId: mapping.spareId ?? null,
+            vesselCode: mapping.vesselCode,
+            vesselName: mapping.vesselName ?? null,
+            mappedBy: mapping.mappedBy,
+            isActive: mapping.isActive ?? true
+          }).returning();
+          return result[0];
+        });
       }
       async removeFleetSpareVesselMappingRecord(partCode, vesselCode, spareId) {
         const db12 = await getDb();
         const conditions = [
-          eq20(fleetSpareVesselMapping.partCode, partCode),
-          eq20(fleetSpareVesselMapping.vesselCode, vesselCode)
+          eq21(fleetSpareVesselMapping.partCode, partCode),
+          eq21(fleetSpareVesselMapping.vesselCode, vesselCode)
         ];
         if (spareId) {
-          conditions.push(eq20(fleetSpareVesselMapping.spareId, spareId));
+          conditions.push(eq21(fleetSpareVesselMapping.spareId, spareId));
         }
-        await db12.update(fleetSpareVesselMapping).set({ isActive: false }).where(and16(...conditions));
+        await db12.update(fleetSpareVesselMapping).set({ isActive: false }).where(and17(...conditions));
       }
       // ============= MODULE 15: IMPORT ENGINE =============
       async createImportHistory(history2) {
@@ -44528,8 +45097,8 @@ var init_postgresStorage = __esm({
         let query = db12.select().from(importHistory);
         let countQuery = db12.select({ count: sql16`count(*)` }).from(importHistory);
         if (type) {
-          query = query.where(eq20(importHistory.type, type));
-          countQuery = countQuery.where(eq20(importHistory.type, type));
+          query = query.where(eq21(importHistory.type, type));
+          countQuery = countQuery.where(eq21(importHistory.type, type));
         }
         const items = await query.orderBy(desc5(importHistory.startedAt)).limit(limit).offset(offset);
         const countResult = await countQuery;
@@ -44538,12 +45107,12 @@ var init_postgresStorage = __esm({
       }
       async getImportHistoryById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(importHistory).where(eq20(importHistory.id, id));
+        const result = await db12.select().from(importHistory).where(eq21(importHistory.id, id));
         return result[0];
       }
       async updateImportHistory(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(importHistory).set(data).where(eq20(importHistory.id, id)).returning();
+        const result = await db12.update(importHistory).set(data).where(eq21(importHistory.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Import history with id ${id} not found`);
         }
@@ -44565,30 +45134,30 @@ var init_postgresStorage = __esm({
       }
       async getImportChangeLogs(importHistoryId) {
         const db12 = await getDb();
-        return await db12.select().from(importChangeLog).where(eq20(importChangeLog.importHistoryId, importHistoryId)).orderBy(desc5(importChangeLog.createdAt));
+        return await db12.select().from(importChangeLog).where(eq21(importChangeLog.importHistoryId, importHistoryId)).orderBy(desc5(importChangeLog.createdAt));
       }
       async deleteImportChangeLogs(importHistoryId) {
         const db12 = await getDb();
-        await db12.delete(importChangeLog).where(eq20(importChangeLog.importHistoryId, importHistoryId));
+        await db12.delete(importChangeLog).where(eq21(importChangeLog.importHistoryId, importHistoryId));
       }
       // ============= MODULE 16: BULK IMPORT =============
       async getBulkImportHistory(vesselCode, moduleType) {
         const db12 = await getDb();
         let conditions = [];
         if (vesselCode) {
-          conditions.push(eq20(bulkImportHistory.vesselCode, vesselCode));
+          conditions.push(eq21(bulkImportHistory.vesselCode, vesselCode));
         }
         if (moduleType) {
-          conditions.push(eq20(bulkImportHistory.moduleType, moduleType));
+          conditions.push(eq21(bulkImportHistory.moduleType, moduleType));
         }
         if (conditions.length > 0) {
-          return await db12.select().from(bulkImportHistory).where(and16(...conditions)).orderBy(desc5(bulkImportHistory.uploadedAt));
+          return await db12.select().from(bulkImportHistory).where(and17(...conditions)).orderBy(desc5(bulkImportHistory.uploadedAt));
         }
         return await db12.select().from(bulkImportHistory).orderBy(desc5(bulkImportHistory.uploadedAt));
       }
       async getBulkImportHistoryItem(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(bulkImportHistory).where(eq20(bulkImportHistory.biuuid, id));
+        const result = await db12.select().from(bulkImportHistory).where(eq21(bulkImportHistory.biuuid, id));
         return result[0];
       }
       async createBulkImportHistory(history2) {
@@ -44617,7 +45186,7 @@ var init_postgresStorage = __esm({
       }
       async updateBulkImportHistory(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(bulkImportHistory).set(data).where(eq20(bulkImportHistory.biuuid, id)).returning();
+        const result = await db12.update(bulkImportHistory).set(data).where(eq21(bulkImportHistory.biuuid, id)).returning();
         if (!result[0]) {
           throw new Error(`Bulk Import History with id ${id} not found`);
         }
@@ -44625,7 +45194,7 @@ var init_postgresStorage = __esm({
       }
       async getBulkImportErrors(importId) {
         const db12 = await getDb();
-        return await db12.select().from(bulkImportErrors).where(eq20(bulkImportErrors.importUuid, importId)).orderBy(asc5(bulkImportErrors.rowNumber));
+        return await db12.select().from(bulkImportErrors).where(eq21(bulkImportErrors.importUuid, importId)).orderBy(asc5(bulkImportErrors.rowNumber));
       }
       async createBulkImportError(error) {
         const db12 = await getDb();
@@ -44690,14 +45259,14 @@ var init_postgresStorage = __esm({
         const conditions = [];
         conditions.push(isNull4(auditLog.disposedAt));
         if (!filters) return conditions;
-        if (filters.vesselCode) conditions.push(eq20(auditLog.vesselCode, filters.vesselCode));
-        if (filters.componentCode) conditions.push(eq20(auditLog.componentCode, filters.componentCode));
-        if (filters.entityType) conditions.push(eq20(auditLog.entityType, filters.entityType));
+        if (filters.vesselCode) conditions.push(eq21(auditLog.vesselCode, filters.vesselCode));
+        if (filters.componentCode) conditions.push(eq21(auditLog.componentCode, filters.componentCode));
+        if (filters.entityType) conditions.push(eq21(auditLog.entityType, filters.entityType));
         if (filters.entityTypes && filters.entityTypes.length > 0) conditions.push(inArray6(auditLog.entityType, filters.entityTypes));
-        if (filters.entityId) conditions.push(eq20(auditLog.entityId, filters.entityId));
-        if (filters.actionType) conditions.push(eq20(auditLog.actionType, filters.actionType));
-        if (filters.userId) conditions.push(eq20(auditLog.userId, filters.userId));
-        if (filters.source) conditions.push(eq20(auditLog.source, filters.source));
+        if (filters.entityId) conditions.push(eq21(auditLog.entityId, filters.entityId));
+        if (filters.actionType) conditions.push(eq21(auditLog.actionType, filters.actionType));
+        if (filters.userId) conditions.push(eq21(auditLog.userId, filters.userId));
+        if (filters.source) conditions.push(eq21(auditLog.source, filters.source));
         if (filters.actor) {
           const a = `%${filters.actor}%`;
           conditions.push(sql16`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
@@ -44714,7 +45283,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const conditions = this.buildAuditLogConditions(filters);
         let q = db12.select({ n: sql16`count(*)::int` }).from(auditLog);
-        if (conditions.length > 0) q = q.where(and16(...conditions));
+        if (conditions.length > 0) q = q.where(and17(...conditions));
         const r = await q;
         return Number(r[0]?.n ?? 0);
       }
@@ -44723,7 +45292,7 @@ var init_postgresStorage = __esm({
         const conditions = this.buildAuditLogConditions(filters);
         let query = db12.select().from(auditLog);
         if (conditions.length > 0) {
-          query = query.where(and16(...conditions));
+          query = query.where(and17(...conditions));
         }
         query = query.orderBy(desc5(auditLog.timestamp));
         if (filters?.limit) {
@@ -44736,14 +45305,14 @@ var init_postgresStorage = __esm({
       }
       async getAuditLogsByEntity(entityType, entityId) {
         const db12 = await getDb();
-        return await db12.select().from(auditLog).where(and16(
-          eq20(auditLog.entityType, entityType),
-          eq20(auditLog.entityId, entityId)
+        return await db12.select().from(auditLog).where(and17(
+          eq21(auditLog.entityType, entityType),
+          eq21(auditLog.entityId, entityId)
         )).orderBy(desc5(auditLog.timestamp));
       }
       async getAuditLogsByUser(userId, limit = 100) {
         const db12 = await getDb();
-        return await db12.select().from(auditLog).where(eq20(auditLog.userId, userId)).orderBy(desc5(auditLog.timestamp)).limit(limit);
+        return await db12.select().from(auditLog).where(eq21(auditLog.userId, userId)).orderBy(desc5(auditLog.timestamp)).limit(limit);
       }
       // ============= SUPERINTENDENT NOTIFICATIONS (Layer 5) =============
       async createSuperintendentNotification(notification) {
@@ -44759,26 +45328,26 @@ var init_postgresStorage = __esm({
       async getSuperintendentNotifications(vesselName) {
         const db12 = await getDb();
         const conditions = [
-          eq20(superintendentNotifications.isAcknowledged, false),
-          or6(eq20(superintendentNotifications.isDeleted, false), isNull4(superintendentNotifications.isDeleted))
+          eq21(superintendentNotifications.isAcknowledged, false),
+          or6(eq21(superintendentNotifications.isDeleted, false), isNull4(superintendentNotifications.isDeleted))
         ];
         if (vesselName) {
-          conditions.push(eq20(superintendentNotifications.vesselName, vesselName));
+          conditions.push(eq21(superintendentNotifications.vesselName, vesselName));
         }
-        return await db12.select().from(superintendentNotifications).where(and16(...conditions)).orderBy(desc5(superintendentNotifications.createdAt));
+        return await db12.select().from(superintendentNotifications).where(and17(...conditions)).orderBy(desc5(superintendentNotifications.createdAt));
       }
       async getAllSuperintendentNotifications(vesselName) {
         const db12 = await getDb();
         const activeCondition = or6(
-          eq20(superintendentNotifications.isDeleted, false),
+          eq21(superintendentNotifications.isDeleted, false),
           isNull4(superintendentNotifications.isDeleted)
         );
-        return await db12.select().from(superintendentNotifications).where(vesselName ? and16(activeCondition, eq20(superintendentNotifications.vesselName, vesselName)) : activeCondition).orderBy(desc5(superintendentNotifications.createdAt));
+        return await db12.select().from(superintendentNotifications).where(vesselName ? and17(activeCondition, eq21(superintendentNotifications.vesselName, vesselName)) : activeCondition).orderBy(desc5(superintendentNotifications.createdAt));
       }
       async acknowledgeSuperintendentNotification(id) {
         const db12 = await getDb();
-        const [existing] = await db12.select().from(superintendentNotifications).where(eq20(superintendentNotifications.id, id));
-        const [result] = await db12.update(superintendentNotifications).set({ isAcknowledged: true, acknowledgedAt: /* @__PURE__ */ new Date() }).where(eq20(superintendentNotifications.id, id)).returning();
+        const [existing] = await db12.select().from(superintendentNotifications).where(eq21(superintendentNotifications.id, id));
+        const [result] = await db12.update(superintendentNotifications).set({ isAcknowledged: true, acknowledgedAt: /* @__PURE__ */ new Date() }).where(eq21(superintendentNotifications.id, id)).returning();
         if (existing && result) {
           try {
             await logFieldChanges("superintendent_notifications", existing.snuuid || String(id), existing.vesselId || null, existing, result, "system");
@@ -44798,13 +45367,13 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const conditions = [];
         if (filters?.status) {
-          conditions.push(eq20(workOrderAnomalies.status, filters.status));
+          conditions.push(eq21(workOrderAnomalies.status, filters.status));
         }
         if (filters?.severity) {
-          conditions.push(eq20(workOrderAnomalies.severity, filters.severity));
+          conditions.push(eq21(workOrderAnomalies.severity, filters.severity));
         }
         if (filters?.vesselId) {
-          conditions.push(eq20(workOrderAnomalies.vesselId, filters.vesselId));
+          conditions.push(eq21(workOrderAnomalies.vesselId, filters.vesselId));
         }
         if (filters?.dateFrom) {
           conditions.push(sql16`${workOrderAnomalies.detectedAt} >= ${filters.dateFrom}`);
@@ -44813,7 +45382,7 @@ var init_postgresStorage = __esm({
           conditions.push(sql16`${workOrderAnomalies.detectedAt} <= ${filters.dateTo}`);
         }
         const query = db12.select().from(workOrderAnomalies);
-        const whereClause = conditions.length > 0 ? and16(...conditions) : void 0;
+        const whereClause = conditions.length > 0 ? and17(...conditions) : void 0;
         const results = whereClause ? await query.where(whereClause).orderBy(
           sql16`CASE ${workOrderAnomalies.severity} WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END`,
           desc5(workOrderAnomalies.detectedAt)
@@ -44825,7 +45394,7 @@ var init_postgresStorage = __esm({
       }
       async getWorkOrderAnomalyByWorkOrderId(workOrderId) {
         const db12 = await getDb();
-        return await db12.select().from(workOrderAnomalies).where(eq20(workOrderAnomalies.workOrderId, workOrderId)).orderBy(desc5(workOrderAnomalies.detectedAt));
+        return await db12.select().from(workOrderAnomalies).where(eq21(workOrderAnomalies.workOrderId, workOrderId)).orderBy(desc5(workOrderAnomalies.detectedAt));
       }
       async acknowledgeWorkOrderAnomaly(id, reviewedBy, notes) {
         const db12 = await getDb();
@@ -44835,16 +45404,16 @@ var init_postgresStorage = __esm({
           reviewedAt: /* @__PURE__ */ new Date(),
           justification: notes || null,
           updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq20(workOrderAnomalies.id, id)).returning();
+        }).where(eq21(workOrderAnomalies.id, id)).returning();
         return result;
       }
       async getWorkOrderAnomalyStatistics(vesselId) {
         const db12 = await getDb();
         const conditions = [];
         if (vesselId) {
-          conditions.push(eq20(workOrderAnomalies.vesselId, vesselId));
+          conditions.push(eq21(workOrderAnomalies.vesselId, vesselId));
         }
-        const whereClause = conditions.length > 0 ? and16(...conditions) : void 0;
+        const whereClause = conditions.length > 0 ? and17(...conditions) : void 0;
         const allAnomalies = whereClause ? await db12.select().from(workOrderAnomalies).where(whereClause) : await db12.select().from(workOrderAnomalies);
         const pending = allAnomalies.filter((a) => a.status === "PENDING_REVIEW");
         const lastDetected = allAnomalies.length > 0 ? allAnomalies.reduce((latest, a) => {
@@ -44874,11 +45443,11 @@ var init_postgresStorage = __esm({
       // ============= WORK ORDER EXECUTIONS (Original) =============
       async getWorkOrderExecutions(componentId) {
         const db12 = await getDb();
-        return await db12.select().from(workOrderExecutions).where(eq20(workOrderExecutions.componentId, componentId)).orderBy(desc5(workOrderExecutions.createdAt));
+        return await db12.select().from(workOrderExecutions).where(eq21(workOrderExecutions.componentId, componentId)).orderBy(desc5(workOrderExecutions.createdAt));
       }
       async getWorkOrderExecutionById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(workOrderExecutions).where(eq20(workOrderExecutions.id, id)).limit(1);
+        const result = await db12.select().from(workOrderExecutions).where(eq21(workOrderExecutions.id, id)).limit(1);
         return result[0] || null;
       }
       async createWorkOrderExecution(data) {
@@ -44888,7 +45457,7 @@ var init_postgresStorage = __esm({
       }
       async updateWorkOrderExecution(id, data) {
         const db12 = await getDb();
-        const result = await db12.update(workOrderExecutions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(workOrderExecutions.id, id)).returning();
+        const result = await db12.update(workOrderExecutions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(workOrderExecutions.id, id)).returning();
         if (result.length === 0) {
           throw new Error(`WorkOrderExecution not found: ${id}`);
         }
@@ -44897,11 +45466,11 @@ var init_postgresStorage = __esm({
       // ============= CERTIFICATES =============
       async getCertificates() {
         const db12 = await getDb();
-        return await db12.select().from(certificates).where(eq20(certificates.isActive, true)).orderBy(asc5(certificates.certificateName));
+        return await db12.select().from(certificates).where(eq21(certificates.isActive, true)).orderBy(asc5(certificates.certificateName));
       }
       async getCertificate(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(certificates).where(eq20(certificates.id, id)).limit(1);
+        const result = await db12.select().from(certificates).where(eq21(certificates.id, id)).limit(1);
         return result[0];
       }
       async createCertificate(certificate) {
@@ -44921,7 +45490,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const existingCert = await this.getCertificate(id);
         const { id: _, createdAt: __, ...updateData } = data;
-        const result = await db12.update(certificates).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(certificates.id, id)).returning();
+        const result = await db12.update(certificates).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(certificates.id, id)).returning();
         if (result.length === 0) {
           throw new Error(`Certificate not found: ${id}`);
         }
@@ -44937,7 +45506,7 @@ var init_postgresStorage = __esm({
       async deleteCertificate(id) {
         const db12 = await getDb();
         const existingCert = await this.getCertificate(id);
-        const [result] = await db12.update(certificates).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(certificates.id, id)).returning();
+        const [result] = await db12.update(certificates).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(certificates.id, id)).returning();
         if (existingCert && result) {
           try {
             await logFieldChanges("certificates", id, existingCert.vesselId || null, existingCert, result, "system");
@@ -44949,11 +45518,11 @@ var init_postgresStorage = __esm({
       // ============= SURVEYS =============
       async getSurveys() {
         const db12 = await getDb();
-        return await db12.select().from(surveys).where(eq20(surveys.isActive, true)).orderBy(asc5(surveys.surveyName));
+        return await db12.select().from(surveys).where(eq21(surveys.isActive, true)).orderBy(asc5(surveys.surveyName));
       }
       async getSurvey(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(surveys).where(eq20(surveys.id, id)).limit(1);
+        const result = await db12.select().from(surveys).where(eq21(surveys.id, id)).limit(1);
         return result[0];
       }
       async createSurvey(survey) {
@@ -44973,7 +45542,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const existingSurvey = await this.getSurvey(id);
         const { id: _, createdAt: __, ...updateData } = data;
-        const result = await db12.update(surveys).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(surveys.id, id)).returning();
+        const result = await db12.update(surveys).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(surveys.id, id)).returning();
         if (result.length === 0) {
           throw new Error(`Survey not found: ${id}`);
         }
@@ -44989,7 +45558,7 @@ var init_postgresStorage = __esm({
       async deleteSurvey(id) {
         const db12 = await getDb();
         const existingSurvey = await this.getSurvey(id);
-        const [result] = await db12.update(surveys).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(surveys.id, id)).returning();
+        const [result] = await db12.update(surveys).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(surveys.id, id)).returning();
         if (existingSurvey && result) {
           try {
             await logFieldChanges("surveys", id, existingSurvey.vesselId || null, existingSurvey, result, "system");
@@ -45001,11 +45570,11 @@ var init_postgresStorage = __esm({
       // ============= WORK ORDER EXECUTION DETAILS =============
       async getWorkOrderExecutionDetails(workOrderId) {
         const db12 = await getDb();
-        return await db12.select().from(workOrderExecutionDetails).where(eq20(workOrderExecutionDetails.workOrderId, workOrderId)).orderBy(desc5(workOrderExecutionDetails.createdAt));
+        return await db12.select().from(workOrderExecutionDetails).where(eq21(workOrderExecutionDetails.workOrderId, workOrderId)).orderBy(desc5(workOrderExecutionDetails.createdAt));
       }
       async getWorkOrderExecutionDetailById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(workOrderExecutionDetails).where(eq20(workOrderExecutionDetails.id, id)).limit(1);
+        const result = await db12.select().from(workOrderExecutionDetails).where(eq21(workOrderExecutionDetails.id, id)).limit(1);
         return result[0];
       }
       async createWorkOrderExecutionDetail(detail) {
@@ -45021,9 +45590,9 @@ var init_postgresStorage = __esm({
       }
       async updateWorkOrderExecutionDetail(id, data) {
         const db12 = await getDb();
-        const existing = await db12.select().from(workOrderExecutionDetails).where(eq20(workOrderExecutionDetails.id, id));
+        const existing = await db12.select().from(workOrderExecutionDetails).where(eq21(workOrderExecutionDetails.id, id));
         const { id: _, createdAt: __, ...updateData } = data;
-        const result = await db12.update(workOrderExecutionDetails).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(workOrderExecutionDetails.id, id)).returning();
+        const result = await db12.update(workOrderExecutionDetails).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(workOrderExecutionDetails.id, id)).returning();
         if (result.length === 0) {
           throw new Error(`WorkOrderExecutionDetail not found: ${id}`);
         }
@@ -45041,12 +45610,12 @@ var init_postgresStorage = __esm({
       // ============= WORK ORDER POSTPONEMENTS (History/Audit Table) =============
       async getWorkOrderPostponements(vesselId, filters, vesselIds) {
         const db12 = await getDb();
-        const conditions = vesselId && vesselId !== "all" ? [eq20(workOrderPostponements.vesselId, vesselId)] : vesselIds?.length ? [inArray6(workOrderPostponements.vesselId, vesselIds)] : [];
+        const conditions = vesselId && vesselId !== "all" ? [eq21(workOrderPostponements.vesselId, vesselId)] : vesselIds?.length ? [inArray6(workOrderPostponements.vesselId, vesselIds)] : [];
         if (filters?.workOrderId) {
-          conditions.push(eq20(workOrderPostponements.workOrderId, filters.workOrderId));
+          conditions.push(eq21(workOrderPostponements.workOrderId, filters.workOrderId));
         }
         if (filters?.status && filters.status !== "All") {
-          conditions.push(eq20(workOrderPostponements.status, filters.status));
+          conditions.push(eq21(workOrderPostponements.status, filters.status));
         }
         if (filters?.dateFrom) {
           conditions.push(gte2(workOrderPostponements.submittedDate, filters.dateFrom));
@@ -45054,20 +45623,20 @@ var init_postgresStorage = __esm({
         if (filters?.dateTo) {
           conditions.push(lte2(workOrderPostponements.submittedDate, filters.dateTo));
         }
-        return await db12.select().from(workOrderPostponements).where(and16(...conditions)).orderBy(desc5(workOrderPostponements.submittedDate));
+        return await db12.select().from(workOrderPostponements).where(and17(...conditions)).orderBy(desc5(workOrderPostponements.submittedDate));
       }
       async getWorkOrderPostponementById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(workOrderPostponements).where(eq20(workOrderPostponements.id, id));
+        const result = await db12.select().from(workOrderPostponements).where(eq21(workOrderPostponements.id, id));
         return result[0];
       }
       async getWorkOrderPostponementsByWorkOrderId(workOrderId) {
         const db12 = await getDb();
-        return await db12.select().from(workOrderPostponements).where(eq20(workOrderPostponements.workOrderId, workOrderId)).orderBy(desc5(workOrderPostponements.postponementNumber));
+        return await db12.select().from(workOrderPostponements).where(eq21(workOrderPostponements.workOrderId, workOrderId)).orderBy(desc5(workOrderPostponements.postponementNumber));
       }
       async getWorkOrderPostponementCount(workOrderId) {
         const db12 = await getDb();
-        const result = await db12.select({ count: sql16`count(*)` }).from(workOrderPostponements).where(eq20(workOrderPostponements.workOrderId, workOrderId));
+        const result = await db12.select({ count: sql16`count(*)` }).from(workOrderPostponements).where(eq21(workOrderPostponements.workOrderId, workOrderId));
         return Number(result[0]?.count || 0);
       }
       async createWorkOrderPostponement(postponement) {
@@ -45085,7 +45654,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const existing = await this.getWorkOrderPostponementById(id);
         const { id: _, ...updateData } = updates;
-        const result = await db12.update(workOrderPostponements).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(workOrderPostponements.id, id)).returning();
+        const result = await db12.update(workOrderPostponements).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(workOrderPostponements.id, id)).returning();
         if (result.length === 0) {
           throw new Error(`WorkOrderPostponement not found: ${id}`);
         }
@@ -45102,9 +45671,9 @@ var init_postgresStorage = __esm({
       // ── WO Postponement Approval Steps ──────────────────────
       async getWoPostponementApprovalSteps(postponementId) {
         const db12 = await getDb();
-        return db12.select().from(woPostponementApprovals).where(and16(
-          eq20(woPostponementApprovals.postponementId, postponementId),
-          eq20(woPostponementApprovals.isDeleted, false)
+        return db12.select().from(woPostponementApprovals).where(and17(
+          eq21(woPostponementApprovals.postponementId, postponementId),
+          eq21(woPostponementApprovals.isDeleted, false)
         )).orderBy(woPostponementApprovals.approvalLevel);
       }
       async createWoPostponementApprovalStep(step) {
@@ -45120,8 +45689,8 @@ var init_postgresStorage = __esm({
       }
       async updateWoPostponementApprovalStep(id, data) {
         const db12 = await getDb();
-        const existing = (await db12.select().from(woPostponementApprovals).where(eq20(woPostponementApprovals.id, id)).limit(1))[0];
-        const result = await db12.update(woPostponementApprovals).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(woPostponementApprovals.id, id)).returning();
+        const existing = (await db12.select().from(woPostponementApprovals).where(eq21(woPostponementApprovals.id, id)).limit(1))[0];
+        const result = await db12.update(woPostponementApprovals).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(woPostponementApprovals.id, id)).returning();
         if (!result[0]) throw new Error(`WO postponement approval step ${id} not found`);
         try {
           const vId = await this.wopVesselId(result[0].postponementId);
@@ -45143,14 +45712,14 @@ var init_postgresStorage = __esm({
       async finalizePostponementApproval(params) {
         const db12 = await getDb();
         return db12.transaction(async (tx) => {
-          const before = (await tx.select().from(workOrders).where(or6(eq20(workOrders.wouuid, params.workOrderId), eq20(workOrders.id, params.workOrderId))).limit(1))[0];
+          const before = (await tx.select().from(workOrders).where(or6(eq21(workOrders.wouuid, params.workOrderId), eq21(workOrders.id, params.workOrderId))).limit(1))[0];
           if (!before) throw new Error(`Work order ${params.workOrderId} not found`);
-          const updated = (await tx.update(workOrders).set({ ...params.woUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(workOrders.wouuid, before.wouuid)).returning())[0];
+          const updated = (await tx.update(workOrders).set({ ...params.woUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(workOrders.wouuid, before.wouuid)).returning())[0];
           await logFieldChanges("work_orders", before.wouuid, before.vesselId || null, before, updated, params.actor, tx);
           if (params.awaitingPostponementId) {
-            const reqBefore = (await tx.select().from(workOrderPostponements).where(eq20(workOrderPostponements.id, params.awaitingPostponementId)).limit(1))[0];
+            const reqBefore = (await tx.select().from(workOrderPostponements).where(eq21(workOrderPostponements.id, params.awaitingPostponementId)).limit(1))[0];
             if (reqBefore) {
-              const reqAfter = (await tx.update(workOrderPostponements).set({ ...params.awaitingUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(workOrderPostponements.id, params.awaitingPostponementId)).returning())[0];
+              const reqAfter = (await tx.update(workOrderPostponements).set({ ...params.awaitingUpdates, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(workOrderPostponements.id, params.awaitingPostponementId)).returning())[0];
               await logFieldChanges("work_order_postponements", params.awaitingPostponementId, reqBefore.vesselId || null, reqBefore, reqAfter, params.actor, tx);
             }
           }
@@ -45161,9 +45730,9 @@ var init_postgresStorage = __esm({
       }
       async getLatestAwaitingPostponement(workOrderId) {
         const db12 = await getDb();
-        const rows = await db12.select().from(workOrderPostponements).where(and16(
-          eq20(workOrderPostponements.workOrderId, workOrderId),
-          eq20(workOrderPostponements.status, "Awaiting Approval")
+        const rows = await db12.select().from(workOrderPostponements).where(and17(
+          eq21(workOrderPostponements.workOrderId, workOrderId),
+          eq21(workOrderPostponements.status, "Awaiting Approval")
         )).orderBy(desc5(workOrderPostponements.postponementNumber));
         return rows[0];
       }
@@ -45173,14 +45742,14 @@ var init_postgresStorage = __esm({
       // ============= REMAINING FILE-BOUND METHODS =============
       async getRunningHourParents(vesselId) {
         const db12 = await getDb();
-        const parents = await db12.select().from(components).where(and16(
-          eq20(components.vesselId, vesselId),
-          eq20(components.isParent, true),
-          eq20(components.isActive, true)
+        const parents = await db12.select().from(components).where(and17(
+          eq21(components.vesselId, vesselId),
+          eq21(components.isParent, true),
+          eq21(components.isActive, true)
         )).orderBy(asc5(components.name));
         const result = [];
         for (const parent of parents) {
-          const children = await db12.select().from(components).where(eq20(components.parentId, parent.id));
+          const children = await db12.select().from(components).where(eq21(components.parentId, parent.id));
           result.push({
             ...parent,
             childCount: children.length,
@@ -45195,9 +45764,9 @@ var init_postgresStorage = __esm({
         const now = /* @__PURE__ */ new Date();
         const dateUpdated = requireReadingDayInput(params.dateUpdated ?? null) ?? formatReadingDay(now);
         const readingDate = parseReadingDayStrict(dateUpdated);
-        const parentResult = await db12.select().from(components).where(or6(eq20(components.cuuid, parentComponentId), eq20(components.id, parentComponentId))).limit(1);
+        const parentResult = await db12.select().from(components).where(or6(eq21(components.cuuid, parentComponentId), eq21(components.id, parentComponentId))).limit(1);
         const resolvedParentId = parentResult.length > 0 ? parentResult[0].cuuid : parentComponentId;
-        const children = await db12.select().from(components).where(or6(eq20(components.parentId, resolvedParentId), eq20(components.parentId, parentComponentId)));
+        const children = await db12.select().from(components).where(or6(eq21(components.parentId, resolvedParentId), eq21(components.parentId, parentComponentId)));
         let newRH = 0;
         let updateData = {};
         let parentAuditValues = null;
@@ -45300,14 +45869,14 @@ var init_postgresStorage = __esm({
             if (!masterVesselId) {
               console.warn(`\u26A0\uFE0F [updateRunningHoursBulk] Cannot determine vesselId for master "${parentComponentId}" - skipping inherited cascade to prevent cross-vessel leak`);
             } else {
-              inheritedComponents = await db12.select().from(components).where(and16(
-                eq20(components.rhCounterType, "INHERITED"),
-                eq20(components.vesselId, masterVesselId),
+              inheritedComponents = await db12.select().from(components).where(and17(
+                eq21(components.rhCounterType, "INHERITED"),
+                eq21(components.vesselId, masterVesselId),
                 or6(
-                  eq20(components.rhMasterComponentId, resolvedParentId),
-                  eq20(components.rhMasterComponentId, parentComponentId),
-                  eq20(components.rhMasterComponentId, masterComponentCode),
-                  eq20(components.rhCounterSource, masterComponentCode)
+                  eq21(components.rhMasterComponentId, resolvedParentId),
+                  eq21(components.rhMasterComponentId, parentComponentId),
+                  eq21(components.rhMasterComponentId, masterComponentCode),
+                  eq21(components.rhCounterSource, masterComponentCode)
                 )
               ));
             }
@@ -45320,7 +45889,7 @@ var init_postgresStorage = __esm({
           let auditsCreated = 0;
           if (parentResult.length > 0) {
             await tx.execute(sql16`SELECT pg_advisory_xact_lock(hashtext(${resolvedParentId}))`);
-            const freshParentResult = await tx.select().from(components).where(eq20(components.cuuid, resolvedParentId)).limit(1);
+            const freshParentResult = await tx.select().from(components).where(eq21(components.cuuid, resolvedParentId)).limit(1);
             if (freshParentResult.length > 0) {
               computeDerived(freshParentResult[0]);
             }
@@ -45338,7 +45907,7 @@ var init_postgresStorage = __esm({
             if (inheritedComponents.length > 0) {
               inheritedComponents = await tx.select().from(components).where(inArray6(components.cuuid, inheritedComponents.map((i) => i.cuuid)));
             }
-            await tx.update(components).set(updateData).where(eq20(components.cuuid, resolvedParentId));
+            await tx.update(components).set(updateData).where(eq21(components.cuuid, resolvedParentId));
             const parentAuditResult = await tx.insert(runningHoursAudit).values(parentAuditValues).returning();
             try {
               await logFieldChanges("running_hours_audit", parentAuditResult[0].rhauuid, parentAuditResult[0].vesselId || null, null, parentAuditResult[0], userId || "system");
@@ -45361,7 +45930,7 @@ var init_postgresStorage = __esm({
                 currentCumulativeRH: newInheritedRH.toString(),
                 lastUpdated: dateUpdated,
                 updatedAt: now
-              }).where(eq20(components.cuuid, inherited.cuuid));
+              }).where(eq21(components.cuuid, inherited.cuuid));
               const inheritedAuditResult = await tx.insert(runningHoursAudit).values({
                 vesselId: inherited.vesselId || "unknown",
                 componentId: inherited.cuuid,
@@ -45418,7 +45987,7 @@ var init_postgresStorage = __esm({
               childUpdateData.rhCurrentInheritedCached = masterTotalRH.toString();
               childUpdateData.rhInheritedUpdatedAt = now;
             }
-            await tx.update(components).set(childUpdateData).where(eq20(components.cuuid, child.cuuid));
+            await tx.update(components).set(childUpdateData).where(eq21(components.cuuid, child.cuuid));
             const childAuditResult = await tx.insert(runningHoursAudit).values({
               vesselId: child.vesselId || "unknown",
               componentId: child.cuuid,
@@ -45466,7 +46035,7 @@ var init_postgresStorage = __esm({
         const results = [];
         for (const update7 of updates) {
           const { id: _, ...updateData } = update7.data;
-          const result = await db12.update(components).set(updateData).where(eq20(components.cuuid, update7.cuuid)).returning();
+          const result = await db12.update(components).set(updateData).where(eq21(components.cuuid, update7.cuuid)).returning();
           if (result.length > 0) {
             results.push(result[0]);
           }
@@ -45478,9 +46047,9 @@ var init_postgresStorage = __esm({
         let created = 0;
         let updated = 0;
         for (const comp of componentsData) {
-          const existing = await db12.select().from(components).where(eq20(components.cuuid, comp.cuuid)).limit(1);
+          const existing = await db12.select().from(components).where(eq21(components.cuuid, comp.cuuid)).limit(1);
           if (existing.length > 0) {
-            await db12.update(components).set(comp).where(eq20(components.cuuid, comp.cuuid));
+            await db12.update(components).set(comp).where(eq21(components.cuuid, comp.cuuid));
             updated++;
           } else {
             await db12.insert(components).values(comp);
@@ -45500,9 +46069,9 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         let results;
         if (vesselId) {
-          results = await db12.select().from(components).where(and16(
+          results = await db12.select().from(components).where(and17(
             inArray6(components.componentCode, codes),
-            eq20(components.vesselId, vesselId)
+            eq21(components.vesselId, vesselId)
           ));
         } else {
           results = await db12.select().from(components).where(inArray6(components.componentCode, codes));
@@ -45517,7 +46086,7 @@ var init_postgresStorage = __esm({
       }
       async archiveComponent(id) {
         const db12 = await getDb();
-        const result = await db12.update(components).set({ isActive: false }).where(or6(eq20(components.cuuid, id), eq20(components.id, id))).returning();
+        const result = await db12.update(components).set({ isActive: false }).where(or6(eq21(components.cuuid, id), eq21(components.id, id))).returning();
         if (result.length === 0) {
           throw new Error(`Component not found: ${id}`);
         }
@@ -45525,7 +46094,7 @@ var init_postgresStorage = __esm({
       }
       async archiveJob(id) {
         const db12 = await getDb();
-        const result = await db12.update(jobs).set({ isActive: false }).where(or6(eq20(jobs.juuid, id), eq20(jobs.id, id))).returning();
+        const result = await db12.update(jobs).set({ isActive: false }).where(or6(eq21(jobs.juuid, id), eq21(jobs.id, id))).returning();
         if (result.length === 0) {
           throw new Error(`Job not found: ${id}`);
         }
@@ -45534,7 +46103,7 @@ var init_postgresStorage = __esm({
       async archiveWorkOrder(id) {
         const db12 = await getDb();
         const existingWO = await this.getWorkOrder(id);
-        const result = await db12.update(workOrders).set({ isActive: false }).where(or6(eq20(workOrders.wouuid, id), eq20(workOrders.id, id))).returning();
+        const result = await db12.update(workOrders).set({ isActive: false }).where(or6(eq21(workOrders.wouuid, id), eq21(workOrders.id, id))).returning();
         if (result.length === 0) {
           throw new Error(`WorkOrder not found: ${id}`);
         }
@@ -45549,7 +46118,7 @@ var init_postgresStorage = __esm({
       }
       async calculateAndUpdateRecurringDefects(vesselId) {
         const db12 = await getDb();
-        const vesselDefects = await db12.select().from(defects).where(eq20(defects.vesselId, vesselId));
+        const vesselDefects = await db12.select().from(defects).where(eq21(defects.vesselId, vesselId));
         const defectGroups = /* @__PURE__ */ new Map();
         for (const defect of vesselDefects) {
           const key = `${defect.vesselId}-${defect.defectCategory || "uncategorized"}`;
@@ -45561,7 +46130,7 @@ var init_postgresStorage = __esm({
         for (const [key, group] of Array.from(defectGroups)) {
           if (group.length >= 2) {
             for (const defect of group) {
-              const [updated] = await db12.update(defects).set({ isRecurring: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(defects.duuid, defect.duuid)).returning();
+              const [updated] = await db12.update(defects).set({ isRecurring: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(defects.duuid, defect.duuid)).returning();
               if (updated) {
                 try {
                   await logFieldChanges("defects", defect.duuid, defect.vesselId || null, defect, updated, "system");
@@ -45582,23 +46151,23 @@ var init_postgresStorage = __esm({
       }
       async purgeJobsAndLinkedData(vesselId) {
         const db12 = await getDb();
-        const vesselJobs = await db12.select().from(jobs).where(eq20(jobs.vesselId, vesselId));
+        const vesselJobs = await db12.select().from(jobs).where(eq21(jobs.vesselId, vesselId));
         const jobIds = vesselJobs.map((j) => j.juuid);
         let workOrdersDeleted = 0;
         if (jobIds.length > 0) {
           const woResult = await db12.delete(workOrders).where(inArray6(workOrders.jobId, jobIds)).returning();
           workOrdersDeleted = woResult.length;
         }
-        const jobResult = await db12.delete(jobs).where(eq20(jobs.vesselId, vesselId)).returning();
+        const jobResult = await db12.delete(jobs).where(eq21(jobs.vesselId, vesselId)).returning();
         return { jobsDeleted: jobResult.length, workOrdersDeleted };
       }
       async getVesselsByFleet(fleetId, options = {}) {
         const db12 = await getDb();
-        return await db12.select().from(vessels).where(options.includeDeleted ? eq20(vessels.fleetId, fleetId) : and16(eq20(vessels.fleetId, fleetId), or6(eq20(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
+        return await db12.select().from(vessels).where(options.includeDeleted ? eq21(vessels.fleetId, fleetId) : and17(eq21(vessels.fleetId, fleetId), or6(eq21(vessels.isDeleted, false), isNull4(vessels.isDeleted))));
       }
       async getVesselsWithFleets(options = {}) {
         const db12 = await getDb();
-        const allVessels = options.includeDeleted ? await db12.select().from(vessels) : await db12.select().from(vessels).where(or6(eq20(vessels.isDeleted, false), isNull4(vessels.isDeleted)));
+        const allVessels = options.includeDeleted ? await db12.select().from(vessels) : await db12.select().from(vessels).where(or6(eq21(vessels.isDeleted, false), isNull4(vessels.isDeleted)));
         const allFleets = await db12.select().from(fleets);
         const fleetMap = new Map(allFleets.map((f) => [f.id, f]));
         return allVessels.map((vessel) => {
@@ -45614,7 +46183,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const makersResult = await db12.select({ count: sql16`count(*)` }).from(makers);
         const masterListsResult = await db12.select({ count: sql16`count(*)` }).from(masterLists);
-        const fleetComponentsResult = await db12.select({ count: sql16`count(*)` }).from(components).where(eq20(components.dataScope, "fleet"));
+        const fleetComponentsResult = await db12.select({ count: sql16`count(*)` }).from(components).where(eq21(components.dataScope, "fleet"));
         const modelsResult = await db12.select({ count: sql16`count(distinct model)` }).from(components).where(sql16`model is not null`);
         return {
           totalMakers: Number(makersResult[0]?.count || 0),
@@ -45640,19 +46209,19 @@ var init_postgresStorage = __esm({
       }
       async deleteFleetVesselMapping(id) {
         const db12 = await getDb();
-        await db12.delete(fleetVesselMapping).where(eq20(fleetVesselMapping.id, parseInt(id)));
+        await db12.delete(fleetVesselMapping).where(eq21(fleetVesselMapping.id, parseInt(id)));
       }
       // ============= POSTPONED WO REAPPEARANCE (Rule #5) =============
       async checkAndRevertPostponedWorkOrders(vesselId) {
         const db12 = await getDb();
         const today = /* @__PURE__ */ new Date();
         const todayStr = today.toISOString().split("T")[0];
-        let query = db12.select().from(workOrders).where(and16(
+        let query = db12.select().from(workOrders).where(and17(
           or6(
-            eq20(workOrders.status, "Postponed"),
-            eq20(workOrders.status, "Postponement Approved")
+            eq21(workOrders.status, "Postponed"),
+            eq21(workOrders.status, "Postponement Approved")
           ),
-          eq20(workOrders.isActive, true)
+          eq21(workOrders.isActive, true)
         ));
         const postponedWOs = await query;
         const revertedWorkOrders = [];
@@ -45663,7 +46232,7 @@ var init_postgresStorage = __esm({
               status: "Pending",
               postponedDate: null,
               updatedAt: /* @__PURE__ */ new Date()
-            }).where(eq20(workOrders.wouuid, wo.wouuid)).returning();
+            }).where(eq21(workOrders.wouuid, wo.wouuid)).returning();
             if (result.length > 0) {
               revertedWorkOrders.push(result[0]);
               try {
@@ -45693,7 +46262,7 @@ var init_postgresStorage = __esm({
           mappedAt: fleetComponentMapping.mappedAt,
           isActive: fleetComponentMapping.isActive,
           vesselName: vessels.name
-        }).from(fleetComponentMapping).leftJoin(vessels, eq20(fleetComponentMapping.vesselCode, vessels.vuuid));
+        }).from(fleetComponentMapping).leftJoin(vessels, eq21(fleetComponentMapping.vesselCode, vessels.vuuid));
         return rows;
       }
       async createComponentVesselMapping(data) {
@@ -45713,24 +46282,24 @@ var init_postgresStorage = __esm({
           return result[0];
         }
         const existing = await db12.select().from(fleetComponentMapping).where(
-          and16(
-            eq20(fleetComponentMapping.fleetEquipmentCode, data.fleetEquipmentCode),
-            eq20(fleetComponentMapping.vesselCode, data.vesselCode),
-            eq20(fleetComponentMapping.componentCode, componentCode)
+          and17(
+            eq21(fleetComponentMapping.fleetEquipmentCode, data.fleetEquipmentCode),
+            eq21(fleetComponentMapping.vesselCode, data.vesselCode),
+            eq21(fleetComponentMapping.componentCode, componentCode)
           )
         ).limit(1);
         return existing[0];
       }
       async deleteComponentVesselMapping(id) {
         const db12 = await getDb();
-        await db12.delete(fleetComponentMapping).where(eq20(fleetComponentMapping.id, id));
+        await db12.delete(fleetComponentMapping).where(eq21(fleetComponentMapping.id, id));
       }
       // ============= PMS VESSEL SETTINGS =============
       async createOrUpdatePmsVesselSettings(settings) {
         const db12 = await getDb();
-        const existing = await db12.select().from(pmsVesselSettings).where(eq20(pmsVesselSettings.vesselId, settings.vesselId)).limit(1);
+        const existing = await db12.select().from(pmsVesselSettings).where(eq21(pmsVesselSettings.vesselId, settings.vesselId)).limit(1);
         if (existing.length > 0) {
-          const result = await db12.update(pmsVesselSettings).set({ ...settings, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(pmsVesselSettings.vesselId, settings.vesselId)).returning();
+          const result = await db12.update(pmsVesselSettings).set({ ...settings, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(pmsVesselSettings.vesselId, settings.vesselId)).returning();
           return result[0];
         } else {
           const result = await db12.insert(pmsVesselSettings).values(settings).returning();
@@ -45747,7 +46316,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const existing = await db12.select().from(companyStandardGraceSettings).limit(1);
         if (existing.length > 0) {
-          const result = await db12.update(companyStandardGraceSettings).set({ ...settings, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(companyStandardGraceSettings.id, existing[0].id)).returning();
+          const result = await db12.update(companyStandardGraceSettings).set({ ...settings, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(companyStandardGraceSettings.id, existing[0].id)).returning();
           return result[0];
         } else {
           const result = await db12.insert(companyStandardGraceSettings).values(settings).returning();
@@ -45763,7 +46332,7 @@ var init_postgresStorage = __esm({
         const db12 = await getDb();
         const existing = await db12.select().from(companyApprovalSettings).limit(1);
         if (existing.length > 0) {
-          const result = await db12.update(companyApprovalSettings).set({ superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(companyApprovalSettings.id, existing[0].id)).returning();
+          const result = await db12.update(companyApprovalSettings).set({ superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(companyApprovalSettings.id, existing[0].id)).returning();
           return result[0];
         } else {
           const result = await db12.insert(companyApprovalSettings).values({ singletonKey: "ACTIVE", superintendentLockEnabled: settings.superintendentLockEnabled, updatedBy: settings.updatedBy ?? null }).returning();
@@ -45772,7 +46341,7 @@ var init_postgresStorage = __esm({
       }
       async getDefectApprovalSettings() {
         const db12 = await getDb();
-        const result = await db12.select().from(defectApprovalSettings).where(eq20(defectApprovalSettings.singletonKey, "default")).limit(1);
+        const result = await db12.select().from(defectApprovalSettings).where(eq21(defectApprovalSettings.singletonKey, "default")).limit(1);
         return result[0];
       }
       async upsertDefectApprovalSettings(settings) {
@@ -45795,10 +46364,10 @@ var init_postgresStorage = __esm({
       }
       async hasActiveUserVesselAssignment(userUuid, vesselId) {
         const db12 = await getDb();
-        const result = await db12.select({ id: masterUserVessels.id }).from(masterUserVessels).where(and16(
-          eq20(masterUserVessels.userUuid, userUuid),
-          eq20(masterUserVessels.vesselId, vesselId),
-          eq20(masterUserVessels.isActive, true)
+        const result = await db12.select({ id: masterUserVessels.id }).from(masterUserVessels).where(and17(
+          eq21(masterUserVessels.userUuid, userUuid),
+          eq21(masterUserVessels.vesselId, vesselId),
+          eq21(masterUserVessels.isActive, true)
         )).limit(1);
         return result.length > 0;
       }
@@ -45809,12 +46378,12 @@ var init_postgresStorage = __esm({
       }
       async getFleetById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(fleets).where(eq20(fleets.id, id)).limit(1);
+        const result = await db12.select().from(fleets).where(eq21(fleets.id, id)).limit(1);
         return result[0];
       }
       async assignVesselToFleet(vesselId, fleetId) {
         const db12 = await getDb();
-        const result = await db12.update(vessels).set({ fleetId, updatedAt: /* @__PURE__ */ new Date() }).where(eq20(vessels.vuuid, vesselId)).returning();
+        const result = await db12.update(vessels).set({ fleetId, updatedAt: /* @__PURE__ */ new Date() }).where(eq21(vessels.vuuid, vesselId)).returning();
         if (result.length === 0) {
           throw new Error(`Vessel not found: ${vesselId}`);
         }
@@ -45823,18 +46392,18 @@ var init_postgresStorage = __esm({
       // ============= INVENTORY MANAGEMENT: LOCATIONS =============
       async getLocations(vesselId) {
         const db12 = await getDb();
-        return await db12.select().from(locations).where(eq20(locations.vesselId, vesselId)).orderBy(asc5(locations.locationName));
+        return await db12.select().from(locations).where(eq21(locations.vesselId, vesselId)).orderBy(asc5(locations.locationName));
       }
       async getLocationById(id) {
         const db12 = await getDb();
-        const result = await db12.select().from(locations).where(eq20(locations.id, id));
+        const result = await db12.select().from(locations).where(eq21(locations.id, id));
         return result[0];
       }
       async getLocationByName(vesselId, locationName) {
         const db12 = await getDb();
         const normalizedName = locationName.trim().toUpperCase();
-        const result = await db12.select().from(locations).where(and16(
-          eq20(locations.vesselId, vesselId),
+        const result = await db12.select().from(locations).where(and17(
+          eq21(locations.vesselId, vesselId),
           sql16`UPPER(TRIM(${locations.locationName})) = ${normalizedName}`
         ));
         return result[0];
@@ -45869,7 +46438,7 @@ var init_postgresStorage = __esm({
       async updateLocation(id, data) {
         const db12 = await getDb();
         const existingLoc = await this.getLocationById(id);
-        const result = await db12.update(locations).set(data).where(eq20(locations.id, id)).returning();
+        const result = await db12.update(locations).set(data).where(eq21(locations.id, id)).returning();
         if (!result[0]) {
           throw new Error(`Location ${id} not found`);
         }
@@ -45884,25 +46453,25 @@ var init_postgresStorage = __esm({
       }
       async deleteLocation(id) {
         const db12 = await getDb();
-        await db12.delete(locations).where(eq20(locations.id, id));
+        await db12.delete(locations).where(eq21(locations.id, id));
       }
       // ============= INVENTORY MANAGEMENT: SPARE-COMPONENT LINKS =============
       async getSpareComponentLinks(vesselId) {
         const db12 = await getDb();
-        return await db12.select().from(spareComponentLinks).where(eq20(spareComponentLinks.vesselId, vesselId));
+        return await db12.select().from(spareComponentLinks).where(eq21(spareComponentLinks.vesselId, vesselId));
       }
       async getSpareComponentLinksBySpare(spareId) {
         const db12 = await getDb();
-        return await db12.select().from(spareComponentLinks).where(eq20(spareComponentLinks.spareId, spareId));
+        return await db12.select().from(spareComponentLinks).where(eq21(spareComponentLinks.spareId, spareId));
       }
       async getSpareComponentLinkCountByVessel(vesselId) {
         const db12 = await getDb();
-        const result = await db12.select({ count: sql16`count(*)` }).from(spareComponentLinks).where(eq20(spareComponentLinks.vesselId, vesselId));
+        const result = await db12.select({ count: sql16`count(*)` }).from(spareComponentLinks).where(eq21(spareComponentLinks.vesselId, vesselId));
         return Number(result[0]?.count ?? 0);
       }
       async getSpareComponentLinksByComponent(componentId) {
         const db12 = await getDb();
-        return await db12.select().from(spareComponentLinks).where(eq20(spareComponentLinks.componentId, componentId));
+        return await db12.select().from(spareComponentLinks).where(eq21(spareComponentLinks.componentId, componentId));
       }
       async createSpareComponentLink(link, skipSiblingSync = false) {
         const db12 = await getDb();
@@ -45910,10 +46479,10 @@ var init_postgresStorage = __esm({
           const result = await db12.insert(spareComponentLinks).values(link).onConflictDoNothing({ target: [spareComponentLinks.spareId, spareComponentLinks.componentId, spareComponentLinks.vesselId] }).returning();
           if (result.length === 0) {
             const existing = await db12.select().from(spareComponentLinks).where(
-              and16(
-                eq20(spareComponentLinks.spareId, link.spareId),
-                eq20(spareComponentLinks.componentId, link.componentId),
-                eq20(spareComponentLinks.vesselId, link.vesselId)
+              and17(
+                eq21(spareComponentLinks.spareId, link.spareId),
+                eq21(spareComponentLinks.componentId, link.componentId),
+                eq21(spareComponentLinks.vesselId, link.vesselId)
               )
             );
             return existing[0];
@@ -45935,10 +46504,10 @@ var init_postgresStorage = __esm({
         } catch (insertError) {
           if (insertError.message?.includes("duplicate") || insertError.code === "23505") {
             const existing = await db12.select().from(spareComponentLinks).where(
-              and16(
-                eq20(spareComponentLinks.spareId, link.spareId),
-                eq20(spareComponentLinks.componentId, link.componentId),
-                eq20(spareComponentLinks.vesselId, link.vesselId)
+              and17(
+                eq21(spareComponentLinks.spareId, link.spareId),
+                eq21(spareComponentLinks.componentId, link.componentId),
+                eq21(spareComponentLinks.vesselId, link.vesselId)
               )
             );
             if (existing.length > 0) return existing[0];
@@ -45949,11 +46518,11 @@ var init_postgresStorage = __esm({
       async getComponentSiblings(componentId) {
         const db12 = await getDb();
         const comp = await db12.select().from(components).where(
-          or6(eq20(components.cuuid, componentId), eq20(components.id, componentId))
+          or6(eq21(components.cuuid, componentId), eq21(components.id, componentId))
         );
         if (!comp[0] || !comp[0].parentId) return [];
-        const siblings = await db12.select({ cuuid: components.cuuid, name: components.name }).from(components).where(and16(
-          eq20(components.parentId, comp[0].parentId),
+        const siblings = await db12.select({ cuuid: components.cuuid, name: components.name }).from(components).where(and17(
+          eq21(components.parentId, comp[0].parentId),
           sql16`${components.cuuid} != ${componentId}`
         ));
         return siblings;
@@ -46023,11 +46592,11 @@ var init_postgresStorage = __esm({
       async deleteSpareComponentLink(spareId, componentId) {
         const db12 = await getDb();
         const existing = await db12.select().from(spareComponentLinks).where(
-          and16(eq20(spareComponentLinks.spareId, spareId), eq20(spareComponentLinks.componentId, componentId))
+          and17(eq21(spareComponentLinks.spareId, spareId), eq21(spareComponentLinks.componentId, componentId))
         );
-        await db12.delete(spareComponentLinks).where(and16(
-          eq20(spareComponentLinks.spareId, spareId),
-          eq20(spareComponentLinks.componentId, componentId)
+        await db12.delete(spareComponentLinks).where(and17(
+          eq21(spareComponentLinks.spareId, spareId),
+          eq21(spareComponentLinks.componentId, componentId)
         ));
         if (existing[0]) {
           try {
@@ -46040,15 +46609,15 @@ var init_postgresStorage = __esm({
       }
       async getLinkedComponentsForSpare(spareId, vesselId) {
         const db12 = await getDb();
-        const conditions = [eq20(spareComponentLinks.spareId, spareId)];
+        const conditions = [eq21(spareComponentLinks.spareId, spareId)];
         if (vesselId) {
-          conditions.push(eq20(components.vesselId, vesselId));
+          conditions.push(eq21(components.vesselId, vesselId));
         }
         const links = await db12.select({
           componentId: spareComponentLinks.componentId,
           componentCode: components.componentCode,
           componentName: components.name
-        }).from(spareComponentLinks).innerJoin(components, eq20(spareComponentLinks.componentId, components.cuuid)).where(and16(...conditions));
+        }).from(spareComponentLinks).innerJoin(components, eq21(spareComponentLinks.componentId, components.cuuid)).where(and17(...conditions));
         return links.map((l) => ({
           componentId: l.componentId,
           componentCode: l.componentCode || "",
@@ -46058,7 +46627,7 @@ var init_postgresStorage = __esm({
       // ============= JOB-COMPONENT LINKS (Many-to-Many for Shared Jobs) =============
       async getJobComponentLinks(vesselId) {
         const db12 = await getDb();
-        return await db12.select().from(jobComponentLinks).where(eq20(jobComponentLinks.vesselId, vesselId));
+        return await db12.select().from(jobComponentLinks).where(eq21(jobComponentLinks.vesselId, vesselId));
       }
       async getAllJobComponentLinks() {
         const db12 = await getDb();
@@ -46066,23 +46635,23 @@ var init_postgresStorage = __esm({
       }
       async getMaintenanceHistoryByJobAndComponent(jobId, componentCode) {
         const db12 = await getDb();
-        let results = await db12.select().from(componentMaintenanceHistory).where(and16(
+        let results = await db12.select().from(componentMaintenanceHistory).where(and17(
           visibleMaintenanceHistory,
-          eq20(componentMaintenanceHistory.jobId, jobId),
-          eq20(componentMaintenanceHistory.componentCode, componentCode)
+          eq21(componentMaintenanceHistory.jobId, jobId),
+          eq21(componentMaintenanceHistory.componentCode, componentCode)
         )).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
         if (results.length > 0) return results;
-        const job = await db12.select().from(jobs).where(eq20(jobs.juuid, jobId)).limit(1);
+        const job = await db12.select().from(jobs).where(eq21(jobs.juuid, jobId)).limit(1);
         if (job.length === 0 || !job[0].jobNo) return [];
         const jobNo = job[0].jobNo;
-        const vessel = job[0].vesselId ? await db12.select({ vCode: vessels.vCode }).from(vessels).where(eq20(vessels.vuuid, job[0].vesselId)).limit(1) : [];
+        const vessel = job[0].vesselId ? await db12.select({ vCode: vessels.vCode }).from(vessels).where(eq21(vessels.vuuid, job[0].vesselId)).limit(1) : [];
         const vesselCode = vessel[0]?.vCode;
-        const allRecords = await db12.select().from(componentMaintenanceHistory).where(and16(
+        const allRecords = await db12.select().from(componentMaintenanceHistory).where(and17(
           visibleMaintenanceHistory,
-          eq20(componentMaintenanceHistory.componentCode, componentCode),
+          eq21(componentMaintenanceHistory.componentCode, componentCode),
           or6(
-            eq20(componentMaintenanceHistory.vesselCode, job[0].vesselId ?? ""),
-            eq20(componentMaintenanceHistory.vesselCode, vesselCode ?? "")
+            eq21(componentMaintenanceHistory.vesselCode, job[0].vesselId ?? ""),
+            eq21(componentMaintenanceHistory.vesselCode, vesselCode ?? "")
           )
         )).orderBy(desc5(componentMaintenanceHistory.dateCompleted));
         return allRecords.filter((record) => {
@@ -46092,11 +46661,11 @@ var init_postgresStorage = __esm({
       }
       async getJobComponentLinksByJob(jobId) {
         const db12 = await getDb();
-        return await db12.select().from(jobComponentLinks).where(eq20(jobComponentLinks.jobId, jobId));
+        return await db12.select().from(jobComponentLinks).where(eq21(jobComponentLinks.jobId, jobId));
       }
       async getJobComponentLinksByComponent(componentId) {
         const db12 = await getDb();
-        return await db12.select().from(jobComponentLinks).where(eq20(jobComponentLinks.componentId, componentId));
+        return await db12.select().from(jobComponentLinks).where(eq21(jobComponentLinks.componentId, componentId));
       }
       async createJobComponentLink(link) {
         const db12 = await getDb();
@@ -46105,9 +46674,9 @@ var init_postgresStorage = __esm({
       }
       async deleteJobComponentLink(jobId, componentId) {
         const db12 = await getDb();
-        await db12.delete(jobComponentLinks).where(and16(
-          eq20(jobComponentLinks.jobId, jobId),
-          eq20(jobComponentLinks.componentId, componentId)
+        await db12.delete(jobComponentLinks).where(and17(
+          eq21(jobComponentLinks.jobId, jobId),
+          eq21(jobComponentLinks.componentId, componentId)
         ));
       }
       async getLinkedComponentsForJob(jobId) {
@@ -46116,7 +46685,7 @@ var init_postgresStorage = __esm({
           componentId: jobComponentLinks.componentId,
           componentCode: components.componentCode,
           componentName: components.name
-        }).from(jobComponentLinks).innerJoin(components, eq20(jobComponentLinks.componentId, components.cuuid)).where(eq20(jobComponentLinks.jobId, jobId));
+        }).from(jobComponentLinks).innerJoin(components, eq21(jobComponentLinks.componentId, components.cuuid)).where(eq21(jobComponentLinks.jobId, jobId));
         return links.map((l) => ({
           componentId: l.componentId,
           componentCode: l.componentCode || "",
@@ -46138,7 +46707,7 @@ var init_postgresStorage = __esm({
           componentId: jobComponentLinks.componentId,
           componentCode: components.componentCode,
           componentName: components.name
-        }).from(jobComponentLinks).innerJoin(components, eq20(jobComponentLinks.componentId, components.cuuid)).where(inArray6(jobComponentLinks.jobId, jobIds));
+        }).from(jobComponentLinks).innerJoin(components, eq21(jobComponentLinks.componentId, components.cuuid)).where(inArray6(jobComponentLinks.jobId, jobIds));
         for (const l of links) {
           const arr = result.get(l.jobId) ?? [];
           arr.push({
@@ -46156,7 +46725,7 @@ var init_postgresStorage = __esm({
           jobId: jobComponentLinks.jobId,
           jobNo: jobs.jobNo,
           jobTitle: jobs.jobTitle
-        }).from(jobComponentLinks).innerJoin(jobs, eq20(jobComponentLinks.jobId, jobs.juuid)).where(eq20(jobComponentLinks.componentId, componentId));
+        }).from(jobComponentLinks).innerJoin(jobs, eq21(jobComponentLinks.jobId, jobs.juuid)).where(eq21(jobComponentLinks.componentId, componentId));
         return links.map((l) => ({
           jobId: l.jobId,
           jobNo: l.jobNo || "",
@@ -46166,17 +46735,17 @@ var init_postgresStorage = __esm({
       // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============
       async getSpareLocationStock(spareId) {
         const db12 = await getDb();
-        return await db12.select().from(spareLocationStock).where(eq20(spareLocationStock.spareId, spareId));
+        return await db12.select().from(spareLocationStock).where(eq21(spareLocationStock.spareId, spareId));
       }
       async getSpareLocationStockByLocation(locationId) {
         const db12 = await getDb();
-        return await db12.select().from(spareLocationStock).where(eq20(spareLocationStock.locationId, locationId));
+        return await db12.select().from(spareLocationStock).where(eq21(spareLocationStock.locationId, locationId));
       }
       async getSpareLocationStockItem(spareId, locationId) {
         const db12 = await getDb();
-        const result = await db12.select().from(spareLocationStock).where(and16(
-          eq20(spareLocationStock.spareId, spareId),
-          eq20(spareLocationStock.locationId, locationId)
+        const result = await db12.select().from(spareLocationStock).where(and17(
+          eq21(spareLocationStock.spareId, spareId),
+          eq21(spareLocationStock.locationId, locationId)
         ));
         return result[0];
       }
@@ -46197,7 +46766,7 @@ var init_postgresStorage = __esm({
           if (data.locationUuid && !existing.locationUuid) {
             updateSet.locationUuid = data.locationUuid;
           }
-          const result = await conn.update(spareLocationStock).set(updateSet).where(eq20(spareLocationStock.id, existing.id)).returning();
+          const result = await conn.update(spareLocationStock).set(updateSet).where(eq21(spareLocationStock.id, existing.id)).returning();
           try {
             await logFieldChanges("spare_location_stock", result[0].slsuuid, result[0].vesselId || data.vesselId || null, existing, result[0], "system");
           } catch (e) {
@@ -46224,7 +46793,7 @@ var init_postgresStorage = __esm({
         if (newQty < 0) {
           throw new Error(`Cannot reduce stock below zero. Current: ${existing.qty}, Requested change: ${qtyChange}`);
         }
-        const result = await db12.update(spareLocationStock).set({ qty: newQty }).where(eq20(spareLocationStock.id, existing.id)).returning();
+        const result = await db12.update(spareLocationStock).set({ qty: newQty }).where(eq21(spareLocationStock.id, existing.id)).returning();
         try {
           await logFieldChanges("spare_location_stock", result[0].slsuuid, result[0].vesselId || null, existing, result[0], "system");
         } catch (e) {
@@ -46242,7 +46811,7 @@ var init_postgresStorage = __esm({
           locationId: spareLocationStock.locationId,
           locationName: locations.locationName,
           qty: spareLocationStock.qty
-        }).from(spareLocationStock).innerJoin(locations, eq20(spareLocationStock.locationId, locations.id)).where(eq20(spareLocationStock.spareId, spareId));
+        }).from(spareLocationStock).innerJoin(locations, eq21(spareLocationStock.locationId, locations.id)).where(eq21(spareLocationStock.spareId, spareId));
         if (activeLocationNames && activeLocationNames.length > 0) {
           const normalizedNames = activeLocationNames.map((n) => n.toLowerCase().trim());
           return result.filter((r) => normalizedNames.includes(r.locationName.toLowerCase().trim()));
@@ -46256,10 +46825,10 @@ var init_postgresStorage = __esm({
           partCode: spares.partCode,
           partName: spares.partName,
           qty: spareLocationStock.qty
-        }).from(spareLocationStock).innerJoin(spares, eq20(spareLocationStock.spareUuid, spares.suuid)).where(and16(
-          eq20(spareLocationStock.locationId, locationId),
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+        }).from(spareLocationStock).innerJoin(spares, eq21(spareLocationStock.spareUuid, spares.suuid)).where(and17(
+          eq21(spareLocationStock.locationId, locationId),
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
         ));
         return result;
       }
@@ -46295,11 +46864,11 @@ var init_postgresStorage = __esm({
           isActive: spares.isActive,
           isRotationItem: spares.isRotationItem,
           locationQty: spareLocationStock.qty
-        }).from(spareLocationStock).innerJoin(spares, eq20(spareLocationStock.spareUuid, spares.suuid)).where(and16(
-          eq20(spareLocationStock.locationId, locationId),
-          eq20(spares.vesselId, vesselId),
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted)),
+        }).from(spareLocationStock).innerJoin(spares, eq21(spareLocationStock.spareUuid, spares.suuid)).where(and17(
+          eq21(spareLocationStock.locationId, locationId),
+          eq21(spares.vesselId, vesselId),
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted)),
           gt2(spareLocationStock.qty, 0)
         ));
         return result;
@@ -46310,10 +46879,10 @@ var init_postgresStorage = __esm({
           id: locations.id,
           locationName: locations.locationName,
           sparesCount: sql16`count(distinct ${spareLocationStock.spareId})`.as("spares_count")
-        }).from(spareLocationStock).innerJoin(locations, eq20(spareLocationStock.locationId, locations.id)).innerJoin(spares, eq20(spareLocationStock.spareUuid, spares.suuid)).where(and16(
-          eq20(spares.vesselId, vesselId),
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted)),
+        }).from(spareLocationStock).innerJoin(locations, eq21(spareLocationStock.locationId, locations.id)).innerJoin(spares, eq21(spareLocationStock.spareUuid, spares.suuid)).where(and17(
+          eq21(spares.vesselId, vesselId),
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted)),
           gt2(spareLocationStock.qty, 0)
         )).groupBy(locations.id, locations.locationName).orderBy(asc5(locations.locationName));
         return result;
@@ -46350,17 +46919,17 @@ var init_postgresStorage = __esm({
       }
       async getInventoryTransactions(vesselId, options) {
         const db12 = await getDb();
-        const conditions = [eq20(inventoryTransactions.vesselId, vesselId)];
+        const conditions = [eq21(inventoryTransactions.vesselId, vesselId)];
         if (options?.spareId) {
-          conditions.push(eq20(inventoryTransactions.spareId, options.spareId));
+          conditions.push(eq21(inventoryTransactions.spareId, options.spareId));
         }
         if (options?.locationId) {
-          conditions.push(eq20(inventoryTransactions.locationId, options.locationId));
+          conditions.push(eq21(inventoryTransactions.locationId, options.locationId));
         }
         if (options?.eventType) {
-          conditions.push(eq20(inventoryTransactions.eventType, options.eventType));
+          conditions.push(eq21(inventoryTransactions.eventType, options.eventType));
         }
-        let query = db12.select().from(inventoryTransactions).where(and16(...conditions)).orderBy(desc5(inventoryTransactions.txnDatetime));
+        let query = db12.select().from(inventoryTransactions).where(and17(...conditions)).orderBy(desc5(inventoryTransactions.txnDatetime));
         if (options?.limit) {
           query = query.limit(options.limit);
         }
@@ -46376,7 +46945,7 @@ var init_postgresStorage = __esm({
         let currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
         if (!currentLocationStock) {
           const existingStockRows = await this.getSpareLocationStock(input.spareId);
-          const spareForSync = await db12.select().from(spares).where(eq20(spares.id, input.spareId));
+          const spareForSync = await db12.select().from(spares).where(eq21(spares.id, input.spareId));
           const spareLegacy = spareForSync[0];
           if (spareLegacy) {
             const existingSum = existingStockRows.reduce((s, r) => s + (r.qty ?? 0), 0);
@@ -46426,7 +46995,7 @@ var init_postgresStorage = __esm({
             throw new Error(`INSUFFICIENT_STOCK: Available at location: ${currentLocationQty}, Requested: ${consumeQty}`);
           }
         }
-        const spareResult = await db12.select().from(spares).where(eq20(spares.id, input.spareId));
+        const spareResult = await db12.select().from(spares).where(eq21(spares.id, input.spareId));
         const spare = spareResult[0];
         if (!spare) {
           throw new Error(`Spare ${input.spareId} not found`);
@@ -46510,7 +47079,7 @@ var init_postgresStorage = __esm({
             robLocationB: newRobB,
             updatedAt: /* @__PURE__ */ new Date(),
             updatedBy: input.userId
-          }).where(eq20(spares.id, input.spareId));
+          }).where(eq21(spares.id, input.spareId));
           try {
             await logFieldChanges(
               "spares",
@@ -46609,6 +47178,8 @@ var init_postgresStorage = __esm({
             componentName: row.component_name,
             componentSpareCode: row.component_spare_code,
             critical: row.critical,
+            spareCategory: row.spare_category,
+            optimumQty: row.optimum_qty,
             rob: row.rob,
             robLocationA: row.rob_location_a,
             robLocationB: row.rob_location_b,
@@ -46789,6 +47360,8 @@ var init_postgresStorage = __esm({
             componentName: row.component_name,
             componentSpareCode: row.component_spare_code,
             critical: row.critical,
+            spareCategory: row.spare_category,
+            optimumQty: row.optimum_qty,
             rob: row.rob,
             robLocationA: row.rob_location_a,
             robLocationB: row.rob_location_b,
@@ -46862,10 +47435,10 @@ var init_postgresStorage = __esm({
       }
       async getSparesWithInventoryByComponent(componentId) {
         const db12 = await getDb();
-        const directSpares = await db12.select().from(spares).where(and16(
-          eq20(spares.componentId, componentId),
-          eq20(spares.deleted, false),
-          or6(eq20(spares.isDeleted, false), isNull4(spares.isDeleted))
+        const directSpares = await db12.select().from(spares).where(and17(
+          eq21(spares.componentId, componentId),
+          eq21(spares.deleted, false),
+          or6(eq21(spares.isDeleted, false), isNull4(spares.isDeleted))
         ));
         const links = await this.getSpareComponentLinksByComponent(componentId);
         const spareIdSet = /* @__PURE__ */ new Set();
@@ -46882,7 +47455,7 @@ var init_postgresStorage = __esm({
         for (const link of links) {
           if (!spareIdSet.has(link.spareId)) {
             spareIdSet.add(link.spareId);
-            const linkedSpareResult = await db12.select().from(spares).where(eq20(spares.id, link.spareId));
+            const linkedSpareResult = await db12.select().from(spares).where(eq21(spares.id, link.spareId));
             const linkedSpare = linkedSpareResult[0];
             if (linkedSpare) {
               const withInventory = await this.getSpareWithInventory(linkedSpare.suuid);
@@ -46897,17 +47470,17 @@ var init_postgresStorage = __esm({
       async getSparesWithInventoryByComponentCode(vesselId, componentCode) {
         const db12 = await getDb();
         const matchingSpares = await db12.select().from(spares).where(
-          and16(
-            eq20(spares.vesselId, vesselId),
-            eq20(spares.componentCode, componentCode)
+          and17(
+            eq21(spares.vesselId, vesselId),
+            eq21(spares.componentCode, componentCode)
           )
         );
         const linkedSpares = await db12.select({
           spareId: spareComponentLinks.spareId
-        }).from(spareComponentLinks).innerJoin(components, eq20(spareComponentLinks.componentId, components.cuuid)).where(
-          and16(
-            eq20(components.componentCode, componentCode),
-            eq20(spareComponentLinks.vesselId, vesselId)
+        }).from(spareComponentLinks).innerJoin(components, eq21(spareComponentLinks.componentId, components.cuuid)).where(
+          and17(
+            eq21(components.componentCode, componentCode),
+            eq21(spareComponentLinks.vesselId, vesselId)
           )
         );
         const linkedSpareIds = new Set(linkedSpares.map((l) => l.spareId));
@@ -46925,7 +47498,7 @@ var init_postgresStorage = __esm({
         for (const spareId of Array.from(linkedSpareIds)) {
           if (!spareIdSet.has(spareId)) {
             spareIdSet.add(spareId);
-            const linkedSpareResult = await db12.select().from(spares).where(eq20(spares.id, spareId));
+            const linkedSpareResult = await db12.select().from(spares).where(eq21(spares.id, spareId));
             const linkedSpare = linkedSpareResult[0];
             if (linkedSpare) {
               const withInventory = await this.getSpareWithInventory(linkedSpare.suuid);
@@ -46949,8 +47522,8 @@ var init_postgresStorage = __esm({
           robLocationA: spares.robLocationA,
           robLocationB: spares.robLocationB
         }).from(spares).where(
-          and16(
-            eq20(spares.vesselId, vesselId),
+          and17(
+            eq21(spares.vesselId, vesselId),
             inArray6(spares.partNumber, partNumbers)
           )
         );
@@ -46978,8 +47551,8 @@ var init_postgresStorage = __esm({
           robLocationA: spares.robLocationA,
           robLocationB: spares.robLocationB
         }).from(spares).where(
-          and16(
-            eq20(spares.vesselId, vesselId),
+          and17(
+            eq21(spares.vesselId, vesselId),
             inArray6(spares.partCode, partCodes)
           )
         );
@@ -47038,31 +47611,31 @@ var init_postgresStorage = __esm({
       }
       async getRoleByName(roleName) {
         const db12 = await getDb();
-        const result = await db12.select().from(admnRoleMaster).where(and16(eq20(admnRoleMaster.assignedRole, roleName), eq20(admnRoleMaster.isActive, true)));
+        const result = await db12.select().from(admnRoleMaster).where(and17(eq21(admnRoleMaster.assignedRole, roleName), eq21(admnRoleMaster.isActive, true)));
         return result[0];
       }
       async getActiveRoles() {
         const db12 = await getDb();
-        return db12.select().from(admnRoleMaster).where(and16(
-          eq20(admnRoleMaster.isActive, true),
-          or6(eq20(admnRoleMaster.isDeleted, false), isNull4(admnRoleMaster.isDeleted))
+        return db12.select().from(admnRoleMaster).where(and17(
+          eq21(admnRoleMaster.isActive, true),
+          or6(eq21(admnRoleMaster.isDeleted, false), isNull4(admnRoleMaster.isDeleted))
         )).orderBy(asc5(admnRoleMaster.sortOrder));
       }
       async getActiveMenuItems() {
         const db12 = await getDb();
-        return db12.select().from(admMenumasterAc).where(and16(
-          eq20(admMenumasterAc.isActive, true),
-          or6(eq20(admMenumasterAc.isDeleted, false), isNull4(admMenumasterAc.isDeleted))
+        return db12.select().from(admMenumasterAc).where(and17(
+          eq21(admMenumasterAc.isActive, true),
+          or6(eq21(admMenumasterAc.isDeleted, false), isNull4(admMenumasterAc.isDeleted))
         )).orderBy(asc5(admMenumasterAc.sortOrder));
       }
       async getRoleMenuPermissions(roleRuid) {
         const db12 = await getDb();
-        return db12.select().from(admRoleMenuAccess).where(eq20(admRoleMenuAccess.roleRuid, roleRuid));
+        return db12.select().from(admRoleMenuAccess).where(eq21(admRoleMenuAccess.roleRuid, roleRuid));
       }
       async saveRoleMenuPermissions(roleRuid, permissions) {
         const db12 = await getDb();
         await db12.transaction(async (tx) => {
-          await tx.delete(admRoleMenuAccess).where(eq20(admRoleMenuAccess.roleRuid, roleRuid));
+          await tx.delete(admRoleMenuAccess).where(eq21(admRoleMenuAccess.roleRuid, roleRuid));
           if (permissions.length > 0) {
             const rows = permissions.map((p) => ({
               roleRuid,
@@ -47080,11 +47653,11 @@ var init_postgresStorage = __esm({
       }
       async getApprovalWorkflowConfig() {
         const db12 = await getDb();
-        return db12.select().from(approvalWorkflowConfig).where(eq20(approvalWorkflowConfig.isDeleted, false)).orderBy(approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName);
+        return db12.select().from(approvalWorkflowConfig).where(eq21(approvalWorkflowConfig.isDeleted, false)).orderBy(approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName);
       }
       async getLocalApprovers() {
         const db12 = await getDb();
-        return db12.select().from(mocApprovers).where(and16(eq20(mocApprovers.isDeleted, false), eq20(mocApprovers.modulename, "Technical")));
+        return db12.select().from(mocApprovers).where(and17(eq21(mocApprovers.isDeleted, false), eq21(mocApprovers.modulename, "Technical")));
       }
       async upsertApprovalWorkflowConfig(rows, updatedByUuid) {
         const db12 = await getDb();
@@ -47493,7 +48066,7 @@ __export(certificateRepository_exports, {
   insertCertificateData: () => insertCertificateData,
   updateCertificateData: () => updateCertificateData
 });
-import { eq as eq24, and as and19, asc as asc6, inArray as inArray7, or as or7, isNull as isNull5, sql as sql18 } from "drizzle-orm";
+import { eq as eq25, and as and20, asc as asc6, inArray as inArray7, or as or7, isNull as isNull5, sql as sql18 } from "drizzle-orm";
 function getDb3() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -47503,9 +48076,9 @@ async function getApplicableCertificates() {
   const db12 = await getDb3();
   if (!db12) return null;
   return db12.select().from(vesselCertificateApplicability).where(
-    and19(
-      eq24(vesselCertificateApplicability.isApplicable, true),
-      or7(eq24(vesselCertificateApplicability.isDeleted, false), isNull5(vesselCertificateApplicability.isDeleted))
+    and20(
+      eq25(vesselCertificateApplicability.isApplicable, true),
+      or7(eq25(vesselCertificateApplicability.isDeleted, false), isNull5(vesselCertificateApplicability.isDeleted))
     )
   );
 }
@@ -47513,10 +48086,10 @@ async function getMasterCertificatesByIds(masterIds) {
   const db12 = await getDb3();
   if (!db12) return null;
   return db12.select().from(shipCertificatesMaster).where(
-    and19(
+    and20(
       inArray7(shipCertificatesMaster.masterId, masterIds),
-      eq24(shipCertificatesMaster.isActive, true),
-      or7(eq24(shipCertificatesMaster.isDeleted, false), isNull5(shipCertificatesMaster.isDeleted))
+      eq25(shipCertificatesMaster.isActive, true),
+      or7(eq25(shipCertificatesMaster.isDeleted, false), isNull5(shipCertificatesMaster.isDeleted))
     )
   ).orderBy(asc6(shipCertificatesMaster.companySequence));
 }
@@ -47524,18 +48097,18 @@ async function getAllVesselCertificateData() {
   const db12 = await getDb3();
   if (!db12) return null;
   return db12.select().from(vesselCertificateData).where(
-    or7(eq24(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
+    or7(eq25(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
   );
 }
 async function getCertificateApplicability(vesselId, masterId) {
   const db12 = await getDb3();
   if (!db12) return null;
   return db12.select().from(vesselCertificateApplicability).where(
-    and19(
-      eq24(vesselCertificateApplicability.vesselId, vesselId),
-      eq24(vesselCertificateApplicability.masterId, masterId),
-      eq24(vesselCertificateApplicability.isApplicable, true),
-      or7(eq24(vesselCertificateApplicability.isDeleted, false), isNull5(vesselCertificateApplicability.isDeleted))
+    and20(
+      eq25(vesselCertificateApplicability.vesselId, vesselId),
+      eq25(vesselCertificateApplicability.masterId, masterId),
+      eq25(vesselCertificateApplicability.isApplicable, true),
+      or7(eq25(vesselCertificateApplicability.isDeleted, false), isNull5(vesselCertificateApplicability.isDeleted))
     )
   ).limit(1);
 }
@@ -47543,10 +48116,10 @@ async function getMasterCertificateById(masterId) {
   const db12 = await getDb3();
   if (!db12) return null;
   return db12.select().from(shipCertificatesMaster).where(
-    and19(
-      eq24(shipCertificatesMaster.masterId, masterId),
-      eq24(shipCertificatesMaster.isActive, true),
-      or7(eq24(shipCertificatesMaster.isDeleted, false), isNull5(shipCertificatesMaster.isDeleted))
+    and20(
+      eq25(shipCertificatesMaster.masterId, masterId),
+      eq25(shipCertificatesMaster.isActive, true),
+      or7(eq25(shipCertificatesMaster.isDeleted, false), isNull5(shipCertificatesMaster.isDeleted))
     )
   ).limit(1);
 }
@@ -47554,10 +48127,10 @@ async function getVesselCertificateDataByKey(vesselId, masterId) {
   const db12 = await getDb3();
   if (!db12) return null;
   return db12.select().from(vesselCertificateData).where(
-    and19(
-      eq24(vesselCertificateData.vesselId, vesselId),
-      eq24(vesselCertificateData.masterId, masterId),
-      or7(eq24(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
+    and20(
+      eq25(vesselCertificateData.vesselId, vesselId),
+      eq25(vesselCertificateData.masterId, masterId),
+      or7(eq25(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
     )
   ).limit(1);
 }
@@ -47565,10 +48138,10 @@ async function updateCertificateData(vesselId, masterId, updateData) {
   const db12 = await getDb3();
   if (!db12) return null;
   return db12.update(vesselCertificateData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and19(
-      eq24(vesselCertificateData.vesselId, vesselId),
-      eq24(vesselCertificateData.masterId, masterId),
-      or7(eq24(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
+    and20(
+      eq25(vesselCertificateData.vesselId, vesselId),
+      eq25(vesselCertificateData.masterId, masterId),
+      or7(eq25(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
     )
   ).returning();
 }
@@ -47582,10 +48155,10 @@ async function insertCertificateData(data) {
   if (inserted.length > 0) return inserted;
   const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
   return db12.update(vesselCertificateData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and19(
-      eq24(vesselCertificateData.vesselId, vesselId),
-      eq24(vesselCertificateData.masterId, masterId),
-      or7(eq24(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
+    and20(
+      eq25(vesselCertificateData.vesselId, vesselId),
+      eq25(vesselCertificateData.masterId, masterId),
+      or7(eq25(vesselCertificateData.isDeleted, false), isNull5(vesselCertificateData.isDeleted))
     )
   ).returning();
 }
@@ -47611,7 +48184,7 @@ __export(surveyRepository_exports, {
   insertSurveyData: () => insertSurveyData,
   updateSurveyData: () => updateSurveyData
 });
-import { eq as eq25, and as and20, asc as asc7, inArray as inArray8, or as or8, sql as sql19 } from "drizzle-orm";
+import { eq as eq26, and as and21, asc as asc7, inArray as inArray8, or as or8, sql as sql19 } from "drizzle-orm";
 function getDb4() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -47620,18 +48193,18 @@ function getDb4() {
 async function getApplicableSurveys() {
   const db12 = await getDb4();
   if (!db12) return null;
-  return db12.select().from(vesselSurveyApplicability).where(and20(
-    eq25(vesselSurveyApplicability.isApplicable, true),
-    or8(eq25(vesselSurveyApplicability.isDeleted, false), sql19`${vesselSurveyApplicability.isDeleted} IS NULL`)
+  return db12.select().from(vesselSurveyApplicability).where(and21(
+    eq26(vesselSurveyApplicability.isApplicable, true),
+    or8(eq26(vesselSurveyApplicability.isDeleted, false), sql19`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getMasterSurveysByIds(masterIds) {
   const db12 = await getDb4();
   if (!db12) return null;
-  return db12.select().from(shipSurveysMaster).where(and20(
+  return db12.select().from(shipSurveysMaster).where(and21(
     inArray8(shipSurveysMaster.masterId, masterIds),
-    eq25(shipSurveysMaster.isDeleted, false),
-    eq25(shipSurveysMaster.isActive, true)
+    eq26(shipSurveysMaster.isDeleted, false),
+    eq26(shipSurveysMaster.isActive, true)
   )).orderBy(asc7(shipSurveysMaster.companySequence));
 }
 async function getAllVesselSurveyData() {
@@ -47643,9 +48216,9 @@ async function getSurveyApplicabilityByKey(vesselId, masterId) {
   const db12 = await getDb4();
   if (!db12) return null;
   return db12.select().from(vesselSurveyApplicability).where(
-    and20(
-      eq25(vesselSurveyApplicability.vesselId, vesselId),
-      eq25(vesselSurveyApplicability.masterId, masterId)
+    and21(
+      eq26(vesselSurveyApplicability.vesselId, vesselId),
+      eq26(vesselSurveyApplicability.masterId, masterId)
     )
   ).limit(1);
 }
@@ -47653,9 +48226,9 @@ async function getVesselSurveyDataByKey(vesselId, masterId) {
   const db12 = await getDb4();
   if (!db12) return null;
   return db12.select().from(vesselSurveyData).where(
-    and20(
-      eq25(vesselSurveyData.vesselId, vesselId),
-      eq25(vesselSurveyData.masterId, masterId)
+    and21(
+      eq26(vesselSurveyData.vesselId, vesselId),
+      eq26(vesselSurveyData.masterId, masterId)
     )
   ).limit(1);
 }
@@ -47663,9 +48236,9 @@ async function updateSurveyData(vesselId, masterId, updateData) {
   const db12 = await getDb4();
   if (!db12) return null;
   return db12.update(vesselSurveyData).set(updateData).where(
-    and20(
-      eq25(vesselSurveyData.vesselId, vesselId),
-      eq25(vesselSurveyData.masterId, masterId)
+    and21(
+      eq26(vesselSurveyData.vesselId, vesselId),
+      eq26(vesselSurveyData.masterId, masterId)
     )
   ).returning();
 }
@@ -47678,9 +48251,9 @@ async function insertSurveyData(data) {
   if (inserted.length > 0) return inserted;
   const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
   return db12.update(vesselSurveyData).set({ ...updateData, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and20(
-      eq25(vesselSurveyData.vesselId, vesselId),
-      eq25(vesselSurveyData.masterId, masterId)
+    and21(
+      eq26(vesselSurveyData.vesselId, vesselId),
+      eq26(vesselSurveyData.masterId, masterId)
     )
   ).returning();
 }
@@ -47703,7 +48276,7 @@ var init_surveyRepository = __esm({
 });
 
 // server/modules/reports/repositories/reportRepository.ts
-import { eq as eq30, and as and25, gte as gte3, desc as desc6, sql as sql22 } from "drizzle-orm";
+import { eq as eq31, and as and26, gte as gte3, desc as desc6, sql as sql22 } from "drizzle-orm";
 async function getVessels6() {
   return storage.getVessels();
 }
@@ -47780,7 +48353,7 @@ __export(monthlySnapshotService_exports, {
   getSnapshotDetail: () => getSnapshotDetail,
   regenerateSnapshots: () => regenerateSnapshots
 });
-import { eq as eq32, and as and27, sql as sql24 } from "drizzle-orm";
+import { eq as eq33, and as and28, sql as sql24 } from "drizzle-orm";
 function buildVesselGraceSettings2(vesselSettings) {
   if (!vesselSettings) {
     return {
@@ -47926,9 +48499,9 @@ async function computeSnapshotAtTimestamp(vesselId, snapshotDate) {
 async function ensureSnapshotsExist(vesselId, year, month) {
   const db12 = await getDb();
   const { opening, closing, monthKey } = getMonthBoundaries(year, month);
-  const existing = await db12.select().from(monthlySnapshots).where(and27(
-    eq32(monthlySnapshots.vesselId, vesselId),
-    eq32(monthlySnapshots.snapshotMonth, monthKey)
+  const existing = await db12.select().from(monthlySnapshots).where(and28(
+    eq33(monthlySnapshots.vesselId, vesselId),
+    eq33(monthlySnapshots.snapshotMonth, monthKey)
   ));
   const hasOpening = existing.some((s) => s.snapshotType === "opening");
   const hasClosing = existing.some((s) => s.snapshotType === "closing");
@@ -47977,9 +48550,9 @@ async function ensureSnapshotsExist(vesselId, year, month) {
       });
     }
   }
-  return db12.select().from(monthlySnapshots).where(and27(
-    eq32(monthlySnapshots.vesselId, vesselId),
-    eq32(monthlySnapshots.snapshotMonth, monthKey)
+  return db12.select().from(monthlySnapshots).where(and28(
+    eq33(monthlySnapshots.vesselId, vesselId),
+    eq33(monthlySnapshots.snapshotMonth, monthKey)
   ));
 }
 async function computeMonthlyMovement(vesselId, year, month) {
@@ -48154,11 +48727,11 @@ function buildDrilldownRows(woIds, allWorkOrders, jobsMap, componentsByCodeMap, 
 async function getSnapshotDetail(vesselId, year, month, snapshotType, category) {
   const db12 = await getDb();
   const monthKey = `${year}-${String(month).padStart(2, "0")}`;
-  const [snapshot] = await db12.select().from(monthlySnapshots).where(and27(
-    eq32(monthlySnapshots.vesselId, vesselId),
-    eq32(monthlySnapshots.snapshotMonth, monthKey),
-    eq32(monthlySnapshots.snapshotType, snapshotType),
-    eq32(monthlySnapshots.category, category)
+  const [snapshot] = await db12.select().from(monthlySnapshots).where(and28(
+    eq33(monthlySnapshots.vesselId, vesselId),
+    eq33(monthlySnapshots.snapshotMonth, monthKey),
+    eq33(monthlySnapshots.snapshotType, snapshotType),
+    eq33(monthlySnapshots.category, category)
   )).limit(1);
   if (!snapshot || !snapshot.workOrderIds || snapshot.workOrderIds.length === 0) {
     return [];
@@ -48196,9 +48769,9 @@ async function getMovementDetail(vesselId, year, month, movementType) {
 async function regenerateSnapshots(vesselId, year, month) {
   const db12 = await getDb();
   const monthKey = `${year}-${String(month).padStart(2, "0")}`;
-  await db12.delete(monthlySnapshots).where(and27(
-    eq32(monthlySnapshots.vesselId, vesselId),
-    eq32(monthlySnapshots.snapshotMonth, monthKey)
+  await db12.delete(monthlySnapshots).where(and28(
+    eq33(monthlySnapshots.vesselId, vesselId),
+    eq33(monthlySnapshots.snapshotMonth, monthKey)
   ));
   return ensureSnapshotsExist(vesselId, year, month);
 }
@@ -48214,6 +48787,36 @@ var init_monthlySnapshotService = __esm({
     init_constants();
     init_storage();
     SNAPSHOT_CATEGORIES = ["Planned", "Due", "Overdue", "Postponed", "Unplanned", "Pending Approval", "Completed"];
+  }
+});
+
+// server/modules/bulk-upload/services/spareClassificationImport.ts
+var spareClassificationImport_exports = {};
+__export(spareClassificationImport_exports, {
+  spareClassificationImport: () => spareClassificationImport
+});
+async function spareClassificationImport(row, headers = Object.keys(row)) {
+  const mode = spareClassificationTemplateMode(headers);
+  if (mode === "legacy") return {};
+  const categories = await storage.getMasterLists(SPARE_CATEGORY_TYPE);
+  const input = String(row["Spare Category"] ?? "").trim();
+  const active = categories.filter((c) => c.isActive && !c.isDeleted);
+  const exactKey = active.find((c) => c.listKey === input);
+  const matches = exactKey ? [exactKey] : active.filter((c) => c.listValue.toLowerCase() === input.toLowerCase());
+  if (matches.length !== 1) throw new Error(
+    `Spare Category '${input}' is ${input ? "invalid or ambiguous" : "blank"}. Use a unique Master List category key or current label.`
+  );
+  return classificationForWrite({
+    spareCategory: matches[0].listKey,
+    optimumQty: row["Optimum Qty"] ?? row["Optimum Quantity"] ?? null
+  }, void 0, true);
+}
+var init_spareClassificationImport = __esm({
+  "server/modules/bulk-upload/services/spareClassificationImport.ts"() {
+    "use strict";
+    init_classification();
+    init_spareClassification();
+    init_storage();
   }
 });
 
@@ -48967,14 +49570,14 @@ var init_identityGuard = __esm({
 });
 
 // server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts
-import { eq as eq39 } from "drizzle-orm";
+import { eq as eq40 } from "drizzle-orm";
 async function getAllMappings() {
   const db12 = await getDb();
   return db12.select().from(shipskartRoleMappings).orderBy(shipskartRoleMappings.sailRole);
 }
 async function getMappingForSailRole(sailRole) {
   const db12 = await getDb();
-  const rows = await db12.select().from(shipskartRoleMappings).where(eq39(shipskartRoleMappings.sailRole, sailRole)).limit(1);
+  const rows = await db12.select().from(shipskartRoleMappings).where(eq40(shipskartRoleMappings.sailRole, sailRole)).limit(1);
   return rows[0];
 }
 async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartRoleId) {
@@ -48986,7 +49589,7 @@ async function upsertMapping2(sailRole, shipskartRole, updatedByUuid, shipskartR
 }
 async function deleteMapping(sailRole) {
   const db12 = await getDb();
-  await db12.delete(shipskartRoleMappings).where(eq39(shipskartRoleMappings.sailRole, sailRole));
+  await db12.delete(shipskartRoleMappings).where(eq40(shipskartRoleMappings.sailRole, sailRole));
 }
 var init_shipskartRoleMappingRepository = __esm({
   "server/modules/shipskart/repositories/shipskartRoleMappingRepository.ts"() {
@@ -49015,10 +49618,10 @@ __export(shipskartB2bRepository_exports, {
   upsertUserLink: () => upsertUserLink,
   upsertVesselLink: () => upsertVesselLink
 });
-import { and as and34, eq as eq40, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
+import { and as and35, eq as eq41, ne as ne2, notInArray as notInArray3 } from "drizzle-orm";
 async function getTenantConfig(tenantId) {
   const db12 = await getDb();
-  const rows = await db12.select().from(shipskartTenantConfig).where(eq40(shipskartTenantConfig.tenantId, tenantId)).limit(1);
+  const rows = await db12.select().from(shipskartTenantConfig).where(eq41(shipskartTenantConfig.tenantId, tenantId)).limit(1);
   return rows[0];
 }
 async function upsertTokenState(tenantId, state) {
@@ -49053,7 +49656,7 @@ async function setReconcilerEnabled(tenantId, enabled) {
 }
 async function getUserLink(userUuid) {
   const db12 = await getDb();
-  const rows = await db12.select().from(shipskartUserLinks).where(eq40(shipskartUserLinks.userUuid, userUuid)).limit(1);
+  const rows = await db12.select().from(shipskartUserLinks).where(eq41(shipskartUserLinks.userUuid, userUuid)).limit(1);
   return rows[0];
 }
 async function upsertUserLink(userUuid, patch) {
@@ -49083,7 +49686,7 @@ async function upsertUserLink(userUuid, patch) {
 }
 async function getVesselLink(vesselVuuid) {
   const db12 = await getDb();
-  const rows = await db12.select().from(shipskartVesselLinks).where(eq40(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
+  const rows = await db12.select().from(shipskartVesselLinks).where(eq41(shipskartVesselLinks.vesselVuuid, vesselVuuid)).limit(1);
   return rows[0];
 }
 async function upsertVesselLink(vesselVuuid, patch) {
@@ -49111,7 +49714,7 @@ async function upsertVesselLink(vesselVuuid, patch) {
 }
 async function getAssignment(userUuid, vesselId) {
   const db12 = await getDb();
-  const rows = await db12.select().from(masterUserVessels).where(and34(eq40(masterUserVessels.userUuid, userUuid), eq40(masterUserVessels.vesselId, vesselId))).limit(1);
+  const rows = await db12.select().from(masterUserVessels).where(and35(eq41(masterUserVessels.userUuid, userUuid), eq41(masterUserVessels.vesselId, vesselId))).limit(1);
   return rows[0];
 }
 async function upsertAssignment(userUuid, vesselId, patch) {
@@ -49156,21 +49759,21 @@ async function replaceAssignmentsForUser(userUuid, vesselVuuids) {
     activated++;
   }
   const keep = vesselVuuids.length > 0 ? vesselVuuids : ["__none__"];
-  const deactivatedRows = await db12.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and34(
-    eq40(masterUserVessels.userUuid, userUuid),
-    eq40(masterUserVessels.isActive, true),
+  const deactivatedRows = await db12.update(masterUserVessels).set({ isActive: false, mapStatus: "revoked", mapAttempts: 0, lastAttemptAt: null, updatedAt: now }).where(and35(
+    eq41(masterUserVessels.userUuid, userUuid),
+    eq41(masterUserVessels.isActive, true),
     notInArray3(masterUserVessels.vesselId, keep)
   )).returning({ id: masterUserVessels.id });
   return { activated, deactivated: deactivatedRows.length };
 }
 async function getActiveVesselIdsForUser(userUuid) {
   const db12 = await getDb();
-  const rows = await db12.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and34(eq40(masterUserVessels.userUuid, userUuid), eq40(masterUserVessels.isActive, true)));
+  const rows = await db12.select({ v: masterUserVessels.vesselId }).from(masterUserVessels).where(and35(eq41(masterUserVessels.userUuid, userUuid), eq41(masterUserVessels.isActive, true)));
   return rows.map((r) => r.v);
 }
 async function getPendingAssignmentWork(userUuid) {
   const db12 = await getDb();
-  const rows = await db12.select().from(masterUserVessels).where(eq40(masterUserVessels.userUuid, userUuid));
+  const rows = await db12.select().from(masterUserVessels).where(eq41(masterUserVessels.userUuid, userUuid));
   return {
     // 'error' is IN this list on purpose (migration 164): a transient failure — rate
     // limit, 5xx, network — used to strand the row forever, because NO retry path
@@ -49200,7 +49803,7 @@ async function failingRows(limit = 100) {
     vesselId: masterUserVessels.vesselId,
     mapStatus: masterUserVessels.mapStatus,
     lastError: masterUserVessels.lastError
-  }).from(masterUserVessels).where(and34(eq40(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
+  }).from(masterUserVessels).where(and35(eq41(masterUserVessels.isActive, true), ne2(masterUserVessels.mapStatus, "mapped"))).limit(limit);
   return { users: users2, vessels: vessels2, assignments };
 }
 async function resetForRetry(kind, id) {
@@ -49209,13 +49812,13 @@ async function resetForRetry(kind, id) {
     const existing2 = await getUserLink(id);
     if (!existing2) return { reset: false, reason: "no link row" };
     if (existing2.shipskartUserId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
-    await db12.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq40(shipskartUserLinks.userUuid, id));
+    await db12.update(shipskartUserLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq41(shipskartUserLinks.userUuid, id));
     return { reset: true };
   }
   const existing = await getVesselLink(id);
   if (!existing) return { reset: false, reason: "no link row" };
   if (existing.shipskartVesselId) return { reset: false, reason: "already has a Shipskart id \u2014 re-pushing would duplicate" };
-  await db12.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq40(shipskartVesselLinks.vesselVuuid, id));
+  await db12.update(shipskartVesselLinks).set({ pushStatus: "pending", lastError: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq41(shipskartVesselLinks.vesselVuuid, id));
   return { reset: true };
 }
 async function linkStatusCounts() {
@@ -49588,7 +50191,7 @@ __export(shipskartReconcilerService_exports, {
   settleAssignmentChanges: () => settleAssignmentChanges
 });
 import crypto6 from "crypto";
-import { inArray as inArray11, eq as eq41, and as and35 } from "drizzle-orm";
+import { inArray as inArray11, eq as eq42, and as and36 } from "drizzle-orm";
 function resolveCallSign(v) {
   return v.imoNumber;
 }
@@ -49714,7 +50317,7 @@ async function diagnoseUserBlock(userUuid, sailRole) {
       email: masterUsers.email,
       role: masterUsers.role,
       fullName: masterUsers.fullName
-    }).from(masterUsers).where(eq41(masterUsers.id, userUuid)).limit(1);
+    }).from(masterUsers).where(eq42(masterUsers.id, userUuid)).limit(1);
     const mu = rows[0];
     if (!mu) {
       return {
@@ -49948,7 +50551,7 @@ async function ensureUserPushed(userUuid, sailRole) {
     email: masterUsers.email,
     role: masterUsers.role,
     designation: masterUsers.designation
-  }).from(masterUsers).where(eq41(masterUsers.id, userUuid)).limit(1);
+  }).from(masterUsers).where(eq42(masterUsers.id, userUuid)).limit(1);
   const mu = rows[0];
   if (!mu) {
     await upsertUserLink(userUuid, {
@@ -50011,14 +50614,14 @@ async function runReconciliationInner(opts = {}) {
   }
   summary.ran = true;
   const db12 = await getDb();
-  const pushedVessels = await db12.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq41(shipskartVesselLinks.pushStatus, "pushed"));
+  const pushedVessels = await db12.select({ v: shipskartVesselLinks.vesselVuuid }).from(shipskartVesselLinks).where(eq42(shipskartVesselLinks.pushStatus, "pushed"));
   const pushedVesselSet = new Set(pushedVessels.map((r) => r.v));
   const vesselRows = await db12.select({
     vuuid: vessels.vuuid,
     name: vessels.name,
     imoNumber: vessels.imoNumber,
     vesselType: vessels.vesselType
-  }).from(vessels).where(eq41(vessels.isActive, true));
+  }).from(vessels).where(eq42(vessels.isActive, true));
   for (const v of vesselRows.filter((r) => !pushedVesselSet.has(r.vuuid)).slice(0, limit)) {
     const st = (await pushVessel(v)).status;
     tally(summary.vessels, st);
@@ -50033,7 +50636,7 @@ async function runReconciliationInner(opts = {}) {
     email: masterUsers.email,
     role: masterUsers.role,
     designation: masterUsers.designation
-  }).from(masterUsers).where(eq41(masterUsers.isDeleted, false));
+  }).from(masterUsers).where(eq42(masterUsers.isDeleted, false));
   for (const mu of userRows.filter((r) => retryUuids.has(r.id)).slice(0, limit)) {
     const st = (await pushUser(mu)).status;
     if (st === "pushed" || st === "already_pushed") clearJitAttempts(mu.id);
@@ -50048,7 +50651,7 @@ async function runReconciliationInner(opts = {}) {
   const linkedUserUuids = new Set(allUserLinks.map((r) => r.u));
   const now = /* @__PURE__ */ new Date();
   const pendingAssignments = orderAssignmentsForRetry(
-    (await db12.select().from(masterUserVessels).where(and35(eq41(masterUserVessels.isActive, true), inArray11(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
+    (await db12.select().from(masterUserVessels).where(and36(eq42(masterUserVessels.isActive, true), inArray11(masterUserVessels.mapStatus, RETRYABLE_MAP_STATUSES)))).filter((a) => linkedUserUuids.has(a.userUuid) && isAssignmentRetryDue(a, now))
   );
   for (const a of pendingAssignments.slice(0, limit)) {
     const st = (await mapUserToVessel(a.userUuid, a.vesselId)).status;
@@ -50056,7 +50659,7 @@ async function runReconciliationInner(opts = {}) {
     if (API_HIT_STATUSES.has(st)) await paceB2b();
   }
   const revokedAssignments = orderAssignmentsForRetry(
-    (await db12.select().from(masterUserVessels).where(and35(eq41(masterUserVessels.isActive, false), eq41(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
+    (await db12.select().from(masterUserVessels).where(and36(eq42(masterUserVessels.isActive, false), eq42(masterUserVessels.mapStatus, "revoked")))).filter((a) => isAssignmentRetryDue(a, now))
   );
   for (const a of revokedAssignments.slice(0, limit)) {
     if (!a.shipskartMappingId) {
@@ -51173,7 +51776,7 @@ var alertEngine_exports = {};
 __export(alertEngine_exports, {
   generateAlerts: () => generateAlerts
 });
-import { eq as eq44, and as and37, isNull as isNull6, ne as ne3, desc as desc9, inArray as inArray13 } from "drizzle-orm";
+import { eq as eq45, and as and38, isNull as isNull6, ne as ne3, desc as desc9, inArray as inArray13 } from "drizzle-orm";
 async function generateAlerts(report) {
   const [consumed, cleared] = await Promise.all([
     evaluateRules(report),
@@ -51195,7 +51798,7 @@ async function ruleConsumptionSpike(report) {
   const db12 = await getDb();
   const todayTotal = (toNum2(report.hfoConsumption) ?? 0) + (toNum2(report.lsmgoConsumption) ?? 0) + (toNum2(report.mgoConsumption) ?? 0) + (toNum2(report.vlsfoConsumption) ?? 0) + (toNum2(report.lpgConsumption) ?? 0);
   if (todayTotal <= 0) return;
-  const robRows = await db12.select().from(nrFuelRob).where(eq44(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db12.select().from(nrFuelRob).where(eq45(nrFuelRob.vesselId, report.vesselId));
   const avg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (avg7Day <= 0) return;
   const pctAbove = (todayTotal - avg7Day) / avg7Day;
@@ -51225,7 +51828,7 @@ async function ruleConsumptionSpike(report) {
 }
 async function ruleRobEndurance(report) {
   const db12 = await getDb();
-  const robRows = await db12.select().from(nrFuelRob).where(eq44(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db12.select().from(nrFuelRob).where(eq45(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum2(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   if (totalAvg7Day <= 0) return;
@@ -51258,9 +51861,9 @@ async function ruleAeHoursSpike(report) {
   const db12 = await getDb();
   const currentAeHours = toNum2(report.aeRunningHours);
   if (currentAeHours === null || currentAeHours <= 0) return;
-  const prior = await db12.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and37(
-    eq44(nrNoonReports.vesselId, report.vesselId),
-    eq44(nrNoonReports.status, "submitted"),
+  const prior = await db12.select({ aeRunningHours: nrNoonReports.aeRunningHours }).from(nrNoonReports).where(and38(
+    eq45(nrNoonReports.vesselId, report.vesselId),
+    eq45(nrNoonReports.status, "submitted"),
     ne3(nrNoonReports.id, report.id)
   )).orderBy(desc9(nrNoonReports.reportDate)).limit(7);
   const priorHours = prior.map((r) => toNum2(r.aeRunningHours)).filter((v) => v !== null && v > 0);
@@ -51283,7 +51886,7 @@ async function ruleAeHoursSpike(report) {
 async function ruleCiiBandDrop(report) {
   const db12 = await getDb();
   const year = new Date(report.reportDate).getFullYear();
-  const ciiRows = await db12.select().from(nrCiiTracking).where(and37(eq44(nrCiiTracking.vesselId, report.vesselId), eq44(nrCiiTracking.year, year))).limit(1);
+  const ciiRows = await db12.select().from(nrCiiTracking).where(and38(eq45(nrCiiTracking.vesselId, report.vesselId), eq45(nrCiiTracking.year, year))).limit(1);
   const row = ciiRows[0] ?? null;
   if (!row || !row.ciiRating || !row.previousCiiRating) return;
   const prevOrder = CII_ORDER[row.previousCiiRating] ?? 0;
@@ -51327,7 +51930,7 @@ async function ruleNegativeRobRisk(report) {
 }
 async function autoResolveCleared(report) {
   const db12 = await getDb();
-  const robRows = await db12.select().from(nrFuelRob).where(eq44(nrFuelRob.vesselId, report.vesselId));
+  const robRows = await db12.select().from(nrFuelRob).where(eq45(nrFuelRob.vesselId, report.vesselId));
   const totalRob = robRows.map((r) => toNum2(r.currentRob) ?? 0).reduce((a, b) => a + b, 0);
   const totalAvg7Day = robRows.map((r) => toNum2(r.avg7Day) ?? 0).reduce((a, b) => a + b, 0);
   const enduranceDays = totalAvg7Day > 0 ? totalRob / totalAvg7Day : null;
@@ -51350,25 +51953,25 @@ async function autoResolveCleared(report) {
   await db12.update(nrAlerts).set({
     acknowledgedAt: /* @__PURE__ */ new Date(),
     acknowledgedBy: "system"
-  }).where(and37(
-    eq44(nrAlerts.vesselId, report.vesselId),
+  }).where(and38(
+    eq45(nrAlerts.vesselId, report.vesselId),
     isNull6(nrAlerts.acknowledgedAt),
     inArray13(nrAlerts.alertType, toResolve)
   ));
 }
 async function resolveOpenAlert(vesselId, alertType) {
   const db12 = await getDb();
-  await db12.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and37(
-    eq44(nrAlerts.vesselId, vesselId),
-    eq44(nrAlerts.alertType, alertType),
+  await db12.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy: "system" }).where(and38(
+    eq45(nrAlerts.vesselId, vesselId),
+    eq45(nrAlerts.alertType, alertType),
     isNull6(nrAlerts.acknowledgedAt)
   ));
 }
 async function upsertAlert(vesselId, reportId, alertType, severity, message, metricValue, thresholdValue) {
   const db12 = await getDb();
-  const existing = await db12.select({ id: nrAlerts.id }).from(nrAlerts).where(and37(
-    eq44(nrAlerts.vesselId, vesselId),
-    eq44(nrAlerts.alertType, alertType),
+  const existing = await db12.select({ id: nrAlerts.id }).from(nrAlerts).where(and38(
+    eq45(nrAlerts.vesselId, vesselId),
+    eq45(nrAlerts.alertType, alertType),
     isNull6(nrAlerts.acknowledgedAt)
   )).limit(1);
   if (existing.length > 0) {
@@ -51378,7 +51981,7 @@ async function upsertAlert(vesselId, reportId, alertType, severity, message, met
       message,
       metricValue: metricValue !== null ? String(metricValue) : null,
       thresholdValue: thresholdValue !== null ? String(thresholdValue) : null
-    }).where(eq44(nrAlerts.id, existing[0].id));
+    }).where(eq45(nrAlerts.id, existing[0].id));
   } else {
     await db12.insert(nrAlerts).values({
       vesselId,
@@ -51531,7 +52134,7 @@ var init_sesEmailTransport = __esm({
 });
 
 // server/modules/approvals/approvalNotifier.ts
-import { eq as eq48, inArray as inArray14 } from "drizzle-orm";
+import { eq as eq49, inArray as inArray14 } from "drizzle-orm";
 async function approvalEmailToggleEnabled() {
   try {
     const row = (await db6().select({ enabled: companyApprovalSettings.approvalEmailEnabled }).from(companyApprovalSettings).limit(1))[0];
@@ -51549,18 +52152,18 @@ async function subjectLine(scope, subjectRef, vesselId) {
   let name = "";
   try {
     if (scope.screenId.endsWith("-cr")) {
-      const r = (await db6().select({ t: changeRequest.title }).from(changeRequest).where(eq48(changeRequest.cruuid, subjectRef)).limit(1))[0];
+      const r = (await db6().select({ t: changeRequest.title }).from(changeRequest).where(eq49(changeRequest.cruuid, subjectRef)).limit(1))[0];
       name = r?.t ?? subjectRef;
     } else if (scope.moduleId === "defects") {
       const { defects: defects2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const r = (await db6().select({ id: defects2.id, d: defects2.description }).from(defects2).where(eq48(defects2.duuid, subjectRef)).limit(1))[0];
+      const r = (await db6().select({ id: defects2.id, d: defects2.description }).from(defects2).where(eq49(defects2.duuid, subjectRef)).limit(1))[0];
       name = r ? `${r.id} \u2014 ${String(r.d ?? "").slice(0, 80)}` : subjectRef;
     } else {
-      const r = (await db6().select({ no: workOrders.workOrderNo, jt: workOrders.jobTitle }).from(workOrders).where(eq48(workOrders.wouuid, subjectRef)).limit(1))[0];
+      const r = (await db6().select({ no: workOrders.workOrderNo, jt: workOrders.jobTitle }).from(workOrders).where(eq49(workOrders.wouuid, subjectRef)).limit(1))[0];
       name = r ? `${r.no} \u2014 ${r.jt}` : subjectRef;
     }
     if (vesselId) {
-      const v = (await db6().select({ n: vessels.name }).from(vessels).where(eq48(vessels.vuuid, vesselId)).limit(1))[0];
+      const v = (await db6().select({ n: vessels.name }).from(vessels).where(eq49(vessels.vuuid, vesselId)).limit(1))[0];
       if (v?.n) name += ` (${v.n})`;
     }
   } catch {
@@ -51616,11 +52219,11 @@ async function notifyUsers(userIds, base) {
     if (emailStatus !== "queued" || !sesCfg || !to) continue;
     try {
       const messageId = await sendApprovalEmail(sesCfg, to, base.title, base.message);
-      await db6().update(approvalNotifications).set({ emailStatus: "sent", emailError: null }).where(eq48(approvalNotifications.anuuid, anuuid));
+      await db6().update(approvalNotifications).set({ emailStatus: "sent", emailError: null }).where(eq49(approvalNotifications.anuuid, anuuid));
       console.log(`[approvals] email sent anuuid=${anuuid} sesMessageId=${messageId}`);
     } catch (e) {
       const msg = String(e?.message ?? e).slice(0, 300);
-      await db6().update(approvalNotifications).set({ emailStatus: "error", emailError: msg }).where(eq48(approvalNotifications.anuuid, anuuid)).catch((u) => console.error("[approvals] email status update failed:", u));
+      await db6().update(approvalNotifications).set({ emailStatus: "error", emailError: msg }).where(eq49(approvalNotifications.anuuid, anuuid)).catch((u) => console.error("[approvals] email status update failed:", u));
       console.error(`[approvals] email failed anuuid=${anuuid} to=${to}: ${msg}`);
     }
   }
@@ -51760,7 +52363,7 @@ var init_approvalNotifier = __esm({
 });
 
 // server/modules/approvals/stalledApprovalWarning.ts
-import { and as and41, eq as eq49 } from "drizzle-orm";
+import { and as and42, eq as eq50 } from "drizzle-orm";
 function findStalledSteps(requests, now, warnMs) {
   const out = [];
   for (const r of requests) {
@@ -51785,7 +52388,7 @@ async function runStalledApprovalWarningPass(now = /* @__PURE__ */ new Date()) {
   const pending = await listPendingEngineRequests();
   const stalled = findStalledSteps(pending, now, warnMs);
   if (stalled.length === 0) return { warned: 0 };
-  const admins = (await db7().select({ id: masterUsers.id }).from(masterUsers).where(and41(eq49(masterUsers.role, "Sail Admin"), eq49(masterUsers.isDeleted, false)))).map((u) => u.id);
+  const admins = (await db7().select({ id: masterUsers.id }).from(masterUsers).where(and42(eq50(masterUsers.role, "Sail Admin"), eq50(masterUsers.isDeleted, false)))).map((u) => u.id);
   if (admins.length === 0) {
     console.warn(`[approvals] ${stalled.length} approval step(s) stalled with nobody to approve \u2014 no Sail Admin user to warn`);
     return { warned: 0 };
@@ -51795,10 +52398,10 @@ async function runStalledApprovalWarningPass(now = /* @__PURE__ */ new Date()) {
     const req = pending.find((p) => p.requuid === s.requuid);
     if (!req) continue;
     const title = `Approval waiting with nobody to approve (step ${s.nodeKey})`;
-    const already = await db7().select({ id: approvalNotifications.id }).from(approvalNotifications).where(and41(
-      eq49(approvalNotifications.requuid, s.requuid),
-      eq49(approvalNotifications.kind, "stalled-no-approver"),
-      eq49(approvalNotifications.title, title)
+    const already = await db7().select({ id: approvalNotifications.id }).from(approvalNotifications).where(and42(
+      eq50(approvalNotifications.requuid, s.requuid),
+      eq50(approvalNotifications.kind, "stalled-no-approver"),
+      eq50(approvalNotifications.title, title)
     )).limit(1);
     if (already.length > 0) continue;
     const subject = await subjectLine(req.scope, req.subjectRef, req.vesselId);
@@ -52203,13 +52806,13 @@ __export(approvalEmailRetryScheduler_exports, {
   approvalEmailRetryScheduler: () => approvalEmailRetryScheduler,
   runApprovalEmailRetryPass: () => runApprovalEmailRetryPass
 });
-import { and as and44, eq as eq53, inArray as inArray15, lt as lt2, gt as gt3, sql as sql32 } from "drizzle-orm";
+import { and as and45, eq as eq54, inArray as inArray15, lt as lt2, gt as gt3, sql as sql32 } from "drizzle-orm";
 async function runApprovalEmailRetryPass(batch = DEFAULT_BATCH) {
   const summary = { finalised: 0, resent: 0, invalid: 0, stillFailing: 0, skipped: null };
   const now = Date.now();
   const windowStart = new Date(now - RETRY_WINDOW_MS);
   const queuedCutoff = new Date(now - QUEUED_STALE_MS);
-  const expired = await db11().update(approvalNotifications).set({ emailStatus: "failed", emailError: sql32`COALESCE(${approvalNotifications.emailError}, '') || ' [retry window expired]'` }).where(and44(inArray15(approvalNotifications.emailStatus, ["error", "queued"]), lt2(approvalNotifications.createdAt, windowStart))).returning({ anuuid: approvalNotifications.anuuid });
+  const expired = await db11().update(approvalNotifications).set({ emailStatus: "failed", emailError: sql32`COALESCE(${approvalNotifications.emailError}, '') || ' [retry window expired]'` }).where(and45(inArray15(approvalNotifications.emailStatus, ["error", "queued"]), lt2(approvalNotifications.createdAt, windowStart))).returning({ anuuid: approvalNotifications.anuuid });
   summary.finalised = expired.length;
   for (const r of expired) console.log(`[ApprovalEmailRetry] anuuid=${r.anuuid} finalised 'failed' (24h retry window expired)`);
   const cfg = sesEmailConfig();
@@ -52228,7 +52831,7 @@ async function runApprovalEmailRetryPass(batch = DEFAULT_BATCH) {
     message: approvalNotifications.message,
     emailStatus: approvalNotifications.emailStatus,
     createdAt: approvalNotifications.createdAt
-  }).from(approvalNotifications).where(and44(
+  }).from(approvalNotifications).where(and45(
     gt3(approvalNotifications.createdAt, windowStart),
     sql32`(${approvalNotifications.emailStatus} = 'error' OR (${approvalNotifications.emailStatus} = 'queued' AND ${approvalNotifications.createdAt} < ${queuedCutoff}))`
   )).limit(batch);
@@ -52239,18 +52842,18 @@ async function runApprovalEmailRetryPass(batch = DEFAULT_BATCH) {
   for (const row of rows) {
     const to = emailByUser.get(row.userUuid);
     if (!to || !isValidEmailAddress(to)) {
-      await db11().update(approvalNotifications).set({ emailStatus: "invalid-address", emailError: to ? "address failed syntax validation \u2014 never sent" : "no email on master_users" }).where(eq53(approvalNotifications.anuuid, row.anuuid));
+      await db11().update(approvalNotifications).set({ emailStatus: "invalid-address", emailError: to ? "address failed syntax validation \u2014 never sent" : "no email on master_users" }).where(eq54(approvalNotifications.anuuid, row.anuuid));
       summary.invalid++;
       continue;
     }
     try {
       const messageId = await sendApprovalEmail(cfg, to, row.title, row.message);
-      await db11().update(approvalNotifications).set({ emailStatus: "sent", emailError: null }).where(eq53(approvalNotifications.anuuid, row.anuuid));
+      await db11().update(approvalNotifications).set({ emailStatus: "sent", emailError: null }).where(eq54(approvalNotifications.anuuid, row.anuuid));
       summary.resent++;
       console.log(`[ApprovalEmailRetry] anuuid=${row.anuuid} RESENT sesMessageId=${messageId}`);
     } catch (e) {
       const msg = String(e?.message ?? e).slice(0, 300);
-      await db11().update(approvalNotifications).set({ emailStatus: "error", emailError: msg }).where(eq53(approvalNotifications.anuuid, row.anuuid)).catch((u) => console.error("[ApprovalEmailRetry] status update failed:", u));
+      await db11().update(approvalNotifications).set({ emailStatus: "error", emailError: msg }).where(eq54(approvalNotifications.anuuid, row.anuuid)).catch((u) => console.error("[ApprovalEmailRetry] status update failed:", u));
       summary.stillFailing++;
       console.warn(`[ApprovalEmailRetry] anuuid=${row.anuuid} still failing: ${msg}`);
     }
@@ -55875,6 +56478,9 @@ async function createFile(data) {
 async function listLinks(jobId, includeRemoved = false) {
   return storage.getJobWorkInstructionLinks(jobId, includeRemoved);
 }
+async function findUserNames(ids) {
+  return storage.getMasterUserNamesByIds(ids);
+}
 async function findLink(jwluuid) {
   return storage.getJobWorkInstructionLink(jwluuid);
 }
@@ -55950,19 +56556,29 @@ async function listForJob(jobId, actor2, includeRemoved = false) {
   const job = await loadVesselJob(jobId);
   assertVesselAccess(actor2, job.vesselId);
   const links = await listLinks(job.juuid, includeRemoved);
+  const removedBy = (l) => l.isDeleted ? l.updatedByUuid ?? null : null;
+  const names = await findUserNames(
+    links.flatMap((l) => [l.file?.uploadedByUuid ?? null, l.attachedByUuid ?? null, removedBy(l)]).filter((x) => !!x)
+  );
+  const nameOf = (id) => id ? names.get(id) ?? null : null;
   return links.map((l) => ({
     jwluuid: l.jwluuid,
     jobId: l.jobId,
     vesselId: l.vesselId,
     isDeleted: l.isDeleted,
     attachedAt: l.attachedAt,
+    attachedByName: nameOf(l.attachedByUuid),
+    // A removed link keeps its row (D5); the removal time is its last update (setLinkDeleted stamps updatedAt).
+    removedAt: l.isDeleted ? l.updatedAt ?? null : null,
+    removedByName: nameOf(removedBy(l)),
     file: l.file ? {
       jwfuuid: l.file.jwfuuid,
       fileName: l.file.fileName,
       fileSize: l.file.fileSize,
       revisionRemarks: l.file.revisionRemarks,
       uploadedAt: l.file.uploadedAt,
-      isDeleted: l.file.isDeleted
+      isDeleted: l.file.isDeleted,
+      uploadedByName: nameOf(l.file.uploadedByUuid)
     } : null
   }));
 }
@@ -58399,14 +59015,14 @@ import sharp from "sharp";
 // server/modules/work-orders/repositories/documentRepository.ts
 init_db();
 init_schema();
-import { eq as eq21, and as and17, sql as sql17 } from "drizzle-orm";
+import { eq as eq22, and as and18, sql as sql17 } from "drizzle-orm";
 async function findByWorkOrderId(workOrderId) {
   const db12 = await getDb();
-  return db12.select().from(workOrderDocuments).where(eq21(workOrderDocuments.workOrderId, workOrderId));
+  return db12.select().from(workOrderDocuments).where(eq22(workOrderDocuments.workOrderId, workOrderId));
 }
 async function findById4(id) {
   const db12 = await getDb();
-  const [doc] = await db12.select().from(workOrderDocuments).where(eq21(workOrderDocuments.id, id));
+  const [doc] = await db12.select().from(workOrderDocuments).where(eq22(workOrderDocuments.id, id));
   return doc;
 }
 async function create7(data) {
@@ -58416,19 +59032,19 @@ async function create7(data) {
 }
 async function deleteById(id) {
   const db12 = await getDb();
-  await db12.delete(workOrderDocuments).where(eq21(workOrderDocuments.id, id));
+  await db12.delete(workOrderDocuments).where(eq22(workOrderDocuments.id, id));
 }
 async function countByWorkOrderAndType(workOrderId, documentType) {
   const db12 = await getDb();
-  const [result] = await db12.select({ count: sql17`count(*)::int` }).from(workOrderDocuments).where(and17(
-    eq21(workOrderDocuments.workOrderId, workOrderId),
-    eq21(workOrderDocuments.documentType, documentType)
+  const [result] = await db12.select({ count: sql17`count(*)::int` }).from(workOrderDocuments).where(and18(
+    eq22(workOrderDocuments.workOrderId, workOrderId),
+    eq22(workOrderDocuments.documentType, documentType)
   ));
   return result?.count ?? 0;
 }
 async function linkExecutionId(workOrderId, executionId) {
   const db12 = await getDb();
-  await db12.update(workOrderDocuments).set({ executionId }).where(eq21(workOrderDocuments.workOrderId, workOrderId));
+  await db12.update(workOrderDocuments).set({ executionId }).where(eq22(workOrderDocuments.workOrderId, workOrderId));
 }
 
 // server/modules/work-orders/services/woDocumentService.ts
@@ -58748,7 +59364,7 @@ init_db();
 init_schema();
 init_storage();
 init_sync();
-import { eq as eq22, and as and18 } from "drizzle-orm";
+import { eq as eq23, and as and19 } from "drizzle-orm";
 import { randomUUID as randomUUID8 } from "crypto";
 var RH_PER_DAY = 24;
 function buildVesselGraceSettings(vesselSettings) {
@@ -58803,7 +59419,7 @@ async function getWorkOrderPlannerData(filters) {
     }
   }
   const database = await getDb();
-  const savedPlannerDates = await database.select().from(plannerDates).where(eq22(plannerDates.vesselId, vesselId));
+  const savedPlannerDates = await database.select().from(plannerDates).where(eq23(plannerDates.vesselId, vesselId));
   const plannerDateMap = /* @__PURE__ */ new Map();
   for (const pd of savedPlannerDates) {
     plannerDateMap.set(`${pd.jobId}::${pd.componentId}`, pd.plannedDate || "");
@@ -58979,19 +59595,19 @@ async function savePlannedDate(vesselId, jobId, componentId, plannedDate) {
   }
   const database = await getDb();
   const existing = await database.select().from(plannerDates).where(
-    and18(
-      eq22(plannerDates.vesselId, vesselId),
-      eq22(plannerDates.jobId, jobId),
-      eq22(plannerDates.componentId, componentId)
+    and19(
+      eq23(plannerDates.vesselId, vesselId),
+      eq23(plannerDates.jobId, jobId),
+      eq23(plannerDates.componentId, componentId)
     )
   );
   if (existing.length > 0) {
     const oldRow = existing[0];
     await database.update(plannerDates).set({ plannedDate: plannedDate || null }).where(
-      and18(
-        eq22(plannerDates.vesselId, vesselId),
-        eq22(plannerDates.jobId, jobId),
-        eq22(plannerDates.componentId, componentId)
+      and19(
+        eq23(plannerDates.vesselId, vesselId),
+        eq23(plannerDates.jobId, jobId),
+        eq23(plannerDates.componentId, componentId)
       )
     );
     await logFieldChanges("planner_dates", oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate: plannedDate || null }, null);
@@ -59035,19 +59651,19 @@ async function bulkSavePlannedDate(vesselId, items, plannedDate) {
     for (const item of items) {
       if (!item.jobId || !item.componentId) continue;
       const existing = await tx.select().from(plannerDates).where(
-        and18(
-          eq22(plannerDates.vesselId, vesselId),
-          eq22(plannerDates.jobId, item.jobId),
-          eq22(plannerDates.componentId, item.componentId)
+        and19(
+          eq23(plannerDates.vesselId, vesselId),
+          eq23(plannerDates.jobId, item.jobId),
+          eq23(plannerDates.componentId, item.componentId)
         )
       );
       if (existing.length > 0) {
         const oldRow = existing[0];
         await tx.update(plannerDates).set({ plannedDate }).where(
-          and18(
-            eq22(plannerDates.vesselId, vesselId),
-            eq22(plannerDates.jobId, item.jobId),
-            eq22(plannerDates.componentId, item.componentId)
+          and19(
+            eq23(plannerDates.vesselId, vesselId),
+            eq23(plannerDates.jobId, item.jobId),
+            eq23(plannerDates.componentId, item.componentId)
           )
         );
         await logFieldChanges("planner_dates", oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate }, null, tx);
@@ -60771,8 +61387,11 @@ async function getSpare3(id) {
   return spare && !spare.deleted && !spare.isDeleted ? spare : void 0;
 }
 async function createSpare2(vesselId, body) {
+  const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+  const classification = await classificationForWrite2(body, void 0, true);
   return createSpare({
     ...body,
+    ...classification,
     vesselId
   });
 }
@@ -60785,6 +61404,15 @@ async function updateSpare2(spareId, body, userId) {
     throw Object.assign(new Error("Spare not found"), { statusCode: 404 });
   }
   const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = body;
+  const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+  const classification = await classificationForWrite2(
+    body,
+    existingSpare,
+    body.partName !== void 0 || body.spareCategory !== void 0 || body.optimumQty !== void 0
+  );
+  if (body.partName !== void 0 || body.spareCategory !== void 0 || body.optimumQty !== void 0) {
+    Object.assign(otherUpdates, classification);
+  }
   if (robLocationA !== void 0 || robLocationB !== void 0) {
     if (robLocationA !== void 0 && (isNaN(Number(robLocationA)) || Number(robLocationA) < 0)) {
       throw Object.assign(new Error("robLocationA must be a valid non-negative number"), { statusCode: 400 });
@@ -61244,6 +61872,7 @@ async function createSpare3(req, res) {
     const spare = await createSpare2(req.params.vesselId, sanitizedBody);
     res.status(201).json(spare);
   } catch (error) {
+    if (error.statusCode === 400) return res.status(400).json({ error: error.message });
     res.status(500).json({ error: error.message || "Failed to create spare" });
   }
 }
@@ -62963,7 +63592,7 @@ async function recalculateRecurringDefects2(req, res) {
 // server/modules/defects/repositories/defectAdminRepository.ts
 init_postgresClient();
 init_schema();
-import { eq as eq23 } from "drizzle-orm";
+import { eq as eq24 } from "drizzle-orm";
 async function getCategories() {
   const { db: db12 } = getPostgresClient();
   return db12.select().from(defectCategories).orderBy(defectCategories.sortOrder);
@@ -62979,21 +63608,21 @@ async function createCategory(data) {
 }
 async function updateCategory(id, updates) {
   const { db: db12 } = getPostgresClient();
-  const existing = await db12.select().from(defectCategories).where(eq23(defectCategories.id, id)).limit(1);
+  const existing = await db12.select().from(defectCategories).where(eq24(defectCategories.id, id)).limit(1);
   if (!existing[0]) {
     return void 0;
   }
   const existingCategory = existing[0];
-  const [category] = await db12.update(defectCategories).set(updates).where(eq23(defectCategories.id, id)).returning();
+  const [category] = await db12.update(defectCategories).set(updates).where(eq24(defectCategories.id, id)).returning();
   return category;
 }
 async function deleteCategory(id) {
   const { db: db12 } = getPostgresClient();
-  const existing = await db12.select().from(defectCategories).where(eq23(defectCategories.id, id)).limit(1);
+  const existing = await db12.select().from(defectCategories).where(eq24(defectCategories.id, id)).limit(1);
   if (!existing[0]) {
     return void 0;
   }
-  const [deleted] = await db12.delete(defectCategories).where(eq23(defectCategories.id, id)).returning();
+  const [deleted] = await db12.delete(defectCategories).where(eq24(defectCategories.id, id)).returning();
   return deleted;
 }
 async function getTypes() {
@@ -63011,21 +63640,21 @@ async function createType(data) {
 }
 async function updateType(id, updates) {
   const { db: db12 } = getPostgresClient();
-  const existing = await db12.select().from(defectTypes).where(eq23(defectTypes.id, id)).limit(1);
+  const existing = await db12.select().from(defectTypes).where(eq24(defectTypes.id, id)).limit(1);
   if (!existing[0]) {
     return void 0;
   }
   const existingType = existing[0];
-  const [defectType] = await db12.update(defectTypes).set(updates).where(eq23(defectTypes.id, id)).returning();
+  const [defectType] = await db12.update(defectTypes).set(updates).where(eq24(defectTypes.id, id)).returning();
   return defectType;
 }
 async function deleteType(id) {
   const { db: db12 } = getPostgresClient();
-  const existing = await db12.select().from(defectTypes).where(eq23(defectTypes.id, id)).limit(1);
+  const existing = await db12.select().from(defectTypes).where(eq24(defectTypes.id, id)).limit(1);
   if (!existing[0]) {
     return void 0;
   }
-  const [deleted] = await db12.delete(defectTypes).where(eq23(defectTypes.id, id)).returning();
+  const [deleted] = await db12.delete(defectTypes).where(eq24(defectTypes.id, id)).returning();
   return deleted;
 }
 
@@ -64044,7 +64673,7 @@ async function createSurvey3(req, res) {
 // server/modules/cert-surveys/repositories/certAdminRepository.ts
 init_postgresClient();
 init_schema();
-import { eq as eq26, and as and21, inArray as inArray9, or as or9, like, sql as sql20 } from "drizzle-orm";
+import { eq as eq27, and as and22, inArray as inArray9, or as or9, like, sql as sql20 } from "drizzle-orm";
 function getDb5(tx) {
   if (tx) return tx;
   const postgres = getPostgresClient();
@@ -64054,22 +64683,22 @@ function getDb5(tx) {
 async function getMasterCertificates() {
   const db12 = await getDb5();
   if (!db12) return null;
-  return db12.select().from(shipCertificatesMaster).where(eq26(shipCertificatesMaster.isDeleted, false)).orderBy(shipCertificatesMaster.sequence);
+  return db12.select().from(shipCertificatesMaster).where(eq27(shipCertificatesMaster.isDeleted, false)).orderBy(shipCertificatesMaster.sequence);
 }
 async function getMasterCertificateByMasterId(masterId, tx) {
   const db12 = getDb5(tx);
   if (!db12) return null;
-  return db12.select().from(shipCertificatesMaster).where(eq26(shipCertificatesMaster.masterId, masterId)).limit(1);
+  return db12.select().from(shipCertificatesMaster).where(eq27(shipCertificatesMaster.masterId, masterId)).limit(1);
 }
 async function getMasterCertificateSystemFlag(masterId, tx) {
   const db12 = getDb5(tx);
   if (!db12) return null;
-  return db12.select({ id: shipCertificatesMaster.id, isSystemDefined: shipCertificatesMaster.isSystemDefined }).from(shipCertificatesMaster).where(and21(eq26(shipCertificatesMaster.masterId, masterId), eq26(shipCertificatesMaster.isDeleted, false))).limit(1);
+  return db12.select({ id: shipCertificatesMaster.id, isSystemDefined: shipCertificatesMaster.isSystemDefined }).from(shipCertificatesMaster).where(and22(eq27(shipCertificatesMaster.masterId, masterId), eq27(shipCertificatesMaster.isDeleted, false))).limit(1);
 }
 async function updateMasterCertificate(masterId, data, tx) {
   const db12 = getDb5(tx);
   if (!db12) return null;
-  return db12.update(shipCertificatesMaster).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(shipCertificatesMaster.masterId, masterId));
+  return db12.update(shipCertificatesMaster).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(shipCertificatesMaster.masterId, masterId));
 }
 async function insertMasterCertificate(data, tx) {
   const db12 = getDb5(tx);
@@ -64079,7 +64708,7 @@ async function insertMasterCertificate(data, tx) {
 async function deleteMasterCertificate(masterId, tx) {
   const db12 = getDb5(tx);
   if (!db12) return null;
-  return db12.update(shipCertificatesMaster).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(shipCertificatesMaster.masterId, masterId));
+  return db12.update(shipCertificatesMaster).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(shipCertificatesMaster.masterId, masterId));
 }
 async function getCertificateLabels() {
   const db12 = await getDb5();
@@ -64089,7 +64718,7 @@ async function getCertificateLabels() {
 async function deleteCertificateLabelsByType(configType) {
   const db12 = await getDb5();
   if (!db12) return null;
-  return db12.delete(shipCertificatesLabelsConfig).where(eq26(shipCertificatesLabelsConfig.configType, configType));
+  return db12.delete(shipCertificatesLabelsConfig).where(eq27(shipCertificatesLabelsConfig.configType, configType));
 }
 async function insertCertificateLabels(data) {
   const db12 = await getDb5();
@@ -64099,26 +64728,26 @@ async function insertCertificateLabels(data) {
 async function getApplicabilityByVesselIds(vesselIdList) {
   const db12 = await getDb5();
   if (!db12) return null;
-  return db12.select().from(vesselCertificateApplicability).where(and21(
+  return db12.select().from(vesselCertificateApplicability).where(and22(
     inArray9(vesselCertificateApplicability.vesselId, vesselIdList),
-    or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselId(vesselId) {
   const db12 = await getDb5();
   if (!db12) return null;
-  return db12.select().from(vesselCertificateApplicability).where(and21(
-    eq26(vesselCertificateApplicability.vesselId, vesselId),
-    or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+  return db12.select().from(vesselCertificateApplicability).where(and22(
+    eq27(vesselCertificateApplicability.vesselId, vesselId),
+    or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselAndMaster(vesselId, masterId, tx) {
   const db12 = getDb5(tx);
   if (!db12) return null;
-  return db12.select().from(vesselCertificateApplicability).where(and21(
-    eq26(vesselCertificateApplicability.vesselId, vesselId),
-    eq26(vesselCertificateApplicability.masterId, masterId),
-    or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+  return db12.select().from(vesselCertificateApplicability).where(and22(
+    eq27(vesselCertificateApplicability.vesselId, vesselId),
+    eq27(vesselCertificateApplicability.masterId, masterId),
+    or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function insertApplicability(data, tx) {
@@ -64140,19 +64769,19 @@ async function insertApplicabilityBulk(data, tx) {
 async function updateApplicability(vesselId, masterId, isApplicable, tx) {
   const db12 = getDb5(tx);
   if (!db12) return null;
-  return db12.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and21(
-    eq26(vesselCertificateApplicability.vesselId, vesselId),
-    eq26(vesselCertificateApplicability.masterId, masterId),
-    or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+  return db12.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
+    eq27(vesselCertificateApplicability.vesselId, vesselId),
+    eq27(vesselCertificateApplicability.masterId, masterId),
+    or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function bulkUpdateApplicability(vesselIds, masterId, isApplicable, tx) {
   const db12 = getDb5(tx);
   if (!db12) return null;
-  return db12.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and21(
+  return db12.update(vesselCertificateApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
     inArray9(vesselCertificateApplicability.vesselId, vesselIds),
-    eq26(vesselCertificateApplicability.masterId, masterId),
-    or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    eq27(vesselCertificateApplicability.masterId, masterId),
+    or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function getApplicabilityByMasterIds(masterIds, tx) {
@@ -64161,9 +64790,9 @@ async function getApplicabilityByMasterIds(masterIds, tx) {
   return db12.select({
     vesselId: vesselCertificateApplicability.vesselId,
     masterId: vesselCertificateApplicability.masterId
-  }).from(vesselCertificateApplicability).where(and21(
+  }).from(vesselCertificateApplicability).where(and22(
     inArray9(vesselCertificateApplicability.masterId, masterIds),
-    or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getAllVessels(tx) {
@@ -64172,16 +64801,16 @@ async function getAllVessels(tx) {
   return db12.select({
     vesselId: vessels.vuuid,
     vesselName: vessels.name
-  }).from(vessels).where(eq26(vessels.isActive, true));
+  }).from(vessels).where(eq27(vessels.isActive, true));
 }
 async function getCompanyCertificates() {
   const db12 = await getDb5();
   if (!db12) return null;
   return db12.select().from(shipCertificatesMaster).where(
-    and21(
-      eq26(shipCertificatesMaster.isDeleted, false),
+    and22(
+      eq27(shipCertificatesMaster.isDeleted, false),
       or9(
-        eq26(shipCertificatesMaster.applicableToCompany, true),
+        eq27(shipCertificatesMaster.applicableToCompany, true),
         like(shipCertificatesMaster.masterId, "CMP-%")
       )
     )
@@ -64193,11 +64822,11 @@ async function getCompanyApplicableMasterIds(tx) {
   return db12.select({
     masterId: shipCertificatesMaster.masterId
   }).from(shipCertificatesMaster).where(
-    and21(
-      eq26(shipCertificatesMaster.isActive, true),
-      eq26(shipCertificatesMaster.isDeleted, false),
+    and22(
+      eq27(shipCertificatesMaster.isActive, true),
+      eq27(shipCertificatesMaster.isDeleted, false),
       or9(
-        eq26(shipCertificatesMaster.applicableToCompany, true),
+        eq27(shipCertificatesMaster.applicableToCompany, true),
         like(shipCertificatesMaster.masterId, "CMP-%"),
         like(shipCertificatesMaster.masterId, "VES-%")
       )
@@ -64211,7 +64840,7 @@ async function getAllApplicabilityRecords(tx) {
     vesselId: vesselCertificateApplicability.vesselId,
     masterId: vesselCertificateApplicability.masterId
   }).from(vesselCertificateApplicability).where(
-    or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
   );
 }
 async function softDeleteApplicabilityByMasterIds(masterIds, tx) {
@@ -64219,9 +64848,9 @@ async function softDeleteApplicabilityByMasterIds(masterIds, tx) {
   if (!db12) return null;
   if (masterIds.length === 0) return [];
   return db12.update(vesselCertificateApplicability).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and21(
+    and22(
       inArray9(vesselCertificateApplicability.masterId, masterIds),
-      or9(eq26(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
+      or9(eq27(vesselCertificateApplicability.isDeleted, false), sql20`${vesselCertificateApplicability.isDeleted} IS NULL`)
     )
   ).returning({ masterId: vesselCertificateApplicability.masterId });
 }
@@ -64798,7 +65427,7 @@ async function bulkUpdateApplicability3(req, res) {
 // server/modules/cert-surveys/repositories/surveyAdminRepository.ts
 init_postgresClient();
 init_schema();
-import { eq as eq27, and as and22, inArray as inArray10, or as or10, like as like2, sql as sql21 } from "drizzle-orm";
+import { eq as eq28, and as and23, inArray as inArray10, or as or10, like as like2, sql as sql21 } from "drizzle-orm";
 function getDb6() {
   const postgres = getPostgresClient();
   if (!postgres) return null;
@@ -64807,20 +65436,20 @@ function getDb6() {
 async function getMasterSurveys() {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.select().from(shipSurveysMaster).where(eq27(shipSurveysMaster.isDeleted, false)).orderBy(shipSurveysMaster.sequence);
+  return db12.select().from(shipSurveysMaster).where(eq28(shipSurveysMaster.isDeleted, false)).orderBy(shipSurveysMaster.sequence);
 }
 async function getMasterSurveyByMasterId(masterId) {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.select().from(shipSurveysMaster).where(and22(
-    eq27(shipSurveysMaster.masterId, masterId),
-    eq27(shipSurveysMaster.isDeleted, false)
+  return db12.select().from(shipSurveysMaster).where(and23(
+    eq28(shipSurveysMaster.masterId, masterId),
+    eq28(shipSurveysMaster.isDeleted, false)
   )).limit(1);
 }
 async function updateMasterSurvey(masterId, data) {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.update(shipSurveysMaster).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(shipSurveysMaster.masterId, masterId));
+  return db12.update(shipSurveysMaster).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(shipSurveysMaster.masterId, masterId));
 }
 async function insertMasterSurvey(data) {
   const db12 = await getDb6();
@@ -64847,7 +65476,7 @@ async function insertMasterSurvey(data) {
 async function deleteMasterSurvey(masterId) {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.update(shipSurveysMaster).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(shipSurveysMaster.masterId, masterId));
+  return db12.update(shipSurveysMaster).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(shipSurveysMaster.masterId, masterId));
 }
 async function getSurveyLabels() {
   const db12 = await getDb6();
@@ -64857,7 +65486,7 @@ async function getSurveyLabels() {
 async function deleteSurveyLabelsByType(configType) {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.delete(shipSurveysLabelsConfig).where(eq27(shipSurveysLabelsConfig.configType, configType));
+  return db12.delete(shipSurveysLabelsConfig).where(eq28(shipSurveysLabelsConfig.configType, configType));
 }
 async function insertSurveyLabels(data) {
   const db12 = await getDb6();
@@ -64867,17 +65496,17 @@ async function insertSurveyLabels(data) {
 async function getApplicabilityByVesselIds2(vesselIdList) {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.select().from(vesselSurveyApplicability).where(and22(
+  return db12.select().from(vesselSurveyApplicability).where(and23(
     inArray10(vesselSurveyApplicability.vesselId, vesselIdList),
-    or10(eq27(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or10(eq28(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function getApplicabilityByVesselId2(vesselId) {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.select().from(vesselSurveyApplicability).where(and22(
-    eq27(vesselSurveyApplicability.vesselId, vesselId),
-    or10(eq27(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
+  return db12.select().from(vesselSurveyApplicability).where(and23(
+    eq28(vesselSurveyApplicability.vesselId, vesselId),
+    or10(eq28(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
   ));
 }
 async function insertApplicabilityBulk2(data) {
@@ -64891,10 +65520,10 @@ async function insertApplicabilityBulk2(data) {
 async function bulkUpdateApplicability4(vesselIds, masterId, isApplicable) {
   const db12 = await getDb6();
   if (!db12) return null;
-  return db12.update(vesselSurveyApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
+  return db12.update(vesselSurveyApplicability).set({ isApplicable, updatedAt: /* @__PURE__ */ new Date() }).where(and23(
     inArray10(vesselSurveyApplicability.vesselId, vesselIds),
-    eq27(vesselSurveyApplicability.masterId, masterId),
-    or10(eq27(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    eq28(vesselSurveyApplicability.masterId, masterId),
+    or10(eq28(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
   )).returning();
 }
 async function getAllApplicability() {
@@ -64904,7 +65533,7 @@ async function getAllApplicability() {
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId
   }).from(vesselSurveyApplicability).where(
-    or10(eq27(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or10(eq28(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
   );
 }
 async function getAllVessels2() {
@@ -64913,16 +65542,16 @@ async function getAllVessels2() {
   return db12.select({
     vesselId: vessels.vuuid,
     vesselName: vessels.name
-  }).from(vessels).where(eq27(vessels.isActive, true));
+  }).from(vessels).where(eq28(vessels.isActive, true));
 }
 async function getCompanySurveys() {
   const db12 = await getDb6();
   if (!db12) return null;
   return db12.select().from(shipSurveysMaster).where(
-    and22(
-      eq27(shipSurveysMaster.isDeleted, false),
+    and23(
+      eq28(shipSurveysMaster.isDeleted, false),
       or10(
-        eq27(shipSurveysMaster.applicableToCompany, true),
+        eq28(shipSurveysMaster.applicableToCompany, true),
         like2(shipSurveysMaster.masterId, "CMP-%")
       )
     )
@@ -64934,11 +65563,11 @@ async function getCompanyApplicableMasterIds2() {
   return db12.select({
     masterId: shipSurveysMaster.masterId
   }).from(shipSurveysMaster).where(
-    and22(
-      eq27(shipSurveysMaster.isActive, true),
-      eq27(shipSurveysMaster.isDeleted, false),
+    and23(
+      eq28(shipSurveysMaster.isActive, true),
+      eq28(shipSurveysMaster.isDeleted, false),
       or10(
-        eq27(shipSurveysMaster.applicableToCompany, true),
+        eq28(shipSurveysMaster.applicableToCompany, true),
         like2(shipSurveysMaster.masterId, "CMP-%"),
         like2(shipSurveysMaster.masterId, "VES-%")
       )
@@ -64952,7 +65581,7 @@ async function getAllApplicabilityRecords2() {
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId
   }).from(vesselSurveyApplicability).where(
-    or10(eq27(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    or10(eq28(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
   );
 }
 async function softDeleteApplicabilityByMasterIds2(masterIds) {
@@ -64960,9 +65589,9 @@ async function softDeleteApplicabilityByMasterIds2(masterIds) {
   if (!db12) return null;
   if (masterIds.length === 0) return [];
   return db12.update(vesselSurveyApplicability).set({ isDeleted: true, updatedAt: /* @__PURE__ */ new Date() }).where(
-    and22(
+    and23(
       inArray10(vesselSurveyApplicability.masterId, masterIds),
-      or10(eq27(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
+      or10(eq28(vesselSurveyApplicability.isDeleted, false), sql21`${vesselSurveyApplicability.isDeleted} IS NULL`)
     )
   ).returning({ masterId: vesselSurveyApplicability.masterId });
 }
@@ -65800,10 +66429,15 @@ async function getFleetSpare2(id) {
   return spare;
 }
 async function createFleetSpare2(body) {
+  const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+  Object.assign(body, await classificationForWrite2(body, void 0, true));
   const validatedData = insertFleetSparesSchema.parse(body);
   return createFleetSpare(validatedData);
 }
 async function updateFleetSpare2(id, body) {
+  const { classificationForWrite: classificationForWrite2 } = await Promise.resolve().then(() => (init_classification(), classification_exports));
+  const saved = await getFleetSpare2(id);
+  Object.assign(body, await classificationForWrite2(body, saved, true));
   const partialSchema = insertFleetSparesSchema.partial();
   const validatedData = partialSchema.parse(body);
   return updateFleetSpare(id, validatedData);
@@ -65835,7 +66469,9 @@ async function exportFleetSpares(fleetEquipmentCode) {
     "Criticality",
     "Is Active",
     "IHM (Inventory of Hazardous Materials)",
-    "Evidence Type"
+    "Evidence Type",
+    "Spare Category",
+    "Optimum Qty"
   ];
   const rows = sparesList.map((s) => [
     s.partCode || "",
@@ -65855,7 +66491,9 @@ async function exportFleetSpares(fleetEquipmentCode) {
     s.criticality || "",
     s.isActive === false ? "No" : "Yes",
     s.ihm || "",
-    s.evidenceType || ""
+    s.evidenceType || "",
+    s.spareCategory ?? "",
+    s.optimumQty ?? ""
   ]);
   const wsData = [headers, ...rows];
   const ws = XLSX2.utils.aoa_to_sheet(wsData);
@@ -66262,11 +66900,12 @@ async function createFleetSpare3(req, res) {
     const spare = await createFleetSpare2(req.body);
     res.status(201).json(spare);
   } catch (error) {
+    if (error.statusCode === 400) return res.status(400).json({ error: error.message });
     if (error.name === "ZodError") {
       return res.status(400).json({ error: "Invalid spare data", details: error.errors });
     }
     console.error("Error creating fleet spare:", error);
-    res.status(500).json({ error: error.message || "Failed to create fleet spare" });
+    res.status(error.statusCode || 500).json({ error: error.message || "Failed to create fleet spare" });
   }
 }
 async function updateFleetSpare3(req, res) {
@@ -66281,6 +66920,7 @@ async function updateFleetSpare3(req, res) {
     console.log(`[FleetSpare] Successfully updated spare id=${id}, partCode=${spare.partCode}`);
     res.json(spare);
   } catch (error) {
+    if (error.statusCode === 400) return res.status(400).json({ error: error.message });
     if (error.name === "ZodError") {
       console.error(`[FleetSpare] Zod validation failed:`, error.errors);
       return res.status(400).json({ error: "Invalid spare data", details: error.errors });
@@ -66289,7 +66929,7 @@ async function updateFleetSpare3(req, res) {
       return res.status(404).json({ error: error.message });
     }
     console.error("[FleetSpare] Error updating fleet spare:", error);
-    res.status(500).json({ error: "Failed to update fleet spare" });
+    res.status(error.statusCode || 500).json({ error: error.message || "Failed to update fleet spare" });
   }
 }
 async function deleteFleetSpare3(req, res) {
@@ -66538,7 +67178,7 @@ import { z as z9 } from "zod";
 init_schema();
 import { z as z8 } from "zod";
 import { randomUUID as randomUUID9 } from "crypto";
-import { eq as eq29, and as and24 } from "drizzle-orm";
+import { eq as eq30, and as and25 } from "drizzle-orm";
 
 // server/modules/fleet/repositories/fleetAdminRepository.ts
 var fleetAdminRepository_exports = {};
@@ -66579,7 +67219,7 @@ __export(fleetAdminRepository_exports, {
   getFleetComponents: () => getFleetComponents,
   getFleetJobByCode: () => getFleetJobByCode,
   getFleetJobVesselMappings: () => getFleetJobVesselMappings,
-  getFleetSpareByPartCode: () => getFleetSpareByPartCode,
+  getFleetSpareByIdentity: () => getFleetSpareByIdentity,
   getFleetSpareVesselMappings: () => getFleetSpareVesselMappings,
   getFleetVesselMappingsByVessel: () => getFleetVesselMappingsByVessel,
   getJobByJuuid: () => getJobByJuuid,
@@ -66605,9 +67245,8 @@ __export(fleetAdminRepository_exports, {
 });
 init_storage();
 init_db();
-init_sync();
 init_schema();
-import { eq as eq28, and as and23, like as like3, or as or11 } from "drizzle-orm";
+import { eq as eq29, and as and24, like as like3, or as or11 } from "drizzle-orm";
 async function getMasterDataList() {
   return storage.getMasterDataList();
 }
@@ -66731,10 +67370,10 @@ async function getFleetAdminMetrics() {
 }
 async function getDashboardStatsData() {
   const db12 = await getDb();
-  const allComponents = await db12.select().from(fleetComponents).where(eq28(fleetComponents.isDeleted, false));
-  const allJobs = await db12.select().from(fleetJobs).where(eq28(fleetJobs.isDeleted, false));
-  const allSpares = await db12.select().from(fleetSpares).where(eq28(fleetSpares.isDeleted, false));
-  const allMakers = await db12.select().from(makerList).where(eq28(makerList.isDeleted, false));
+  const allComponents = await db12.select().from(fleetComponents).where(eq29(fleetComponents.isDeleted, false));
+  const allJobs = await db12.select().from(fleetJobs).where(eq29(fleetJobs.isDeleted, false));
+  const allSpares = await db12.select().from(fleetSpares).where(eq29(fleetSpares.isDeleted, false));
+  const allMakers = await db12.select().from(makerList).where(eq29(makerList.isDeleted, false));
   return { allComponents, allJobs, allSpares, allMakers };
 }
 async function getCopyVesselDb() {
@@ -66748,11 +67387,11 @@ async function getVesselComponentsByFleetEquipmentPrefix(vesselCode, fleetEquipm
     name: components.name,
     fleetEquipmentCode: components.fleetEquipmentCode,
     fleetEquipmentName: components.fleetEquipmentName
-  }).from(components).where(and23(
-    eq28(components.vesselCode, vesselCode),
-    eq28(components.dataScope, "vessel"),
+  }).from(components).where(and24(
+    eq29(components.vesselCode, vesselCode),
+    eq29(components.dataScope, "vessel"),
     or11(
-      eq28(components.fleetEquipmentCode, fleetEquipmentCode),
+      eq29(components.fleetEquipmentCode, fleetEquipmentCode),
       like3(components.fleetEquipmentCode, fleetEquipmentCode + ".%")
     )
   ));
@@ -66760,97 +67399,89 @@ async function getVesselComponentsByFleetEquipmentPrefix(vesselCode, fleetEquipm
 async function getActiveComponentMappingsForVessel(vesselCode, fleetEquipmentCode) {
   const db12 = await getDb();
   const conditions = [
-    eq28(fleetComponentMapping.vesselCode, vesselCode),
-    eq28(fleetComponentMapping.isActive, true)
+    eq29(fleetComponentMapping.vesselCode, vesselCode),
+    eq29(fleetComponentMapping.isActive, true)
   ];
   if (fleetEquipmentCode) {
-    conditions.push(eq28(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode));
+    conditions.push(eq29(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode));
   }
-  return db12.select().from(fleetComponentMapping).where(and23(...conditions));
+  return db12.select().from(fleetComponentMapping).where(and24(...conditions));
 }
 async function getActiveFleetComponentByCode(code) {
   const db12 = await getDb();
-  const rows = await db12.select().from(fleetComponents).where(and23(
-    eq28(fleetComponents.fleetEquipmentCode, code),
-    eq28(fleetComponents.isActive, true),
-    eq28(fleetComponents.isDeleted, false)
+  const rows = await db12.select().from(fleetComponents).where(and24(
+    eq29(fleetComponents.fleetEquipmentCode, code),
+    eq29(fleetComponents.isActive, true),
+    eq29(fleetComponents.isDeleted, false)
   ));
   return rows[0] || null;
 }
 async function getComponentByCuuid(cuuid) {
   const db12 = await getDb();
-  const rows = await db12.select().from(components).where(eq28(components.cuuid, cuuid));
+  const rows = await db12.select().from(components).where(eq29(components.cuuid, cuuid));
   return rows[0] || null;
 }
 async function updateComponentResyncFields(cuuid, fields) {
   const db12 = await getDb();
-  await db12.update(components).set({ ...fields, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(components.cuuid, cuuid));
+  await db12.update(components).set({ ...fields, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(components.cuuid, cuuid));
 }
 async function getActiveJobMappingsForVessel(vesselCode, fleetEquipmentCode) {
   const db12 = await getDb();
   const conditions = [
-    eq28(fleetJobVesselMapping.vesselCode, vesselCode),
-    eq28(fleetJobVesselMapping.isActive, true)
+    eq29(fleetJobVesselMapping.vesselCode, vesselCode),
+    eq29(fleetJobVesselMapping.isActive, true)
   ];
   if (fleetEquipmentCode) {
-    conditions.push(eq28(fleetJobVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+    conditions.push(eq29(fleetJobVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
   }
-  return db12.select().from(fleetJobVesselMapping).where(and23(...conditions));
+  return db12.select().from(fleetJobVesselMapping).where(and24(...conditions));
 }
 async function getFleetJobByCode(jobCode) {
   const db12 = await getDb();
-  const rows = await db12.select().from(fleetJobs).where(and23(
-    eq28(fleetJobs.jobCode, jobCode),
-    eq28(fleetJobs.isActive, true),
-    eq28(fleetJobs.isDeleted, false)
+  const rows = await db12.select().from(fleetJobs).where(and24(
+    eq29(fleetJobs.jobCode, jobCode),
+    eq29(fleetJobs.isActive, true),
+    eq29(fleetJobs.isDeleted, false)
   ));
   return rows[0] || null;
 }
 async function getJobByJuuid(juuid) {
   const db12 = await getDb();
-  const rows = await db12.select().from(jobs).where(eq28(jobs.juuid, juuid));
+  const rows = await db12.select().from(jobs).where(eq29(jobs.juuid, juuid));
   return rows[0] || null;
 }
 async function updateJobResyncFields(juuid, fields) {
   const db12 = await getDb();
-  await db12.update(jobs).set({ ...fields, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(jobs.juuid, juuid));
+  await db12.update(jobs).set({ ...fields, updatedAt: /* @__PURE__ */ new Date() }).where(eq29(jobs.juuid, juuid));
 }
 async function getActiveSpareMappingsForVessel(vesselCode, fleetEquipmentCode) {
   const db12 = await getDb();
   const conditions = [
-    eq28(fleetSpareVesselMapping.vesselCode, vesselCode),
-    eq28(fleetSpareVesselMapping.isActive, true)
+    eq29(fleetSpareVesselMapping.vesselCode, vesselCode),
+    eq29(fleetSpareVesselMapping.isActive, true)
   ];
   if (fleetEquipmentCode) {
-    conditions.push(eq28(fleetSpareVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+    conditions.push(eq29(fleetSpareVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
   }
-  return db12.select().from(fleetSpareVesselMapping).where(and23(...conditions));
+  return db12.select().from(fleetSpareVesselMapping).where(and24(...conditions));
 }
-async function getFleetSpareByPartCode(partCode) {
+async function getFleetSpareByIdentity(partCode, fleetEquipmentCode) {
   const db12 = await getDb();
-  const rows = await db12.select().from(fleetSpares).where(and23(
-    eq28(fleetSpares.partCode, partCode),
-    eq28(fleetSpares.isActive, true),
-    eq28(fleetSpares.isDeleted, false)
+  const rows = await db12.select().from(fleetSpares).where(and24(
+    eq29(fleetSpares.partCode, partCode),
+    eq29(fleetSpares.fleetEquipmentCode, fleetEquipmentCode),
+    eq29(fleetSpares.isActive, true),
+    eq29(fleetSpares.isDeleted, false)
   ));
   return rows[0] || null;
 }
 async function getSpareBySuuid(suuid) {
   const db12 = await getDb();
-  const rows = await db12.select().from(spares).where(eq28(spares.suuid, suuid));
+  const rows = await db12.select().from(spares).where(eq29(spares.suuid, suuid));
   return rows[0] || null;
 }
 async function updateSpareResyncFields(suuid, fields) {
-  const db12 = await getDb();
-  const existingSpare = await getSpareBySuuid(suuid);
-  const [updated] = await db12.update(spares).set({ ...fields, updatedAt: /* @__PURE__ */ new Date() }).where(eq28(spares.suuid, suuid)).returning();
-  if (existingSpare && updated) {
-    try {
-      await logFieldChanges("spares", suuid, existingSpare.vesselId || null, existingSpare, updated, "system");
-    } catch (e) {
-      console.error("[FieldLogger] spare resync:", e);
-    }
-  }
+  return storage.updateSpare(suuid, fields);
 }
 
 // server/modules/fleet/services/fleetAdminService.ts
@@ -67459,8 +68090,8 @@ async function copyVessel(body) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 13)}`;
   };
   if (data.copyComponents) {
-    const sourceComps = await db12.select().from(components2).where(eq29(components2.vesselId, data.sourceVesselCode));
-    const targetComps = await db12.select().from(components2).where(eq29(components2.vesselId, data.targetVesselCode));
+    const sourceComps = await db12.select().from(components2).where(eq30(components2.vesselId, data.sourceVesselCode));
+    const targetComps = await db12.select().from(components2).where(eq30(components2.vesselId, data.targetVesselCode));
     const existingCodeToId = /* @__PURE__ */ new Map();
     for (const c of targetComps) {
       if (c.componentCode) existingCodeToId.set(c.componentCode, c.cuuid);
@@ -67524,15 +68155,15 @@ async function copyVessel(body) {
     }
   }
   if (data.copyJobs) {
-    const sourceJobList = await db12.select().from(jobs2).where(eq29(jobs2.vesselId, data.sourceVesselCode));
-    const targetJobList = await db12.select().from(jobs2).where(eq29(jobs2.vesselId, data.targetVesselCode));
+    const sourceJobList = await db12.select().from(jobs2).where(eq30(jobs2.vesselId, data.sourceVesselCode));
+    const targetJobList = await db12.select().from(jobs2).where(eq30(jobs2.vesselId, data.targetVesselCode));
     const existingJobNos = new Set(targetJobList.map((j) => j.jobNo));
     for (const job of sourceJobList) {
       if (existingJobNos.has(job.jobNo)) continue;
       const newId = generateId("JOB");
       const newComponentId = componentIdMap.get(job.componentId || "") || job.componentId;
       if (job.maintenanceBasis === "Dual Frequency" && newComponentId) {
-        const [targetComp] = await db12.select().from(components2).where(eq29(components2.cuuid, newComponentId));
+        const [targetComp] = await db12.select().from(components2).where(eq30(components2.cuuid, newComponentId));
         const targetRhType = (targetComp?.rhCounterType || "").toUpperCase();
         if (!targetComp || targetRhType !== "MASTER" && targetRhType !== "INHERITED") {
           const compName = targetComp?.name || job.componentName || newComponentId;
@@ -67591,11 +68222,11 @@ async function copyVessel(body) {
     }
   }
   if (data.copySpares) {
-    const sourceSpareList = await db12.select().from(spares2).where(and24(
-      eq29(spares2.vesselId, data.sourceVesselCode),
-      eq29(spares2.deleted, false)
+    const sourceSpareList = await db12.select().from(spares2).where(and25(
+      eq30(spares2.vesselId, data.sourceVesselCode),
+      eq30(spares2.deleted, false)
     ));
-    const targetSpareList = await db12.select().from(spares2).where(eq29(spares2.vesselId, data.targetVesselCode));
+    const targetSpareList = await db12.select().from(spares2).where(eq30(spares2.vesselId, data.targetVesselCode));
     const existingSpareKeyMap = /* @__PURE__ */ new Map();
     const existingSpareUuidMap = /* @__PURE__ */ new Map();
     for (const s of targetSpareList) {
@@ -67613,8 +68244,8 @@ async function copyVessel(body) {
       }
       const newComponentId = componentIdMap.get(spare.componentId || "") || spare.componentId;
       try {
-        const [inserted] = await db12.insert(spares2).values({
-          suuid: randomUUID9(),
+        const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+        const inserted = await storage2.createSpare({
           partCode: spare.partCode,
           partName: spare.partName,
           componentId: newComponentId,
@@ -67622,6 +68253,8 @@ async function copyVessel(body) {
           componentName: spare.componentName,
           componentSpareCode: spare.componentSpareCode,
           critical: spare.critical,
+          spareCategory: spare.spareCategory,
+          optimumQty: spare.optimumQty,
           rob: 0,
           robLocationA: 0,
           robLocationB: 0,
@@ -67642,7 +68275,7 @@ async function copyVessel(body) {
           drawingNo: spare.drawingNo,
           location2: null,
           remarks: spare.remarks
-        }).returning({ id: spares2.id, suuid: spares2.suuid });
+        }, true);
         spareIdMap.set(spare.id, inserted.id);
         spareUuidMap.set(spare.id, inserted.suuid);
         copyResults.spares++;
@@ -67650,8 +68283,8 @@ async function copyVessel(body) {
         copyResults.errors.push(`Spare ${spare.partCode}: ${e.message}`);
       }
     }
-    const sourceLinks = await db12.select().from(spareComponentLinks2).where(eq29(spareComponentLinks2.vesselId, data.sourceVesselCode));
-    const targetLinks = await db12.select().from(spareComponentLinks2).where(eq29(spareComponentLinks2.vesselId, data.targetVesselCode));
+    const sourceLinks = await db12.select().from(spareComponentLinks2).where(eq30(spareComponentLinks2.vesselId, data.sourceVesselCode));
+    const targetLinks = await db12.select().from(spareComponentLinks2).where(eq30(spareComponentLinks2.vesselId, data.targetVesselCode));
     const existingLinkKeys = new Set(
       targetLinks.map((l) => `${l.spareId}|${l.componentId}`)
     );
@@ -67678,11 +68311,11 @@ async function copyVessel(body) {
     }
   }
   if (data.copyStores) {
-    const sourceStoreList = await db12.select().from(storesItems2).where(and24(
-      eq29(storesItems2.vesselId, data.sourceVesselCode),
-      eq29(storesItems2.deleted, false)
+    const sourceStoreList = await db12.select().from(storesItems2).where(and25(
+      eq30(storesItems2.vesselId, data.sourceVesselCode),
+      eq30(storesItems2.deleted, false)
     ));
-    const targetStoreList = await db12.select().from(storesItems2).where(eq29(storesItems2.vesselId, data.targetVesselCode));
+    const targetStoreList = await db12.select().from(storesItems2).where(eq30(storesItems2.vesselId, data.targetVesselCode));
     const existingStoreCodes = new Set(
       targetStoreList.map((s) => `${s.itemCode}|${s.itemType}`)
     );
@@ -67869,6 +68502,8 @@ async function resyncJobs(vesselCode, fleetEquipmentCode) {
   return result;
 }
 var SPARE_FIELD_MAP = [
+  { fleetKey: "spareCategory", vesselKey: "spareCategory", label: "Spare Category" },
+  { fleetKey: "optimumQty", vesselKey: "optimumQty", label: "Optimum Qty" },
   { fleetKey: "partName", vesselKey: "partName", label: "part_name" },
   { fleetKey: "partNumber", vesselKey: "partNumber", label: "part_number" },
   { fleetKey: "unitOfMeasurement", vesselKey: "uom", label: "uom" },
@@ -67884,7 +68519,7 @@ async function resyncSpares(vesselCode, fleetEquipmentCode) {
   const mappings = await getActiveSpareMappingsForVessel(vesselCode, fleetEquipmentCode);
   const result = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
   for (const m of mappings) {
-    const fleetSpare = await getFleetSpareByPartCode(m.partCode);
+    const fleetSpare = await getFleetSpareByIdentity(m.partCode, m.fleetEquipmentCode);
     if (!fleetSpare) {
       result.skipped++;
       result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: "skipped", changedFields: [], error: "Fleet spare not found or inactive" });
@@ -70413,7 +71048,7 @@ import ExcelJS2 from "exceljs";
 init_storage();
 init_db();
 init_schema();
-import { eq as eq31, and as and26, gte as gte4, sql as sql23, desc as desc7 } from "drizzle-orm";
+import { eq as eq32, and as and27, gte as gte4, sql as sql23, desc as desc7 } from "drizzle-orm";
 var LowStockReportService = class {
   async computeReport(vesselId, filters) {
     const allItems = await storage.getStoresItems(vesselId);
@@ -70427,9 +71062,9 @@ var LowStockReportService = class {
       totalConsumed: sql23`COALESCE(SUM(ABS(${storesLedger.qtyChangeBase})), 0)`,
       eventCount: sql23`COUNT(*)`,
       lastConsumed: sql23`MAX(${storesLedger.timestampUTC})`
-    }).from(storesLedger).where(and26(
-      eq31(storesLedger.vesselId, vesselId),
-      eq31(storesLedger.eventType, "CONSUME"),
+    }).from(storesLedger).where(and27(
+      eq32(storesLedger.vesselId, vesselId),
+      eq32(storesLedger.eventType, "CONSUME"),
       gte4(storesLedger.timestampUTC, ninetyDaysAgo)
     )).groupBy(storesLedger.itemId);
     const consumptionMap = /* @__PURE__ */ new Map();
@@ -70548,8 +71183,8 @@ var LowStockReportService = class {
   }
   async getSnapshots(vesselId, reportType, startDate, endDate, limit = 50) {
     const db12 = await getDb();
-    const conditions = [eq31(reportSnapshots.vesselId, vesselId)];
-    if (reportType) conditions.push(eq31(reportSnapshots.reportType, reportType));
+    const conditions = [eq32(reportSnapshots.vesselId, vesselId)];
+    if (reportType) conditions.push(eq32(reportSnapshots.reportType, reportType));
     if (startDate) conditions.push(gte4(reportSnapshots.generatedAt, startDate));
     if (endDate) {
       const { lte: lte4 } = await import("drizzle-orm");
@@ -70565,12 +71200,12 @@ var LowStockReportService = class {
       itemCount: reportSnapshots.itemCount,
       filtersApplied: reportSnapshots.filtersApplied,
       summaryData: reportSnapshots.summaryData
-    }).from(reportSnapshots).where(and26(...conditions)).orderBy(desc7(reportSnapshots.generatedAt)).limit(limit);
+    }).from(reportSnapshots).where(and27(...conditions)).orderBy(desc7(reportSnapshots.generatedAt)).limit(limit);
     return results;
   }
   async getSnapshotDetail(snapshotId) {
     const db12 = await getDb();
-    const [snapshot] = await db12.select().from(reportSnapshots).where(eq31(reportSnapshots.id, snapshotId)).limit(1);
+    const [snapshot] = await db12.select().from(reportSnapshots).where(eq32(reportSnapshots.id, snapshotId)).limit(1);
     return snapshot || null;
   }
 };
@@ -77779,7 +78414,7 @@ async function exportChangeRequestsExcel2(req, res) {
 // server/modules/reports/controllers/favoritesController.ts
 init_schema();
 init_db();
-import { eq as eq33, and as and28 } from "drizzle-orm";
+import { eq as eq34, and as and29 } from "drizzle-orm";
 function getUserUuid(req) {
   return req.user?.userUuid || null;
 }
@@ -77791,9 +78426,9 @@ async function getFavorites(req, res) {
     }
     const db12 = await getDb();
     const favorites = await db12.select({ reportId: reportFavorites.reportId }).from(reportFavorites).where(
-      and28(
-        eq33(reportFavorites.createdByUuid, userUuid),
-        eq33(reportFavorites.isDeleted, false)
+      and29(
+        eq34(reportFavorites.createdByUuid, userUuid),
+        eq34(reportFavorites.isDeleted, false)
       )
     );
     res.json({ reportIds: favorites.map((f) => f.reportId) });
@@ -77814,9 +78449,9 @@ async function addFavorite(req, res) {
     }
     const db12 = await getDb();
     const existing = await db12.select().from(reportFavorites).where(
-      and28(
-        eq33(reportFavorites.createdByUuid, userUuid),
-        eq33(reportFavorites.reportId, reportId)
+      and29(
+        eq34(reportFavorites.createdByUuid, userUuid),
+        eq34(reportFavorites.reportId, reportId)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -77824,7 +78459,7 @@ async function addFavorite(req, res) {
         await db12.update(reportFavorites).set({
           isDeleted: false,
           updatedByUuid: userUuid
-        }).where(eq33(reportFavorites.id, existing[0].id));
+        }).where(eq34(reportFavorites.id, existing[0].id));
       }
       return res.json({ success: true, reportId });
     }
@@ -77854,9 +78489,9 @@ async function removeFavorite(req, res) {
       isDeleted: true,
       updatedByUuid: userUuid
     }).where(
-      and28(
-        eq33(reportFavorites.createdByUuid, userUuid),
-        eq33(reportFavorites.reportId, reportId)
+      and29(
+        eq34(reportFavorites.createdByUuid, userUuid),
+        eq34(reportFavorites.reportId, reportId)
       )
     );
     res.json({ success: true, reportId });
@@ -78072,7 +78707,7 @@ import Papa2 from "papaparse";
 import { v4 as uuidv42 } from "uuid";
 import path10 from "path";
 import { promises as fsPromises2 } from "fs";
-import { eq as eq34, and as and29 } from "drizzle-orm";
+import { eq as eq35, and as and30 } from "drizzle-orm";
 
 // server/services/fileBasedImportHistory.ts
 import path9 from "path";
@@ -78826,6 +79461,13 @@ function normalizeColumnNames(data, type) {
   const columnMap = {};
   for (const col of originalColumns) {
     const normalizedLookup = col.toLowerCase().trim();
+    if (type === "spares" || type === "fleet-spares") {
+      const compact = normalizedLookup.replace(/[\s_-]+/g, "");
+      if (compact === "sparecategory" || compact === "optimumqty" || compact === "optimumquantity") {
+        columnMap[col] = compact === "sparecategory" ? "Spare Category" : "Optimum Qty";
+        continue;
+      }
+    }
     if (mappings[normalizedLookup]) {
       columnMap[col] = mappings[normalizedLookup];
     } else {
@@ -79016,7 +79658,9 @@ var SPARES_TEMPLATE_FIELDS = [
   { header: "Is Active", key: "isActive", width: 12, required: false, description: "Yes or No - defaults to Yes" },
   { header: "IHM (Inventory of Hazardous Materials)", key: "ihm", width: 35, required: false, description: "Yes or No" },
   { header: "Evidence Type", key: "evidenceType", width: 16, required: false, description: "Type of evidence/remarks" },
-  { header: "Rotation Item", key: "isRotationItem", width: 14, required: false, description: "Yes or No - Rotation spare flag" }
+  { header: "Rotation Item", key: "isRotationItem", width: 14, required: false, description: "Yes or No - Rotation spare flag" },
+  { header: "Spare Category", key: "spareCategory", width: 20, required: true, description: "Required Master List category key or label (Essential, Optimum, General). Legacy templates must omit BOTH new columns." },
+  { header: "Optimum Qty", key: "optimumQty", width: 18, required: false, description: "Required only for Optimum: whole number 1\u20132147483647. Leave blank for other categories." }
 ];
 function getSparesExcelColumns() {
   return SPARES_TEMPLATE_FIELDS.map((f) => ({
@@ -79203,7 +79847,9 @@ async function generateFleetMasterTemplate() {
     { header: "Supplier", key: "supplier", width: 30 },
     { header: "Critical Yes/No", key: "critical", width: 15 },
     { header: "IS Active", key: "isActive", width: 12 },
-    { header: "Remarks", key: "remarks", width: 40 }
+    { header: "Remarks", key: "remarks", width: 40 },
+    { header: "Spare Category", key: "spareCategory", width: 22 },
+    { header: "Optimum Qty", key: "optimumQty", width: 18 }
   ];
   fleetSpareSheet.getRow(1).font = { bold: true };
   const vesselSpareSheet = workbook.addWorksheet("Vessel_Spare");
@@ -80345,6 +80991,8 @@ async function validateData(type, data, mode, vesselId) {
   }
   const fleetSpareCompositeOccurrences = /* @__PURE__ */ new Map();
   const existingDbFleetSpareCompositeKeys = /* @__PURE__ */ new Set();
+  const existingSpareClassifications = /* @__PURE__ */ new Map();
+  const fileSpareClassifications = /* @__PURE__ */ new Map();
   if (type === "fleet-spares") {
     try {
       const existingFleetSpares = await storage.getFleetSparesFromTable();
@@ -80352,6 +81000,7 @@ async function validateData(type, data, mode, vesselId) {
         if (fs12.partCode && fs12.fleetEquipmentCode) {
           const compositeKey = `${fs12.partCode.toUpperCase()}|${fs12.fleetEquipmentCode.toUpperCase()}`;
           existingDbFleetSpareCompositeKeys.add(compositeKey);
+          existingSpareClassifications.set(compositeKey, fs12);
         }
       });
       console.log(`\u{1F4CB} Loaded ${existingDbFleetSpareCompositeKeys.size} existing fleet spare composite keys from database`);
@@ -80381,6 +81030,7 @@ async function validateData(type, data, mode, vesselId) {
       try {
         const existingSparesList = await storage.getSpares(vesselId);
         existingSparesList.forEach((s) => {
+          if (s.partCode) existingSpareClassifications.set(String(s.partCode).trim().toUpperCase(), s);
           if (s.partCode && s.componentCode) {
             const vessel = (s.vesselId ?? vesselId ?? "").toUpperCase();
             const ck = `${String(s.partCode).trim().toUpperCase()}|${String(s.componentCode).trim().toUpperCase()}|${vessel}`;
@@ -80610,6 +81260,31 @@ async function validateData(type, data, mode, vesselId) {
     const errors = [];
     const warnings = [];
     const normalized = {};
+    if (type === "spares" || type === "fleet-spares") {
+      try {
+        const { spareClassificationImport: spareClassificationImport2 } = await Promise.resolve().then(() => (init_spareClassificationImport(), spareClassificationImport_exports));
+        const pair = await spareClassificationImport2(row, results.columns);
+        if ("spareCategory" in pair && "optimumQty" in pair) {
+          normalized["Spare Category"] = pair.spareCategory;
+          normalized["Optimum Qty"] = pair.optimumQty;
+          const part = String(row["Part Code"] || "").trim().toUpperCase();
+          const key = type === "fleet-spares" ? `${part}|${String(row["Fleet Equipment Code"] || "").trim().toUpperCase()}` : part;
+          const fingerprint = JSON.stringify(pair);
+          if (fileSpareClassifications.has(key) && fileSpareClassifications.get(key) !== fingerprint) {
+            errors.push(`Row ${rowNum}: linked rows for Part Code '${part}' must use the same Spare Category and Optimum Qty.`);
+          }
+          fileSpareClassifications.set(key, fingerprint);
+          const saved = existingSpareClassifications.get(key);
+          if (saved && (saved.spareCategory !== pair.spareCategory || (saved.optimumQty ?? null) !== pair.optimumQty)) {
+            warnings.push(`Row ${rowNum}: Spare Category ${saved.spareCategory || "(unclassified)"} \u2192 ${pair.spareCategory}; Optimum Qty ${saved.optimumQty ?? "(blank)"} \u2192 ${pair.optimumQty ?? "(blank)"}. These values will be overwritten on import.`);
+          }
+        } else {
+          warnings.push(`Row ${rowNum}: Legacy template \u2014 existing Spare Category/Optimum Qty are preserved; a newly created spare remains unclassified.`);
+        }
+      } catch (error) {
+        errors.push(`Row ${rowNum}: ${error.message}`);
+      }
+    }
     const typesWithVesselCode = ["components", "jobs"];
     if (typesWithVesselCode.includes(type)) {
       if (vesselId && row["Vessel Code"]) {
@@ -81979,6 +82654,7 @@ async function validateData(type, data, mode, vesselId) {
 
 // server/modules/bulk-upload/services/importService.ts
 init_storage();
+init_spareClassificationImport();
 init_dateUtils();
 init_rhValidation();
 init_workOrderNumbering();
@@ -82422,6 +83098,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
       const row = data[_spareIdx];
       const _spareRowNum = row["__meta"]?.rowNumber || _spareIdx + 1;
       try {
+        const classification = await spareClassificationImport(row);
         const componentCode = String(row["Component Code"]).trim();
         const component = componentsByCode.get(componentCode);
         if (!component) {
@@ -82497,6 +83174,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           const robLocationAVal = parseRowRob(row["Location A - ROB"]);
           const robLocationBVal = parseRowRob(row["Location B - ROB"]);
           const newSpare = await storage.createSpare({
+            ...classification,
             partCode,
             partName: String(row["Part Name"]).trim(),
             componentId: component.cuuid,
@@ -82600,6 +83278,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           const robLocationAUpdate = parseRowRob(row["Location A - ROB"]) ?? existingSpare.robLocationA ?? null;
           const robLocationBUpdate = parseRowRob(row["Location B - ROB"]) ?? existingSpare.robLocationB ?? null;
           const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
+            ...classification,
             partName: String(row["Part Name"]).trim(),
             componentId: component.cuuid,
             componentCode,
@@ -82715,6 +83394,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
                 console.log(`\u{1F517} Linked spare ${partCode} to additional component ${componentCode} (upsert mode)`);
               }
               const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
+                ...classification,
                 partName: String(row["Part Name"]).trim(),
                 componentId: component.cuuid,
                 componentCode,
@@ -82772,6 +83452,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             }
           } else {
             const newSpare = await storage.createSpare({
+              ...classification,
               partCode,
               partName: String(row["Part Name"]).trim(),
               componentId: component.cuuid,
@@ -84359,6 +85040,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             result.skipped++;
             result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: "skipped", error: "Fleet spare already exists" });
           } else {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
             fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
             result.created++;
@@ -84367,6 +85049,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           }
         } else if (mode === "update") {
           if (existingFleetSpare) {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
             result.updated++;
             result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: "updated" });
@@ -84378,11 +85061,13 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           }
         } else if (mode === "upsert") {
           if (existingFleetSpare) {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             await storage.updateFleetSpareInTable(existingFleetSpare.id, fleetSpareData);
             result.updated++;
             result.rowResults.push({ rowNumber: _fsRowNum, primaryIdentifier: partCode, action: "updated" });
             console.log(`\u{1F504} Updated fleet spare: ${partCode} - ${partName} (equipment: ${fleetEquipmentCode}, component: ${fleetComponentsUuid})`);
           } else {
+            Object.assign(fleetSpareData, await spareClassificationImport(row));
             const newFleetSpare = await storage.createFleetSpareInTable(fleetSpareData);
             fleetSparesByCompositeKey.set(compositeKey, newFleetSpare);
             result.created++;
@@ -84996,7 +85681,9 @@ async function getTemplate3(req, res) {
         "Is Active",
         "IHM (Inventory of Hazardous Materials)",
         "Evidence Type",
-        "Rotation Item"
+        "Rotation Item",
+        "Spare Category",
+        "Optimum Qty"
       ];
       validValues = [
         "Text (Part ID)",
@@ -85026,7 +85713,9 @@ async function getTemplate3(req, res) {
         "Yes/No",
         "Yes/No",
         "Text (Evidence type)",
-        "Yes/No"
+        "Yes/No",
+        "Required Master List category key or label",
+        "Whole number 1\u20132147483647 for Optimum only; otherwise blank"
       ];
       example = [];
       break;
@@ -85223,7 +85912,9 @@ async function getTemplate3(req, res) {
         "Criticality",
         "Is Active",
         "IHM (Inventory of Hazardous Materials)",
-        "Evidence Type"
+        "Evidence Type",
+        "Spare Category",
+        "Optimum Qty"
       ];
       validValues = [
         "Required (Unique part code)",
@@ -85243,7 +85934,9 @@ async function getTemplate3(req, res) {
         "Text (Yes/No)",
         "Required (Yes/No, defaults to Yes)",
         "Text (Yes/No)",
-        "Text (Evidence type)"
+        "Text (Evidence type)",
+        "Required Master List category key or label",
+        "Whole number 1\u20132147483647 for Optimum only; otherwise blank"
       ];
       example = [];
       break;
@@ -85622,7 +86315,7 @@ async function dryRun(req, res) {
     }
     try {
       const db12 = await getDb();
-      const mlItems = await db12.select({ listKey: masterLists.listKey, listValue: masterLists.listValue }).from(masterLists).where(and29(eq34(masterLists.listType, "componentCategory"), eq34(masterLists.isActive, true)));
+      const mlItems = await db12.select({ listKey: masterLists.listKey, listValue: masterLists.listValue }).from(masterLists).where(and30(eq35(masterLists.listType, "componentCategory"), eq35(masterLists.isActive, true)));
       if (mlItems.length > 0) {
         setDynamicComponentCategories(mlItems);
         const effectiveCats = getEffectiveComponentCategories();
@@ -87658,11 +88351,11 @@ init_auth();
 // server/modules/assistant-api/masterUserRepository.ts
 init_schema();
 init_db();
-import { and as and30, eq as eq35 } from "drizzle-orm";
+import { and as and31, eq as eq36 } from "drizzle-orm";
 async function findMasterUserById(userId) {
   const db12 = await getDb();
   if (!db12) return null;
-  const rows = await db12.select({ role: masterUsers.role, userType: masterUsers.userType }).from(masterUsers).where(and30(eq35(masterUsers.id, userId), eq35(masterUsers.isDeleted, false))).limit(1);
+  const rows = await db12.select({ role: masterUsers.role, userType: masterUsers.userType }).from(masterUsers).where(and31(eq36(masterUsers.id, userId), eq36(masterUsers.isDeleted, false))).limit(1);
   if (!rows.length) return null;
   const ut = (rows[0].userType || "").trim();
   return {
@@ -87676,7 +88369,7 @@ init_db();
 init_schema();
 init_auth();
 import OpenAI from "openai";
-import { eq as eq36, and as and31 } from "drizzle-orm";
+import { eq as eq37, and as and32 } from "drizzle-orm";
 async function loadWorkOrders(vesselId) {
   const { getWorkOrdersWithComputedStatus: getWorkOrdersWithComputedStatus2 } = await Promise.resolve().then(() => (init_workOrderService2(), workOrderService_exports));
   return getWorkOrdersWithComputedStatus2(vesselId);
@@ -89776,7 +90469,7 @@ async function executeTool(toolName, args, storage2, access) {
         let surveyAlerts = [];
         try {
           const db12 = await getDb();
-          const certData = await db12.select().from(vesselCertificateData).where(eq36(vesselCertificateData.vesselId, args.vesselId));
+          const certData = await db12.select().from(vesselCertificateData).where(eq37(vesselCertificateData.vesselId, args.vesselId));
           const certMasters = await db12.select().from(shipCertificatesMaster);
           const certMasterMap = new Map(certMasters.map((m) => [m.masterId, m]));
           for (const cert of certData) {
@@ -89804,8 +90497,8 @@ async function executeTool(toolName, args, storage2, access) {
               });
             }
           }
-          const surveyData = await db12.select().from(vesselSurveyData).where(eq36(vesselSurveyData.vesselId, args.vesselId));
-          const surveyMasters = await db12.select().from(shipSurveysMaster).where(and31(eq36(shipSurveysMaster.isDeleted, false), eq36(shipSurveysMaster.isActive, true)));
+          const surveyData = await db12.select().from(vesselSurveyData).where(eq37(vesselSurveyData.vesselId, args.vesselId));
+          const surveyMasters = await db12.select().from(shipSurveysMaster).where(and32(eq37(shipSurveysMaster.isDeleted, false), eq37(shipSurveysMaster.isActive, true)));
           const surveyMasterMap = new Map(surveyMasters.map((m) => [m.masterId, m]));
           for (const survey of surveyData) {
             if (!survey.dueDate) continue;
@@ -90287,7 +90980,7 @@ init_externalApi();
 init_sync();
 init_completedWorkOrderDate();
 init_schema();
-import { sql as sql27, eq as eq37 } from "drizzle-orm";
+import { sql as sql27, eq as eq38 } from "drizzle-orm";
 function normalizeSourceDeletionState(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
@@ -90304,7 +90997,7 @@ function getSourceDeletionState(entry) {
   return normalizeSourceDeletionState(entry?.is_deleted);
 }
 async function upsertMasterRecord(db12, table, id, insertValues, updateValues, isDeleted, stats) {
-  const existing = await db12.select({ id: table.id }).from(table).where(eq37(table.id, id)).limit(1);
+  const existing = await db12.select({ id: table.id }).from(table).where(eq38(table.id, id)).limit(1);
   await db12.insert(table).values(insertValues).onConflictDoUpdate({
     target: table.id,
     set: updateValues
@@ -91223,7 +91916,7 @@ async function repairRhTracking(req, res) {
         const storedNextDueReading = parseFloat(wo.nextDueReading || "0");
         if (storedNextDueReading !== correctNextDue) {
           if (!dryRun2) {
-            await db12.update(workOrders).set({ nextDueReading: correctNextDue.toString() }).where(eq37(workOrders.id, wo.id));
+            await db12.update(workOrders).set({ nextDueReading: correctNextDue.toString() }).where(eq38(workOrders.id, wo.id));
           }
           wosRepaired++;
           repairs.push({
@@ -91262,7 +91955,7 @@ async function repairRhTracking(req, res) {
         const storedNextDueReading = parseFloat(wo.nextDueReading || "0");
         if (storedNextDueReading !== jobLevelNextDue) {
           if (!dryRun2) {
-            await db12.update(workOrders).set({ nextDueReading: jobLevelNextDue.toString() }).where(eq37(workOrders.id, wo.id));
+            await db12.update(workOrders).set({ nextDueReading: jobLevelNextDue.toString() }).where(eq38(workOrders.id, wo.id));
           }
           wosRepaired++;
           repairs.push({
@@ -91283,7 +91976,7 @@ async function repairRhTracking(req, res) {
           await db12.update(jobs).set({
             lastDoneRH: jobLevelLastDone.toString(),
             nextDueRH: jobLevelNextDue.toString()
-          }).where(eq37(jobs.juuid, job.juuid));
+          }).where(eq38(jobs.juuid, job.juuid));
         }
         jobsRepaired++;
         repairs.push({
@@ -91340,10 +92033,10 @@ init_syncRole();
 // server/modules/access-control/repositories/viewModeRepository.ts
 init_db();
 init_schema();
-import { eq as eq38, and as and33, asc as asc8, sql as sql28 } from "drizzle-orm";
+import { eq as eq39, and as and34, asc as asc8, sql as sql28 } from "drizzle-orm";
 async function getActiveViewModes() {
   const db12 = await getDb();
-  return db12.select().from(viewModesMaster).where(and33(eq38(viewModesMaster.isDeleted, false), eq38(viewModesMaster.isActive, true))).orderBy(asc8(viewModesMaster.sortOrder), asc8(viewModesMaster.code));
+  return db12.select().from(viewModesMaster).where(and34(eq39(viewModesMaster.isDeleted, false), eq39(viewModesMaster.isActive, true))).orderBy(asc8(viewModesMaster.sortOrder), asc8(viewModesMaster.code));
 }
 async function getRolesWithMappings() {
   const db12 = await getDb();
@@ -91354,11 +92047,11 @@ async function getRolesWithMappings() {
     viewModeCode: roleViewModeMapping.viewModeCode
   }).from(admnRoleMaster).leftJoin(
     roleViewModeMapping,
-    and33(
+    and34(
       sql28`${roleViewModeMapping.roleRuid} = ${admnRoleMaster.ruid}::text`,
-      eq38(roleViewModeMapping.isDeleted, false)
+      eq39(roleViewModeMapping.isDeleted, false)
     )
-  ).where(and33(eq38(admnRoleMaster.isActive, true), eq38(admnRoleMaster.isDeleted, false))).orderBy(asc8(admnRoleMaster.roletype), asc8(admnRoleMaster.assignedRole));
+  ).where(and34(eq39(admnRoleMaster.isActive, true), eq39(admnRoleMaster.isDeleted, false))).orderBy(asc8(admnRoleMaster.roletype), asc8(admnRoleMaster.assignedRole));
   return rows;
 }
 async function getActiveRoleByTypeAndName(roletype, assignedRole) {
@@ -91368,11 +92061,11 @@ async function getActiveRoleByTypeAndName(roletype, assignedRole) {
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
-    and33(
-      eq38(admnRoleMaster.roletype, roletype),
-      eq38(admnRoleMaster.assignedRole, assignedRole),
-      eq38(admnRoleMaster.isActive, true),
-      eq38(admnRoleMaster.isDeleted, false)
+    and34(
+      eq39(admnRoleMaster.roletype, roletype),
+      eq39(admnRoleMaster.assignedRole, assignedRole),
+      eq39(admnRoleMaster.isActive, true),
+      eq39(admnRoleMaster.isDeleted, false)
     )
   ).limit(1);
   return rows[0];
@@ -91384,10 +92077,10 @@ async function getActiveRoleByRuid(roleRuid) {
     assignedRole: admnRoleMaster.assignedRole,
     roletype: admnRoleMaster.roletype
   }).from(admnRoleMaster).where(
-    and33(
+    and34(
       sql28`${admnRoleMaster.ruid}::text = ${roleRuid}`,
-      eq38(admnRoleMaster.isActive, true),
-      eq38(admnRoleMaster.isDeleted, false)
+      eq39(admnRoleMaster.isActive, true),
+      eq39(admnRoleMaster.isDeleted, false)
     )
   ).limit(1);
   return rows[0];
@@ -91395,7 +92088,7 @@ async function getActiveRoleByRuid(roleRuid) {
 async function getMappingByRoleRuid(roleRuid) {
   const db12 = await getDb();
   const rows = await db12.select().from(roleViewModeMapping).where(
-    and33(eq38(roleViewModeMapping.roleRuid, roleRuid), eq38(roleViewModeMapping.isDeleted, false))
+    and34(eq39(roleViewModeMapping.roleRuid, roleRuid), eq39(roleViewModeMapping.isDeleted, false))
   ).limit(1);
   return rows[0];
 }
@@ -91413,7 +92106,7 @@ async function upsertMapping(roleRuid, viewModeCode, updatedByUuid) {
 }
 async function softDeleteMapping(roleRuid, updatedByUuid) {
   const db12 = await getDb();
-  await db12.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq38(roleViewModeMapping.roleRuid, roleRuid));
+  await db12.update(roleViewModeMapping).set({ isDeleted: true, updatedByUuid, updatedAt: /* @__PURE__ */ new Date() }).where(eq39(roleViewModeMapping.roleRuid, roleRuid));
 }
 
 // server/modules/access-control/services/viewModeService.ts
@@ -93828,21 +94521,21 @@ init_permissions();
 // server/modules/noon-report/repositories/noonReportRepository.ts
 init_db();
 init_schema();
-import { eq as eq42, and as and36, desc as desc8 } from "drizzle-orm";
+import { eq as eq43, and as and37, desc as desc8 } from "drizzle-orm";
 async function getNoonReports(filters) {
   const db12 = await getDb();
   let query = db12.select().from(nrNoonReports).orderBy(desc8(nrNoonReports.reportDate));
   const conditions = [];
-  if (filters.vesselId) conditions.push(eq42(nrNoonReports.vesselId, filters.vesselId));
-  if (filters.status) conditions.push(eq42(nrNoonReports.status, filters.status));
+  if (filters.vesselId) conditions.push(eq43(nrNoonReports.vesselId, filters.vesselId));
+  if (filters.status) conditions.push(eq43(nrNoonReports.status, filters.status));
   if (conditions.length > 0) {
-    return db12.select().from(nrNoonReports).where(and36(...conditions)).orderBy(desc8(nrNoonReports.reportDate)).limit(filters.limit || 100);
+    return db12.select().from(nrNoonReports).where(and37(...conditions)).orderBy(desc8(nrNoonReports.reportDate)).limit(filters.limit || 100);
   }
   return db12.select().from(nrNoonReports).orderBy(desc8(nrNoonReports.reportDate)).limit(filters.limit || 100);
 }
 async function getNoonReportById(id) {
   const db12 = await getDb();
-  const result = await db12.select().from(nrNoonReports).where(eq42(nrNoonReports.id, id)).limit(1);
+  const result = await db12.select().from(nrNoonReports).where(eq43(nrNoonReports.id, id)).limit(1);
   return result[0] || null;
 }
 async function createNoonReport(data) {
@@ -93855,7 +94548,7 @@ async function createNoonReport(data) {
 }
 async function updateNoonReport(id, data) {
   const db12 = await getDb();
-  const result = await db12.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq42(nrNoonReports.id, id)).returning();
+  const result = await db12.update(nrNoonReports).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq43(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function submitNoonReport(id, submittedBy) {
@@ -93865,27 +94558,27 @@ async function submitNoonReport(id, submittedBy) {
     submittedAt: /* @__PURE__ */ new Date(),
     submittedBy,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq42(nrNoonReports.id, id)).returning();
+  }).where(eq43(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function deleteNoonReport(id) {
   const db12 = await getDb();
-  await db12.delete(nrNoonReports).where(and36(eq42(nrNoonReports.id, id), eq42(nrNoonReports.status, "draft")));
+  await db12.delete(nrNoonReports).where(and37(eq43(nrNoonReports.id, id), eq43(nrNoonReports.status, "draft")));
 }
 async function saveDraft(id, data) {
   const db12 = await getDb();
-  const result = await db12.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq42(nrNoonReports.id, id)).returning();
+  const result = await db12.update(nrNoonReports).set({ ...data, draftSavedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }).where(eq43(nrNoonReports.id, id)).returning();
   return result[0];
 }
 async function getFuelRobByVessel(vesselId) {
   const db12 = await getDb();
-  return db12.select().from(nrFuelRob).where(eq42(nrFuelRob.vesselId, vesselId));
+  return db12.select().from(nrFuelRob).where(eq43(nrFuelRob.vesselId, vesselId));
 }
 async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
   const db12 = await getDb();
-  const existing = await db12.select().from(nrFuelRob).where(and36(eq42(nrFuelRob.vesselId, vesselId), eq42(nrFuelRob.fuelType, fuelType))).limit(1);
+  const existing = await db12.select().from(nrFuelRob).where(and37(eq43(nrFuelRob.vesselId, vesselId), eq43(nrFuelRob.fuelType, fuelType))).limit(1);
   if (existing.length > 0) {
-    await db12.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and36(eq42(nrFuelRob.vesselId, vesselId), eq42(nrFuelRob.fuelType, fuelType)));
+    await db12.update(nrFuelRob).set({ currentRob: String(currentRob), updatedAt: /* @__PURE__ */ new Date(), lastReportId: reportId }).where(and37(eq43(nrFuelRob.vesselId, vesselId), eq43(nrFuelRob.fuelType, fuelType)));
   } else {
     await db12.insert(nrFuelRob).values({
       vesselId,
@@ -93897,23 +94590,23 @@ async function upsertFuelRob(vesselId, fuelType, currentRob, reportId) {
 }
 async function getLastNReports(vesselId, n) {
   const db12 = await getDb();
-  return db12.select().from(nrNoonReports).where(and36(eq42(nrNoonReports.vesselId, vesselId), eq42(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
+  return db12.select().from(nrNoonReports).where(and37(eq43(nrNoonReports.vesselId, vesselId), eq43(nrNoonReports.status, "submitted"))).orderBy(desc8(nrNoonReports.reportDate)).limit(n);
 }
 
 // server/modules/noon-report/services/noonReportService.ts
 init_db();
 init_schema();
-import { eq as eq46, and as and39, desc as desc11, asc as asc9, isNull as isNull7, count as count2 } from "drizzle-orm";
+import { eq as eq47, and as and40, desc as desc11, asc as asc9, isNull as isNull7, count as count2 } from "drizzle-orm";
 
 // server/modules/noon-report/services/calculationEngine.ts
 init_db();
 init_schema();
-import { eq as eq45, and as and38, desc as desc10, gte as gte5, lte as lte3 } from "drizzle-orm";
+import { eq as eq46, and as and39, desc as desc10, gte as gte5, lte as lte3 } from "drizzle-orm";
 
 // server/modules/noon-report/utils/existingDataAdapter.ts
 init_db();
 init_schema();
-import { eq as eq43, sql as sql30 } from "drizzle-orm";
+import { eq as eq44, sql as sql30 } from "drizzle-orm";
 async function getVesselById(vesselId) {
   const db12 = await getDb();
   const result = await db12.execute(
@@ -93943,7 +94636,7 @@ async function getVesselDwt(vesselId) {
 init_fuelConversionFactors();
 async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   const db12 = await getDb();
-  const rows = await db12.select().from(nrFuelRob).where(and38(eq45(nrFuelRob.vesselId, vesselId), eq45(nrFuelRob.fuelType, fuelType))).limit(1);
+  const rows = await db12.select().from(nrFuelRob).where(and39(eq46(nrFuelRob.vesselId, vesselId), eq46(nrFuelRob.fuelType, fuelType))).limit(1);
   if (rows.length === 0) {
     const newRob = Math.max(0, deltaMt);
     await db12.insert(nrFuelRob).values({
@@ -93955,7 +94648,7 @@ async function adjustRobForBunker(vesselId, fuelType, deltaMt) {
   } else {
     const current = Number(rows[0].currentRob) || 0;
     const updated = Math.max(0, current + deltaMt);
-    await db12.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and38(eq45(nrFuelRob.vesselId, vesselId), eq45(nrFuelRob.fuelType, fuelType)));
+    await db12.update(nrFuelRob).set({ currentRob: String(updated), updatedAt: /* @__PURE__ */ new Date() }).where(and39(eq46(nrFuelRob.vesselId, vesselId), eq46(nrFuelRob.fuelType, fuelType)));
   }
 }
 var PHASE1_STEPS = ["rollingAverages", "ciiTracking", "eeoi"];
@@ -94000,7 +94693,7 @@ async function computeRollingAveragesAndEndurance(report) {
     const cons3 = last3.map((r) => getReportConsumption(r, fuelType)).filter((v) => v !== null);
     const avg7Day = cons7.length > 0 ? cons7.reduce((a, b) => a + b, 0) / cons7.length : null;
     const avg3Day = cons3.length > 0 ? cons3.reduce((a, b) => a + b, 0) / cons3.length : null;
-    const robRows = await db12.select().from(nrFuelRob).where(and38(eq45(nrFuelRob.vesselId, report.vesselId), eq45(nrFuelRob.fuelType, fuelType))).limit(1);
+    const robRows = await db12.select().from(nrFuelRob).where(and39(eq46(nrFuelRob.vesselId, report.vesselId), eq46(nrFuelRob.fuelType, fuelType))).limit(1);
     const robRow = robRows[0] ?? null;
     const currentRob = robRow !== null ? Math.max(0, toNum3(robRow.currentRob) ?? 0) : null;
     let enduranceDays = null;
@@ -94016,7 +94709,7 @@ async function computeRollingAveragesAndEndurance(report) {
         avg7Day: avg7Day !== null ? String(avg7Day) : null,
         enduranceDays: enduranceDays !== null ? String(enduranceDays) : null,
         enduranceNm: enduranceNM !== null ? String(enduranceNM) : null
-      }).where(and38(eq45(nrFuelRob.vesselId, report.vesselId), eq45(nrFuelRob.fuelType, fuelType)));
+      }).where(and39(eq46(nrFuelRob.vesselId, report.vesselId), eq46(nrFuelRob.fuelType, fuelType)));
     } else if (avg7Day !== null) {
       await db12.insert(nrFuelRob).values({
         vesselId: report.vesselId,
@@ -94037,9 +94730,9 @@ async function computeCiiTracking(report) {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const yearReports = await db12.select().from(nrNoonReports).where(
-    and38(
-      eq45(nrNoonReports.vesselId, report.vesselId),
-      eq45(nrNoonReports.status, "submitted"),
+    and39(
+      eq46(nrNoonReports.vesselId, report.vesselId),
+      eq46(nrNoonReports.status, "submitted"),
       gte5(nrNoonReports.reportDate, yearStart),
       lte3(nrNoonReports.reportDate, yearEnd)
     )
@@ -94066,7 +94759,7 @@ async function computeCiiTracking(report) {
     const refLine = computeCiiRefLine(dwt);
     ciiRating = assignCiiRating(aer, refLine);
   }
-  const existing = await db12.select().from(nrCiiTracking).where(and38(eq45(nrCiiTracking.vesselId, report.vesselId), eq45(nrCiiTracking.year, year))).limit(1);
+  const existing = await db12.select().from(nrCiiTracking).where(and39(eq46(nrCiiTracking.vesselId, report.vesselId), eq46(nrCiiTracking.year, year))).limit(1);
   const previousCiiRating = existing[0]?.ciiRating ?? null;
   if (existing.length > 0) {
     await db12.update(nrCiiTracking).set({
@@ -94077,7 +94770,7 @@ async function computeCiiTracking(report) {
       previousCiiRating,
       // store old rating before overwriting
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(and38(eq45(nrCiiTracking.vesselId, report.vesselId), eq45(nrCiiTracking.year, year)));
+    }).where(and39(eq46(nrCiiTracking.vesselId, report.vesselId), eq46(nrCiiTracking.year, year)));
   } else {
     await db12.insert(nrCiiTracking).values({
       vesselId: report.vesselId,
@@ -94108,9 +94801,9 @@ async function computeEeoi(report) {
     }
   }
   const eeoi = totalCo2Mt / (cargoMt * distanceSailed);
-  const existing = await db12.select().from(nrVoyageLegs).where(and38(eq45(nrVoyageLegs.vesselId, report.vesselId), eq45(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
+  const existing = await db12.select().from(nrVoyageLegs).where(and39(eq46(nrVoyageLegs.vesselId, report.vesselId), eq46(nrVoyageLegs.voyageNo, voyageNo))).limit(1);
   if (existing.length > 0) {
-    await db12.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq45(nrVoyageLegs.id, existing[0].id));
+    await db12.update(nrVoyageLegs).set({ eeoi: String(eeoi), updatedAt: /* @__PURE__ */ new Date() }).where(eq46(nrVoyageLegs.id, existing[0].id));
   } else {
     await db12.insert(nrVoyageLegs).values({
       vesselId: report.vesselId,
@@ -94137,7 +94830,7 @@ function getReportConsumption(report, fuelType) {
 }
 async function getLastNSubmitted(vesselId, n) {
   const db12 = await getDb();
-  return db12.select().from(nrNoonReports).where(and38(eq45(nrNoonReports.vesselId, vesselId), eq45(nrNoonReports.status, "submitted"))).orderBy(desc10(nrNoonReports.reportDate)).limit(n);
+  return db12.select().from(nrNoonReports).where(and39(eq46(nrNoonReports.vesselId, vesselId), eq46(nrNoonReports.status, "submitted"))).orderBy(desc10(nrNoonReports.reportDate)).limit(n);
 }
 function toNum3(val) {
   if (val === null || val === void 0 || val === "") return null;
@@ -94210,7 +94903,7 @@ async function updateFuelRobFromReport(report) {
 }
 async function getFuelDashboard(vesselId) {
   const db12 = await getDb();
-  const robRecords = await db12.select().from(nrFuelRob).where(eq46(nrFuelRob.vesselId, vesselId));
+  const robRecords = await db12.select().from(nrFuelRob).where(eq47(nrFuelRob.vesselId, vesselId));
   const robByFuelType = {};
   const enduranceDaysByFuel = {};
   const avg7DayByFuel = {};
@@ -94241,11 +94934,11 @@ async function getFuelDashboard(vesselId) {
     recommendedBunker = minBunkerToNextPort * (1 + BUNKER_SAFETY_MARGIN_PCT / 100);
   }
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-  const ciiRows = await db12.select().from(nrCiiTracking).where(and39(eq46(nrCiiTracking.vesselId, vesselId), eq46(nrCiiTracking.year, currentYear))).limit(1);
+  const ciiRows = await db12.select().from(nrCiiTracking).where(and40(eq47(nrCiiTracking.vesselId, vesselId), eq47(nrCiiTracking.year, currentYear))).limit(1);
   const ciiTracking = ciiRows[0] ?? null;
   const dwt = await getVesselDwt(vesselId);
   const ciiRefLine = dwt !== null ? computeCiiRefLine(dwt) : null;
-  const last30Raw = await db12.select().from(nrNoonReports).where(and39(eq46(nrNoonReports.vesselId, vesselId), eq46(nrNoonReports.status, "submitted"))).orderBy(desc11(nrNoonReports.reportDate)).limit(30);
+  const last30Raw = await db12.select().from(nrNoonReports).where(and40(eq47(nrNoonReports.vesselId, vesselId), eq47(nrNoonReports.status, "submitted"))).orderBy(desc11(nrNoonReports.reportDate)).limit(30);
   const last30 = [...last30Raw].reverse().map((r) => {
     const hfo = toNum4(r.hfoConsumption) ?? 0;
     const lsmgo = toNum4(r.lsmgoConsumption) ?? 0;
@@ -94275,7 +94968,7 @@ async function getFuelDashboard(vesselId) {
     vlsfoConsumption: nrNoonReports.vlsfoConsumption,
     lpgConsumption: nrNoonReports.lpgConsumption,
     reportDate: nrNoonReports.reportDate
-  }).from(nrNoonReports).where(and39(eq46(nrNoonReports.vesselId, vesselId), eq46(nrNoonReports.status, "submitted"))).orderBy(asc9(nrNoonReports.reportDate));
+  }).from(nrNoonReports).where(and40(eq47(nrNoonReports.vesselId, vesselId), eq47(nrNoonReports.status, "submitted"))).orderBy(asc9(nrNoonReports.reportDate));
   const speedConsumptionData = allReports.flatMap((r) => {
     const speed = toNum4(r.speed);
     if (speed === null) return [];
@@ -94309,7 +95002,7 @@ async function getVesselKPIs(vesselId) {
 }
 async function getActiveAlerts(vesselId) {
   const db12 = await getDb();
-  return db12.select().from(nrAlerts).where(and39(eq46(nrAlerts.vesselId, vesselId), isNull7(nrAlerts.acknowledgedAt))).orderBy(desc11(nrAlerts.createdAt));
+  return db12.select().from(nrAlerts).where(and40(eq47(nrAlerts.vesselId, vesselId), isNull7(nrAlerts.acknowledgedAt))).orderBy(desc11(nrAlerts.createdAt));
 }
 async function getAllAlerts(vesselId, page, limit) {
   const db12 = await getDb();
@@ -94317,8 +95010,8 @@ async function getAllAlerts(vesselId, page, limit) {
   const safePage = Math.max(1, page);
   const offset = (safePage - 1) * safeLimit;
   const [data, totalRows] = await Promise.all([
-    db12.select().from(nrAlerts).where(eq46(nrAlerts.vesselId, vesselId)).orderBy(desc11(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
-    db12.select({ total: count2() }).from(nrAlerts).where(eq46(nrAlerts.vesselId, vesselId))
+    db12.select().from(nrAlerts).where(eq47(nrAlerts.vesselId, vesselId)).orderBy(desc11(nrAlerts.createdAt)).limit(safeLimit).offset(offset),
+    db12.select({ total: count2() }).from(nrAlerts).where(eq47(nrAlerts.vesselId, vesselId))
   ]);
   const total = totalRows[0]?.total ?? 0;
   return {
@@ -94331,28 +95024,28 @@ async function getAllAlerts(vesselId, page, limit) {
 }
 async function getActiveAlertCount(vesselId) {
   const db12 = await getDb();
-  const rows = await db12.select({ total: count2() }).from(nrAlerts).where(and39(eq46(nrAlerts.vesselId, vesselId), isNull7(nrAlerts.acknowledgedAt)));
+  const rows = await db12.select({ total: count2() }).from(nrAlerts).where(and40(eq47(nrAlerts.vesselId, vesselId), isNull7(nrAlerts.acknowledgedAt)));
   return rows[0]?.total ?? 0;
 }
 async function acknowledgeAlert(alertId, acknowledgedBy) {
   const db12 = await getDb();
-  const existing = await db12.select({ id: nrAlerts.id }).from(nrAlerts).where(eq46(nrAlerts.id, alertId)).limit(1);
+  const existing = await db12.select({ id: nrAlerts.id }).from(nrAlerts).where(eq47(nrAlerts.id, alertId)).limit(1);
   if (existing.length === 0) return null;
-  const updated = await db12.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq46(nrAlerts.id, alertId)).returning();
+  const updated = await db12.update(nrAlerts).set({ acknowledgedAt: /* @__PURE__ */ new Date(), acknowledgedBy }).where(eq47(nrAlerts.id, alertId)).returning();
   return updated[0] ?? null;
 }
 async function getFleetSummary(vesselIds) {
   const db12 = await getDb();
   const results = [];
   for (const vesselId of vesselIds) {
-    const latestReports = await db12.select().from(nrNoonReports).where(and39(eq46(nrNoonReports.vesselId, vesselId), eq46(nrNoonReports.status, "submitted"))).orderBy(desc11(nrNoonReports.reportDate)).limit(1);
+    const latestReports = await db12.select().from(nrNoonReports).where(and40(eq47(nrNoonReports.vesselId, vesselId), eq47(nrNoonReports.status, "submitted"))).orderBy(desc11(nrNoonReports.reportDate)).limit(1);
     const latest = latestReports[0] ?? null;
-    const allReports = await db12.select().from(nrNoonReports).where(eq46(nrNoonReports.vesselId, vesselId));
+    const allReports = await db12.select().from(nrNoonReports).where(eq47(nrNoonReports.vesselId, vesselId));
     const totalReports = allReports.length;
     const submittedReports = allReports.filter((r) => r.status === "submitted").length;
-    const alertRows = await db12.select({ total: count2() }).from(nrAlerts).where(and39(eq46(nrAlerts.vesselId, vesselId), isNull7(nrAlerts.acknowledgedAt)));
+    const alertRows = await db12.select({ total: count2() }).from(nrAlerts).where(and40(eq47(nrAlerts.vesselId, vesselId), isNull7(nrAlerts.acknowledgedAt)));
     const activeAlerts = alertRows[0]?.total ?? 0;
-    const robRows = await db12.select().from(nrFuelRob).where(eq46(nrFuelRob.vesselId, vesselId));
+    const robRows = await db12.select().from(nrFuelRob).where(eq47(nrFuelRob.vesselId, vesselId));
     const totalHfoRob = toNum4(robRows.find((r) => r.fuelType === "HFO")?.currentRob) ?? 0;
     const totalAllRob = robRows.reduce((acc, r) => acc + (toNum4(r.currentRob) ?? 0), 0);
     const avg7Day = robRows.reduce((acc, r) => acc + (toNum4(r.avg7Day) ?? 0), 0) || null;
@@ -94391,16 +95084,16 @@ function round4(n) {
 // server/modules/noon-report/repositories/bunkerRepository.ts
 init_db();
 init_schema();
-import { eq as eq47, and as and40, desc as desc12, sum } from "drizzle-orm";
+import { eq as eq48, and as and41, desc as desc12, sum } from "drizzle-orm";
 async function getBunkerRecords(filters) {
   const db12 = await getDb();
-  const conditions = [eq47(nrBunkerRecords.vesselId, filters.vesselId)];
-  if (filters.voyageNo) conditions.push(eq47(nrBunkerRecords.voyageNo, filters.voyageNo));
-  return db12.select().from(nrBunkerRecords).where(and40(...conditions)).orderBy(desc12(nrBunkerRecords.bunkeredDate));
+  const conditions = [eq48(nrBunkerRecords.vesselId, filters.vesselId)];
+  if (filters.voyageNo) conditions.push(eq48(nrBunkerRecords.voyageNo, filters.voyageNo));
+  return db12.select().from(nrBunkerRecords).where(and41(...conditions)).orderBy(desc12(nrBunkerRecords.bunkeredDate));
 }
 async function getBunkerRecordById(id) {
   const db12 = await getDb();
-  const rows = await db12.select().from(nrBunkerRecords).where(eq47(nrBunkerRecords.id, id)).limit(1);
+  const rows = await db12.select().from(nrBunkerRecords).where(eq48(nrBunkerRecords.id, id)).limit(1);
   return rows[0] ?? null;
 }
 async function createBunkerRecord(data) {
@@ -94410,22 +95103,22 @@ async function createBunkerRecord(data) {
 }
 async function updateBunkerRecord(id, data) {
   const db12 = await getDb();
-  const rows = await db12.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq47(nrBunkerRecords.id, id)).returning();
+  const rows = await db12.update(nrBunkerRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq48(nrBunkerRecords.id, id)).returning();
   return rows[0] ?? null;
 }
 async function deleteBunkerRecord(id) {
   const db12 = await getDb();
-  await db12.delete(nrBunkerRecords).where(eq47(nrBunkerRecords.id, id));
+  await db12.delete(nrBunkerRecords).where(eq48(nrBunkerRecords.id, id));
 }
 async function getBunkerCostSummary(vesselId, voyageNo) {
   const db12 = await getDb();
-  const conditions = [eq47(nrBunkerRecords.vesselId, vesselId)];
-  if (voyageNo) conditions.push(eq47(nrBunkerRecords.voyageNo, voyageNo));
+  const conditions = [eq48(nrBunkerRecords.vesselId, vesselId)];
+  if (voyageNo) conditions.push(eq48(nrBunkerRecords.voyageNo, voyageNo));
   const rows = await db12.select({
     fuelType: nrBunkerRecords.fuelType,
     totalQuantityMt: sum(nrBunkerRecords.quantityMt),
     totalCost: sum(nrBunkerRecords.totalCost)
-  }).from(nrBunkerRecords).where(and40(...conditions)).groupBy(nrBunkerRecords.fuelType);
+  }).from(nrBunkerRecords).where(and41(...conditions)).groupBy(nrBunkerRecords.fuelType);
   return rows.map((r) => ({
     fuelType: r.fuelType,
     totalQuantityMt: r.totalQuantityMt ?? "0",
@@ -94940,7 +95633,7 @@ init_middleware();
 init_auth();
 init_permissions();
 import { Router as Router28 } from "express";
-import { and as and43, desc as desc13, eq as eq52, isNull as isNull8 } from "drizzle-orm";
+import { and as and44, desc as desc13, eq as eq53, isNull as isNull8 } from "drizzle-orm";
 
 // server/modules/approvals/approvalDiagnosticsController.ts
 init_permissions();
@@ -94955,7 +95648,7 @@ init_approvalNotifier();
 init_schema();
 init_postgresClient();
 init_asyncLocalStorage();
-import { and as and42, eq as eq50 } from "drizzle-orm";
+import { and as and43, eq as eq51 } from "drizzle-orm";
 var db8 = () => {
   const ctx = getCurrentTenantContext();
   return ctx ? ctx.db : getPostgresClient().db;
@@ -94968,7 +95661,7 @@ async function listSubmittedChangeRequests() {
     targetType: changeRequest.targetType,
     targetId: changeRequest.targetId,
     vesselId: changeRequest.vesselId
-  }).from(changeRequest).where(eq50(changeRequest.status, "submitted"));
+  }).from(changeRequest).where(eq51(changeRequest.status, "submitted"));
 }
 async function listWorkOrdersAwaitingApproval() {
   return db8().select({
@@ -94977,7 +95670,7 @@ async function listWorkOrdersAwaitingApproval() {
     workOrderNo: workOrders.workOrderNo,
     jobTitle: workOrders.jobTitle,
     vesselId: workOrders.vesselId
-  }).from(workOrders).where(eq50(workOrders.status, "Awaiting Office Approval"));
+  }).from(workOrders).where(eq51(workOrders.status, "Awaiting Office Approval"));
 }
 async function listOpenApprovalDefects() {
   const rows = await db8().select({
@@ -94993,7 +95686,7 @@ async function listOpenApprovalDefects() {
   return rows.filter((r) => r.isDeleted !== true);
 }
 async function listActiveVessels() {
-  return db8().select({ vuuid: vessels.vuuid, name: vessels.name }).from(vessels).where(and42(eq50(vessels.isActive, true), eq50(vessels.isDeleted, false)));
+  return db8().select({ vuuid: vessels.vuuid, name: vessels.name }).from(vessels).where(and43(eq51(vessels.isActive, true), eq51(vessels.isDeleted, false)));
 }
 
 // server/modules/approvals/approvalDiagnosticsService.ts
@@ -95190,7 +95883,7 @@ init_notificationSchema();
 init_schema();
 init_postgresClient();
 init_asyncLocalStorage();
-import { eq as eq51 } from "drizzle-orm";
+import { eq as eq52 } from "drizzle-orm";
 var db9 = () => {
   const ctx = getCurrentTenantContext();
   return ctx ? ctx.db : getPostgresClient().db;
@@ -95198,7 +95891,7 @@ var db9 = () => {
 async function setApprovalEmailEnabled(enabled, actor2) {
   const before = (await db9().select({ id: companyApprovalSettings.id }).from(companyApprovalSettings).limit(1))[0];
   if (before) {
-    await db9().update(companyApprovalSettings).set({ approvalEmailEnabled: enabled, updatedBy: actor2, updatedAt: /* @__PURE__ */ new Date() }).where(eq51(companyApprovalSettings.id, before.id));
+    await db9().update(companyApprovalSettings).set({ approvalEmailEnabled: enabled, updatedBy: actor2, updatedAt: /* @__PURE__ */ new Date() }).where(eq52(companyApprovalSettings.id, before.id));
   } else {
     await db9().insert(companyApprovalSettings).values({ singletonKey: "ACTIVE", approvalEmailEnabled: enabled, updatedBy: actor2 });
   }
@@ -95220,7 +95913,7 @@ router27.get("/approvals/config", asyncHandler(async (_req, res) => {
 router27.get("/approvals/notifications", asyncHandler(async (req, res) => {
   const userUuid = me(req);
   const unreadOnly = String(req.query.unread ?? "") === "1";
-  const where = unreadOnly ? and43(eq52(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt)) : eq52(approvalNotifications.userUuid, userUuid);
+  const where = unreadOnly ? and44(eq53(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt)) : eq53(approvalNotifications.userUuid, userUuid);
   const rows = await db10().select().from(approvalNotifications).where(where).orderBy(desc13(approvalNotifications.createdAt)).limit(50);
   res.json(rows);
 }));
@@ -95261,17 +95954,17 @@ router27.post("/approvals/withdrawals", asyncHandler(createWithdrawal));
 router27.get("/approvals/withdrawals", asyncHandler(listWithdrawals2));
 router27.get("/approvals/notifications/count", asyncHandler(async (req, res) => {
   const userUuid = me(req);
-  const rows = await db10().select({ id: approvalNotifications.id }).from(approvalNotifications).where(and43(eq52(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt)));
+  const rows = await db10().select({ id: approvalNotifications.id }).from(approvalNotifications).where(and44(eq53(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt)));
   res.json({ count: rows.length });
 }));
 router27.patch("/approvals/notifications/:anuuid/read", asyncHandler(async (req, res) => {
   const userUuid = me(req);
-  const updated = await db10().update(approvalNotifications).set({ readAt: /* @__PURE__ */ new Date() }).where(and43(eq52(approvalNotifications.anuuid, req.params.anuuid), eq52(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt))).returning({ anuuid: approvalNotifications.anuuid });
+  const updated = await db10().update(approvalNotifications).set({ readAt: /* @__PURE__ */ new Date() }).where(and44(eq53(approvalNotifications.anuuid, req.params.anuuid), eq53(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt))).returning({ anuuid: approvalNotifications.anuuid });
   res.json({ success: true, updated: updated.length });
 }));
 router27.post("/approvals/notifications/read-all", asyncHandler(async (req, res) => {
   const userUuid = me(req);
-  const updated = await db10().update(approvalNotifications).set({ readAt: /* @__PURE__ */ new Date() }).where(and43(eq52(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt))).returning({ anuuid: approvalNotifications.anuuid });
+  const updated = await db10().update(approvalNotifications).set({ readAt: /* @__PURE__ */ new Date() }).where(and44(eq53(approvalNotifications.userUuid, userUuid), isNull8(approvalNotifications.readAt))).returning({ anuuid: approvalNotifications.anuuid });
   res.json({ success: true, updated: updated.length });
 }));
 var routes_default27 = router27;
@@ -95828,7 +96521,7 @@ var ALL_SEED_IDS = [
 // server/routes.ts
 init_db();
 init_schema();
-import { and as and45, eq as eq54, isNull as isNull9, sql as sql33 } from "drizzle-orm";
+import { and as and46, eq as eq55, isNull as isNull9, sql as sql33 } from "drizzle-orm";
 async function registerRoutes(app2) {
   try {
     await ensureMaintenanceHistoryImmutability();
@@ -96172,8 +96865,8 @@ async function registerRoutes(app2) {
               const repaired = await db12.update(jobs).set({
                 nextDueRH: derivedNextDueRh,
                 updatedAt: /* @__PURE__ */ new Date()
-              }).where(and45(
-                eq54(jobs.juuid, job.juuid),
+              }).where(and46(
+                eq55(jobs.juuid, job.juuid),
                 isNull9(jobs.nextDueRH),
                 sql33`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`
               )).returning({ nextDueRH: jobs.nextDueRH });
@@ -96219,8 +96912,8 @@ async function registerRoutes(app2) {
             rhAveragePerDay: estimate.averagePerDay === null ? null : String(estimate.averagePerDay),
             rhEstimateBasis: estimate.basis,
             updatedAt: /* @__PURE__ */ new Date()
-          }).where(and45(
-            eq54(jobs.juuid, job.juuid),
+          }).where(and46(
+            eq55(jobs.juuid, job.juuid),
             sql33`${jobs.lastDoneRH} IS NOT DISTINCT FROM ${job.lastDoneRH}`,
             sql33`${jobs.nextDueRH} IS NOT DISTINCT FROM ${effectiveNextDueRh}`,
             sql33`${jobs.rhEstimatedDueDate} IS NOT DISTINCT FROM ${job.rhEstimatedDueDate}`,
