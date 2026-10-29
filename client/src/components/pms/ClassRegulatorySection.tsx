@@ -6,6 +6,10 @@ import { isReplit } from "@/lib/env";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
 import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { classSurveyDay, validateClassRegulatoryDates } from "@shared/classRegulatory";
@@ -23,6 +27,9 @@ type Draft = {
   classRequirements: string;
   information: string;
 };
+type Confirmation =
+  | { kind: "remove"; componentId: string; securityScope: string; principalScope: string; expectedEditingId: number | "new" | null; targetId: number; opener: HTMLElement | null; fallbackSelector: string }
+  | { kind: "discard"; componentId: string; securityScope: string; principalScope: string; expectedEditingId: number | "new"; nextAction: "begin" | "cancel"; target?: RegulatoryEntry; opener: HTMLElement | null; fallbackSelector: string };
 const blankDraft = (): Draft => ({ classificationSocietyKey: "", surveyTypeKey: "", certificateNumber: "", lastClassSurvey: "", nextSurveyDue: "", classRequirements: "", information: "" });
 const apiRoot = "/technical/api";
 const inputClass = "h-8 rounded-sm border-[#52baf3] text-sm focus-visible:ring-[#52baf3]";
@@ -86,6 +93,17 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState("");
   const [switchNotice, setSwitchNotice] = useState("");
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
+  const confirmationRef = useRef<Confirmation | null>(confirmation);
+  const cancelConfirmationRef = useRef<HTMLButtonElement>(null);
+  const confirmationFocus = useRef<{ opener: HTMLElement | null; fallbackSelector: string } | null>(null);
+  const latestContext = useRef({
+    id, securityScope, principalScope, readOnly, canEdit: false,
+    editingId: null as number | "new" | null, entries: [] as RegulatoryEntry[],
+  });
+  const confirmationActionInFlight = useRef(false);
+  const previousConfirmationContext = useRef({ id, securityScope, principalScope });
   const inFlight = useRef(false);
   const originalDates = useRef({ lastClassSurvey: "", nextSurveyDue: "" });
   const originalReferences = useRef({ classificationSocietyKey: "", surveyTypeKey: "", classificationSociety: "", surveyType: "" });
@@ -156,6 +174,47 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
       query.queryKey[1] !== securityScope });
   }, [securityScope]);
   const entries = useMemo(() => rowsQuery.data || [], [rowsQuery.data]);
+  latestContext.current = { id, securityScope, principalScope, readOnly, canEdit, editingId, entries };
+  confirmationRef.current = confirmation;
+  useEffect(() => {
+    const previous = previousConfirmationContext.current;
+    previousConfirmationContext.current = { id, securityScope, principalScope };
+    if (previous.id !== id || previous.securityScope !== securityScope || previous.principalScope !== principalScope ||
+      (!canEdit && !(confirmationBusy && confirmation?.kind === "remove"))) {
+      confirmationRef.current = null;
+      setConfirmation(null);
+      setConfirmationBusy(false);
+      confirmationActionInFlight.current = false;
+    }
+  }, [id, securityScope, principalScope, canEdit, confirmationBusy, confirmation]);
+  useEffect(() => {
+    if (!confirmation) return;
+    const current = latestContext.current;
+    if (confirmation.componentId !== current.id || confirmation.securityScope !== current.securityScope ||
+      confirmation.principalScope !== current.principalScope ||
+      (!current.canEdit && !(confirmationBusy && confirmation.kind === "remove")) ||
+      confirmation.expectedEditingId !== current.editingId ||
+      (confirmation.kind === "remove" && !current.entries.some(entry => entry.id === confirmation.targetId && !entry.isDeleted)) ||
+      (confirmation.kind === "discard" && confirmation.target && !current.entries.some(entry => entry.id === confirmation.target?.id && !entry.isDeleted))) {
+      setConfirmation(null);
+    }
+  }, [confirmation, id, securityScope, principalScope, canEdit, editingId, entries, confirmationBusy]);
+  const closeConfirmation = () => {
+    confirmationRef.current = null;
+    setConfirmation(null);
+    setConfirmationBusy(false);
+    confirmationActionInFlight.current = false;
+  };
+  useEffect(() => {
+    if (confirmation) return;
+    const last = confirmationFocus.current;
+    if (!last) return;
+    confirmationFocus.current = null;
+    requestAnimationFrame(() => {
+      if (last.opener?.isConnected) last.opener.focus();
+      else document.querySelector<HTMLElement>(last.fallbackSelector)?.focus();
+    });
+  }, [confirmation]);
   const societies = useMemo(() => (societyQuery.data || []).filter((x) => x.isActive !== false && x.isDeleted !== true), [societyQuery.data]);
   const surveys = useMemo(() => (surveyQuery.data || []).filter((x) => x.isActive !== false && x.isDeleted !== true), [surveyQuery.data]);
 
@@ -193,24 +252,33 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   });
   const lifecycleMutation = useMutation({
     mutationFn: async ({ entry, restore }: { entry: RegulatoryEntry; restore: boolean }) => {
-      if (!canEdit) throw new Error("Edit access could not be confirmed. No record was changed.");
+      // A confirmation can refetch access before React commits the next render.
+      // Use the current query state, not the previous render's isFetching snapshot.
+      const accessState = queryClient.getQueryState<Access>([accessUrl, securityScope]);
+      const access = accessState?.data;
+      const context = latestContext.current;
+      const canManageNow = !readOnly && !!currentUser &&
+        context.id === id && context.securityScope === securityScope && context.principalScope === principalScope &&
+        accessState?.status === "success" && accessState.fetchStatus === "idle" && access?.canEdit === true &&
+        (access.identityMode === "verified" || (isReplit() && access.identityMode === "replit-default"));
+      if (!canManageNow) throw new Error("Edit access could not be confirmed. No record was changed.");
       if (inFlight.current) throw new Error("An action is already in progress.");
       inFlight.current = true;
       return apiRequest(restore ? "POST" : "DELETE", `${apiRoot}/component-class-regulatory/${entry.id}${restore ? "/restore" : ""}`);
     },
     onSuccess: async () => {
+      setSaveError("");
       await queryClient.invalidateQueries({ queryKey: [`${apiRoot}/component-class-regulatory/${encodeURIComponent(id)}`] });
     },
     onError: (error) => setSaveError(errorDetails(error).message),
-    onSettled: () => { inFlight.current = false; },
+    onSettled: () => { inFlight.current = false; confirmationActionInFlight.current = false; },
   });
   const setValue = (key: keyof Draft, value: string) => {
     setDraft((previous) => ({ ...previous, [key]: value }));
     setFieldErrors((previous) => ({ ...previous, [key]: "" }));
     setSaveError("");
   };
-  const begin = (entry?: RegulatoryEntry) => {
-    if (editingId !== null && !window.confirm("Discard the current unsaved Section H entry?")) return;
+  const applyBegin = (entry?: RegulatoryEntry) => {
     setEditingId(entry?.id ?? "new");
     setDraft(toDraft(entry));
     originalDates.current = { lastClassSurvey: entry?.lastClassSurvey || "", nextSurveyDue: entry?.nextSurveyDue || "" };
@@ -224,9 +292,98 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
     setSaveError("");
     setSwitchNotice("");
   };
+  const begin = (entry?: RegulatoryEntry, opener?: HTMLElement | null) => {
+    if (editingId !== null) {
+      const fallbackSelector = entry ? `[data-section-h-entry-edit="${entry.id}"]` : "[data-section-h-add]";
+      confirmationFocus.current = { opener: opener || null, fallbackSelector };
+      setConfirmation({
+        kind: "discard", componentId: id, securityScope, principalScope, expectedEditingId: editingId,
+        nextAction: "begin", target: entry, opener: opener || null, fallbackSelector,
+      });
+      return;
+    }
+    applyBegin(entry);
+  };
   const cancel = () => {
-    if (!window.confirm("Discard this unsaved Section H entry?")) return;
-    setEditingId(null); setDraft(blankDraft()); setFieldErrors({}); setSaveError("");
+    if (editingId === null) return;
+    const fallbackSelector = typeof editingId === "number" ? `[data-section-h-entry-edit="${editingId}"]` : "[data-section-h-add]";
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmationFocus.current = { opener, fallbackSelector };
+    setConfirmation({
+      kind: "discard", componentId: id, securityScope, principalScope, expectedEditingId: editingId,
+      nextAction: "cancel", opener, fallbackSelector,
+    });
+  };
+  const requestRemove = (entry: RegulatoryEntry, opener: HTMLElement) => {
+    const fallbackSelector = `[data-section-h-entry-edit="${entry.id}"]`;
+    confirmationFocus.current = { opener, fallbackSelector };
+    setConfirmation({
+      kind: "remove", componentId: id, securityScope, principalScope, expectedEditingId: editingId,
+      targetId: entry.id, opener, fallbackSelector,
+    });
+  };
+  const confirmPendingAction = async () => {
+    if (confirmationActionInFlight.current) return;
+    const pending = confirmation;
+    const current = latestContext.current;
+    if (!pending || confirmationRef.current !== pending || pending.componentId !== current.id ||
+      pending.securityScope !== current.securityScope || pending.principalScope !== current.principalScope ||
+      pending.expectedEditingId !== current.editingId || !current.canEdit) {
+      setConfirmation(null);
+      return;
+    }
+    if (pending.kind === "remove") {
+      const visibleEntry = current.entries.find(row => row.id === pending.targetId && !row.isDeleted);
+      if (!visibleEntry || inFlight.current || lifecycleMutation.isPending) { closeConfirmation(); return; }
+      confirmationActionInFlight.current = true;
+      setConfirmationBusy(true);
+      try {
+        const [freshRows, freshAccess] = await Promise.all([rowsQuery.refetch(), accessQuery.refetch()]);
+        const latest = latestContext.current;
+        if (confirmationRef.current !== pending || pending.componentId !== latest.id ||
+          pending.securityScope !== latest.securityScope || pending.principalScope !== latest.principalScope ||
+          pending.expectedEditingId !== latest.editingId || latest.readOnly) {
+          confirmationActionInFlight.current = false;
+          setConfirmationBusy(false);
+          return;
+        }
+        const access = freshAccess.data;
+        const accessStillAllowsEdit = freshAccess.isSuccess && access?.canEdit === true &&
+          (access.identityMode === "verified" || (isReplit() && access.identityMode === "replit-default"));
+        const freshEntry = freshRows.data?.find(row => row.id === pending.targetId && !row.isDeleted);
+        if (!freshRows.isSuccess || !freshEntry || !accessStillAllowsEdit) {
+          setSaveError(!accessStillAllowsEdit
+            ? "Edit access could not be confirmed. No record was changed."
+            : "This record is no longer available to remove.");
+          confirmationActionInFlight.current = false;
+          setConfirmationBusy(false);
+          return;
+        }
+        confirmationFocus.current = { opener: null, fallbackSelector: "[data-section-h-add]" };
+        confirmationRef.current = null;
+        setConfirmation(null);
+        setConfirmationBusy(false);
+        lifecycleMutation.mutate({ entry: freshEntry, restore: false });
+      } catch (error) {
+        setSaveError(errorDetails(error).message);
+        confirmationActionInFlight.current = false;
+        setConfirmationBusy(false);
+      }
+      return;
+    }
+    const currentTarget = pending.target
+      ? current.entries.find(row => row.id === pending.target?.id && !row.isDeleted)
+      : undefined;
+    if (pending.target && !currentTarget) {
+      setConfirmation(null);
+      return;
+    }
+    confirmationRef.current = null;
+    setConfirmation(null);
+    if (pending.nextAction === "begin") applyBegin(currentTarget);
+    else {
+      setEditingId(null); setDraft(blankDraft()); setFieldErrors({}); setSaveError("");
+    }
   };
   const dateWarning = (value: string | null) => {
     if (!value) return "";
@@ -283,13 +440,47 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
     </div>
   );
 
-  if (!currentUser) return <div role="alert" className="text-sm text-amber-900">Please sign in to access Classification &amp; Regulatory Data.</div>;
-  if (!id) return <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Save the component first to add or view classification records.</div>;
-  if (rowsQuery.isLoading) return <div className="space-y-2" aria-label="Loading classification records">{[1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-sm bg-slate-100" />)}</div>;
-  if (rowsQuery.isError) return <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="min-w-0 flex-1">{errorDetails(rowsQuery.error).message}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => rowsQuery.refetch()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Retry records</Button><Button size="sm" variant="outline" onClick={() => accessQuery.refetch()}>Retry access</Button></div></div>;
+  const confirmationDialog = (
+    <AlertDialog open={!!confirmation} onOpenChange={(open) => { if (!open) closeConfirmation(); }}>
+        <AlertDialogContent
+          className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto sm:w-full"
+          onOpenAutoFocus={(event) => { event.preventDefault(); cancelConfirmationRef.current?.focus(); }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmation?.kind === "remove" ? "Remove classification record?" : "Discard changes?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmation?.kind === "remove"
+                ? "This record will be removed from the active register. An authorized user can restore it later."
+                : confirmation?.kind === "discard" && confirmation.nextAction === "begin"
+                  ? "Your current unsaved entry will be discarded and the requested entry will open."
+                  : "Your unsaved Section H entry and its validation messages will be discarded."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel ref={cancelConfirmationRef} onClick={closeConfirmation}>
+              {confirmation?.kind === "remove" ? "Cancel" : "Keep editing"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => { event.preventDefault(); confirmPendingAction(); }}
+              disabled={confirmationBusy}
+              className={confirmation?.kind === "remove" ? "bg-red-700 text-white hover:bg-red-800" : ""}
+            >
+              {confirmation?.kind === "remove" ? "Remove entry" : "Discard changes"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+  );
+  if (!currentUser) return <>{confirmationDialog}<div role="alert" className="text-sm text-amber-900">Please sign in to access Classification &amp; Regulatory Data.</div></>;
+  if (!id) return <>{confirmationDialog}<div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Save the component first to add or view classification records.</div></>;
+  if (rowsQuery.isLoading) return <>{confirmationDialog}<div className="space-y-2" aria-label="Loading classification records">{[1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-sm bg-slate-100" />)}</div></>;
+  if (rowsQuery.isError) return <>{confirmationDialog}<div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="min-w-0 flex-1">{errorDetails(rowsQuery.error).message}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => rowsQuery.refetch()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Retry records</Button><Button size="sm" variant="outline" onClick={() => accessQuery.refetch()}>Retry access</Button></div></div></>;
 
   return (
     <section className="space-y-3" aria-label="Classification and regulatory data">
+      {confirmationDialog}
       {!classItem && <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">This component is marked “Class Item: No”. Records remain visible and are not removed.</div>}
       {switchNotice && <p role="status" className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{switchNotice}</p>}
       {!readOnly && accessQuery.isLoading && <div className="h-8 animate-pulse rounded-sm bg-slate-100" />}
@@ -299,7 +490,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
         {canEdit && <div className="flex items-center gap-2 text-xs text-slate-600"><ShieldCheck className="h-4 w-4 text-emerald-700" />{accessQuery.data?.identityMode === "replit-default" ? "Replit default-user access. " : ""}Changes save per entry, independently of the component.</div>}
         <div className="flex flex-wrap gap-2">
           {canViewRemoved && <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={includeDeleted} onChange={(e) => setIncludeDeleted(e.target.checked)} />Show removed</label>}
-          {canEdit && <Button size="sm" className="h-8 bg-[#16569e] text-white hover:bg-[#12477f]" onClick={() => begin()} disabled={editingId !== null || saveMutation.isPending}><Plus className="mr-1 h-3.5 w-3.5" />Add entry</Button>}
+          {canEdit && <Button data-section-h-add size="sm" className="h-8 bg-[#16569e] text-white hover:bg-[#12477f]" onClick={(event) => begin(undefined, event.currentTarget)} disabled={editingId !== null || saveMutation.isPending}><Plus className="mr-1 h-3.5 w-3.5" />Add entry</Button>}
         </div>
       </div>}
       {saveError && <p role="alert" className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{saveError}</p>}
@@ -325,7 +516,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               {entry.isDeleted && <span className="w-fit rounded-sm bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">Removed</span>}
               {canEdit && <div className="ml-auto flex shrink-0 gap-1">
-                {entry.isDeleted ? <Button size="sm" variant="outline" className="h-8" aria-label="Restore entry" disabled={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ entry, restore: true })}><RotateCcw className="mr-1 h-3.5 w-3.5" />Restore</Button> : <><Button size="icon" variant="outline" className="h-8 w-8" aria-label="Edit entry" disabled={editingId !== null} onClick={() => begin(entry)}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="outline" className="h-8 w-8 text-red-700 hover:bg-red-50" aria-label="Remove entry" disabled={lifecycleMutation.isPending || editingId !== null} onClick={() => { if (window.confirm("Remove this classification record? It can be restored later.")) lifecycleMutation.mutate({ entry, restore: false }); }}><Trash2 className="h-3.5 w-3.5" /></Button></>}
+                {entry.isDeleted ? <Button size="sm" variant="outline" className="h-8" aria-label="Restore entry" disabled={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ entry, restore: true })}><RotateCcw className="mr-1 h-3.5 w-3.5" />Restore</Button> : <><Button data-section-h-entry-edit={entry.id} size="icon" variant="outline" className="h-8 w-8" aria-label="Edit entry" disabled={editingId !== null} onClick={(event) => begin(entry, event.currentTarget)}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="outline" className="h-8 w-8 text-red-700 hover:bg-red-50" aria-label="Remove entry" disabled={lifecycleMutation.isPending || editingId !== null} onClick={(event) => requestRemove(entry, event.currentTarget)}><Trash2 className="h-3.5 w-3.5" /></Button></>}
               </div>}
             </div>
             <div className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
