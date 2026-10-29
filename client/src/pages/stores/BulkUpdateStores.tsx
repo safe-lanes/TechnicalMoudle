@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { storeSelection, type StoreSelection } from "@shared/storesPagination";
 import { useStorePage, useStoreSearch, storeUrl, storesJson } from "./storesPaging";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
@@ -67,8 +68,13 @@ export default function BulkUpdateStores() {
   const [gridModel, setGridModel] = useState<{sort: any[]; filters: any}>({ sort: [], filters: {} });
   const originals = useRef(new Map<number, StoreItem>());
   type ChemicalField = "expiryDate" | "batchNumber" | "sdsReference";
-  const [appliedFields, setAppliedFields] = useState<Partial<Record<ChemicalField, { token: string; value: string; total: number }>>>({});
-  const [appliedMembership, setAppliedMembership] = useState<Record<string, number[]>>({});
+  const [appliedFields, setAppliedFields] = useState<Partial<Record<ChemicalField, StoreSelection & { value: string }>>>({});
+  const appliedMembership = useMemo(() => Object.fromEntries(Object.entries(appliedFields).map(([field, applied]) =>
+    [field, new Set(applied!.targets.map(t => t.id))])), [appliedFields]);
+  const captureRequest = useRef<{ controller: AbortController; scope: string }>();
+  const editSequence = useRef(0);
+  const chemicalEditSequence = useRef(new Map<string, number>());
+  const failedChemicalIds = useRef(new Set<number>());
   const [isCapturing, setIsCapturing] = useState(false);
   const effectiveSearch = useStoreSearch(bulkSearchQuery);
   const scopeSegment = isMyVessels ? "all" : vesselId;
@@ -127,34 +133,30 @@ export default function BulkUpdateStores() {
   const paginatedItems = items;
 
   useEffect(() => {
+    captureRequest.current?.controller.abort(); captureRequest.current = undefined;
+    setIsCapturing(false); chemicalEditSequence.current.clear(); failedChemicalIds.current.clear();
     setBulkUpdateData({}); setChemBulkData({}); setAppliedFields({});
     originals.current.clear(); setCurrentPage(1);
+    return () => captureRequest.current?.controller.abort();
   }, [scopeKey]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [effectiveSearch, itemsPerPage, gridModel]);
   useEffect(() => { if (pageQuery.data && currentPage > totalPages) setCurrentPage(totalPages); }, [pageQuery.data, totalPages, currentPage]);
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(Object.values(appliedFields).map(async applied => {
-      const result = await storesJson(storeUrl(scopeSegment, scopeParams, "targets/membership"), { token: applied!.token, ids: items.map(i => i.id) });
-      return [applied!.token, result.data] as const;
-    })).then(entries => { if (!cancelled) setAppliedMembership(Object.fromEntries(entries)); })
-      .catch(e => { if (!cancelled) toast({ title: "Apply to All unavailable", description: e.message, variant: "destructive" }); });
-    return () => { cancelled = true; };
-  }, [appliedFields, items, scopeKey]);
   const rememberOriginal = (id: number) => {
     const item = items.find(i => i.id === id);
     if (item && !originals.current.has(id)) originals.current.set(id, item);
   };
   const handleChemicalChange = (id: number, field: ChemicalField, value: string) => {
+    if (chemUpdateMutation.isPending) return;
+    chemicalEditSequence.current.set(`${id}:${field}`, ++editSequence.current);
     rememberOriginal(id);
     setChemBulkData(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
   };
   const chemicalValue = (item: StoreItem, field: ChemicalField) => {
     const applied = appliedFields[field];
-    return chemBulkData[item.id]?.[field] ?? (applied && appliedMembership[applied.token]?.includes(item.id) ? applied.value : item[field]) ?? "";
+    return chemBulkData[item.id]?.[field] ?? (applied && appliedMembership[field]?.has(item.id) ? applied.value : item[field]) ?? "";
   };
 
   const handleBulkUpdateChange = (itemId: number, field: 'consumedLocationA' | 'consumedLocationB' | 'receivedLocationA' | 'receivedLocationB' | 'comments', value: string | number) => {
@@ -253,25 +255,27 @@ export default function BulkUpdateStores() {
   };
 
   const chemUpdateMutation = useMutation({
+    onMutate: () => scopeKey,
     mutationFn: async (updates: {itemId: number, data: any}[]) =>
       (await storesJson(storeUrl(scopeSegment, scopeParams, "chemicals/update"), {
-        applied: Object.entries(appliedFields).map(([field, applied]) => ({ token: applied!.token, values: { [field]: applied!.value } })),
+        version: 2,
+        applied: Object.entries(appliedFields).map(([field, applied]) => ({ targets: applied!.targets, values: { [field]: applied!.value } })),
         overrides: updates.map(u => ({ id: u.itemId, data: u.data })),
       })).data,
-    onSuccess: (result) => {
+    onSuccess: (result, _updates, startedScope) => {
       invalidateByUrlPrefix('/technical/api/stores');
+      if (currentScope.current !== startedScope) return;
       if (result.failedIds.length) {
         // Convert only failed targets to explicit drafts; successful Apply-to-All
         // targets must not be submitted again on retry.
         const failed = new Set<number>(result.failedIds);
-        setChemBulkData(prev => Object.fromEntries(Array.from(failed).map(id => [id, {
-          ...Object.fromEntries(Object.entries(appliedFields).map(([key, applied]) => [key, applied!.value])),
-          ...prev[id],
-        }])));
+        failedChemicalIds.current = failed;
+        setChemBulkData(Object.fromEntries(result.failedPatches.map((item: { id: number; data: Record<string, string> }) => [item.id, item.data])));
         setAppliedFields({});
         toast({ title: "Some chemical updates failed", description: `${result.succeeded} saved; ${failed.size} remain pending.`, variant: "destructive" });
         return;
       }
+      failedChemicalIds.current.clear();
       setChemBulkData({}); setAppliedFields({});
       toast({ title: "Success", description: "Chemical fields updated successfully" });
     },
@@ -281,14 +285,16 @@ export default function BulkUpdateStores() {
   });
 
   const handleSaveChemUpdates = async () => {
+    if (isCapturing || captureRequest.current || chemUpdateMutation.isPending) return;
     const updates: {itemId: number, data: any}[] = [];
     Object.entries(chemBulkData).forEach(([id, data]) => {
       const itemId = Number(id);
       const item = originals.current.get(itemId);
       const changed: any = {};
-      if (data.expiryDate !== undefined && (appliedFields.expiryDate || data.expiryDate !== item?.expiryDate)) changed.expiryDate = data.expiryDate;
-      if (data.batchNumber !== undefined && (appliedFields.batchNumber || data.batchNumber !== item?.batchNumber)) changed.batchNumber = data.batchNumber;
-      if (data.sdsReference !== undefined && (appliedFields.sdsReference || data.sdsReference !== item?.sdsReference)) changed.sdsReference = data.sdsReference;
+      const retry = failedChemicalIds.current.has(itemId);
+      if (data.expiryDate !== undefined && (retry || appliedFields.expiryDate || data.expiryDate !== item?.expiryDate)) changed.expiryDate = data.expiryDate;
+      if (data.batchNumber !== undefined && (retry || appliedFields.batchNumber || data.batchNumber !== item?.batchNumber)) changed.batchNumber = data.batchNumber;
+      if (data.sdsReference !== undefined && (retry || appliedFields.sdsReference || data.sdsReference !== item?.sdsReference)) changed.sdsReference = data.sdsReference;
       if (Object.keys(changed).length > 0) {
         updates.push({ itemId, data: changed });
       }
@@ -301,24 +307,31 @@ export default function BulkUpdateStores() {
   };
 
   const applyChemicalToAll = async (field: ChemicalField, value: string) => {
-    if (!value || isCapturing) return;
+    if (!value || captureRequest.current || chemUpdateMutation.isPending) return;
     const startedScope = scopeKey;
+    const startedSequence = ++editSequence.current;
+    const request = { controller: new AbortController(), scope: startedScope };
+    captureRequest.current = request;
     setIsCapturing(true);
     try {
-      const result = await storesJson(storeUrl(scopeSegment, scopeParams, "targets"), {});
-      if (currentScope.current !== startedScope) return;
-      setAppliedFields(prev => ({ ...prev, [field]: { ...result.data, value } }));
+      const result = await storesJson(storeUrl(scopeSegment, scopeParams, "targets"), { version: 2 }, request.controller.signal);
+      if (currentScope.current !== startedScope || captureRequest.current !== request || request.controller.signal.aborted) return;
+      const selection = storeSelection.parse(result.data);
+      setAppliedFields(prev => ({ ...prev, [field]: { ...selection, value } }));
       setChemBulkData(prev => Object.fromEntries(Object.entries(prev).map(([id, patch]) => {
-        const next = { ...patch }; delete next[field]; return [id, next];
+        const next = { ...patch };
+        if ((chemicalEditSequence.current.get(`${id}:${field}`) ?? 0) <= startedSequence) delete next[field];
+        return [id, next];
       })));
-    } catch (e: any) { toast({ title: "Apply to All failed", description: e.message, variant: "destructive" }); }
-    finally { setIsCapturing(false); }
+    } catch (e: any) { if (!request.controller.signal.aborted && captureRequest.current === request) toast({ title: "Apply to All failed", description: e.message, variant: "destructive" }); }
+    finally { if (captureRequest.current === request) { captureRequest.current = undefined; setIsCapturing(false); } }
   };
   const applyBulkExpiryToAll = () => applyChemicalToAll("expiryDate", bulkExpiryDate);
   const applyBulkBatchToAll = () => applyChemicalToAll("batchNumber", bulkBatchNumber);
   const applyBulkSdsToAll = () => applyChemicalToAll("sdsReference", bulkSdsReference);
 
   const hasAnyChemChanges = Object.keys(appliedFields).length > 0 || Object.entries(chemBulkData).some(([id, data]) => {
+    if (failedChemicalIds.current.has(Number(id))) return Object.keys(data).length > 0;
     const item = originals.current.get(Number(id));
     if (!item) return Object.keys(data).length > 0;
     return (data.expiryDate !== undefined && data.expiryDate !== item.expiryDate) ||
@@ -624,6 +637,7 @@ export default function BulkUpdateStores() {
               <Input
                 type="date"
                 value={chemicalValue(item, "expiryDate")}
+                disabled={chemUpdateMutation.isPending}
                 onChange={(e) => handleChemicalChange(item.id, "expiryDate", e.target.value)}
                 className="w-32 h-7 text-xs"
                 data-testid={`input-chem-expiry-${item.id}`}
@@ -645,6 +659,7 @@ export default function BulkUpdateStores() {
               <Input
                 type="text"
                 value={chemicalValue(item, "batchNumber")}
+                disabled={chemUpdateMutation.isPending}
                 onChange={(e) => handleChemicalChange(item.id, "batchNumber", e.target.value)}
                 className="w-24 h-7 text-xs"
                 placeholder="Batch #"
@@ -667,6 +682,7 @@ export default function BulkUpdateStores() {
               <Input
                 type="text"
                 value={chemicalValue(item, "sdsReference")}
+                disabled={chemUpdateMutation.isPending}
                 onChange={(e) => handleChemicalChange(item.id, "sdsReference", e.target.value)}
                 className="w-24 h-7 text-xs"
                 placeholder="SDS Ref"
@@ -680,7 +696,7 @@ export default function BulkUpdateStores() {
     }
 
     return cols;
-  }, [activeTab, transactionMode, locationNames.locationA, locationNames.locationB, bulkUpdateData, chemBulkData, appliedFields, appliedMembership, dateReceived, items]);
+  }, [activeTab, transactionMode, locationNames.locationA, locationNames.locationB, bulkUpdateData, chemBulkData, appliedFields, appliedMembership, dateReceived, items, chemUpdateMutation.isPending]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">

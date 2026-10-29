@@ -223,3 +223,16 @@ export async function queryTargets(vesselId: string, q: StorePageQuery) {
   const rows = await db.execute(sql`SELECT s.id,s.vessel_id FROM stores_items s WHERE ${criteria(vesselId, q, false, false)}`);
   return rows.rows.map(r => ({ id: Number(r.id), vesselId: String(r.vessel_id) }));
 }
+
+/** Validate only submitted identities, not complete inventory records.
+ * JSON binding avoids PostgreSQL's parameter-count limit for large selections.
+ */
+export async function queryTargetIdentities(ids: number[]) {
+  if (!ids.length) return [];
+  const db = await getDb();
+  const result = await db.execute(sql`SELECT s.id,s.vessel_id,s.item_type,s.deleted FROM stores_items s
+    WHERE s.id IN (SELECT jsonb_array_elements_text(${JSON.stringify(Array.from(new Set(ids)))}::jsonb)::bigint)`);
+  return result.rows.map(row => ({
+    id: Number(row.id), vesselId: String(row.vessel_id), itemType: String(row.item_type), deleted: row.deleted === true,
+  }));
+}

@@ -1,19 +1,13 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { StorePage } from "@shared/storesPagination";
+import { storesJson } from "./storesTransport";
+export { storesJson } from "./storesTransport";
 
 export function useStoreSearch(value: string) {
   const [effective, setEffective] = useState(value);
   useEffect(() => { const timer = setTimeout(() => setEffective(value), 300); return () => clearTimeout(timer); }, [value]);
   return effective;
-}
-export async function storesJson(url: string, body?: unknown, signal?: AbortSignal) {
-  const response = await fetch(url, { signal, ...(body !== undefined ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}) });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || "Stores request failed");
-  }
-  return response.json();
 }
 export function storeUrl(vesselId: string, query: Record<string, any>, action = "paged") {
   const params = new URLSearchParams();

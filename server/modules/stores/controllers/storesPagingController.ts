@@ -1,8 +1,7 @@
 import type { Request, Response } from "express";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import ExcelJS from "exceljs";
-import { storePageQuery, storeStock, type StorePageQuery } from "@shared/storesPagination";
+import { storePageQuery, storeStock, storeCaptureBody, storeInactivateBody, storeChemicalBody, type StoreTarget, type StorePageQuery } from "@shared/storesPagination";
 import * as paging from "../repositories/storesPagingRepository";
 import * as service from "../services/storesService";
 import * as repo from "../repositories/storesRepository";
@@ -46,86 +45,71 @@ export const itemHistory = badRequest(async (req, res) => {
   res.json({ success: true, data: await paging.queryPage(item.vesselId, q, true, item.stuuid) });
 });
 
-// Opaque server-side target snapshots: no full record arrays travel to the browser.
-// Bound to authenticated identity in the tenant DB; survives process restarts
-// and routing to a different application instance. IDs only, never full rows.
-type Snapshot = {
-  ids: Array<{id: number; vesselId: string}>;
-  itemType: string;
+const legacySelection = (req: Request) => {
+  if (req.body?.token !== undefined || (Array.isArray(req.body?.applied) && req.body.applied.some((entry: any) => entry?.token !== undefined)))
+    throw Object.assign(new Error("Stores selections have changed. Keep a copy of pending edits, refresh the page and select the records again."), { statusCode: 409 });
 };
-const owner = (req: Request) => String((req as AuthenticatedRequest).user?.userUuid ?? (req as AuthenticatedRequest).user?.id ?? "");
-async function snapshot(req: Request, token: string) {
-  const db = await getDb();
-  const result = await db.execute(sql`SELECT targets,item_type FROM stores_operation_targets WHERE token=${token} AND owner_uuid=${owner(req)}`);
-  if (!result.rows.length) {
-    throw Object.assign(new Error("Selection unavailable. Please select the records again."), { statusCode: 409 });
+async function validateAssociations(targets: StoreTarget[], q: StorePageQuery, vesselId: string, additionalIds: number[] = []) {
+  const current = new Map((await paging.queryTargetIdentities([...targets.map(t => t.id), ...additionalIds])).map(row => [row.id, row]));
+  const allowedVessels = q.vesselIds === undefined ? null : new Set(q.vesselIds.split(",").filter(Boolean));
+  const seen = new Map<number, string>();
+  for (const target of targets) {
+    if ((seen.has(target.id) && seen.get(target.id) !== target.vesselId) ||
+      (current.has(target.id) && current.get(target.id)!.vesselId !== target.vesselId))
+      throw Object.assign(new Error("Item vessel does not match the requested scope"), { statusCode: 403 });
+    seen.set(target.id, target.vesselId);
   }
-  return { ids: result.rows[0].targets, itemType: result.rows[0].item_type } as Snapshot;
+  for (const row of Array.from(current.values())) {
+    if (!row.deleted && (row.itemType !== q.itemType ||
+      (vesselId !== "all" && row.vesselId !== vesselId) ||
+      (allowedVessels && !allowedVessels.has(row.vesselId))))
+      throw Object.assign(new Error("Item is outside the requested scope"), { statusCode: 403 });
+  }
 }
 export const capture = badRequest(async (req, res) => {
+  legacySelection(req);
+  if (req.body?.version !== 2) return res.status(409).json({ error: "Refresh Stores before selecting records; selection version 2 is required." });
+  const body = storeCaptureBody.parse(req.body);
   const q = await parse(req);
-  const db = await getDb();
-  // Session selections have no short TTL: drafts must not become invalid merely
-  // because a user returned after a break. Prune abandoned state after 30 days.
-  await db.execute(sql`DELETE FROM stores_operation_targets WHERE created_at < now()-interval '30 days'`);
-  const count = await db.execute(sql`SELECT count(*)::int AS count FROM stores_operation_targets WHERE owner_uuid=${owner(req)}`);
-  if (Number(count.rows[0].count) >= 1000) return res.status(429).json({ error: "Too many pending selections" });
   const ids = await paging.queryTargets(req.params.vesselId, q);
-  const explicitIds = req.body.ids === undefined ? null : new Set(z.array(z.number().int().positive()).max(100000).parse(req.body.ids));
+  const explicitIds = body.ids === undefined ? null : new Set(body.ids);
   const selected = explicitIds ? ids.filter(i => explicitIds.has(i.id)) : ids;
-  const token = randomUUID();
-  await db.execute(sql`INSERT INTO stores_operation_targets(token,owner_uuid,item_type,targets)
-    VALUES(${token},${owner(req)},${q.itemType},${JSON.stringify(selected)}::jsonb)`);
-  res.json({ success: true, data: { token, total: selected.length } });
-});
-const targetBody = z.object({
-  token: z.string().uuid(),
-  exclude: z.array(z.number().int().positive()).max(100000).default([]),
+  if (!req.aborted && !res.destroyed) res.json({ success: true, data: { version: 2, targets: selected, total: selected.length } });
 });
 export const targetMembership = badRequest(async (req, res) => {
-  const token = z.string().uuid().parse(req.body.token);
-  const ids = z.array(z.number().int().positive()).max(200).parse(req.body.ids);
-  const snap = await snapshot(req, token);
-  const set = new Set(snap.ids.map(i => i.id));
-  res.json({ success: true, data: ids.filter(id => set.has(id)) });
+  res.status(409).json({ error: "Refresh Stores and reselect records. Membership is now maintained in the browser; pending edits are not automatically recovered." });
 });
 export const inactivateTargets = badRequest(async (req, res) => {
-  const body = targetBody.parse(req.body);
-  const snap = await snapshot(req, body.token);
+  legacySelection(req);
+  const body = storeInactivateBody.parse(req.body);
   const q = await parse(req);
   // Existing delete applies only selected records still in the application-filtered list.
-  const eligible = new Set((await paging.queryTargets(req.params.vesselId, q)).map(i => i.id));
+  const eligibleRows = await paging.queryTargets(req.params.vesselId, q);
+  const eligible = new Map(eligibleRows.map(i => [i.id, i.vesselId]));
+  await validateAssociations(body.targets, q, req.params.vesselId, body.additionalIds);
   const excluded = new Set(body.exclude);
   const failures: number[] = [];
-  const eligibleRows = await paging.queryTargets(req.params.vesselId, q);
-  const additionalIds = new Set(z.array(z.number().int().positive()).max(100000).default([]).parse(req.body.additionalIds));
-  const targets = new Map(snap.ids.map(i => [i.id, i]));
+  const additionalIds = new Set(body.additionalIds);
+  const targets = new Map(body.targets.map(i => [i.id, i]));
   for (const item of eligibleRows) if (additionalIds.has(item.id)) targets.set(item.id, item);
   let succeeded = 0;
   for (const target of Array.from(targets.values())) if (!excluded.has(target.id) && eligible.has(target.id)) {
-    try { await service.inactivateStoresItem(String(target.id), target.vesselId); succeeded++; }
+    try { await service.inactivateStoresItem(String(target.id), eligible.get(target.id)!); succeeded++; }
     catch { failures.push(target.id); }
   }
   res.json({ success: failures.length === 0, data: { succeeded, failedIds: failures } });
 });
-const chemicalPatch = z.object({
-  expiryDate: z.string().max(100).optional(), batchNumber: z.string().max(500).optional(), sdsReference: z.string().max(2000).optional(),
-}).strict();
 export const updateChemicals = badRequest(async (req, res) => {
-  const body = z.object({
-    token: z.string().uuid().optional(), values: chemicalPatch.default({}),
-    applied: z.array(z.object({ token: z.string().uuid(), values: chemicalPatch })).max(3).default([]),
-    overrides: z.array(z.object({ id: z.number().int().positive(), data: chemicalPatch })).max(10000).default([]),
-  }).parse(req.body);
+  legacySelection(req);
+  const body = storeChemicalBody.parse(req.body);
   const q = await parse(req);
   if (q.itemType !== "chemicals") return res.status(400).json({ error: "Chemical updates require the Chemicals tab" });
   const eligible = await paging.queryTargets(req.params.vesselId, { ...q, search: "", category: "", stockStatus: "", location: undefined });
-  const allowed = new Set(eligible.map(i => i.id));
-  const targets = body.token ? (await snapshot(req, body.token)).ids : [];
+  const allowed = new Map(eligible.map(i => [i.id, i.vesselId]));
+  await validateAssociations(body.applied.flatMap(a => a.targets), q, req.params.vesselId);
   const patches = new Map<number, Record<string, string>>();
-  for (const item of targets) if (allowed.has(item.id)) patches.set(item.id, body.values);
   for (const applied of body.applied) {
-    for (const item of (await snapshot(req, applied.token)).ids) if (allowed.has(item.id)) patches.set(item.id, { ...patches.get(item.id), ...applied.values });
+    for (const item of applied.targets) if (allowed.has(item.id)) patches.set(item.id, { ...patches.get(item.id), ...applied.values });
   }
   for (const item of body.overrides) {
     if (!allowed.has(item.id)) return res.status(403).json({ error: "Item is outside the requested scope" });
@@ -139,7 +123,8 @@ export const updateChemicals = badRequest(async (req, res) => {
     try { await service.updateStoresItem(String(id), patch); succeeded++; succeededIds.push(id); }
     catch { failedIds.push(id); }
   }
-  res.json({ success: failedIds.length === 0, data: { succeeded, failedIds, succeededIds } });
+  res.json({ success: failedIds.length === 0, data: { succeeded, failedIds, succeededIds,
+    failedPatches: failedIds.map(id => ({ id, data: patches.get(id)! })) } });
 });
 
 export const bulkQuantities = badRequest(async (req, res) => {

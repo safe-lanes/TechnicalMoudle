@@ -1,5 +1,6 @@
 import { apiErrorMessage } from "@/lib/apiErrorMessage";
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { storeSelection, type StoreSelection } from "@shared/storesPagination";
 import { useStorePage, useStoreSearch, storeUrl, storesJson, StoresPager, downloadStoreExport } from "./storesPaging";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
@@ -221,9 +222,12 @@ const Stores: React.FC = () => {
   const [locationItemsPerPage, setLocationItemsPerPage] = useState(10);
   const effectiveSearch = useStoreSearch(searchTerm);
   const effectiveHistorySearch = useStoreSearch(historySearch);
-  const [targetSelection, setTargetSelection] = useState<{token: string; total: number} | null>(null);
+  const [targetSelection, setTargetSelection] = useState<StoreSelection | null>(null);
   const [excludedStoreIds, setExcludedStoreIds] = useState<Set<number>>(new Set());
-  const [pageSelectionIds, setPageSelectionIds] = useState<Set<number>>(new Set());
+  const pageSelectionIds = useMemo(() => new Set(targetSelection?.targets.map(t => t.id) ?? []), [targetSelection]);
+  const captureGeneration = useRef(0);
+  const captureAbort = useRef<AbortController>();
+  const deletePending = useRef(false);
   const editedLocationRows = useRef(new Map<number, StoreItem>());
   const exportAbort = useRef<AbortController>();
   const [exporting, setExporting] = useState(false);
@@ -269,6 +273,7 @@ const Stores: React.FC = () => {
 
   useEffect(() => {
     if (viewMode !== 'inventory') {
+      captureGeneration.current++; captureAbort.current?.abort();
       setIsDeleteSelectionMode(false);
       setSelectedStoreIds(new Set());
       setTargetSelection(null); setExcludedStoreIds(new Set());
@@ -279,6 +284,7 @@ const Stores: React.FC = () => {
   }, [viewMode]);
 
   useEffect(() => {
+    captureGeneration.current++; captureAbort.current?.abort();
     setHistoryPeriodFilter(null);
   }, [activeTab]);
 
@@ -321,7 +327,7 @@ const Stores: React.FC = () => {
     setTargetSelection(null); setExcludedStoreIds(new Set()); editedLocationRows.current.clear();
     setSelectedStoreIds(new Set()); setIsDeleteSelectionMode(false);
     setEditingLocRobValues({});
-    return () => exportAbort.current?.abort();
+    return () => { exportAbort.current?.abort(); captureAbort.current?.abort(); };
   }, [scopeKey]);
   useEffect(() => {
     if (inventoryQuery.data) {
@@ -331,14 +337,6 @@ const Stores: React.FC = () => {
     }
     if (historyQuery.data && historyPage > Math.max(1, historyQuery.data.totalPages)) setHistoryPage(Math.max(1, historyQuery.data.totalPages));
   }, [inventoryQuery.data, historyQuery.data, inventoryPage, locationPage, historyPage, viewMode]);
-  useEffect(() => {
-    if (!targetSelection || !inventoryQuery.data) { setPageSelectionIds(new Set()); return; }
-    let cancelled = false;
-    storesJson(storeUrl(scopeSegment, scopeParams, "targets/membership"), { token: targetSelection.token, ids: inventoryQuery.data.items.map(i => i.id) })
-      .then(json => { if (!cancelled) setPageSelectionIds(new Set(json.data)); })
-      .catch(e => { if (!cancelled) toast({ title: "Selection unavailable", description: e.message, variant: "destructive" }); });
-    return () => { cancelled = true; };
-  }, [targetSelection, inventoryQuery.data, scopeKey]);
   
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
@@ -1605,12 +1603,15 @@ const Stores: React.FC = () => {
   };
 
   const exitDeleteSelectionMode = () => {
+    captureGeneration.current++; captureAbort.current?.abort();
     setIsDeleteSelectionMode(false);
     setSelectedStoreIds(new Set());
     setTargetSelection(null); setExcludedStoreIds(new Set());
   };
 
   const toggleStoreSelection = (storeId: number) => {
+    if (deletePending.current) return;
+    captureGeneration.current++; captureAbort.current?.abort();
     if (targetSelection && pageSelectionIds.has(storeId)) {
       setExcludedStoreIds(prev => {
         const next = new Set(prev); if (next.has(storeId)) next.delete(storeId); else next.add(storeId); return next;
@@ -1626,32 +1627,49 @@ const Stores: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
+    if (deletePending.current) return;
+    const generation = ++captureGeneration.current;
+    captureAbort.current?.abort();
     if (targetSelection && !excludedStoreIds.size) {
       setTargetSelection(null); setExcludedStoreIds(new Set());
       setSelectedStoreIds(new Set());
     } else {
       const startedScope = scopeKey;
-      storesJson(storeUrl(scopeSegment, inventoryParams, "targets"), {}).then(json => {
-        if (currentScope.current !== startedScope) return;
-        setTargetSelection(json.data); setSelectedStoreIds(new Set()); setExcludedStoreIds(new Set());
-      }).catch(e => toast({ title: "Selection failed", description: e.message, variant: "destructive" }));
+      const controller = new AbortController(); captureAbort.current = controller;
+      storesJson(storeUrl(scopeSegment, inventoryParams, "targets"), { version: 2 }, controller.signal).then(json => {
+        if (currentScope.current !== startedScope || generation !== captureGeneration.current || controller.signal.aborted) return;
+        setTargetSelection(storeSelection.parse(json.data)); setSelectedStoreIds(new Set()); setExcludedStoreIds(new Set());
+      }).catch(e => { if (!controller.signal.aborted && generation === captureGeneration.current) toast({ title: "Selection failed", description: e.message, variant: "destructive" }); })
+        .finally(() => { if (captureAbort.current === controller) captureAbort.current = undefined; });
     }
   };
   const isStoreSelected = (id: number) => selectedStoreIds.has(id) || (!!targetSelection && pageSelectionIds.has(id) && !excludedStoreIds.has(id));
-  const selectedStoreCount = (targetSelection?.total ?? 0) - excludedStoreIds.size + selectedStoreIds.size;
+  const selectedStoreCount = new Set([
+    ...(targetSelection?.targets.filter(t => !excludedStoreIds.has(t.id)).map(t => t.id) ?? []),
+    ...Array.from(selectedStoreIds).filter(id => !excludedStoreIds.has(id)),
+  ]).size;
 
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
 
   const executeDeleteSelected = async () => {
+    if (deletePending.current) return;
+    if (captureAbort.current && !captureAbort.current.signal.aborted) {
+      toast({ title: "Selection is loading", description: "Wait for Select All to finish before deleting." }); return;
+    }
     if (!selectedStoreCount) {
       toast({ title: "No items selected", description: "Please select at least one item to delete.", variant: "destructive" });
       return;
     }
+    deletePending.current = true;
     setIsDeletingSelected(true);
     try {
-      const token = targetSelection?.token ?? (await storesJson(storeUrl(scopeSegment, inventoryParams, "targets"), { ids: Array.from(selectedStoreIds) })).data.token;
+      const startedScope = scopeKey;
+      const startedGeneration = captureGeneration.current;
+      const selection = targetSelection ?? storeSelection.parse((await storesJson(storeUrl(scopeSegment, inventoryParams, "targets"), { version: 2, ids: Array.from(selectedStoreIds) })).data);
+      if (currentScope.current !== startedScope || captureGeneration.current !== startedGeneration) return;
       const result = await storesJson(storeUrl(scopeSegment, inventoryParams, "targets/inactivate"),
-        { token, exclude: Array.from(excludedStoreIds), additionalIds: Array.from(selectedStoreIds) });
+        { version: 2, targets: selection.targets, exclude: Array.from(excludedStoreIds), additionalIds: Array.from(selectedStoreIds) });
+      if (currentScope.current !== startedScope || captureGeneration.current !== startedGeneration) return;
       const { succeeded, failedIds } = result.data;
       setTargetSelection(null); setExcludedStoreIds(new Set()); setSelectedStoreIds(new Set(failedIds));
       invalidateByUrlPrefix('/technical/api/stores');
@@ -1659,7 +1677,7 @@ const Stores: React.FC = () => {
       toast({ title: failedIds.length ? "Partial failure" : "Success", description: `${succeeded} succeeded, ${failedIds.length} failed.`, variant: failedIds.length ? "destructive" : "default" });
     } catch (e: any) {
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
-    } finally { setIsDeletingSelected(false); }
+    } finally { deletePending.current = false; setIsDeletingSelected(false); }
   };
 
   // ============================================================

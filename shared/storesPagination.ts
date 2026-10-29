@@ -1,6 +1,37 @@
 import { z } from "zod";
 
 export const storeTab = z.enum(["stores", "lubes", "chemicals", "others"]);
+export const storeTarget = z.object({ id: z.number().int().positive().safe(), vesselId: z.string().min(1).max(200) }).strict();
+export type StoreTarget = z.infer<typeof storeTarget>;
+export const storeSelection = z.object({
+  version: z.literal(2),
+  targets: z.array(storeTarget),
+  total: z.number().int().nonnegative(),
+}).superRefine((selection, ctx) => {
+  if (selection.total !== selection.targets.length || new Set(selection.targets.map(t => t.id)).size !== selection.total)
+    ctx.addIssue({ code: "custom", message: "Invalid selection count or duplicate targets" });
+});
+export type StoreSelection = z.infer<typeof storeSelection>;
+export const storeCaptureBody = z.object({
+  version: z.literal(2),
+  ids: z.array(z.number().int().positive().safe()).max(100000).optional(),
+}).strict();
+export const chemicalPatch = z.object({
+  expiryDate: z.string().max(100).optional(), batchNumber: z.string().max(500).optional(), sdsReference: z.string().max(2000).optional(),
+}).strict();
+export type ChemicalPatch = z.infer<typeof chemicalPatch>;
+export const storeInactivateBody = z.object({
+  version: z.literal(2), targets: z.array(storeTarget),
+  exclude: z.array(z.number().int().positive().safe()).default([]),
+  additionalIds: z.array(z.number().int().positive().safe()).default([]),
+}).strict();
+export const storeChemicalBody = z.object({
+  version: z.literal(2),
+  applied: z.array(z.object({ targets: z.array(storeTarget), values: chemicalPatch }).strict()).max(3),
+  // Failure-only drafts can be as large as a captured Apply-to-All set. The
+  // existing transport byte ceiling, not a smaller override count, bounds them.
+  overrides: z.array(z.object({ id: z.number().int().positive().safe(), data: chemicalPatch }).strict()),
+}).strict();
 export const storePageQuery = z.object({
   itemType: storeTab,
   page: z.coerce.number().int().min(1).max(10_000_000).default(1),

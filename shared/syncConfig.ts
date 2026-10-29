@@ -1242,7 +1242,7 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     tableName: 'stores_operation_targets', category: 'NO_SYNC', direction: 'none',
     identityColumn: 'token', vesselScopeColumn: null, vesselScopeJoinPath: null,
     isGlobal: true, isConfigurable: false, businessRules: null,
-    notes: 'Transient per-user Stores selection snapshots; tenant database-local, never vessel inventory or sync data.',
+    notes: 'Retired selection table: exclusion tombstone for older installations only. Never create, read, replicate or automatically drop it.',
   },
   // ══════════════════════════════════════════════════════════════════════════════
 
