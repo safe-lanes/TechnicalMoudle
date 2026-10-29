@@ -3,6 +3,7 @@ import { asyncHandler } from '../shared/middleware';
 import { requirePermission } from '../../middleware/permissions';
 import { requireRole, requireVesselAccess } from '../../middleware/auth';
 import * as defectsCtrl from './controllers/defectsController';
+import { getDefectLogPage } from './paging/defectLogController';
 import * as adminCtrl from './controllers/defectAdminController';
 import * as filesCtrl from './controllers/defectFileController';
 
@@ -108,6 +109,7 @@ router.get('/defects/:id/approval-process',
   asyncHandler(defectsCtrl.getDefectApprovalProcess));
 
 // GET    /defects/:id — get single defect
+router.get('/defects/log-page', asyncHandler(getDefectLogPage));
 router.get('/defects/:id', asyncHandler(defectsCtrl.getDefect));
 
 // PATCH  /defects/:id — update defect

@@ -18,3 +18,4 @@
 - [Certificates pagination scope](certificates-pagination-scope.md) — Certificates first; follow Spares loading principles without changing existing filters or exports.
 - [Survey pagination scope](survey-pagination-scope.md) — preserve existing search/filter behaviour; ordinary Survey sorting has its own scoped approval.
 - [Defect pagination scope](defects-pagination-scope.md) — loading-only scope for Defect Log and COC; preserve existing search, export and filter functionality.
+- [Defect matching runtime](defect-matching-runtime.md) — SQL timezone settings do not control PL/V8 Date parsing; verify actual browser and database runtimes independently.

@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,7 @@ import {
   makeDefectLogExportRow,
   stripDefectHtml,
 } from "./defectLogExport";
+import { fetchDefectLog, useDefectLogPage } from "./useDefectLogPage";
 
 interface DefectsFilters {
   periodValue?: PeriodValue | null;
@@ -302,8 +303,8 @@ export default function DefectsLogWithTabs() {
     defectId: null 
   });
   const [showFilters, setShowFilters] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 100;
+  const exportPending = useRef(false);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; defect: Defect | null }>({
     open: false,
     defect: null
@@ -323,41 +324,22 @@ export default function DefectsLogWithTabs() {
     setSelectedVesselNames(result.selectedVesselNames);
   }, []);
 
-  const { data: defects = [], isLoading } = useQuery({
-    queryKey: [
-      'defects',
-      'active',
-      filters.vesselId,
-      filters.type,
-      filters.fleet,
-      filters.addGroup,
-      filters.dueOverdue,
-    ],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.append('statusScope', 'active');
-      
-      if (filters.vesselId) params.append('vesselId', filters.vesselId);
-      if (filters.type) params.append('category', filters.type);
-      if (filters.fleet) params.append('fleet', filters.fleet);
-      if (filters.addGroup) params.append('group', filters.addGroup);
-      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
-      
-      const response = await fetch(`/technical/api/defects?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch defects');
-      const data = await response.json();
-      
-      // Transform data to include first action's description in actionTakenRequested
-      // Prioritize actions array over actionTakenRequested field since actions are updated via the form
-      return data.map((defect: Defect) => ({
-        ...defect,
-        actionTakenRequested: 
-          (defect.actions && defect.actions.length > 0 && defect.actions[0].actionDescription)
-            ? defect.actions[0].actionDescription 
-            : (defect.actionTakenRequested || '')
-      }));
-    },
-  });
+  const scope = {
+    vesselId: filters.vesselId,
+    selectedVessel,
+    selectedVesselName: allVessels.find(v => v.id === selectedVessel)?.name?.toLowerCase().trim() || '',
+    selectedVesselNames,
+    search: filters.search,
+    periodValue: filters.periodValue,
+    dueOverdue: filters.dueOverdue,
+    type: filters.type,
+    fleet: filters.fleet,
+    addGroup: filters.addGroup,
+  };
+  const { data: defectPage, isFetching, isError, error, refetch, currentPage, setCurrentPage } = useDefectLogPage(scope);
+  const paginatedDefects = isError ? [] : defectPage?.items || [];
+  const totalDefects = isError ? 0 : defectPage?.total || 0;
+  const totalPages = isError ? 1 : defectPage?.totalPages || 1;
 
   const handleFilterChange = (key: keyof DefectsFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -371,9 +353,9 @@ export default function DefectsLogWithTabs() {
   };
 
   // Browser PDF (decision 23-Oct-2026: no server-side PDF) — the same rows and columns as the CSV / Excel export.
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     try {
-      const exportDefects = getDefectsForExport();
+      const exportDefects = await getDefectsForExport();
       const columns: TableColumn[] = DEFECT_LOG_EXPORT_COLUMNS.map((header) => ({ header, field: header, width: header === "Description" ? 40 : 18 }));
       const data = exportDefects.map((defect) => {
         const row = makeDefectLogExportRow(defect);
@@ -394,14 +376,23 @@ export default function DefectsLogWithTabs() {
     }
   };
 
-  const getDefectsForExport = (): Defect[] => {
-    const gridFilters = gridApi && !gridApi.isDestroyed() ? gridApi.getFilterModel() : null;
-    return filterDefectsForExport(filteredDefects, gridFilters) as Defect[];
+  const getDefectsForExport = async (): Promise<Defect[]> => {
+    if (exportPending.current) throw new Error('An export is already in progress');
+    exportPending.current = true;
+    // Freeze the active filter model before the asynchronous full-result read.
+    try {
+      const gridFilters = gridApi && !gridApi.isDestroyed()
+        ? structuredClone(gridApi.getFilterModel()) : null;
+      const result = await fetchDefectLog(scope, 1, true);
+      return filterDefectsForExport(result.items, gridFilters);
+    } finally {
+      exportPending.current = false;
+    }
   };
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     try {
-      downloadDefectLogCsv(getDefectsForExport());
+      downloadDefectLogCsv(await getDefectsForExport());
     } catch (error) {
       console.error("Failed to export Defect Log CSV:", error);
       toast({
@@ -412,9 +403,9 @@ export default function DefectsLogWithTabs() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     try {
-      downloadDefectLogExcel(getDefectsForExport());
+      downloadDefectLogExcel(await getDefectsForExport());
     } catch (error) {
       console.error("Failed to export Defect Log Excel:", error);
       toast({
@@ -425,132 +416,6 @@ export default function DefectsLogWithTabs() {
     }
   };
 
-  const filteredDefects = useMemo(() => {
-    let result = defects;
-    
-    if (selectedVessel !== 'all') {
-      const selectedVesselObj = allVessels.find(v => v.id === selectedVessel);
-      const selectedVesselName = selectedVesselObj?.name?.toLowerCase().trim() || '';
-      result = result.filter((defect: Defect) => {
-        if (defect.vesselId === selectedVessel) return true;
-        if (selectedVesselName) {
-          const defectVesselName = (defect.vesselName || '').toLowerCase().trim();
-          return defectVesselName === selectedVesselName;
-        }
-        return false;
-      });
-    }
-
-    if (selectedVesselNames.length > 0) {
-      const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
-      result = result.filter((defect: Defect) => {
-        const defectVessel = (defect.vesselId || defect.vesselName || '').toLowerCase().trim();
-        return normalizedFilterNames.some(filterName => 
-          filterName === defectVessel || defectVessel.includes(filterName) || filterName.includes(defectVessel)
-        );
-      });
-    }
-
-    if (filters.search?.trim()) {
-      const search = filters.search.trim().toLocaleLowerCase();
-      result = result.filter((defect: Defect) =>
-        Object.values(makeDefectLogExportRow(defect)).some((value) =>
-          value.toLocaleLowerCase().includes(search)
-        )
-      );
-    }
-    
-    if (filters.periodValue) {
-      const pv = filters.periodValue;
-      result = result.filter((defect: Defect) => {
-        if (!defect.issueDate) return false;
-        const val = String(defect.issueDate);
-        let issueDate: Date;
-        const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        const ddmmyyyyMatch = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-        if (isoMatch) {
-          const [, yStr, mStr, dStr] = isoMatch;
-          issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
-        } else if (ddmmyyyyMatch) {
-          const [, dStr, mStr, yStr] = ddmmyyyyMatch;
-          issueDate = new Date(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr));
-        } else {
-          issueDate = new Date(val);
-        }
-        if (isNaN(issueDate.getTime())) return false;
-        issueDate.setHours(0, 0, 0, 0);
-
-        if (pv.mode === "yearQuarterMonth") {
-          if (pv.month !== undefined && pv.year) {
-            return issueDate.getFullYear() === pv.year && issueDate.getMonth() === pv.month;
-          }
-          if (pv.quarter !== undefined && pv.year) {
-            const qStartMonth = (pv.quarter - 1) * 3;
-            return issueDate.getFullYear() === pv.year && issueDate.getMonth() >= qStartMonth && issueDate.getMonth() <= qStartMonth + 2;
-          }
-          if (pv.year) {
-            return issueDate.getFullYear() === pv.year;
-          }
-        } else if (pv.mode === "dateRange") {
-          if (pv.dateFrom) {
-            const from = new Date(pv.dateFrom);
-            from.setHours(0, 0, 0, 0);
-            if (issueDate < from) return false;
-          }
-          if (pv.dateTo) {
-            const to = new Date(pv.dateTo);
-            to.setHours(23, 59, 59, 999);
-            if (issueDate > to) return false;
-          }
-          return true;
-        }
-        return true;
-      });
-    }
-
-    // Due/Overdue filter based on Target Date
-    if (filters.dueOverdue && filters.dueOverdue !== 'all') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      result = result.filter((defect: Defect) => {
-        const targetDateStr = defect.targetCloseDate;
-        if (!targetDateStr) return false;
-        
-        const targetDate = new Date(targetDateStr);
-        targetDate.setHours(0, 0, 0, 0);
-        
-        const diffTime = targetDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        switch (filters.dueOverdue) {
-          case 'overdue':
-            return diffDays < 0;
-          case 'due1month':
-            return diffDays >= 0 && diffDays <= 30;
-          case 'due2months':
-            return diffDays >= 0 && diffDays <= 60;
-          default:
-            return true;
-        }
-      });
-    }
-    
-    return result;
-  }, [defects, selectedVessel, allVessels, selectedVesselNames, filters.search, filters.periodValue, filters.dueOverdue]);
-
-  const totalDefects = filteredDefects.length;
-  const totalPages = Math.max(1, Math.ceil(totalDefects / pageSize));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredDefects]);
-
-  const paginatedDefects = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredDefects.slice(startIndex, startIndex + pageSize);
-  }, [filteredDefects, currentPage, pageSize]);
-  
   const canEdit = () => {
     return isSailAdmin || isClientAdmin || isTechSuperintendent || isHeadOfDept || isVessel;
   };
@@ -672,13 +537,27 @@ export default function DefectsLogWithTabs() {
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     setGridApi(params.api);
+    params.api.sizeColumnsToFit();
   }, []);
+
+  useEffect(() => {
+    if (!gridApi) return;
+    
+    const handleResize = () => {
+      setTimeout(() => {
+        gridApi.sizeColumnsToFit();
+      }, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [gridApi]);
 
   const columnDefs: ColDef[] = [
     {
       headerName: 'ID',
       field: 'id',
-      initialFlex: 1,
+      flex: 1,
       cellStyle: { fontSize: '13px', color: '#2563eb' },
       filter: 'agTextColumnFilter',
       sortable: true,
@@ -687,7 +566,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Vessel',
       field: 'vesselName',
-      initialFlex: 0.8,
+      flex: 0.8,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agSetColumnFilter',
       sortable: true,
@@ -696,7 +575,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Issue Date',
       field: 'issueDate',
-      initialFlex: 0.6,
+      flex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -705,7 +584,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Category',
       field: 'category',
-      initialFlex: 0.7,
+      flex: 0.7,
       cellRenderer: CategoryCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
@@ -715,7 +594,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Component',
       field: 'componentHardwareLevel3',
-      initialFlex: 0.88,
+      flex: 0.88,
       autoHeight: true,
       wrapText: true,
       cellStyle: { fontSize: '13px', color: '#4f5863', lineHeight: '1.4' },
@@ -728,7 +607,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Description',
       field: 'description',
-      initialFlex: 1.5,
+      flex: 1.5,
       cellRenderer: HtmlTextCellRenderer,
       autoHeight: true,
       wrapText: true,
@@ -740,7 +619,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Action Taken / Requested',
       field: 'actionTakenRequested',
-      initialFlex: 1.5,
+      flex: 1.5,
       cellRenderer: HtmlTextCellRenderer,
       autoHeight: true,
       wrapText: true,
@@ -753,7 +632,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Target Date',
       field: 'targetCloseDate',
-      initialFlex: 0.6,
+      flex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -762,7 +641,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Date Compl.',
       field: 'dateCompleted',
-      initialFlex: 0.6,
+      flex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -771,7 +650,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Status',
       field: 'status',
-      initialFlex: 0.6,
+      flex: 0.6,
       cellRenderer: StatusCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
@@ -781,7 +660,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Priority',
       field: 'priority',
-      initialFlex: 0.6,
+      flex: 0.6,
       cellRenderer: PriorityCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
@@ -791,11 +670,10 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Actions',
       field: 'actions',
-      initialFlex: 0.8,
+      flex: 0.8,
       cellRenderer: ActionsCellRenderer,
       sortable: false,
       filter: false,
-      resizable: true,
       cellClass: 'flex items-center justify-center'
     }
   ];
@@ -904,8 +782,15 @@ export default function DefectsLogWithTabs() {
       </div>
 
       <div className="px-4 flex-1 flex flex-col min-h-0">
+        {isFetching && <div className="text-center text-sm text-gray-500" role="status">Loading defects...</div>}
+        {isError && (
+          <div className="text-center py-2 text-red-600" role="alert">
+            {error.message} <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+          </div>
+        )}
+        {(
           <>
-            <div className="flex-1 min-h-0">
+            <div className={cn("flex-1 min-h-0", isFetching && "pointer-events-none opacity-60")} aria-busy={isFetching} {...(isFetching ? { inert: '' } : {})}>
               <AgGridTable
                 rowData={paginatedDefects}
                 columnDefs={columnDefs}
@@ -913,12 +798,9 @@ export default function DefectsLogWithTabs() {
                 enableSideBar={true}
                 enableStatusBar={false}
                 enableRowGrouping={true}
-                preserveColumnWidths
                 height="100%"
-                className="defects-resizable-grid"
                 gridOptions={{
-                  domLayout: 'normal',
-                  loading: isLoading
+                  domLayout: 'normal'
                 }}
                 context={{
                   handleViewClick,
@@ -949,7 +831,7 @@ export default function DefectsLogWithTabs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
+                    disabled={isFetching || isError || currentPage === 1}
                     data-testid="button-defects-prev-page"
                   >
                     Previous
@@ -961,7 +843,7 @@ export default function DefectsLogWithTabs() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
+                    disabled={isFetching || isError || currentPage === totalPages}
                     data-testid="button-defects-next-page"
                   >
                     Next
@@ -982,6 +864,7 @@ export default function DefectsLogWithTabs() {
               </div>
             </div>
           </>
+        )}
       </div>
       
       {linkModal.defectId && (
