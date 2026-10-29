@@ -245,6 +245,35 @@ def paging_line(p: dict[str, Any]) -> str:
     return f"Showing {returned} of {total} {unit} (records {first}–{last}; {tail})."
 
 
+# ── expired / upcoming line (29-Oct-2026, Sahil A4: expired documents are listed WITH the expiring ones) ───────────────
+def breakdown_line(result: dict[str, Any]) -> str | None:
+    """'Of these, 3 documents (3 people) have already expired and 15 documents (12 people) expire by 2026-12-31.' — built
+    from the server's `breakdown` and `expiryWindow`, never from the model's text. None when the result carries no breakdown
+    (no expiry condition, refusal, non-crewing tool)."""
+    if not isinstance(result, dict) or result.get("ok") is not True:
+        return None
+    b = result.get("breakdown")
+    if not isinstance(b, dict) or "expired" not in b or "upcoming" not in b:
+        return None
+    win = result.get("expiryWindow") if isinstance(result.get("expiryWindow"), dict) else {}
+    as_of = str(result.get("asOf") or "")
+
+    def part(d: Any, verb: str) -> str:
+        d = d if isinstance(d, dict) else {}
+        try:
+            docs, people = d.get("documents"), int(d.get("people") or 0)
+        except (TypeError, ValueError):
+            return f"0 {verb}"
+        if docs is None:
+            return f"{people} {'person' if people == 1 else 'people'} {verb}"
+        return f"{int(docs)} {'document' if int(docs) == 1 else 'documents'} ({people} {'person' if people == 1 else 'people'}) {verb}"
+
+    expired = part(b["expired"], f"already expired as of {as_of}" if as_of else "already expired")
+    to = str(win.get("to") or "")
+    upcoming = part(b["upcoming"], f"expire by {to}" if to else "have not expired yet")
+    return f"Of these, {expired}; {upcoming}."
+
+
 # ── cross-tool translation and consistency ─────────────────────────────────────
 DOC_KEYS = ("documentTypes", "documentNameContains", "expiryState", "expiryWithin")   # = the hasDocument sub-keys
 

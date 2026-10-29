@@ -196,3 +196,15 @@ def test_primary_only_without_evidence_is_refused_even_on_a_first_question():
     ok = qg.decide(A, {"mode": "count", "vessels": ["MV Beta Ocean"], "crewStatus": ["primary"], "conversation": {"basis": "new"}}, None,
                    "How many primary crew are on MV Beta Ocean?")
     assert not ok.violations
+
+
+def test_breakdown_line_from_server_counts_only():
+    # 29-Oct-2026 (Sahil A4): the expired / upcoming split is built from the server's breakdown and window, never from the model
+    docs = {"ok": True, "mode": "count", "asOf": "2026-11-01", "breakdown": {"expired": {"documents": 3, "people": 3}, "upcoming": {"documents": 15, "people": 12}},
+            "expiryWindow": {"from": "2026-11-01", "to": "2026-12-31", "state": "expired_or_expiring"}}
+    assert qg.breakdown_line(docs) == "Of these, 3 documents (3 people) already expired as of 2026-11-01; 15 documents (12 people) expire by 2026-12-31."
+    people = {"ok": True, "asOf": "2026-11-01", "breakdown": {"expired": {"people": 1}, "upcoming": {"people": 7}}, "expiryWindow": {"to": "2026-12-01"}}
+    assert qg.breakdown_line(people) == "Of these, 1 person already expired as of 2026-11-01; 7 people expire by 2026-12-01."
+    assert qg.breakdown_line({"ok": True, "mode": "count", "total": 8}) is None            # no expiry condition → no line
+    assert qg.breakdown_line({"ok": False, "code": "not_allowed", "breakdown": {}}) is None  # refusals never get a line
+    assert qg.breakdown_line({"ok": True, "breakdown": {"expired": {"documents": 0, "people": 0}, "upcoming": {"documents": 0, "people": 0}}, "asOf": "2026-11-01"})         == "Of these, 0 documents (0 people) already expired as of 2026-11-01; 0 documents (0 people) have not expired yet."

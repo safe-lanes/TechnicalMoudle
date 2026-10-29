@@ -141,6 +141,9 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
             if state_key:
                 mask_memory.remember(masker, *state_key)
             text = r.text
+            if ui_module == "crewing" and r.breakdown:
+                # 29-Oct-2026 (Sahil A4): expired vs upcoming counts come from the server's breakdown, never from the model
+                text += "\n\n" + r.breakdown
             if ui_module == "crewing" and r.paging:
                 # 28-Oct-2026 review item 1: the paging line comes from the server's totals, never from the model's memory
                 text += "\n\n" + query_guard.paging_line(r.paging)

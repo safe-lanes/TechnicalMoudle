@@ -73,6 +73,7 @@ class Deps:
     user_message: str = ""
     query_guard: bool = False
     paging: dict[str, Any] | None = None   # server totals of the LAST list-mode Crewing result (review item 1)
+    breakdown: str | None = None           # expired / upcoming line of the LAST Crewing result with an expiry condition (A4)
 
 
 # ── module manifests (Data API discovery) ─────────────────────────────────────────
@@ -205,6 +206,10 @@ class ManifestToolset(AbstractToolset[Deps]):
                 p = query_guard.paging_summary(result)
                 if p is not None:
                     deps.paging = p
+                # 29-Oct-2026 (Sahil A4): the expired / upcoming split comes from the server's breakdown, never from the model
+                bl = query_guard.breakdown_line(result)
+                if bl is not None or result.get("ok") is True:
+                    deps.breakdown = bl
             if decision is not None and isinstance(result, dict):
                 state = query_guard.state_from_result(name, result)
                 if state and deps.conv_key:
@@ -327,6 +332,7 @@ class LoopResult:
     partial: bool
     citations: list[dict[str, Any]] = field(default_factory=list)
     paging: dict[str, Any] | None = None
+    breakdown: str | None = None
 
 
 # Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
@@ -388,10 +394,20 @@ CREWING_DATA_RULES = (
     "are and offer to show them. If groupsTruncated is true, say that only the largest groups are listed. "
     "RULE — filters: put every condition the user states into ONE tool call (vessel, rank or rank group, on board, document "
     "type or name, expiry window, nationality, sign-on period). Combine crew and documents with crewOnBoard / vessels on the "
-    "documents tool, or hasDocument on the assignments tool — never merge two result lists yourself. 'Expiring' = expiryState "
-    "not_expired plus expiryWithin; 'expired' = expiryState expired. Use the time unit the user said (60 days and 2 months "
-    "are different windows). If the user asks about expiring documents without a period, ask which period (for example 30 "
-    "days, 60 days or 2 months) instead of choosing one. "
+    "documents tool, or hasDocument on the assignments tool — never merge two result lists yourself. "
+    "RULE — expiry (confirmed by the business owner): 'expiring in N days/months' = expiryWithin next N with NO expiryState — the "
+    "server then lists the documents already expired TOGETHER with those expiring by the window end; each row carries expiryState "
+    "expired/upcoming and `breakdown` gives both counts: always state both ('N already expired, M expiring by <date>') and mark "
+    "expired rows. 'Only upcoming' / 'not yet expired' = expiryState not_expired; 'expired' = expiryState expired. Use the time "
+    "unit the user said (60 days and 2 months are different windows). If the user asks about expiring documents without a period, "
+    "ask which period (for example 30 days, 60 days or 2 months) instead of choosing one. 'Certificates' means both licences and "
+    "training-course certificates unless the user names one kind. "
+    "RULE — rank groups: 'engineers', 'officers', 'ratings' and the other groups are the categories configured in Rank "
+    "Administration, not a fixed list; when the result's rankConfig reports unclassified ranks or people, say so in one sentence "
+    "(e.g. '2 crew on board hold ranks with no category in Rank Administration (Gas Engineer, Deck Cadet) and are not counted'). "
+    "RULE — handover: during a handover both the person on board (primary) and the reliever who has signed on (secondary) are on "
+    "board; a planned reliever who has not signed on is not. Never add crewStatus unless the user asks for primary/relievers only. "
+    "Terminated crew never appear in document answers; inactive crew do. "
     "RULE — names: pass vessel names exactly as the user wrote them; the server resolves them. If the message starts with an "
     "[App context] line naming a vessel and the user names no other vessel, use that vessel's NAME. vessel_ambiguous → list "
     "the candidates and ask which one; vessel_not_found, rank_not_recognised or nationality_not_recognised → say so plainly. "
@@ -567,7 +583,7 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     if deps.partial:
         text = f"{text}{PARTIAL_NOTE}"
     return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial, citations=deps.citations,
-                      paging=deps.paging)
+                      paging=deps.paging, breakdown=deps.breakdown)
 
 
 async def answer_docs(system: str, user: str, masker: Masker | None, history: list[ModelMessage] | None = None) -> tuple[str, dict[str, int] | None]:
