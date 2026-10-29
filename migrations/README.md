@@ -69,3 +69,16 @@ grep -rn "ADD COLUMN" migrations/*.sql | grep -v "IF NOT EXISTS" | wc -l     # m
 ```
 
 Note: `ADD COLUMN` / `DROP CONSTRAINT` / `CREATE INDEX` inside `DO $$` blocks with proper guards will appear in these counts but are safe — verify manually that the surrounding block provides idempotency.
+
+## Certificate and Survey migration numbering
+
+The unchanged Certificate and Survey collation SQL now ships as
+`188_certificate_natural_sort.sql` and `189_survey_default_sort.sql`, respectively,
+after the reserved historical migration 187. The old 185/186 files are not
+discovered on fresh installations.
+
+Migration IDs are derived from filenames. An existing installation may retain
+`185_certificate_natural_sort` and `186_survey_default_sort` history entries.
+Do not rename, delete or replace those entries: the normal runner safely
+re-executes the idempotent SQL and records the new 188/189 IDs. No alias,
+fabricated applied entry, schema push or sorting-rule change is required.

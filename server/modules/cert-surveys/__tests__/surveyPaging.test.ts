@@ -140,7 +140,7 @@ describe('Survey database page contract', () => {
   });
 
   it('ships only the approved ordinary, nondeterministic Survey collation', () => {
-    const migration = fs.readFileSync('migrations/186_survey_default_sort.sql', 'utf8');
+    const migration = fs.readFileSync('migrations/189_survey_default_sort.sql', 'utf8');
     expect(migration).toContain('CREATE COLLATION IF NOT EXISTS public.surveys_default_en_us');
     expect(migration).toContain("locale = 'en-US'");
     expect(migration).toContain('deterministic = false');

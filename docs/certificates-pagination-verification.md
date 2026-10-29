@@ -14,7 +14,7 @@ vessel/sequence ordering, stable sort ties, duplicate-data mapping and empty
 response variants are preserved. No ID-based tie-breaker was introduced.
 
 The user explicitly approved the dedicated database sorting rule. Migration
-`185_certificate_natural_sort.sql` adds only the Certificate natural-sort
+`188_certificate_natural_sort.sql` adds only the Certificate natural-sort
 collation: ICU en-US, numeric ordering, base sensitivity, nondeterministic
 comparison. Nondeterminism preserves case/accent/leading-zero equivalences as
 ties; the prior vessel/sequence/source order resolves those ties.

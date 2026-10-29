@@ -260,8 +260,8 @@ describe("Table-free Stores selection with actual SQL and trusted vessel resolut
       const scopedPool = { query: client.query.bind(client) } as unknown as typeof pool;
       const fresh = await getPendingMigrations(scopedPool);
       expect(fresh).not.toContain("184_stores_operation_targets");
-      expect(fresh).toContain("185_certificate_natural_sort");
-      expect(fresh).toContain("186_survey_default_sort");
+      expect(fresh).toContain("188_certificate_natural_sort");
+      expect(fresh).toContain("189_survey_default_sort");
       await client.query(`INSERT INTO schema_migrations(id,name) VALUES('184_stores_operation_targets','Historical installation')`);
       expect(await getPendingMigrations(scopedPool)).toEqual(fresh);
       expect((await client.query(`SELECT count(*)::int AS n FROM schema_migrations WHERE id='184_stores_operation_targets'`)).rows[0].n).toBe(1);

@@ -32,7 +32,7 @@ describe('Certificate SQL read transaction', () => {
     });
 
   it('ships an idempotent, narrowly scoped collation migration', () => {
-    const migration = fs.readFileSync('migrations/185_certificate_natural_sort.sql', 'utf8');
+    const migration = fs.readFileSync('migrations/188_certificate_natural_sort.sql', 'utf8');
     expect(migration).toContain('CREATE COLLATION IF NOT EXISTS public.certificates_natural_en_us');
     expect(migration).toContain("locale = 'en-US-u-kn-true-ks-level1'");
     expect(migration).toContain('deterministic = false');
