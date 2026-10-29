@@ -308,7 +308,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {control("classificationSocietyKey", "Classification Society", editingId === "new" || !!originalReferences.current.classificationSocietyKey)}
           {control("surveyTypeKey", "Survey Type", editingId === "new" || !!originalReferences.current.surveyTypeKey)}
-          {textField("certificateNumber", "Certificate No.", 100)}
+          {textField("certificateNumber", "Certificate Number", 100)}
           <div><label className="mb-1 block text-xs font-medium text-gray-600">Last Class Survey</label><ComponentDateInput value={draft.lastClassSurvey} onChange={(v) => setValue("lastClassSurvey", v)} className={inputClass} data-testid="input-last-class-survey" />{fieldErrors.lastClassSurvey && <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.lastClassSurvey}</p>}</div>
           <div><label className="mb-1 block text-xs font-medium text-gray-600">Next Survey Due</label><ComponentDateInput value={draft.nextSurveyDue} onChange={(v) => setValue("nextSurveyDue", v)} className={inputClass} data-testid="input-next-survey-due" />{fieldErrors.nextSurveyDue && <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.nextSurveyDue}</p>}</div>
           {textField("classRequirements", "Class Requirements", 2000, true)}
@@ -322,20 +322,26 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
       {rowsQuery.isSuccess && entries.length === 0 && editingId === null ? <div className="rounded-sm border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-medium text-slate-700">No classification records have been added for this component.</p>{canEdit && <p className="mt-1 text-xs text-slate-500">Add a record for each certificate or survey.</p>}</div> : (
         <div className="space-y-2">
           {entries.map((entry) => <article key={entry.id} className={`rounded-sm border ${entry.isDeleted ? "border-slate-200 bg-slate-50 opacity-80" : "border-slate-200 bg-white"} p-3`}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
-                <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Society</span><span className="break-words text-sm text-slate-900">{societyLabel(entry)}</span></div>
-                <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Survey type</span><span className="break-words text-sm text-slate-900">{surveyLabel(entry)}</span></div>
-                <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Certificate</span><span className="break-words text-sm text-slate-900">{entry.certificateNumber || "—"}</span></div>
-                <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Last survey</span><span className="text-sm text-slate-900">{formatComponentDate(entry.lastClassSurvey)}</span>{dateWarning(entry.lastClassSurvey) && <span className="block text-[10px] text-amber-800">{dateWarning(entry.lastClassSurvey)}</span>}</div>
-                <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Next due</span><span className="text-sm text-slate-900">{formatComponentDate(entry.nextSurveyDue)}</span>{dateWarning(entry.nextSurveyDue) && <span className="block text-[10px] text-amber-800">{dateWarning(entry.nextSurveyDue)}</span>}</div>
-                <div><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Class code</span><span className="text-sm text-slate-900">{entry.classCode || "—"}</span></div>
-                {(entry.classRequirements || entry.information) && <div className="col-span-2 sm:col-span-3 lg:col-span-6"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Requirements / information</span><span className="whitespace-pre-wrap text-sm text-slate-700">{[entry.classRequirements, entry.information].filter(Boolean).join(" · ")}</span></div>}
-                {entry.isDeleted && <span className="col-span-full w-fit rounded-sm bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">Removed</span>}
-              </div>
-              {canEdit && <div className="flex shrink-0 gap-1">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              {entry.isDeleted && <span className="w-fit rounded-sm bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">Removed</span>}
+              {canEdit && <div className="ml-auto flex shrink-0 gap-1">
                 {entry.isDeleted ? <Button size="sm" variant="outline" className="h-8" aria-label="Restore entry" disabled={lifecycleMutation.isPending} onClick={() => lifecycleMutation.mutate({ entry, restore: true })}><RotateCcw className="mr-1 h-3.5 w-3.5" />Restore</Button> : <><Button size="icon" variant="outline" className="h-8 w-8" aria-label="Edit entry" disabled={editingId !== null} onClick={() => begin(entry)}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="outline" className="h-8 w-8 text-red-700 hover:bg-red-50" aria-label="Remove entry" disabled={lifecycleMutation.isPending || editingId !== null} onClick={() => { if (window.confirm("Remove this classification record? It can be restored later.")) lifecycleMutation.mutate({ entry, restore: false }); }}><Trash2 className="h-3.5 w-3.5" /></Button></>}
               </div>}
+            </div>
+            <div className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Classification Society</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{societyLabel(entry)}</span></div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Certificate Number</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{entry.certificateNumber || "—"}</span></div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Last Class Survey</span><span className="block break-words text-sm text-slate-900">{formatComponentDate(entry.lastClassSurvey)}</span>{dateWarning(entry.lastClassSurvey) && <span className="block break-words text-[10px] text-amber-800">{dateWarning(entry.lastClassSurvey)}</span>}</div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Next Class Survey</span><span className="block break-words text-sm text-slate-900">{formatComponentDate(entry.nextSurveyDue)}</span>{dateWarning(entry.nextSurveyDue) && <span className="block break-words text-[10px] text-amber-800">{dateWarning(entry.nextSurveyDue)}</span>}</div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Survey Type</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{surveyLabel(entry)}</span></div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Class Requirements</span><span className="block whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm text-slate-700">{entry.classRequirements || "—"}</span></div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Class Code</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{entry.classCode || "—"}</span></div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Information</span><span className="block whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm text-slate-700">{entry.information || "—"}</span></div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Attachment</span>
+              <Button type="button" size="sm" variant="outline" className="h-7" disabled>Attach File</Button>
+              <span className="text-xs text-slate-500">Attachment upload is not available yet.</span>
             </div>
           </article>)}
         </div>
