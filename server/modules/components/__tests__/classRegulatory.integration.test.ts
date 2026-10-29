@@ -56,15 +56,6 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     const saved = await conn.query("SELECT list_value,is_active FROM pg_temp.master_lists WHERE list_key='DNV'");
     expect(saved.rows[0]).toEqual({ list_value: "Edited DNV", is_active: false });
   });
-  it("replays the readiness-key cleanup without changing any other settings", async () => {
-    await conn.query("INSERT INTO pg_temp.sync_settings (setting_key,setting_value) VALUES ('section_h_ready_vessels','[]'),('unrelated-test-setting','keep')");
-    const before = (await conn.query("SELECT * FROM pg_temp.sync_settings WHERE setting_key='unrelated-test-setting'")).rows;
-    const cleanup = await readFile("migrations/189_remove_section_h_ready_vessels.sql", "utf8");
-    await conn.query(cleanup);
-    await conn.query(cleanup);
-    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.sync_settings WHERE setting_key='section_h_ready_vessels'")).rows[0].n).toBe(0);
-    expect((await conn.query("SELECT * FROM pg_temp.sync_settings WHERE setting_key='unrelated-test-setting'")).rows).toEqual(before);
-  });
   it("persists multiple same-pair entries, edits independently and preserves untouched legacy fields", async () => {
     const first = await createClassEntry(component, business, actor);
     const second = await createClassEntry(component, { ...business, certificateNumber: "OTHER" }, actor);

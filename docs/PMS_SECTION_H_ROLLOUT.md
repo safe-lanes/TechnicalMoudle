@@ -49,7 +49,7 @@ Use the existing integrated login and matching verification configuration, inclu
 
 ### View and edit are independent
 
-Normal record loading applies the Section H entitlement and component/vessel scope, but does not depend on historical UUID reconciliation or write activation. Every verified Office user can view active and removed entries without Component menu permissions; verified Ship users remain read-only with existing view permission and active vessel scope. The access response includes `canView`, `canViewRemoved`, `canEdit`, `identityMode` and `reasonCode`, distinguishing development read-only, vessel read-only, reconciliation pending and rollout pending. Office write controls remain disabled until reconciliation/readiness gates pass, but those write gates do not suppress Show removed. Existing record-array responses remain unchanged.
+Normal record loading applies the Section H entitlement and component/vessel scope, but does not depend on historical UUID reconciliation or per-vessel write activation. Every verified Office user can view active and removed entries without Component menu permissions; verified Ship users remain read-only with existing view permission and active vessel scope. The access response includes `canView`, `canViewRemoved`, `canEdit`, `identityMode` and `reasonCode`, distinguishing development read-only, vessel read-only and reconciliation pending. Office write controls remain disabled while historical UUID reconciliation is pending, but this does not suppress Show removed. There is no readiness-setting dependency. Existing record-array responses remain unchanged.
 
 The UI displays safe specific errors, a truthful successful-empty state, and independent records/access retries. Failed edit/access checks retain a draft without enabling Save. Cache keys for records/access and form master choices partition by viewer, role/type, tenant, vessel scope and auth-session generation; old record caches including removed entries are cleared on session changes. Access refreshes use active-only reads until removed-record access is freshly confirmed.
 
@@ -86,7 +86,9 @@ The API refuses Section H mutations while any historical NULL identity remains. 
 
 The user explicitly rejected the implementation-added `section_h_ready_vessels` allowlist. Section H no longer reads it for access, create, update, soft-delete or restore, and no longer emits `ROLLOUT_PENDING`. Office users manage records across vessels without assignments or per-vessel activation; Ship users remain read-only within their existing viewing scope. Existing historical NULL UUID checks, parent validity, business validation and atomic audit remain enforced.
 
-`migrations/189_remove_section_h_ready_vessels.sql` is a file-based, idempotent **data-cleanup** migration discovered by the existing runner. It acquires a transaction-level advisory lock and deletes only the exact obsolete setting key. No schema, column, constraint, other setting or business record is changed; replay and a missing key are safe no-ops. Number 188 remains reserved for the separately authorized historical-identity finalization described above.
+The obsolete-setting cleanup was **Replit-only**, not a general migration for other installations. The previously applied `migrations/189_remove_section_h_ready_vessels.sql` has been removed from the distributed migration directory; its replay test has also been removed. No replacement migration, environment-gated cleanup, startup hook or provisioning deletion is provided. Existing stale setting rows on other installations can remain because Section H ignores them.
+
+Leave already-applied migration-history entries intact, including Replit's `189_remove_section_h_ready_vessels` entry. Removing the source file does not undo past execution or require database-history changes. Do not reuse that migration identity or renumber other files. No new schema or data change is needed; number 188 remains reserved for the separately authorized historical-identity finalization described above.
 
 This changes saving/access, not sync delivery: capability `component_class_regulatory_uuid_v1`, receiver schema and dependency checks, UUID-only identity, timestamp/replay guards, provisioning validation and failure-safe checkpoints remain required. No replacement readiness key is introduced, sync direction remains shore-to-ship, and no artificial field logs are added.
 
@@ -124,11 +126,17 @@ Provisioning retains its existing active-row snapshot policy. Removed entries al
 
 Record focused test/build results in the delivery response. Cross-installation inventory, mapping, remote migrations, authenticated production session checks, separately released finalization and actual shore–vessel rollout require authorized target evidence. They are not inferred from local tests and no production/vessel operation is authorized or claimed here.
 
-### Readiness restriction removal verification
+### Removal of the distributed Replit-only cleanup file
+
+- After removal, six focused suites passed, 89 tests total. The only removed test was the obsolete cleanup-file replay test; Office/Ship lifecycle, ignored readiness values, audit, UUID and sync/replay coverage remain.
+- The SQL file is absent, and a search of server, scripts and migrations found no executable references to its migration identity or replacement deletion of the obsolete setting.
+- No database settings, migration-history rows or live business data were changed for this removal. No application runtime code changed, so no workflow restart or migration execution was needed.
+
+### Historical readiness restriction removal verification (Replit-only cleanup)
 
 - Six focused suites passed, 90 tests total, including real PostgreSQL TEMP-table lifecycle tests without any readiness setting, ignored empty/malformed/stale values, cross-vessel non-admin Office editing, Ship denials, canonical audit, stable UUIDs and full-row sync/replay behavior.
-- The cleanup migration was replayed twice against session-local TEMP settings; the obsolete row was removed and an unrelated setting remained byte-for-byte unchanged.
-- The existing development migration runner recorded `189_remove_section_h_ready_vessels` as applied. The obsolete key was already absent; all 14 other settings retained the same complete-row fingerprint before and after startup.
+- Before its source file was removed, the Replit-only cleanup migration was replayed twice against session-local TEMP settings; the obsolete row was removed and an unrelated setting remained byte-for-byte unchanged. This is historical evidence, not an instruction to replay the removed file.
+- The existing Replit development migration runner recorded `189_remove_section_h_ready_vessels` as applied. The obsolete key was already absent; all 14 other settings retained the same complete-row fingerprint before and after startup. That history is retained; the cleanup is no longer distributed.
 - Live development access responses for Alejandro / 271.010 RUDDER and a component on Vessel 8 both returned `identityMode=replit-default`, `canEdit=true`, `canViewRemoved=true`, `reasonCode=EDIT_ALLOWED`.
 - Frontend production build and backend bundle completed. The workflow restarted successfully and the Component page rendered. The existing Add Entry control remains governed by the server's `canEdit` response; no client permission override was added.
 - No live classification business record, production installation or physical vessel was modified or synchronized during verification. Actual integrated-production sessions and physical shore/vessel delivery are not claimed by these local checks.
