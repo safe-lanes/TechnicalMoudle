@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
-import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
+import { requireAuth, requirePMSAdmin, requireRole } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import * as componentCtrl from './controllers/componentController';
 import * as uploadCtrl from './controllers/componentUploadController';
 import * as subCtrl from './controllers/subEntityController';
+import * as classCtrl from './controllers/classRegulatoryController';
+import { requireSectionHIdentity } from './services/classRegulatoryAccess';
 
 const router = Router();
 
@@ -62,10 +64,16 @@ router.get('/component-documents/:id/download', requireAuth, asyncHandler(subCtr
 
 // ── Component Class Regulatory ──
 
-router.get('/component-class-regulatory/:componentId', requireAuth, asyncHandler(subCtrl.listClassRegulatory));
-router.post('/component-class-regulatory', requirePMSAdmin, asyncHandler(subCtrl.createClassRegulatory));
-router.put('/component-class-regulatory/:id', requirePMSAdmin, asyncHandler(subCtrl.updateClassRegulatory));
-router.delete('/component-class-regulatory/:id', requirePMSAdmin, asyncHandler(subCtrl.deleteClassRegulatory));
+const sectionHView = [requireAuth, requireSectionHIdentity,
+  requirePermission('pms-components', 'view', { enforce: true, unconfigured: 'deny' })];
+const sectionHWrite = [requireAuth, requireSectionHIdentity, requireRole('Office'),
+  requirePermission('pms-components', 'edit', { enforce: true, unconfigured: 'deny' })];
+router.get('/component-class-regulatory/:componentId/access', ...sectionHView, classCtrl.access);
+router.get('/component-class-regulatory/:componentId', ...sectionHView, classCtrl.list);
+router.post('/component-class-regulatory', ...sectionHWrite, classCtrl.create);
+router.put('/component-class-regulatory/:id', ...sectionHWrite, classCtrl.update);
+router.delete('/component-class-regulatory/:id', ...sectionHWrite, classCtrl.remove);
+router.post('/component-class-regulatory/:id/restore', ...sectionHWrite, classCtrl.restore);
 
 // ── Component Requisitions ──
 

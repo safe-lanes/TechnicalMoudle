@@ -517,7 +517,9 @@ export async function generateProvisionHandler(req: Request, res: Response) {
     const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
     console.log(`[Provisioning] Generating bundle for vessel ${vesselId} by ${userId}`);
 
-    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId);
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, {
+      receiverCapabilities: typeof req.query.receiverCapabilities === 'string' ? req.query.receiverCapabilities.split(',') : undefined,
+    });
 
     res.json({
       manifest: bundle.manifest,
@@ -567,7 +569,9 @@ export async function downloadProvisionHandler(req: Request, res: Response) {
     // ?blunt=true forces the full re-deliver-everything reset (the guaranteed self-heal used
     // when a prior import failed verification). Default = snapshot-baseline partition.
     const blunt = req.query.blunt === 'true' || req.query.blunt === '1';
-    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true, blunt });
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId, { domain, persist: true, blunt,
+      receiverCapabilities: typeof req.query.receiverCapabilities === 'string' ? req.query.receiverCapabilities.split(',') : undefined,
+    });
 
     const fileName = `provision_${vesselId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     res.setHeader('Content-Type', 'application/json');

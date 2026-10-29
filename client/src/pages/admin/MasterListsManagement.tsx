@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Package, ArrowLeft, Settings2, Lock } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Package, ArrowLeft, Settings2, Lock } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -42,6 +42,8 @@ const CREATE_NEW_TYPE_SENTINEL = "__create_new_list_type__";
 
 const masterListFormSchema = insertMasterListSchema;
 type MasterListFormData = z.infer<typeof masterListFormSchema>;
+const isRegulatoryMasterType = (listType?: string) => listType === "classificationSociety" || listType === "surveyType";
+const isClassificationSocietyType = (listType?: string) => listType === "classificationSociety";
 
 // Convert a human label into a camelCase key (same convention as the
 // 7 seeded system types: "Interval Unit" -> "intervalUnit").
@@ -160,6 +162,9 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
       listValue: "",
       displayOrder: 0,
       isActive: true,
+      country: "",
+      category: "",
+      description: "",
     },
   });
 
@@ -172,7 +177,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
       queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/master-lists'], exact: false });
       toast({ title: "Success", description: "Master list item created successfully" });
       setIsFormOpen(false);
-      form.reset({ listType: selectedListType, listKey: "", listValue: "", displayOrder: 0, isActive: true });
+      form.reset({ listType: selectedListType, listKey: "", listValue: "", displayOrder: 0, isActive: true, country: "", category: "", description: "" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message || "Failed to create", variant: "destructive" }),
   });
@@ -270,7 +275,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
       return;
     }
     setSelectedItem(null);
-    form.reset({ listType: selectedListType, listKey: "", listValue: "", displayOrder: 0, isActive: true });
+    form.reset({ listType: selectedListType, listKey: "", listValue: "", displayOrder: 0, isActive: true, country: "", category: "", description: "" });
     setIsFormOpen(true);
   };
 
@@ -282,6 +287,9 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
       listValue: item.listValue,
       displayOrder: item.displayOrder,
       isActive: item.isActive,
+      country: item.country || "",
+      category: item.category || "",
+      description: item.description || "",
     });
     setIsFormOpen(true);
   };
@@ -296,8 +304,25 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
   };
 
   const onSubmit = (data: MasterListFormData) => {
-    if (selectedItem) updateMutation.mutate({ ...data, id: selectedItem.id });
-    else createMutation.mutate(data);
+    const societyType = isClassificationSocietyType(data.listType);
+    const surveyType = data.listType === "surveyType";
+    if (societyType && !String(data.country || "").trim()) {
+      form.setError("country", { type: "manual", message: "Country is required for a classification society." });
+      return;
+    }
+    if (surveyType && !String(data.category || "").trim()) {
+      form.setError("category", { type: "manual", message: "Category is required for a survey type." });
+      return;
+    }
+    if (surveyType && !String(data.description || "").trim()) {
+      form.setError("description", { type: "manual", message: "Description is required for a survey type." });
+      return;
+    }
+    const payload = isRegulatoryMasterType(data.listType)
+      ? { ...data, country: String(data.country || "").trim(), category: String(data.category || "").trim(), description: String(data.description || "").trim() }
+      : data;
+    if (selectedItem) updateMutation.mutate({ ...payload, id: selectedItem.id });
+    else createMutation.mutate(payload);
   };
 
   // ── List-type dialog handlers ──
@@ -357,6 +382,8 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const totalItems = masterLists?.length || 0;
   const currentTypeLabel = typesForCurrentSection.find((t) => t.listTypeKey === selectedListType)?.label || "";
+  const regulatoryMasterList = isRegulatoryMasterType(selectedListType);
+  const societyMasterList = isClassificationSocietyType(selectedListType);
 
   const typesBySection = useMemo(() => {
     const map: Record<Section, MasterListType[]> = { "Components": [], "Jobs/WO": [], "Spares": [] };
@@ -509,6 +536,9 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                 <tr className="bg-[#52baf3] hover:bg-[#52baf3]">
                   <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</th>
                   <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</th>
+                  {regulatoryMasterList && (societyMasterList
+                    ? <th className="text-left text-white py-3 px-4 font-medium">Country</th>
+                    : <><th className="text-left text-white py-3 px-4 font-medium">Survey Category</th><th className="text-left text-white py-3 px-4 font-medium">Description</th></>)}
                   <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</th>
                   <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</th>
                   <th className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</th>
@@ -534,6 +564,9 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                       {index === 0 && <Marker id="I4.QL.2.19" />}
                       {item.listValue}
                     </td>
+                    {regulatoryMasterList && (societyMasterList
+                      ? <td className="py-3 px-4 text-gray-700">{item.country || "—"}</td>
+                      : <><td className="py-3 px-4 text-gray-700">{item.category || "—"}</td><td className="max-w-[24rem] py-3 px-4 text-gray-700">{item.description || "—"}</td></>)}
                     <td className="py-3 px-4" data-testid={index === 0 ? "I4.QL.2.20" : undefined}>
                       {index === 0 && <Marker id="I4.QL.2.20" />}
                       {item.displayOrder}
@@ -563,10 +596,12 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteClick(item); }}
                           className="p-1 hover:bg-gray-200 rounded text-red-500"
+                          aria-label={`${isRegulatoryMasterType(item.listType) ? "Retire" : "Delete"} ${item.listValue}`}
+                          title={isRegulatoryMasterType(item.listType) ? "Retire master item" : "Delete master item"}
                           data-testid={index === 0 ? "I4.QL.2.23" : `button-delete-${item.id}`}
                         >
                           {index === 0 && <Marker id="I4.QL.2.23" />}
-                          <Trash2 className="h-4 w-4" />
+                          {isRegulatoryMasterType(item.listType) ? <Archive className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                         </button>
                       </div>
                     </td>
@@ -582,7 +617,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
           Add/Edit Item Dialog
           ═══════════════════════════════════════════════════════════════ */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-master-list-form">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]" data-testid="dialog-master-list-form">
           <DialogHeader>
             <DialogTitle>
               {selectedItem ? "Edit Master List Item" : "Add New Master List Item"}
@@ -634,12 +669,41 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                 id="listKey"
                 {...form.register("listKey")}
                 placeholder="Unique identifier (e.g., DECK, ENGINE)"
+                readOnly={!!selectedItem && isRegulatoryMasterType(form.watch("listType"))}
+                aria-describedby={!!selectedItem && isRegulatoryMasterType(form.watch("listType")) ? "list-key-immutable-note" : undefined}
                 data-testid="input-list-key"
               />
+              {!!selectedItem && isRegulatoryMasterType(form.watch("listType")) && <p id="list-key-immutable-note" className="text-xs text-gray-500">Stable keys cannot be changed after a regulatory master is created.</p>}
               {form.formState.errors.listKey && (
                 <p className="text-sm text-red-500">{form.formState.errors.listKey.message}</p>
               )}
             </div>
+
+            {isRegulatoryMasterType(form.watch("listType")) && (
+              <div className="space-y-3 rounded-sm border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-medium text-slate-700">Classification &amp; Regulatory metadata</p>
+                {isClassificationSocietyType(form.watch("listType")) ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="country">Country <span className="text-red-500">*</span></Label>
+                    <Input id="country" {...form.register("country")} placeholder="e.g. Norway" aria-invalid={!!form.formState.errors.country} />
+                    {form.formState.errors.country && <p role="alert" className="text-xs text-red-600">{form.formState.errors.country.message}</p>}
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="category">Survey Category <span className="text-red-500">*</span></Label>
+                      <Input id="category" {...form.register("category")} placeholder="e.g. Class, Statutory" aria-invalid={!!form.formState.errors.category} />
+                      {form.formState.errors.category && <p role="alert" className="text-xs text-red-600">{form.formState.errors.category.message}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
+                      <textarea id="description" {...form.register("description")} rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Describe the survey scope" aria-invalid={!!form.formState.errors.description} />
+                      {form.formState.errors.description && <p role="alert" className="text-xs text-red-600">{form.formState.errors.description.message}</p>}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Value */}
             <div className="space-y-2">
@@ -919,9 +983,11 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-master-list">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Master List Item</AlertDialogTitle>
+            <AlertDialogTitle>{isRegulatoryMasterType(itemToDelete?.listType) ? "Retire Regulatory Master" : "Delete Master List Item"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{itemToDelete?.listValue}"? This action cannot be undone.
+              {isRegulatoryMasterType(itemToDelete?.listType)
+                ? `Retire "${itemToDelete?.listValue}" from active choices? Existing regulatory entries retain their saved snapshots.`
+                : `Are you sure you want to delete "${itemToDelete?.listValue}"? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -932,7 +998,9 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending
+                ? isRegulatoryMasterType(itemToDelete?.listType) ? "Retiring..." : "Deleting..."
+                : isRegulatoryMasterType(itemToDelete?.listType) ? "Retire" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -39,6 +39,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { parseDate } from "@/lib/dateUtils";
 import { formatComponentDate, formatComponentChangeValue } from "@/lib/componentDatePresentation";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import ClassRegulatorySection from "@/components/pms/ClassRegulatorySection";
 import {
   Select,
   SelectContent,
@@ -2506,102 +2507,6 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   );
 };
 
-const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Fetch class regulatory data for the selected component
-  const { data: classRegData = [], isLoading, error: classLoadError } = useQuery<any[]>({
-    queryKey: [`/technical/api/component-class-regulatory/${selectedComponent?.id}`],
-    enabled: !!selectedComponent?.id,
-  });
-  
-  if (!selectedComponent) {
-    return <div className="text-sm text-gray-500">Select a component to view classification & regulatory data</div>;
-  }
-  
-  if (isLoading) {
-    return <div className="text-sm text-gray-500">Loading classification & regulatory data...</div>;
-  }
-  if (classLoadError) return <ComponentLoadErrors failures={[["Classification Data", classLoadError]]} />;
-  
-  const record = classRegData[0] || {};
-
-  return (
-    <div className="grid grid-cols-4 gap-4">
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Classification Society</label>
-        <Input
-          readOnly
-          value={record.classificationSociety || ""}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-classification-society"
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Certificate No.</label>
-        <Input
-          readOnly
-          value={record.certificateNo || record.certificateNumber || ""}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-certificate-no"
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Last Class Survey</label>
-        <Input
-          readOnly
-          value={formatComponentDate(record.lastClassSurvey, "")}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-last-class-survey"
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Next Class Survey</label>
-        <Input
-          readOnly
-          value={formatComponentDate(record.nextClassSurvey || record.nextSurveyDue, "")}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-next-class-survey"
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Survey Type</label>
-        <Input
-          readOnly
-          value={record.surveyType || ""}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-survey-type"
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Class Requirements</label>
-        <Input
-          readOnly
-          value={record.classRequirements || ""}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-class-requirements"
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Class Code</label>
-        <Input
-          readOnly
-          value={record.classCode || ""}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-class-code"
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">Information</label>
-        <Input
-          readOnly
-          value={record.information || ""}
-          className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3] bg-gray-50"
-          data-testid="view-class-information"
-        />
-      </div>
-    </div>
-  );
-};
-
 const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   // Fetch requisitions for the selected component
   const { data: requisitions = [], isLoading, error: requisitionsLoadError } = useQuery<any[]>({
@@ -3869,7 +3774,7 @@ const Components: React.FC = () => {
     { id: "E", title: "Maintenance History", marker: "B7.E" },
     { id: "F", title: "Spares", marker: "B7.F.1" },
     { id: "G", title: "Drawings & Manuals", marker: "B7.G" },
-    ...(isClassItem ? [{ id: "H", title: "Classification & Regulatory Data", marker: "B7.H" }] : []),
+    { id: "H", title: "Classification & Regulatory Data", marker: "B7.H" },
     { id: "I", title: "Requisitions", marker: "B7.I" }
   ];
 
@@ -4397,7 +4302,10 @@ const Components: React.FC = () => {
                           ) : section.id === "G" ? (
                             <DrawingsAndManualsSection selectedComponent={selectedComponent} />
                           ) : section.id === "H" ? (
-                            <ClassificationRegulatorySection selectedComponent={selectedComponent} />
+                            <ClassRegulatorySection
+                              componentId={selectedComponent?.actualId || selectedComponent?.id}
+                              classItem={isClassItem}
+                            />
                           ) : section.id === "I" ? (
                             <RequisitionsSection selectedComponent={selectedComponent} />
                           ) : (

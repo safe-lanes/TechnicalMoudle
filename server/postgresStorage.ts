@@ -846,6 +846,11 @@ export class PostgresStorage {
   async updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList> {
     const db = await getDb();
     const [saved] = await db.select().from(masterLists).where(eq(masterLists.id, id));
+    if (saved && ['classificationSociety', 'surveyType'].includes(saved.listType) &&
+        ((data.listKey !== undefined && data.listKey !== saved.listKey) ||
+         (data.listType !== undefined && data.listType !== saved.listType))) {
+      throw Object.assign(new Error('Regulatory master codes are permanent. Edit the display label or retire the value instead.'), { statusCode: 400 });
+    }
     if (saved?.listType === 'spareCategory' &&
       ((data.listKey !== undefined && data.listKey !== saved.listKey) ||
        (data.listType !== undefined && data.listType !== saved.listType))) {
@@ -864,6 +869,12 @@ export class PostgresStorage {
   async deleteMasterList(id: number): Promise<void> {
     const db = await getDb();
     const [saved] = await db.select().from(masterLists).where(eq(masterLists.id, id));
+    if (saved && ['classificationSociety', 'surveyType'].includes(saved.listType)) {
+      // Retire only these types; referenced historical entries remain readable and restorable.
+      await db.update(masterLists).set({ isActive: false, updatedAt: new Date(),
+        updatedByUuid: getRequestContext()?.userId ?? null }).where(eq(masterLists.id, id));
+      return;
+    }
     if (saved?.listType === 'spareCategory') {
       const used = await db.select({ id: spares.id }).from(spares).where(eq(spares.spareCategory, saved.listKey)).limit(1);
       const fleetUsed = await db.select({ id: fleetSpares.id }).from(fleetSpares).where(eq(fleetSpares.spareCategory, saved.listKey)).limit(1);
@@ -2430,7 +2441,8 @@ export class PostgresStorage {
   async getComponentClassRegulatory(componentId: string): Promise<ComponentClassRegulatory[]> {
     const db = await getDb();
     return await db.select().from(componentClassRegulatory)
-      .where(eq(componentClassRegulatory.componentId, componentId));
+      .where(and(eq(componentClassRegulatory.componentId, componentId),
+        or(isNull(componentClassRegulatory.isDeleted), eq(componentClassRegulatory.isDeleted, false))));
   }
 
   async getComponentClassRegulatoryItem(id: number): Promise<ComponentClassRegulatory | undefined> {

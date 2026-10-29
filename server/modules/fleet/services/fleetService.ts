@@ -374,8 +374,19 @@ export async function getMasterListById(id: number) {
   return masterList;
 }
 
+function validateRegulatoryMaster(data: Record<string, any>) {
+  const required = data.listType === "classificationSociety" ? ["country"] :
+    data.listType === "surveyType" ? ["category", "description"] : [];
+  for (const field of required) {
+    if (typeof data[field] !== "string" || !data[field].trim()) {
+      throw Object.assign(new Error(`${field.charAt(0).toUpperCase() + field.slice(1)} is required for this regulatory master.`), { statusCode: 400 });
+    }
+  }
+}
+
 export async function createMasterList(body: any) {
   const validatedData = insertMasterListSchema.parse(body);
+  validateRegulatoryMaster(validatedData);
   // FK-style validation at the SERVICE layer (intentional — NOT a DB FK).
   //
   // WHY NOT A DB FK:
@@ -405,6 +416,8 @@ export async function createMasterList(body: any) {
 export async function updateMasterList(id: number, body: any) {
   const partialMasterListSchema = insertMasterListSchema.partial();
   const validatedData = partialMasterListSchema.parse(body);
+  const savedMaster = await repo.getMasterListById(id);
+  if (savedMaster) validateRegulatoryMaster({ ...savedMaster, ...validatedData });
   // If listType is being changed, validate the new value exists + is active.
   if (validatedData.listType !== undefined) {
     const type = await repo.getMasterListTypeByKey(validatedData.listType);

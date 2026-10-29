@@ -952,7 +952,7 @@ export class SyncEngine {
       instanceId: this.instanceId,
       lastCheckpoint: floor ? floor.toISOString() : null,
       // 13-Oct-2026: this ship matches component_documents on cduuid (mig 182) — the shore may send UUID-keyed changes.
-      capabilities: ['component_documents_uuid', 'spare_classification_pair'],
+      capabilities: ['component_documents_uuid', 'spare_classification_pair', 'component_class_regulatory_uuid_v1'],
       ...(havePerTable
         ? {
             tableCheckpoints: Object.fromEntries(

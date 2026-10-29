@@ -2061,6 +2061,10 @@ export const masterLists = pgTable("master_lists", {
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  country: text("country"),
+  category: text("category"),
+  description: text("description"),
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
@@ -2074,6 +2078,7 @@ export const masterLists = pgTable("master_lists", {
 export const insertMasterListSchema = createInsertSchema(masterLists).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertMasterList = z.infer<typeof insertMasterListSchema>;
@@ -2312,6 +2317,12 @@ export type JobWorkInstructionLink = typeof jobWorkInstructionLinks.$inferSelect
 // Component Class Regulatory Table - Classification and regulatory survey data (multiple rows per component)
 export const componentClassRegulatory = pgTable("component_class_regulatory", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  // Nullable until shore/vessel historical identities have been reconciled.
+  ccruuid: text("ccruuid"),
+  classificationSocietyKey: text("classification_society_key"),
+  surveyTypeKey: text("survey_type_key"),
+  deletedByUuid: text("deleted_by_uuid"),
+  deletedAt: timestamp("deleted_at"),
   componentId: text("component_id").notNull().references(() => components.cuuid),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),

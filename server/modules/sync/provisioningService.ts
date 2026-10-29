@@ -17,7 +17,8 @@ import * as crypto from 'crypto';
 import { getPool } from '../../db';
 import { tenantConnectionManager } from '../../utils/tenantConnectionManager';
 import * as syncRepo from './repository';
-import { coerceArrayValue } from './oneWayApplier';
+import { coerceArrayValue, applyOneWayRows, getColumnMeta } from './oneWayApplier';
+import { CLASS_REGULATORY_CAPABILITY, CLASS_REGULATORY_REQUIRED_COLUMNS } from './classRegulatorySync';
 import {
   getTablesByCategory,
   getTableSyncConfig,
@@ -38,6 +39,7 @@ export interface ProvisioningManifest {
   tables: { tableName: string; rowCount: number; category: string }[];
   totalRows: number;
   version: string;
+  requiredCapabilities?: string[];
   // Phase 4a (optional, additive — absent in pre-4a bundles):
   // per-tenant sync key the ship seeds into its sync_settings on import (dormant until 4b).
   syncApiKey?: string;
@@ -55,7 +57,7 @@ export interface ProvisioningBundle {
 export async function generateProvisioningBundle(
   vesselId: string,
   generatedBy: string,
-  opts?: { domain?: string; persist?: boolean; blunt?: boolean }
+  opts?: { domain?: string; persist?: boolean; blunt?: boolean; receiverCapabilities?: string[] }
 ): Promise<ProvisioningBundle> {
   const pool = await getPool();
 
@@ -66,6 +68,16 @@ export async function generateProvisioningBundle(
   );
   const vesselName = vesselResult.rows[0]?.name || 'Unknown';
   const vesselCode = vesselResult.rows[0]?.code || '';
+  // Check before any provisioning keys/checkpoints or other persistence is touched.
+  const regulatory = await pool.query(
+    `SELECT ccruuid FROM component_class_regulatory WHERE vessel_code = ANY($1)
+     AND COALESCE(is_deleted, false) = false`, [[vesselId, vesselCode]]);
+  if (regulatory.rows.some(row => !row.ccruuid)) {
+    throw new Error("Section H historical UUIDs must be reconciled before provisioning.");
+  }
+  if (regulatory.rows.length && !opts?.receiverCapabilities?.includes(CLASS_REGULATORY_CAPABILITY)) {
+    throw new Error("Confirm the receiving vessel supports component_class_regulatory_uuid_v1 before provisioning Section H.");
+  }
 
   const bundle: ProvisioningBundle = {
     manifest: {
@@ -78,6 +90,7 @@ export async function generateProvisioningBundle(
       tables: [],
       totalRows: 0,
       version: '1.0',
+      requiredCapabilities: regulatory.rows.length ? [CLASS_REGULATORY_CAPABILITY] : [],
     },
     data: [],
   };
@@ -447,6 +460,19 @@ export async function importProvisioningBundle(
   let tablesImported = 0;
   let rowsImported = 0;
   const errors: string[] = [];
+  const regulatoryRows = bundle.data.find(item => item.tableName === 'component_class_regulatory')?.rows || [];
+  if (regulatoryRows.length) {
+    if (!bundle.manifest.requiredCapabilities?.includes(CLASS_REGULATORY_CAPABILITY) ||
+        regulatoryRows.some(row => !row.ccruuid)) {
+      throw new Error("Refusing legacy Section H provisioning data without the UUID contract. Regenerate after reconciliation.");
+    }
+    const meta = await getColumnMeta(pool, 'component_class_regulatory');
+    if (CLASS_REGULATORY_REQUIRED_COLUMNS.some(column => !meta.allCols.has(column))) {
+      throw new Error("Migrate the receiving Section H schema before importing. No provisioning cleanup has run.");
+    }
+    const unresolved = await pool.query('SELECT 1 FROM component_class_regulatory WHERE ccruuid IS NULL LIMIT 1');
+    if (unresolved.rows.length) throw new Error("Reconcile existing Section H identities before importing. No provisioning cleanup has run.");
+  }
 
   // ── Identity gate: refuse to provision a ship without a REAL instance id ──
   // Resolve via the same DB-first resolver the field-logger and sync engine
@@ -598,6 +624,13 @@ export async function importProvisioningBundle(
     if (tableData.rows.length === 0) continue;
 
     try {
+      if (tableData.tableName === 'component_class_regulatory') {
+        const applied = await applyOneWayRows(tableData.tableName, tableData.rows);
+        if (applied.errors.length) throw new Error(applied.errors[0].error);
+        rowsImported += tableData.rows.length;
+        tablesImported++;
+        continue;
+      }
       const config = getTableSyncConfig(tableData.tableName);
       const identityCol = config?.identityColumn || null;
       let tableRowCount = 0;

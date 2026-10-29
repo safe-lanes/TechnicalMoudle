@@ -1098,6 +1098,10 @@ export async function preparePullData(
   //    falling back to the shared floor for any table without one)
   const oneWayGather = await gatherOneWayShoreRows(vesselId, lastCheckpoint, tableCheckpoints);
   const oneWayRows = oneWayGather.batches;
+  if (!capabilities?.includes('component_class_regulatory_uuid_v1') &&
+      oneWayRows.some(batch => batch.tableName === 'component_class_regulatory' && batch.rows.length > 0)) {
+    throw Object.assign(new Error('Section H synchronization is pending: upgrade, migrate and reconcile this vessel before retrying. No regulatory changes have been acknowledged.'), { statusCode: 409 });
+  }
 
   // 2. Gather shore's BOTH_EDITABLE field logs (excluding ship's own changes)
   //    Pass vesselCode so logs stored with vessel_code (instead of UUID) are also found
@@ -1638,6 +1642,10 @@ async function gatherOneWayShoreRows(
       }
 
       const result = await pool.query(query, params);
+      if (config.tableName === 'component_class_regulatory' &&
+          result.rows.some(row => !row.ccruuid)) {
+        throw new Error('Section H requires historical UUID reconciliation; no checkpoint has advanced.');
+      }
       if (result.rows.length > 0) {
         // Rows are ORDER BY updated_at ASC, so the LAST row carries the max we are
         // actually delivering. Advancing to this (not to now) means a LIMIT-5000
@@ -1665,6 +1673,7 @@ async function gatherOneWayShoreRows(
       // Best-effort: skip tables that don't exist yet or have schema issues.
       // NOTE: a table that throws records NO tableMax, so its watermark is not advanced
       // — a schema error can never step the checkpoint over rows it failed to read.
+      if (config.tableName === 'component_class_regulatory') throw err;
       console.warn(`[Sync Pull] Skipping one-way table ${config.tableName}: ${err.message}`);
     }
   }

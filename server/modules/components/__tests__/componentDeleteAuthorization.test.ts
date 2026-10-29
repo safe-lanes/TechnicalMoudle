@@ -8,6 +8,7 @@ vi.mock('../../../middleware/permissions', () => ({ requirePermission }));
 vi.mock('../../../middleware/auth', () => ({
   requireAuth: (_req: any, _res: any, next: () => void) => next(),
   requirePMSAdmin: (_req: any, _res: any, next: () => void) => next(),
+  requireRole: () => (_req: any, _res: any, next: () => void) => next(),
 }));
 vi.mock('../../shared/middleware', () => ({
   asyncHandler: (handler: any) => handler,

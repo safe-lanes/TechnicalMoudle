@@ -325,6 +325,10 @@ export async function applyOneWayRows(
 
   // Schema-aware column metadata (GENERATED ALWAYS + JSON detection)
   const meta = await getColumnMeta(pool, tableName);
+  if (tableName === 'component_class_regulatory') {
+    const { applyClassRegulatoryRows } = await import('./classRegulatorySync');
+    return applyClassRegulatoryRows(pool, rows, meta.allCols);
+  }
   if ((tableName === 'spares' || tableName === 'fleet_spares') &&
       rows.some(r => ['spareCategory', 'optimumQty', 'spare_category', 'optimum_qty'].some(k => Object.hasOwn(r, k))) &&
       (!meta.allCols.has('spare_category') || !meta.allCols.has('optimum_qty'))) {

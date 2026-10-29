@@ -608,13 +608,13 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     tableName: 'component_class_regulatory',
     category: 'ONE_WAY_SHORE_TO_SHIP',
     direction: 'shore_to_ship',
-    identityColumn: null,
+    identityColumn: 'ccruuid',
     vesselScopeColumn: 'vessel_code',
     vesselScopeJoinPath: null,
     isGlobal: false,
     isConfigurable: false,
     businessRules: null,
-    notes: 'Class/regulatory data for components. Uses vessel_code. Integer PK, no UUID.',
+    notes: 'Office-owned regulatory entries. UUID identity; schema-first rollout and historical reconciliation required. Never match by mutable society/type or local integer id.',
   },
 
   // ── Approval workflow: office-managed config + approver registry (global) ──

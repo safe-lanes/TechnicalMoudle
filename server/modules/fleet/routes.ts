@@ -4,6 +4,7 @@ import { requireOfficeOrAdmin, requireRole } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import * as fleetCtrl from './controllers/fleetController';
 import * as adminCtrl from './controllers/fleetAdminController';
+import { regulatoryMasterAccess } from './services/regulatoryMasterAccess';
 
 // Only Sail Admin can mutate master list types
 const requireSailAdmin = requireRole(["Sail Admin"]);
@@ -63,9 +64,9 @@ router.delete('/fleet/makers/:id', requirePermission('admin-masters', 'delete'),
 // ── Master Lists ──
 router.get('/fleet/master-lists', asyncHandler(fleetCtrl.getMasterLists));
 router.get('/fleet/master-lists/:id', asyncHandler(fleetCtrl.getMasterListById));
-router.post('/fleet/master-lists', requirePermission('admin-masters', 'create'), asyncHandler(fleetCtrl.createMasterList));
-router.put('/fleet/master-lists/:id', requirePermission('admin-masters', 'edit'), asyncHandler(fleetCtrl.updateMasterList));
-router.delete('/fleet/master-lists/:id', requirePermission('admin-masters', 'delete'), asyncHandler(fleetCtrl.deleteMasterList));
+router.post('/fleet/master-lists', regulatoryMasterAccess('create'), requirePermission('admin-masters', 'create'), asyncHandler(fleetCtrl.createMasterList));
+router.put('/fleet/master-lists/:id', regulatoryMasterAccess('edit'), requirePermission('admin-masters', 'edit'), asyncHandler(fleetCtrl.updateMasterList));
+router.delete('/fleet/master-lists/:id', regulatoryMasterAccess('delete'), requirePermission('admin-masters', 'delete'), asyncHandler(fleetCtrl.deleteMasterList));
 
 // ── Master List Types (Sail Admin only for mutations) ──
 router.get('/fleet/master-list-types', asyncHandler(fleetCtrl.getMasterListTypes));

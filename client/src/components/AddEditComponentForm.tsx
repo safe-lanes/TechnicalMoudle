@@ -38,6 +38,7 @@ import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
 import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import ClassRegulatorySection from "@/components/pms/ClassRegulatorySection";
 import { buildDraftJobPayload } from "@/lib/jobFormPayload";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
 import { componentErrorDescription, componentResponseError } from "@/lib/componentErrorFeedback";
@@ -401,11 +402,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
   const { data: documents = [], isLoading: isLoadingDocs, error: documentsError } = useQuery<any[]>({
     queryKey: [`/technical/api/component-documents/${componentId}`],
-    enabled: isEditMode && !!componentId,
-  });
-
-  const { data: classRegData = [], isLoading: isLoadingClassReg, error: classError } = useQuery<any[]>({
-    queryKey: [`/technical/api/component-class-regulatory/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
@@ -949,7 +945,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     { id: "E", title: "Maintenance History" },
     { id: "F", title: "Spares" },
     { id: "G", title: "Drawings & Manuals" },
-    ...(componentData.classItem === "Yes" ? [{ id: "H", title: "Classification & Regulatory Data" }] : []),
+    { id: "H", title: "Classification & Regulatory Data" },
     { id: "I", title: "Requisitions" }
   ];
 
@@ -969,7 +965,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         <ComponentLoadErrors failures={[
           ["Component", componentLoadError], ["Maker List", makersError], ["Component Register", registerError],
           ["Jobs", jobsError], ["Maintenance History", historyError], ["Spares", sparesError],
-          ["Documents", documentsError], ["Classification Data", classError], ["Requisitions", requisitionsError],
+          ["Documents", documentsError], ["Requisitions", requisitionsError],
           ["RH Sources", mastersError || masterError || rhParentError], ["Running Hours", rhError],
           ["Component Categories", categoryError],
         ]} />
@@ -1772,86 +1768,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
                       {/* Section G: Classification & Regulatory Data - EXACT REPLICA */}
                       {section.id === "H" && (
-                        <div>
-                          {!isEditMode ? (
-                            <div className="text-sm text-gray-500">
-                              Classification data will be available after component is created
-                            </div>
-                          ) : isLoadingClassReg ? (
-                            <div className="text-sm text-gray-500">Loading classification & regulatory data...</div>
-                          ) : classRegData.length === 0 ? (
-                            <div className="text-center py-8">
-                              <div className="text-gray-400 text-sm">
-                                {classError ? "Classification data could not be loaded. Refresh and try again." : "No classification & regulatory data found for this component"}
-                              </div>
-                              <AdminOnly>
-                                <p className="text-xs text-gray-500 mt-2">
-                                  Add survey records to track classification society requirements
-                                </p>
-                              </AdminOnly>
-                            </div>
-                          ) : (
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between mb-4">
-                                <div className="text-sm text-gray-600">
-                                  <span className="font-semibold">{classRegData.length}</span> survey record(s)
-                                </div>
-                                <AdminOnly>
-                                  <Button size="sm" variant="outline" className="text-xs" data-testid="button-add-survey">
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Add Survey
-                                  </Button>
-                                </AdminOnly>
-                              </div>
-
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="border-b border-gray-200">
-                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Classification Society</th>
-                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Survey Type</th>
-                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Certificate No.</th>
-                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Last Survey</th>
-                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due</th>
-                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Status</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {getPreviewData(classRegData, "G").map((item, index) => (
-                                      <tr key={index} className="border-b border-gray-100">
-                                        <td className="py-3 px-3 text-gray-900">{item.classificationSociety}</td>
-                                        <td className="py-3 px-3 text-gray-900">{item.surveyType}</td>
-                                        <td className="py-3 px-3 text-gray-900">{item.certificateNo}</td>
-                                        <td className="py-3 px-3 text-gray-900">{formatComponentDate(item.lastSurveyDate, "")}</td>
-                                        <td className="py-3 px-3 text-gray-900">{formatComponentDate(item.nextDueDate, "")}</td>
-                                        <td className="py-3 px-3">
-                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                            item.status === "Valid" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                                          }`}>
-                                            {item.status}
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                                {classRegData.length > PREVIEW_ROW_LIMIT && (
-                                  <div className="text-center mt-2">
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      onClick={() => toggleShowAllRows("G")}
-                                      className="text-[#16569e] text-xs"
-                                      data-testid="button-toggle-classreg"
-                                    >
-                                      {showAllRows.has("G") ? `Show Less` : `View More (${classRegData.length - PREVIEW_ROW_LIMIT} more)`}
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        <ClassRegulatorySection componentId={isEditMode ? componentId : null} readOnly={true} classItem={componentData.classItem === "Yes"} />
                       )}
 
                       {/* Section H: Requisitions */}

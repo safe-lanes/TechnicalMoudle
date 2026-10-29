@@ -7,6 +7,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import ClassRegulatorySection from "@/components/pms/ClassRegulatorySection";
 import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { Textarea } from "@/components/ui/textarea";
 import StampSelect from "@/components/StampSelect";
@@ -206,17 +207,6 @@ function ComponentEditorSession({
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   
-  const [classRegData, setClassRegData] = useState({
-    classificationSociety: "",
-    certificateNo: "",
-    lastClassSurvey: "",
-    nextClassSurvey: "",
-    surveyType: "",
-    classRequirements: "",
-    classCode: "",
-    information: "",
-  });
-
   const { data: components = EMPTY_ROWS, isLoading: isLoadingComponents, error: registerError } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
   });
@@ -1259,16 +1249,6 @@ function ComponentEditorSession({
                 });
                 setWorkOrders([]);
                 setSpares([]);
-                setClassRegData({
-                  classificationSociety: "",
-                  certificateNo: "",
-                  lastClassSurvey: "",
-                  nextClassSurvey: "",
-                  surveyType: "",
-                  classRequirements: "",
-                  classCode: "",
-                  information: "",
-                });
                 toast({
                   title: "New Component",
                   description: selectedTreeNode ? `Form cleared. Component code auto-generated: ${nextCode}` : "Form cleared for adding a new component. Select a location in the tree first.",
@@ -2093,80 +2073,7 @@ function ComponentEditorSession({
                 </CardHeader>
                 {!collapsedSections['H'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                  <div className="grid grid-cols-4 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Classification Society</label>
-                      <Input
-                        value={classRegData.classificationSociety}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, classificationSociety: e.target.value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-classification-society"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Certificate No.</label>
-                      <Input
-                        value={classRegData.certificateNo}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, certificateNo: e.target.value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-certificate-no"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Last Class Survey</label>
-                      <ComponentDateInput
-                        value={classRegData.lastClassSurvey}
-                        onChange={(value) => setClassRegData(prev => ({ ...prev, lastClassSurvey: value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-last-class-survey"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Next Class Survey</label>
-                      <ComponentDateInput
-                        value={classRegData.nextClassSurvey}
-                        onChange={(value) => setClassRegData(prev => ({ ...prev, nextClassSurvey: value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-next-class-survey"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Survey Type</label>
-                      <Input
-                        value={classRegData.surveyType}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, surveyType: e.target.value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-survey-type"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Class Requirements</label>
-                      <Input
-                        value={classRegData.classRequirements}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, classRequirements: e.target.value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-class-requirements"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Class Code</label>
-                      <Input
-                        value={classRegData.classCode}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, classCode: e.target.value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-class-code"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Information</label>
-                      <Input
-                        value={classRegData.information}
-                        onChange={(e) => setClassRegData(prev => ({ ...prev, information: e.target.value }))}
-                        className="h-8 text-sm border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-class-information"
-                      />
-                    </div>
-                  </div>
+                  <ClassRegulatorySection componentId={isEditMode ? activeComponentId : null} classItem={componentData.classItem === "Yes"} />
                 </CardContent>
                 )}
               </Card>
