@@ -19,6 +19,9 @@ const matchSchema = z.object({
 });
 
 export async function getDefectLogPage(req: Request, res: Response) {
+  const cancellation = new AbortController();
+  const onClose = () => cancellation.abort();
+  res.once('close', onClose);
   try {
     const page = z.coerce.number().int().min(1).max(1_000_000).default(1).parse(req.query.page);
     const match = matchSchema.parse(JSON.parse(String(req.query.match ?? '{}')));
@@ -29,13 +32,17 @@ export async function getDefectLogPage(req: Request, res: Response) {
       vesselId: z.string().optional().parse(req.query.vesselId),
       vesselIds: z.string().optional().parse(req.query.vesselIds)?.split(',').filter(Boolean),
       match,
+      signal: cancellation.signal,
     }, req.query.export === 'true');
     res.json(result);
   } catch (error) {
+    if (cancellation.signal.aborted) return;
     if (error instanceof z.ZodError || error instanceof SyntaxError || error instanceof RangeError) {
       return res.status(400).json({ error: 'Invalid Defect Log paging request' });
     }
     console.error('Defect Log paged read failed:', error);
     return res.status(500).json({ error: 'Failed to fetch Defect Log records' });
+  } finally {
+    res.off('close', onClose);
   }
 }

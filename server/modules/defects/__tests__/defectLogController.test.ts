@@ -5,7 +5,7 @@ import { getDefectLogPage } from '../paging/defectLogController';
 
 const match = { locale: 'en-US', timeZone: 'Asia/Kolkata', now: '2026-10-29T12:00:00Z' };
 const response = () => {
-  const res = { status: vi.fn(), json: vi.fn() };
+  const res = { status: vi.fn(), json: vi.fn(), once: vi.fn(), off: vi.fn() };
   res.status.mockReturnValue(res);
   return res;
 };
@@ -21,6 +21,7 @@ describe('Defect Log opt-in controller', () => {
     } } as any, res as any);
     expect(readDefectLog).toHaveBeenCalledWith({
       page: 2, pageSize: 100, vesselId: 'a', vesselIds: ['b', 'c'], match: { ...match, search: 'valve' },
+      signal: expect.any(AbortSignal),
     }, false);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ total: 0 }));
   });
@@ -56,5 +57,18 @@ describe('Defect Log opt-in controller', () => {
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledExactlyOnceWith({ error: 'Failed to fetch Defect Log records' });
     } finally { log.mockRestore(); }
+  });
+  it('cancels disconnected reads and removes the close listener without sending partial data', async () => {
+    const res = response();
+    vi.mocked(readDefectLog).mockImplementation(async input => {
+      expect(res.once).toHaveBeenCalledWith('close', expect.any(Function));
+      res.once.mock.calls[0][1]();
+      input.signal!.throwIfAborted();
+      throw new Error('unreachable');
+    });
+    await getDefectLogPage({ query: { match: JSON.stringify(match) } } as any, res as any);
+    expect(res.json).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.off).toHaveBeenCalledWith('close', res.once.mock.calls[0][1]);
   });
 });

@@ -1,7 +1,7 @@
 import { parseFragment, defaultTreeAdapter } from 'parse5';
 import { TZDate } from '@date-fns/tz';
 
-/** Executed in PostgreSQL's V8 runtime, not over a candidate array in Node. */
+/** Browser context for the approved bounded server-side scalar matcher. */
 export interface LogMatchOptions {
   selectedVessel?: string;
   selectedVesselName?: string;
@@ -18,10 +18,10 @@ export interface LogMatchOptions {
 }
 
 type Row = {
-  id?: string; vesselId?: string; vesselName?: string; issueDate?: string;
-  category?: string; is_coc?: boolean; componentHardwareLevel3?: string;
-  description?: string; targetCloseDate?: string; dateCompleted?: string;
-  verified?: boolean; isDeferred?: boolean; hasActions?: boolean; priority?: string;
+  id?: string | null; vesselId?: string | null; vesselName?: string | null; issueDate?: string | null;
+  category?: string | null; is_coc?: boolean | null; componentHardwareLevel3?: string | null;
+  description?: string | null; targetCloseDate?: string | null; dateCompleted?: string | null;
+  verified?: boolean | null; isDeferred?: boolean | null; hasActions?: boolean; priority?: string | null;
 };
 
 /** Same fragment context as document.createElement("div").innerHTML. */
@@ -34,9 +34,8 @@ export function browserText(html: string): string {
 }
 
 function dates(timeZone: string) {
-  // PLV8's OS timezone is UTC. Explicit-zone timestamps and ISO date-only
-  // strings denote instants; legacy/timezone-free datetime strings denote local
-  // wall time. Comments are ignored by V8's legacy date parser.
+  // Explicit-zone timestamps and ISO date-only strings denote instants;
+  // timezone-free strings denote browser wall time, not the server's timezone.
   const parse = (value: string): TZDate => {
     const timestamp = Date.parse(value);
     if (!Number.isFinite(timestamp)) return new TZDate(NaN, timeZone);
@@ -46,13 +45,12 @@ function dates(timeZone: string) {
     // A trailing "-2026" can be the YEAR in a legacy date, not a zone.
     // Numeric zones need a preceding clock (and can precede the calendar).
     const clockZone = /\d{1,2}:\d{1,2}(?::\d{1,2}(?:\.\d+)?)?\s*[+-]\d{1,4}(?::\d{2})?(?:\s|$)/.test(s);
-    // V8 also accepts short legacy offsets ("10:00 -5") and zones before
-    // the clock. Appending GMT exposes a nonzero explicit offset without
-    // guessing from a hyphen that might instead be part of the calendar date.
-    const forcedUTC = Date.parse(`${s} GMT`);
-    const explicitOffset = Number.isFinite(forcedUTC) && forcedUTC !== timestamp;
-    if (isoDay || namedZone || clockZone || explicitOffset) return new TZDate(timestamp, timeZone);
-    const utc = new Date(timestamp);
+    const zoneBeforeClock = /(?:^|\s)[+-]\d{1,4}(?::\d{2})?(?:\s|$)/.test(s) && /\d{1,2}:\d{1,2}/.test(s);
+    if (isoDay || namedZone || clockZone || zoneBeforeClock) return new TZDate(timestamp, timeZone);
+    // Parse unzoned wall components in UTC before applying the browser zone.
+    // This also avoids the host timezone normalizing a DST gap prematurely.
+    const neutral = Date.parse(/^\d{4}-\d{2}-\d{2}T/.test(s) ? `${s}Z` : `${s} GMT`);
+    const utc = new Date(Number.isFinite(neutral) ? neutral : timestamp);
     return new TZDate(
       utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate(),
       utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds(),
@@ -69,22 +67,25 @@ function dates(timeZone: string) {
   return { parse, structured, midnight };
 }
 
-export function matchesDefectLog(row: Row, options: LogMatchOptions): boolean {
+export function createDefectLogMatcher(options: LogMatchOptions): (row: Row) => boolean {
   const { selectedVessel = 'all', selectedVesselName = '', selectedVesselNames = [] } = options;
+  const names = selectedVesselNames.map(n => n.toLowerCase().trim());
+  const d = dates(options.timeZone);
+  const today = d.midnight(new TZDate(options.now, options.timeZone));
+  const valid = (date: Date) => !Number.isNaN(date.getTime());
+  const search = options.search?.trim().toLocaleLowerCase(options.locale);
+  const monthFormatter = search ? new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' }) : null;
+  return row => {
   if (selectedVessel !== 'all' && row.vesselId !== selectedVessel &&
     (!selectedVesselName || (row.vesselName || '').toLowerCase().trim() !== selectedVesselName)) return false;
   if (selectedVesselNames.length) {
     const vessel = (row.vesselId || row.vesselName || '').toLowerCase().trim();
-    if (!selectedVesselNames.some(n => {
-      const name = n.toLowerCase().trim();
+    if (!names.some(name => {
       return name === vessel || vessel.includes(name) || name.includes(vessel);
     })) return false;
   }
-  const d = dates(options.timeZone);
-  const today = d.midnight(new TZDate(options.now, options.timeZone));
-  const valid = (date: Date) => !Number.isNaN(date.getTime());
-  if (options.search?.trim()) {
-    const format = (value?: string) => {
+  if (search) {
+    const format = (value?: string | null) => {
       if (value == null || value === '') return '';
       const s = value.trim();
       const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
@@ -94,8 +95,7 @@ export function matchesDefectLog(row: Row, options: LogMatchOptions): boolean {
       const year = iso ? +iso[1] : dmy ? +dmy[3] : date.getFullYear();
       const month = iso ? +iso[2] : dmy ? +dmy[2] : date.getMonth() + 1;
       const day = iso ? +iso[3] : dmy ? +dmy[1] : date.getDate();
-      const shortMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' })
-        .format(new Date(Date.UTC(year, month - 1, 1)));
+      const shortMonth = monthFormatter!.format(new Date(Date.UTC(year, month - 1, 1)));
       return `${String(day).padStart(2, '0')} ${shortMonth} ${year}`;
     };
     const completed = row.dateCompleted ? d.structured(row.dateCompleted, true) : null;
@@ -110,7 +110,6 @@ export function matchesDefectLog(row: Row, options: LogMatchOptions): boolean {
       row.componentHardwareLevel3 || '-', browserText(row.description || ''),
       format(row.targetCloseDate), format(row.dateCompleted), status, row.priority || '-',
     ];
-    const search = options.search.trim().toLocaleLowerCase(options.locale);
     if (!values.some(value => value.toLocaleLowerCase(options.locale).includes(search))) return false;
   }
   const pv = options.periodValue;
@@ -142,4 +141,9 @@ export function matchesDefectLog(row: Row, options: LogMatchOptions): boolean {
     if (options.dueOverdue === 'due2months' && !(days >= 0 && days <= 60)) return false;
   }
   return true;
+  };
+}
+
+export function matchesDefectLog(row: Row, options: LogMatchOptions): boolean {
+  return createDefectLogMatcher(options)(row);
 }

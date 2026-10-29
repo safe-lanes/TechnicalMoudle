@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 import { build } from 'esbuild';
 import { chromium, type Browser } from 'playwright';
-import { matchesDefectLog, type LogMatchOptions } from '../paging/compatibility';
+import { createDefectLogMatcher, type LogMatchOptions } from '../paging/compatibility';
 
 const dates = [
   '2026-03-07', '2026-03-08', '2026-04-07', '2026-05-07', '2026-05-08',
@@ -74,7 +74,8 @@ describe('Defect Log browser compatibility (independent legacy oracle)', () => {
           const options = { ...base, ...scenario } as LogMatchOptions;
           const expected = await page.evaluate(({ rows, options }) =>
             (window as any).LegacyLog.legacyFilter(rows, options).map((r: any) => r.id), { rows, options });
-          const actual = rows.filter(row => matchesDefectLog({ ...row, hasActions: row.actions.length > 0 }, options)).map(r => r.id);
+          const matches = createDefectLogMatcher(options);
+          const actual = rows.filter(row => matches({ ...row, hasActions: row.actions.length > 0 })).map(r => r.id);
           expect(actual, JSON.stringify(options)).toEqual(expected);
         }
       } finally { await context.close(); }
