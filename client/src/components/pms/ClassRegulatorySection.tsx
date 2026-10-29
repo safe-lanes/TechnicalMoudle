@@ -305,12 +305,12 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
       {saveError && <p role="alert" className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{saveError}</p>}
       {editingId !== null && <div className="space-y-3 rounded-sm border border-sky-200 bg-sky-50/40 p-3">
         {editingId !== "new" && (!originalReferences.current.classificationSocietyKey || !originalReferences.current.surveyTypeKey) && <p className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">This legacy entry has a missing stable master reference. You may leave it unchanged while editing other fields; its saved snapshot will be preserved.</p>}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {control("classificationSocietyKey", "Classification Society", editingId === "new" || !!originalReferences.current.classificationSocietyKey)}
-          {control("surveyTypeKey", "Survey Type", editingId === "new" || !!originalReferences.current.surveyTypeKey)}
           {textField("certificateNumber", "Certificate Number", 100)}
           <div><label className="mb-1 block text-xs font-medium text-gray-600">Last Class Survey</label><ComponentDateInput value={draft.lastClassSurvey} onChange={(v) => setValue("lastClassSurvey", v)} className={inputClass} data-testid="input-last-class-survey" />{fieldErrors.lastClassSurvey && <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.lastClassSurvey}</p>}</div>
-          <div><label className="mb-1 block text-xs font-medium text-gray-600">Next Survey Due</label><ComponentDateInput value={draft.nextSurveyDue} onChange={(v) => setValue("nextSurveyDue", v)} className={inputClass} data-testid="input-next-survey-due" />{fieldErrors.nextSurveyDue && <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.nextSurveyDue}</p>}</div>
+          <div><label className="mb-1 block text-xs font-medium text-gray-600">Next Class Survey</label><ComponentDateInput value={draft.nextSurveyDue} onChange={(v) => setValue("nextSurveyDue", v)} className={inputClass} data-testid="input-next-survey-due" />{fieldErrors.nextSurveyDue && <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.nextSurveyDue}</p>}</div>
+          {control("surveyTypeKey", "Survey Type", editingId === "new" || !!originalReferences.current.surveyTypeKey)}
           {textField("classRequirements", "Class Requirements", 2000, true)}
           <div className="rounded-sm border border-slate-200 bg-slate-50 px-2.5 py-2"><span className="block text-xs font-medium text-gray-600">Class Code</span><span className="text-sm text-slate-700">Assigned from classification society</span></div>
           {textField("information", "Information", 2000, true)}
