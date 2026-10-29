@@ -1,590 +1,578 @@
-# PMS Component Classification & Regulatory Data
-## Functionality and Backend Implementation Proposal
+# PMS Components — Section H: Classification & Regulatory Data
+## Corrected functional, backend, database and synchronization plan
 
-**Status:** Draft for user validation. No implementation, migration or database changes have been made.  
-**Feature:** PMS → Components → selected component → H. Classification & Regulatory Data.  
-**Purpose:** Describe the intended user-visible functionality, backend work, proposed schema changes, migration, risks and acceptance criteria before implementation is authorized.
+**Review date:** 29 October 2026
 
-> **Review boundary:** This document is a proposal. The “new columns” and “new tables” below have not been created or migrated. Confirm the open decisions in Section 15 before implementation.
+**Status:** Proposed specification awaiting validation; documentation only.
 
-## 1. Summary
+**Area:** PMS → Components → H. Classification & Regulatory Data
 
-Complete Section H as a component-specific register that lets authorized users:
+**Branch reviewed:** `feature/replit-work`
 
-- View multiple classification/survey entries for the selected component.
-- Add an entry and edit an existing entry.
-- Soft-delete an entry without physically removing its database row.
-- Select Classification Society and Survey Type from maintained masters.
-- Populate Class Code from the chosen society.
-- Record Last Class Survey, Next Class Survey and certificate/details.
-- Attach PDF, Word, Excel or CSV files to a specific entry, up to **25 MB per file**.
-- Display survey dates as `DD-MM-YYYY` and colour-code the next survey’s urgency.
+**Companion:** `docs/PMS_SECTION_H_FINAL_FUNCTIONAL_DATABASE_SYNC_SUMMARY.md` (14 October 2026; retained unchanged).
 
-The existing application already has a `component_class_regulatory` table, generated entry IDs, a component UUID foreign key, most requested entry fields and list/create/update/delete API routes. The primary gaps found in source are that the Component Add/Edit form keeps these values only in local state, the selected-component view shows only the first record, master fields are currently free-text inputs, and the current delete implementation physically deletes a row.
+> This document describes existing code and proposed future work. No application code, schema, migration, seed, sync setting or database data is changed by this documentation task. No production/vessel rollout or implementation is authorized. Business choices are labelled **Proposed — needs confirmation**, including recommendations supplied during review.
 
-This is therefore a plan to connect and complete the existing feature, not replace the entire Component Register backend.
+## Contents
 
-## 2. Current implementation versus proposed work
+1. Release boundary and verified findings
+2. Existing table, columns and consumers
+3. Authorization and forwarded vessel scope
+4. Functional behavior and API responsibilities
+5. Masters and validation
+6. Proposed schema changes and named migrations
+7. Synchronization, field logs and reconciliation
+8. Audit and lifecycle
+9. Delivery phases
+10. Acceptance and regression checks
+11. Open decisions
+12. Differences from the 14 October summary and stop condition
 
-| Area | Current source evidence | Proposed work |
+## 1. Release boundary and verified findings
+
+### 1.1 Objective
+
+Complete the existing regulatory register, rather than create a parallel table/API or add eight fields to `components`.
+
+- Display all active entries for a component, including separate certificates sharing society/type.
+- Save/Cancel each entry through the existing class-regulatory resource, independently of Component Save.
+- Enforce office-only writes against genuine forwarded identity and verified scope.
+- Use shared masters, derive Class Code, preserve stored dates, and return friendly errors.
+- Add stable per-entry sync identity, soft deletion/restoration and lifecycle audit.
+- Preserve existing columns, component relationships and report contracts.
+- Defer entry attachments/file sync, child-entry Modify PMS and survey urgency colours to a separately approved product Phase 2.
+
+### 1.2 Eleven requested current-state findings
+
+Source locations are review-time references. These findings do not assert that production or all vessel installations have matching schema, data or versions.
+
+| # | Finding | Source |
 |---|---|---|
-| Entry storage | `component_class_regulatory` already exists. | Extend compatibly only where needed. |
-| Entry ID | Auto-generated integer `id` already exists. | Reuse it; no additional entry ID is proposed. |
-| Component relationship | `component_id` references `components.cuuid`. | Keep it as the authoritative association. |
-| Entry fields | Society, survey type, certificate, last/next survey, requirements, class code and information are already stored. | Reuse these columns and explicitly map UI names to database names. |
-| API routes | Read, create, update and delete routes already exist. | Connect/review them; enforce access checks and soft-delete behaviour. |
-| Add/Edit component form | Holds H-section values in separate client state; inspected component Save payload does not persist that state. | Provide a complete entry-level create/edit workflow, not a silent unsaved section. |
-| Selected component view | Fetches records and renders `classRegData[0]`. | Render all non-deleted records with individual actions. |
-| Society, Survey Type, Class Code | Inspected form uses text inputs. | Master-driven selects; derive and server-validate Class Code. |
-| Delete | Storage method issues SQL `DELETE`. | Change to update `is_deleted`; exclude deleted rows from normal reads. |
-| Attachments | Existing component documents belong to a component, not a classification entry. | New metadata relationship to the exact classification entry. |
-| Survey colouring | No requested red/orange/green next-date rule found in inspected view. | Calculate a read/display indicator, subject to boundary approval. |
-| Synchronization | Class-regulatory table is registered shore-to-ship. | Preserve by default; confirm whether vessel-side writes are required. |
+| 1 | `component_class_regulatory` exists with 25 columns, integer identity PK and FK to `components.cuuid`; exact columns/nullability are in Section 2. | `shared/schema.ts:2313–2358`; timestamp helper: `shared/schemaHelpers.ts:18–22` |
+| 2 | GET uses `requireAuth`; POST, PUT and DELETE name `requirePMSAdmin`. That alias is non-enforcing. The mock role/null vessel make this a live authorization gap, not effective PMS-admin protection. | `server/modules/components/routes.ts:63–68`; `server/middleware/auth.ts:128–142,231–267` |
+| 3 | Storage listing/detail do not exclude `is_deleted`. Delete executes physical SQL DELETE. | `server/postgresStorage.ts:2418–2452` |
+| 4 | Create/update controllers return raw Zod `error.errors` as response details. | `server/modules/components/controllers/subEntityController.ts:64–99` |
+| 5 | The regulatory service→repository→storage mutation path contains no `audit_log` call. A component audit pattern exists separately but is best-effort. | `server/modules/components/services/subEntityService.ts:24–62`; `server/modules/components/repositories/componentRepository.ts:154–174`; `server/postgresStorage.ts:2431–2452`; `server/modules/components/services/componentService.ts:220–240` |
+| 6 | Table is ONE_WAY_SHORE_TO_SHIP, identityColumn null, vesselScopeColumn `vessel_code`. Receiver key is component_id + survey_type + classification_society, with id fallback when needed. Physical deletes have no incremental tombstone. | `shared/syncConfig.ts:605–618`; `server/modules/sync/oneWayApplier.ts:352–408`; `server/modules/sync/service.ts:1571–1652` |
+| 7 | Main details view takes `classRegData[0]`. H is currently conditional on Class Item. | `client/src/pages/pms/Components.tsx:2509–2603,3862–3874` |
+| 8 | Full-page form holds eight H values separately. Save checks component rights, builds a component-only payload, sends POST/PATCH components, then reports success/refetches/navigates. It never submits that H state to class-regulatory endpoints. | `client/src/components/ComponentRegisterAddEdit.tsx:209–219,888–1056,2084–2172` |
+| 9 | Class Items Master List expands entries and already skips deleted rows. Another form uses incompatible aliases. See Section 2.2. | `server/modules/reports/services/equipmentReportService.ts:1404–1529`; `client/src/components/AddEditComponentForm.tsx:407–411,1816–1835` |
+| 10 | Modify PMS targets are component, job, work_order, spare and store; there is no regulatory child-entry target. Component classItem change support does not cover H children. | `shared/changeRequestFields.ts:15–40,145`; `server/modules/change-requests/services/changeRequestsService.ts:8–40` |
+| 11 | ComponentDateInput already supplies DD-MM-YYYY presentation; componentDateChangeValue preserves an unchanged original representation. Strict calendar/order/server validation is additional work. | `client/src/components/pms/ComponentDateInput.tsx:25–69`; `client/src/lib/componentDatePresentation.ts:1–24` |
 
-These are source-inspection findings, not results of a live save/delete test.
+### 1.3 Corrections to earlier descriptions
 
-## 3. Proposed user functionality
+- The superseded implementation plan already recognized the existing table, multiple entries and missing H persistence. It was not wholly a new-table/single-entry plan. Actual conflicts included dedicated master tables, no extra stable entry identity, authorization assumptions, initial-release attachments/colours and omitted restoration.
+- DELETE does name the legacy guard; the issue is that the guard is pass-through, not absent.
+- The Class Items report already skips deleted regulatory rows. Preserve that defense.
+- The supplied 19-society/46-survey dataset is proposed seed content, not confirmed installed data.
+- Earlier read-only development inspection confirmed the 25-column table. Matching master-type searches returned classItem/classRelated, two active values each, not the proposed society/survey datasets. This is development-only evidence, not production/vessel inventory.
+- `master_lists.updated_at` is defined by existing audit migrations even though absent from its inspected ORM declaration; this is a source/schema alignment issue, not proof that the column is absent in live databases. See Section 5.
 
-### 3.1 Display the entry list
+## 2. Existing table, columns and consumers
 
-When a component is selected and Section H is opened:
+### 2.1 Current `component_class_regulatory`
 
-1. Load every non-deleted classification/survey entry for that component UUID.
-2. Display a separate row/card for each entry, with society, class code, category/type, certificate number, last/next survey dates, attachment count and permitted actions.
-3. Show clear loading, error/retry and no-record states.
-4. Display entries in a stable order. **Proposal:** next survey date ascending, with entries that have no date last.
-5. Never show a record from another component or vessel merely because a business code matches.
-
-### 3.2 Add an entry
-
-1. Start Add Entry from the selected component’s Section H.
-2. Bind the new entry to the selected component UUID.
-3. Select an active Classification Society from a dropdown. Display its name/country and populate Class Code from that master.
-4. Select a Survey Type from a master dropdown that shows its category, display name and unique code. Names such as “Annual Survey” repeat across categories and must remain distinguishable.
-5. Enter an optional Certificate No., Last Class Survey, Next Class Survey, Class Requirements and Information.
-6. Display date inputs in `DD-MM-YYYY`; validate values before sending.
-7. Upload files against the new saved entry.
-8. Save the entry and show the server-generated record ID’s row in Section H after success.
-
-### 3.3 Edit an existing entry
-
-The user confirmed that existing entries must be editable.
-
-1. Select Edit on the specific record.
-2. Load that record—not the first record for its component—and its attachments.
-3. Allow authorized edits to society, Survey Type, certificate number, survey dates and free text.
-4. On a society change, refresh the displayed Class Code from the selected master; the server rechecks and saves the matching master value.
-5. Save only the selected entry. Do not overwrite other entries for that component.
-6. Refresh the record list and retain attachments unless the user explicitly removes one.
-
-**Proposal for historical inactive masters:** show the old value when viewing/editing a record, but require the user to select an active master before changing it.
-
-### 3.4 Soft-delete an entry
-
-1. Ask for confirmation identifying the selected entry.
-2. Set `is_deleted = true`; update existing updater/time fields where available.
-3. Hide the entry and its attachments from ordinary Section H views.
-4. Retain the row and its attachment data. Do not run a SQL `DELETE` or remove stored file bytes.
-5. Exclude it from normal alerts/reports unless a separately authorized audit view is designed.
-
-No restore action is specified by the supplied requirements. **Proposal:** omit restore from the normal UI in this scope.
-
-### 3.5 Upload and manage attachments
-
-1. Add one or more files to a saved classification entry.
-2. Accept PDF, Word (`.doc`, `.docx`), Excel (`.xls`, `.xlsx`) and CSV.
-3. Limit each file to **25 MB**. **Implementation proposal:** define the precise limit as 25 MiB (`25 × 1,048,576` bytes); confirm the unit.
-4. Show filename, size, upload information and permitted download/remove actions.
-5. Associate each file with the classification record, not just its component.
-6. Validate extension, MIME type/content and size server-side; client checks are only a usability aid.
-7. On metadata save failure, remove the newly uploaded bytes or report a recoverable orphan for cleanup.
-8. Removing an attachment or soft-deleting its parent hides it without permanently deleting the file under this proposal.
-
-The current component-document flow provides a possible storage-pattern reference. It does not itself satisfy record-specific attachment association or permission requirements.
-
-### 3.6 Survey date and urgency indicators
-
-Always display Last Class Survey and Next Class Survey as `DD-MM-YYYY`.
-
-The original requirement says red within one month, orange within three months and green after three months. The one-month rule takes precedence over the three-month rule.
-
-**Proposed interpretation pending approval:**
-
-| Next survey date relative to today | Display |
+| Existing SQL column | Nullability / purpose |
 |---|---|
-| Before today | Red — Overdue |
-| Today | Red — Due today |
-| After today through one calendar month, inclusive | Red — Due within 1 month |
-| After one month through three calendar months, inclusive | Orange — Due within 3 months |
-| Later than three calendar months | Green — Due after 3 months |
-| Missing date | Neutral — no urgency indicator |
+| `id` | NOT NULL; INTEGER PRIMARY KEY, GENERATED BY DEFAULT AS IDENTITY |
+| `component_id` | NOT NULL; TEXT FK → components.cuuid |
+| `component_code` | NOT NULL; TEXT |
+| `vessel_code` | NOT NULL; TEXT |
+| `classification_society` | NOT NULL; TEXT |
+| `survey_type` | NOT NULL; TEXT |
+| `certificate_number` | Nullable; TEXT |
+| `issue_date` | Nullable; legacy TEXT date |
+| `expiry_date` | Nullable; legacy TEXT date |
+| `last_class_survey` | Nullable; TEXT date |
+| `next_survey_due` | Nullable; TEXT date |
+| `class_requirements` | Nullable; TEXT |
+| `class_code` | Nullable; TEXT |
+| `information` | Nullable; TEXT |
+| `survey_status` | NOT NULL; TEXT, default Active |
+| `remarks` | Nullable; TEXT |
+| `created_by` | NOT NULL; TEXT |
+| `created_at` | NOT NULL; TIMESTAMP, default now |
+| `updated_by` | Nullable; TEXT |
+| `updated_at` | NOT NULL; TIMESTAMP, default now and ORM update helper |
+| `is_sync` | Nullable; BOOLEAN, default false |
+| `created_by_uuid` | Nullable; TEXT |
+| `updated_by_uuid` | Nullable; TEXT |
+| `is_deleted` | Nullable; BOOLEAN, default false |
+| `sort_order` | Nullable; INTEGER |
 
-Use calendar-month boundaries, not a silent 30/90-day approximation. Include visible text/icon labels so colour is not the only indication. Store no calculated colour. Do not automatically change `survey_status` based on colour unless separately approved.
+There are 10 required and 15 nullable columns. Default false does not make a boolean NOT NULL. Society/type NOT NULL does not reject empty strings. Ownership, identity and audit columns are server-managed technical requirements, not additional mandatory user-entered business fields.
 
-## 4. Field mapping and validation
+Keep all existing columns, indexes and the component UUID relationship. No certificate-number or component/society/type uniqueness constraint is proposed.
 
-### 4.1 UI, request and existing table fields
+### 2.2 Consumer contracts and aliases
 
-| User-facing field | Existing DB column/property | Value source |
+| Consumer | Existing contract / issue | Proposed treatment |
 |---|---|---|
-| Certificate No. | `certificate_number` / `certificateNumber` | Free text; UI currently uses `certificateNo`, which must be mapped. |
-| Classification Society | `classification_society` / `classificationSociety` | Selected society master; retain a readable snapshot. |
-| Class Code | `class_code` / `classCode` | Server-derived from the chosen society. |
-| Last Class Survey | `last_class_survey` / `lastClassSurvey` | Validated date. |
-| Next Class Survey | `next_survey_due` / `nextSurveyDue` | Validated date; UI currently uses `nextClassSurvey`, which must be mapped. |
-| Survey Type | `survey_type` / `surveyType` | Selected survey-type master; retain readable snapshot. |
-| Class Requirements | `class_requirements` / `classRequirements` | Free text. |
-| Information | `information` | Free text. |
-| Component UUID | `component_id` / `componentId` | Server-resolved `components.cuuid`. |
-| Component code / vessel | `component_code`, `vessel_code` | Resolve from the selected database component; do not trust client copies. |
-| Society master | **Proposed new:** `society_master_id` | Stable FK to society master. |
-| Survey type master | **Proposed new:** `survey_type_master_id` | Stable FK to survey-type master. |
+| Main Components H view | First row; reads some fallback aliases | Show all active rows with explicit canonical mapping |
+| ComponentRegisterAddEdit | certificateNo/nextClassSurvey local state; component-only Save | Per-entry endpoint calls, map to certificateNumber/nextSurveyDue |
+| AddEditComponentForm preview | certificateNo/lastSurveyDate/nextDueDate/status aliases | Map to certificateNumber/lastClassSurvey/nextSurveyDue/surveyStatus; retain multi-row preview |
+| Class Items service and export | classificationSociety, certificateNumber, surveyType, lastClassSurvey, nextSurveyDue, classRequirements | Preserve current field names and columns |
+| Class Items screen | `client/src/pages/reports/ClassItemsMasterList.tsx` consumes report contract | Regression-check against service and available Excel/PDF representations |
+| Component imports/exports and fleet paths | No new H entry import/inheritance contract established | Do not silently add eight component columns or create child entries from fleet data |
+| Certificates & Surveys module | Separate records/ownership | No automatic cross-module creation or authoritative-data replacement |
 
-Existing `issue_date`, `expiry_date`, `survey_status`, `remarks`, audit and synchronization fields are to be preserved. This scope does not add or change behaviour for them unless the user specifically approves it.
+The Class Items report currently selects Class Item components, emits one row per active regulatory entry, and emits a component-only placeholder when no active entry exists. It sorts using nextSurveyDue and excludes `cr.isDeleted === true` (`equipmentReportService.ts:1422–1460,1512–1529`). Class Code/Information are not grounds to silently add export columns.
 
-### 4.2 Validation proposal
+**Proposed — needs confirmation:** H remains visible for Class Item No, but report population remains unchanged. UI visibility does not silently expand Class Items reporting.
 
-- New or changed society/type values must resolve to active master rows.
-- The server derives codes, labels/snapshots, component code and vessel code; it does not accept client-supplied values as authoritative.
-- Confirm selected component exists and is in permitted vessel scope on every read and mutation.
-- Reject unknown/deleted records and cross-component record IDs.
-- Optional text may be blank. **Proposed default:** 2,000 characters per free-text field.
-- **Proposed default:** Certificate No. up to 100 characters; otherwise permit ordinary text.
-- Parse dates strictly and reject impossible calendar dates.
-- **Proposal:** reject Last Class Survey later than Next Class Survey, unless a documented correction case is valid.
-- Empty next date stays empty and neutral; do not fill it with today.
-- Enforce file size, allowed types and access permissions at the API.
-- Return user-readable validation responses; do not return stack traces or database internals.
+## 3. Authorization and forwarded vessel scope
 
-Text limits and date-order rules are recommended defaults for review, not decisions in the original requirement.
+### 3.1 Live issue
 
-## 5. Backend and API work
+**Section H POST/PUT/DELETE are currently open to any authenticated caller without effective role authorization.**
 
-### 5.1 Existing services to extend
+`requirePMSAdmin` is pass-through (`server/middleware/auth.ts:128–142`). The current middleware sets `req.user.role = "Sail Admin"` and `req.user.vesselId = null` (`:237–267`). Accordingly, `role === 'Ship'` checks in `subEntityService.ts:24–58` never run on that request path. Its ship-scope helper constrains only an explicitly supplied Ship identity (`server/modules/components/services/shipVesselAccess.ts:1–15`). `deleteClassRegulatory(id)` has no caller context at all (`subEntityService.ts:61–62`).
 
-Start with:
+Validation/database rejection does not close this authorization gap. This documentation task does not fix it.
 
-- `server/modules/components/routes.ts`
-- `server/modules/components/controllers/subEntityController.ts`
-- `server/modules/components/services/subEntityService.ts`
-- `server/modules/components/repositories/componentRepository.ts`
-- `server/postgresStorage.ts`
-- `shared/schema.ts`
-- Existing component document/storage/file-sync services, as appropriate.
+### 3.2 Phase 1 fix: Section H only
 
-Implementation responsibilities:
+Use enforcing `requireRole([...])` / `requirePermission(...)` evaluated against `req.rbac`, plus a Section H-specific source, Office, approved-admin and vessel-scope policy.
 
-1. Keep the existing component-scoped list/create/update/delete APIs if compatible with their callers.
-2. Filter soft-deleted entries from normal list results.
-3. Validate component and vessel access in list, create, update and delete.
-4. On create/update, validate master references and derive/verify society/type/code snapshots.
-5. Change delete from physical removal to `is_deleted = true`, with updater/time audit.
-6. Prevent updates through an entry ID that belongs to another vessel/component.
-7. Add master read APIs; add authorized master-management APIs only if administration of these lists is in scope and no compatible existing endpoints are available.
-8. Add entry-specific attachment list/upload/download/soft-delete APIs.
-9. Enforce request/body schemas, error responses and size/type limits server-side.
-10. Use transaction/cleanup boundaries so a failed metadata insert does not silently leave a newly uploaded file untracked.
-11. Refresh/invalidate the component’s Section H data after successful mutations.
+**Do not change the global `requirePMSAdmin` alias.** It sits on approximately 65 other routes with different access needs. Do not alter the other legacy aliases or unrelated sub-entity permissions.
 
-Exact new paths are provisional: first reuse or align with existing route conventions and avoid registering duplicate endpoints.
+Important helper behavior:
 
-### 5.2 Access and authorization
+- `requireRole` uses forwarded RBAC vocabulary, but can accept a matching mock identity (`auth.ts:44–87`).
+- `requirePermission` passes through unless `enforce: true`; unconfigured roles can pass unless `unconfigured: "deny"`; Sail Admin/PMS Admin bypass permission lookup (`server/middleware/permissions.ts:94–141`).
+- Therefore, first refuse non-forwarded identities and enforce Office/admin policy, then apply the approved permission contract. Do not use Office alone as an allowed-role shortcut.
+- A source label is not authentication. Verify the trusted forwarding boundary and prevent spoofed headers before treating forwarded identity as authoritative.
 
-In inspected code, class-regulatory reads use authentication and mutations use a PMS-admin route guard for create/update. The delete route does not show the same route guard; the current delete service also does not receive the caller for an access check.
+**Proposed — needs confirmation:** release-one writes are for approved office PMS Admin identities only; vessel users are read-only. Exact forwarded role names, Sail Admin treatment, permission resource/actions and office cross-vessel entitlements remain explicit approval decisions.
 
-Proposed:
+### 3.3 Failure matrix
 
-- Pass authenticated user context through every mutation, including delete and attachment operations.
-- Enforce configured permission and component/vessel scope at the API, not only by hiding UI controls.
-- Resolve `created_by`, component UUID/code and vessel code on the server.
-- Apply the same explicit permission policy to deleting as to editing.
-- Gate attachment download by record/component/vessel access.
-- Confirm if authorized Ship users must write records or if mutations remain shore/PMS-admin-only.
+| Context | Section H write result |
+|---|---|
+| No authenticated request user | 401, no mutation |
+| RBAC absent / source none | 403, no mock fallback |
+| PMS_AUTH_MOCK_RBAC enabled → source mock | 403, even for mock Sail Admin/Office |
+| Forwarded Ship type, regardless of privileged-sounding role name | 403 |
+| Forwarded Office but role not approved | 403 |
+| Forwarded approved Office admin, required rights and valid scope | Permit the authorized operation |
+| Missing/unauthorized vessel scope | Refuse; normally 403 |
+| Permission infrastructure failure | Safe failure response; no mutation, never fail open |
 
-Review actual deployed identity/role behaviour before claiming any role is securely authorized. Current route guards should not be presumed to represent every deployment’s production permissions.
+Source/Office policy must precede helper bypasses. This does not change the mock environment setting: standalone mock sessions intentionally cannot write Section H.
 
-### 5.3 Illustrative create request
+### 3.4 Vessel scope and parent checks
 
-```json
-{
-  "componentId": "<selected component cuuid>",
-  "societyMasterId": 1,
-  "surveyTypeMasterId": 4,
-  "certificateNumber": "CERT-12345",
-  "lastClassSurvey": "15-Oct-2026",
-  "nextSurveyDue": "15-Oct-2027",
-  "classRequirements": "Inspect the listed items at the next survey.",
-  "information": "Optional notes"
-}
-```
+`req.rbac` contains role/userType/source only (`auth.ts:22–33`), not a vessel assignment. The null mock vessel cannot authorize anything.
 
-Illustrative only. The server resolves the component and master rows and derives `componentCode`, `vesselCode`, society/type snapshots and `classCode`. Final API date representation must be specified separately from the UI’s `DD-MM-YYYY` presentation.
+Resolve effective scope from the authenticated forwarded canonical user identity and authoritative assignments/integration context. Reuse a verified resolver or add one local to this resource. The exact resolver is an open decision, not an existing capability asserted by this plan.
 
-## 6. Proposed database/schema changes
+- Request parameters, body vessel fields and selected-vessel UI state identify a target; they are not proof of entitlement.
+- Resolve code/UUID vessel representations deliberately.
+- Ship GET reads must use real forwarded scope; do not retain the unreachable mock Ship branch as the security boundary. Missing scope must not become unrestricted access.
+- POST loads the component, checks access and derives component/vessel ownership server-side.
+- PUT loads entry and parent, checks scope and rejects component/vessel reassignment.
+- DELETE and restore both load the entry and parent, verify stored ownership and scope, then mutate. Removed records do not bypass scope checks.
+- Pass verified actor/scope into services rather than only an id or the legacy mock role.
+- Show removed, individual reads and report entry reads must respect applicable parent/scope policy.
 
-The proposal below is conditional. Check existing migrations and generic master APIs/tables before adopting it. No migration is included in this document.
+## 4. Functional behavior and API responsibilities
 
-### 6.1 Existing `component_class_regulatory` table
+### 4.1 Multiple entries and visibility
 
-Already present:
+Display all active rows for the saved component. Two records with the same society/type and different certificates remain separate through viewing, editing and sync. No inferred natural uniqueness or arbitrary maximum count.
 
-- `id`: generated integer primary key.
-- `component_id`: required FK to `components.cuuid`.
-- `component_code`, `vessel_code`.
-- `classification_society`, `survey_type`, `certificate_number`.
-- `issue_date`, `expiry_date`, `last_class_survey`, `next_survey_due`.
-- `class_requirements`, `class_code`, `information`, `survey_status`, `remarks`.
-- Creation/update/sync fields and `is_deleted`.
+**Proposed — needs confirmation:** keep H visible for Class Item No with a “Class Item: No” notice. Never auto-delete or hide saved entries. This changes current hide-when-No behavior.
 
-**Proposed new columns:**
+Provide loading, empty, failure/retry and read-only states. Component/vessel switches must not display cached rows from the previous selection.
 
-| Property | SQL column | Proposed type | Constraint / purpose |
-|---|---|---|---|
-| `societyMasterId` | `society_master_id` | Integer | Nullable FK to society master while legacy values are backfilled; required in new writes. |
-| `surveyTypeMasterId` | `survey_type_master_id` | Integer | Nullable FK to survey-type master while legacy values are backfilled; required in new writes. |
+**Proposed — needs confirmation:** stable sort_order then entry-identity order; warn before navigation discards unsaved entry drafts.
 
-**Retain the existing society/type/code text columns** as history-compatible readable snapshots and for compatibility with existing code/sync. New application writes must derive them from the master IDs. Do not add another component UUID or another entry ID.
+### 4.2 Independent Save/Cancel
 
-Backfill references only on an unambiguous match. Do not guess mappings for unknown values or the duplicate RINA code. Keep unmatched legacy entries readable and flag them for explicit review.
+Reuse the existing resource:
 
-### 6.2 Proposed new `classification_society_master` table
+| Operation | Existing/proposed route |
+|---|---|
+| List active entries | Existing GET `/component-class-regulatory/:componentId` |
+| Create entry | Existing POST `/component-class-regulatory` |
+| Edit selected entry | Existing PUT `/component-class-regulatory/:id` |
+| Soft-delete entry | Existing DELETE `/component-class-regulatory/:id`, changed semantics |
+| Restore | Proposed POST `/component-class-regulatory/:id/restore` within the same resource |
+| Show removed | Proposed explicitly authorized option on the existing list resource |
 
-| Column | Type | Purpose / rule |
+Routes are relative to the existing router mount. Final restore/removed-list contract must avoid ambiguity with current routes; no parallel API.
+
+1. Save a new component before creating H entries.
+2. Each entry has Save/Cancel; Component Save persists the component only.
+3. Server loads ownership, validates, writes and returns the saved entry.
+4. Show success only after that mutation actually succeeds.
+5. Retain draft input and friendly field messages on failure.
+6. Cancel discards that entry's draft, not other entries.
+7. Prevent duplicate submissions and handle repeated delete/restore safely.
+8. If several operations are attempted, report partial outcomes honestly; no “all saved” after any failed part.
+9. Refresh the entry list after success without silently discarding other drafts.
+
+### 4.3 UI/API mapping
+
+| UI field | API property | Existing SQL column |
 |---|---|---|
-| `id` | Integer identity primary key | Stable FK target |
-| `society_name` | Text, required | Display name |
-| `society_code` | Text, required | Stable code; unique only after duplicate/alias issue is resolved |
-| `country` | Text, required | Country shown with society |
-| `is_active` | Boolean, default true | Inactive values cannot be selected for new entries |
-| `display_order` | Integer, default 0 | Stable dropdown order |
-| `created_at` | Timestamp, server default | Seed/audit time |
-| `updated_at` | Timestamp, nullable/managed | Update time |
-| `created_by_uuid` | Text, nullable | Actor if available |
-| `updated_by_uuid` | Text, nullable | Actor if available |
-| `is_sync` | Boolean | According to chosen sync model |
+| Classification Society | classificationSociety | classification_society |
+| Certificate No. | certificateNumber | certificate_number |
+| Last Class Survey | lastClassSurvey | last_class_survey |
+| Next Class Survey | nextSurveyDue | next_survey_due |
+| Survey Type | surveyType | survey_type |
+| Class Requirements | classRequirements | class_requirements |
+| Class Code | classCode | class_code |
+| Information | information | information |
 
-Proposed indexes: primary key, normalized/unique society code, and active/display-order query index. Society name uniqueness needs a business decision if aliases are permitted.
+Whitelist client-editable fields. Do not accept arbitrary generated-schema properties for UUID, ownership, deletion or audit fields. Derive Class Code and snapshots on the server. Reject attempts to move an entry.
 
-### 6.3 Proposed new `survey_type_master` table
+## 5. Masters and validation
 
-| Column | Type | Purpose / rule |
+### 5.1 Shared master representation
+
+**Proposed — needs confirmation:** reuse `master_lists` with types `classificationSociety` and `surveyType`, registered in existing `master_list_types`. Do not add separate society, survey or Class Code tables or a redundant column_type.
+
+| Shared field | Society | Survey |
 |---|---|---|
-| `id` | Integer identity primary key | Stable FK target |
-| `survey_category` | Text, required | Class, Statutory, Flag State, Port State, ISM, ISPS, MLC or Other |
-| `survey_type_name` | Text, required | Display name; can repeat in another category |
-| `survey_code` | Text, required, unique | Stable identifier |
-| `description` | Text, nullable | Supplied explanation |
-| `is_active` | Boolean, default true | Prevent selecting inactive items for new entries |
-| `display_order` | Integer, default 0 | Stable ordering |
-| `created_at` | Timestamp, server default | Seed/audit time |
-| `updated_at` | Timestamp, nullable/managed | Update time |
-| `created_by_uuid` | Text, nullable | Actor if available |
-| `updated_by_uuid` | Text, nullable | Actor if available |
-| `is_sync` | Boolean | According to chosen sync model |
+| list_type | classificationSociety | surveyType |
+| list_key | Class Code | Survey Code |
+| list_value | Society name | Survey name |
+| Proposed country | Country | Normally null |
+| Proposed category | Normally null | Class/Statutory/etc. |
+| Proposed description | Normally null | Supplied survey description |
 
-Proposed indexes: primary key, unique survey code, category index and active/display-order index.
+Use existing unique `(list_type, list_key)`; do not require unique display names. Distinguish repeated survey names by category/code.
 
-### 6.4 Proposed new `component_class_regulatory_attachments` table
+**Proposed — needs confirmation:** adopt the 19 societies/46 survey types in the companion's Sections 4.3/4.4 (`:287–360`), exactly one canonical RINA / RINA / Italy. Preserve supplied survey descriptions. This is the seed authority, not the obsolete 20-row duplicate-RINA list.
 
-| Column | Type | Purpose / rule |
+Admin management reuses the existing Master Lists framework and its permission policy. **Proposed — needs confirmation:** group these under a Classification and Regulatory label within Components initially. A new top-level master section requires explicit validator/navigation changes and is not assumed approved.
+
+- Select only active/non-deleted masters for new/changed references.
+- Verify expected list_type, not just row existence.
+- Preserve historical snapshots and retired references.
+- Define retirement of referenced masters; do not change global master hard-delete behavior as an incidental H fix.
+- Do not reset inactive/deleted state or overwrite authorized changes when reseeding.
+- Do not assume local master integer ids match across installations.
+
+### 5.2 Reference design requiring confirmation
+
+**Proposed — needs confirmation:** if persistent stable references are needed alongside existing text snapshots, add nullable `classification_society_key` and `survey_type_key` TEXT to component_class_regulatory. New writes resolve those keys under their fixed list types; retain existing society/type/code text as compatible snapshots.
+
+These two columns are conditional, not part of the three required identity/deletion additions. Do not add local integer FKs alone or infer a survey from its repeated display name. If local FKs are later chosen, require receiver-local resolution by stable type/key. Finalize the key/FK contract before writing migration 186; no silent schema extension.
+
+### 5.3 Master watermark alignment
+
+`shared/schema.ts:2056–2120` declares master values/types; the values ORM omits updated_at. Existing migrations already add `master_lists.updated_at` (`server/migrations.ts:1540–1546`; `migrations/107_reapply_audit_columns_for_ship.sql:340–346`).
+
+Future implementation must verify actual shore/vessel schema, align ORM/service updates and ensure create/edit/retire changes advance this watermark. Do not claim the live column is missing merely because the ORM omits it. If absent on a target, migration 186 can explicitly add `updated_at TIMESTAMP` using the existing default convention; do not reset saved timestamps. Record actual prerequisite results and ensure existing-row delivery is covered.
+
+### 5.4 Business validation and dates
+
+**Proposed — needs confirmation:**
+
+- Society/type are mandatory valid controlled selections. No other mandatory user-entered business fields.
+- Trim leading/trailing spaces.
+- Certificate No. maximum 100 characters.
+- Class Requirements and Information maximum 2,000 characters each.
+- No certificate-number uniqueness rule.
+- Validate actual calendar dates on client and server.
+- Compare only when both dates exist: Last Class Survey ≤ Next Class Survey; equality allowed.
+- Missing dates stay missing; do not populate today or derive new dates.
+
+Use ComponentDateInput and componentDateChangeValue. DD-MM-YYYY is presentation/entry only. Preserve exact untouched legacy strings/timestamps; no backend date migration, export-format extension or calculation changes. Intentionally changed dates use the existing supported API representation, not formatted UI text as an arbitrary new storage convention.
+
+**Proposed — needs confirmation:** keep invalid legacy values visible and flagged, never silently normalize them; determine whether unrelated edits may retain such pre-existing values. New/changed invalid dates always fail.
+
+Return safe field-error mappings such as “Select a classification society” or “Next Class Survey cannot be before Last Class Survey.” Do not expose raw Zod structures, database internals or stacks; retain technical diagnostics server-side. The UI keeps input on failure.
+
+### 5.5 Hidden legacy fields
+
+**Proposed — needs confirmation:** hide but retain issue_date, expiry_date, survey_status and remarks in the first release. Preserve values during partial updates and sync; retain survey_status defaults/constraints. Do not merge remarks into Information or drop fields.
+
+## 6. Proposed schema changes and named migrations
+
+### 6.1 Table-change inventory
+
+**New application tables: zero in release one.** Reuse component_class_regulatory, master_lists, master_list_types, audit_log and existing migration/sync infrastructure.
+
+| Table | Proposed structural change |
+|---|---|
+| component_class_regulatory | ccruuid TEXT; deleted_by_uuid TEXT NULL; deleted_at TIMESTAMP NULL |
+| Same, conditional | classification_society_key TEXT NULL; survey_type_key TEXT NULL after reference-design approval |
+| master_lists | country/category/description TEXT NULL if approved; align migration-defined updated_at and add only if actually absent |
+| master_list_types | Seed two records; no new registry table or structural extension assumed |
+| audit_log | Existing table; lifecycle events, no schema change currently established |
+| sync_field_log / sync_field_log_failures | Existing tables; applicable contracts reviewed, no schema change or new H logging transport assumed |
+| schema_migrations | Existing tracking; use established runner |
+
+Keep regulatory integer id for API/local compatibility. ccruuid starts nullable during reconciliation; later becomes unique/NOT NULL with the approved future-insert default. Generate once, preserve everywhere. Existing is_deleted is reused; normal filtering treats null as not deleted.
+
+### 6.2 Exact proposed file names and locations
+
+These are **future files, not created by this task**. At review the root sequence ends at 184. Recheck before implementation; if concurrent work occupies a number, allocate the next free sequence and update the task/document to exact final names before creating files.
+
+| Proposed file | Contents | Activation gate |
 |---|---|---|
-| `id` | Integer identity primary key | Attachment metadata ID |
-| `class_regulatory_id` | Integer, required FK | Parent classification entry; index this column |
-| `file_name` | Text, required | Safe display filename |
-| `file_key` | Text, required | Private storage key; not an authorization token |
-| `content_type` | Text, required | Server-validated MIME/content |
-| `file_size` | Integer, required | File size in bytes; max 25 MB per file |
-| `storage_backend` | Text | Existing object/local storage pattern |
-| `uploaded_by` | Text, required | Server-derived actor |
-| `uploaded_at` | Timestamp, server default | Upload time |
-| `is_deleted` | Boolean, default false | Soft-delete attachment metadata |
-| `is_sync` | Boolean | Only if supported by approved sync design |
-| `created_by_uuid` | Text, nullable | Actor UUID if available |
-| `updated_by_uuid` | Text, nullable | Actor UUID if available |
+| `migrations/185_component_class_regulatory_identity_lifecycle.sql` | Add nullable ccruuid, deleted_by_uuid, deleted_at; preserve local PK/FK/audit fields; supporting indexes only where evidenced | Schema-first on shore and receiving vessels |
+| `migrations/186_section_h_master_metadata.sql` | Approved nullable country/category/description; conditional key references after confirmation; align or add master updated_at only where required | Approved reference design and compatible receiver schema |
+| `migrations/187_section_h_master_seed.sql` | Register types, seed 19/46 values by stable keys, one RINA; preserve authorized edits and retirement state | Approved dataset, metadata schema and master-first delivery |
+| `migrations/188_component_class_regulatory_identity_finalize.sql` | Preflight reconciled UUID completeness/uniqueness including removed rows; enforce unique/NOT NULL and approved future-insert default | Separate later release after shore/vessel identity mapping is complete |
 
-Proposed indexes: primary key, parent foreign-key index and deleted-state index. Do not enforce unique filenames; repeated file names can be valid.
+No SQL files are created or executed in this documentation deliverable.
 
-Parent/component/vessel authorization should be resolved through the parent classification entry and component relationship. Only add duplicate component/vessel snapshot fields if an approved file-sync protocol requires them.
+### 6.3 File-based idempotency contract
 
-### 6.5 Proposed schema-change count
+All future migrations must be **file-based, idempotent, additive and non-destructive**, following `migrations/README.md`.
 
-Under the dedicated-master proposal:
+- ADD COLUMN IF NOT EXISTS; CREATE INDEX IF NOT EXISTS.
+- Catalog-guarded constraints scoped to the right table/schema, not constraint name alone.
+- Conflict-safe seed insertion on existing type keys and `(list_type,list_key)`.
+- Re-executing SQL directly against compatible applied schema/data must be safe; migration tracking alone is insufficient.
+- Preserve UUIDs, user-edited masters, creation metadata and business values on rerun.
+- Use established migration transactions/locking and tracking; do not duplicate execution through an unrelated runner.
+- Do not edit old migrations, use destructive db:push, DROP/TRUNCATE/reset, delete duplicates automatically or convert all dates.
+- Do not randomly backfill shore and vessel UUIDs independently.
 
-- **2 nullable foreign-key columns** on the existing classification table.
-- **3 new tables**: society master, survey-type master and classification attachment metadata.
-- Foreign keys, indexes and sync configuration/registration only where the selected deployment/sync design requires them.
-- Seed **20 society master rows and 46 survey-type master rows** from the provided plan after review.
+The runner discovers root migrations/*.sql at startup (`server/migrations.ts:3350–3435`). It will not pause between 185 and 188 for manual reconciliation. Do not ship 188 in the first release; deliver later or specify a separately approved gated rollout.
 
-No new entry ID or component UUID column is proposed. The existing `is_deleted` column can implement entry soft deletion. A new `deleted_at` column is optional and should be added only if an audit requirement demands a deletion-specific time separate from `updated_at`.
+### 6.4 Reconciliation utility, retry and rollback
 
-### 6.6 Generic master-list alternative
+Historical identity mapping is a controlled, repeatable operation using a reviewed authoritative map, not an unconditional per-installation UPDATE generating random UUIDs.
 
-The project has `master_lists` and `master_list_types`; `master_lists` provides `list_type`, `list_key`, `list_value`, display order and lifecycle/sync fields. It does not provide dedicated country and survey-category/description fields in its inspected schema.
+Its exact utility/input-artifact paths remain an implementation prerequisite to choose after inventory; no permanent mapping table or automatic backfill file is approved. Record chosen paths and procedure before executing. Never commit production data or sensitive mapping exports into Git.
 
-Before adding new tables, check if existing master services support these extra fields cleanly. If the generic master list is used, document exactly where society country, survey category and survey description are stored and how uniqueness is validated. Do not create a second competing master system or assume the generic list is sufficient.
+Test first application, second direct replay, already-applied boot, partial rollout/retry, seed replay preserving edits, and refusal to finalize null/duplicate/unresolved UUIDs.
 
-## 7. Master rows to seed
+Rollback normally retains additive columns/data and tracking records. Do not re-enable unsafe natural-key matching after UUID activation without coordinated receiver/sender rollback planning. A failed finalization must report the cause; it must not delete records to make constraints pass.
 
-The following values come from the supplied plan. Treat the codes/entries as proposed seed data pending domain-owner confirmation. Seeds must be repeatable and must not create duplicates on a rerun.
+## 7. Synchronization, field logs and reconciliation
 
-### 7.1 Classification Societies (20 supplied rows)
+### 7.1 Existing one-way limitations
 
-| Society | Code | Country |
+Natural-key matching can collapse separate same-society/type certificates; editing either key field can create another receiving row. Local integer fallback is not cross-installation identity.
+
+Physical DELETE leaves no extant row for updated_at extraction. The receiver's deleted-row branch currently sets deletion state/time rather than applying all incoming deletion-actor/time fields (`oneWayApplier.ts:40–55,373–440`).
+
+### 7.2 Proposed transport contract
+
+- Retain ONE_WAY_SHORE_TO_SHIP and vessel_code scope.
+- Set identityColumn to ccruuid and use UUID matching, not the mutable composite or integer fallback for upgraded entries.
+- Preserve identity on create/update/provision/retry/delete/restore.
+- Every future mutation advances updated_at, including raw SQL/import/bulk paths if added.
+- Soft-delete and restore carry explicit state, deletion actor/time, updater and originating metadata.
+- Restore clears deletion fields explicitly on the same row; no reinsertion.
+- Preserve omitted legacy fields on supported partial updates; distinguish absent from intentional null.
+- Deliver masters before dependent entries; resolve by stable type/key.
+- Preserve code/UUID scope handling already present in `provisioningService.ts:965–973`.
+- Maintain precise watermarks/checkpoints and replay safety; do not replace origin with receiver-local actor/time.
+
+### 7.3 Field logs: current applicability versus proposed work
+
+`requiresFieldLogging` enables only BOTH_EDITABLE (`shared/syncConfig.ts:1818–1821`). `logFieldChanges` accepts an optional transaction connection but returns zero for other categories (`server/modules/sync/fieldLogger.ts:182–214`).
+
+Consequently, adding a logger call for current Section H would **not emit field logs**. Section H and the two master tables are one-way; their transport is row extraction, not bidirectional merge logs. audit_log lifecycle history is distinct from sync_field_log transport.
+
+The following matrix is a required implementation checklist:
+
+| Future write path | Required sync/audit coverage | Field-log applicability |
 |---|---|---|
-| American Bureau of Shipping | ABS | USA |
-| Bureau Veritas | BV | France |
-| China Classification Society | CCS | China |
-| DNV | DNV | Norway |
-| Lloyd's Register | LR | United Kingdom |
-| Korean Register | KR | South Korea |
-| Nippon Kaiji Kyokai (ClassNK) | NK | Japan |
-| RINA | RINA | Italy |
-| Indian Register of Shipping | IRS | India |
-| Polish Register of Shipping | PRS | Poland |
-| Croatian Register of Shipping | CRS | Croatia |
-| Russian Maritime Register of Shipping | RS | Russia |
-| Türk Loydu | TL | Türkiye |
-| Hellenic Register of Shipping | HRS | Greece |
-| Registro Brasileiro de Navios | RBNA | Brazil |
-| International Register of Shipping | IRS-US | USA |
-| Korean Ship Safety Technology Authority | KST | South Korea |
-| Maritime Bureau of the Ministry of Land, Infrastructure, Transport and Tourism | MLIT | Japan |
-| Registro Italiano Navale | RINA | Italy |
-| Spanish Maritime Register / Bureau Veritas Spain | BV-ES | Spain |
+| H create/edit | UUID, trusted actors, updated_at, full changed business values, lifecycle audit | Current one-way table: no logs from existing guarded logger |
+| H soft-delete/restore | Same UUID, timestamp, deletion marker/actor/time, explicit null clearing, audit | One-way delivery; do not assume a fake logger call covers it |
+| Master create/edit/retire | Stable type/key, verified watermark updates and origin; parent-first delivery | One-way, not BOTH_EDITABLE |
+| Any genuinely affected BOTH_EDITABLE record | All approved changed business/lifecycle fields, canonical row UUID, correct vessel UUID, trusted user/instance | Existing field logger required; no such new child workflow is implicitly introduced |
+| Import/bulk/script/raw SQL | Inventory each actual path; same ownership, watermark or applicable logging contract | Per table category; no implicit H import feature |
+| Sync receiver/replay | Preserve origin and identity, avoid echo/duplicate local logs | No fabricated local user edits |
+| Historical UUID reconciliation | Controlled map, initial snapshot/replay/checkpoint plan | Do not manufacture independent user-edit backlogs; no logs does not mean no delivery needed |
 
-**Data conflict:** RINA and Registro Italiano Navale have the same code and country. Confirm whether one is an alias/duplicate or a genuinely distinct master with an approved distinct code. Do not seed both under a unique-code constraint or silently invent a corrected code.
+**Proposed — needs confirmation:** if actual Section H sync_field_log rows are additionally required, approve explicit one-way logging support and its consumer, retention, failure and transaction contract. Do not globally relax the logger, queue undeliverable logs, change category to BOTH_EDITABLE or enable vessel writes merely to obtain logs. Until approved, promise only the existing one-way transport plus required lifecycle audit.
 
-### 7.2 Survey Types (46 supplied rows)
+Where logs apply, a transaction connection rethrows failures so the caller can roll back; standalone logging can leave the business row committed and persist a failure in sync_field_log_failures. Do not call standalone post-commit logging atomic. Specify/test transaction or recovery handling before asserting guaranteed delivery.
 
-The source plan includes descriptions; preserve those descriptions when seeding, along with the category/type/code below. If a shorter seed summary disagrees with the attachment, the attachment is the content authority pending user review.
+### 7.4 Coordinated historical rollout
 
-| Category | Type | Code |
+1. Inventory versions, schemas, UUID/code scope mappings and regulatory rows on shore/vessels, including removed rows.
+2. Establish authoritative matching. Natural keys can suggest candidates but must not merge separate certificates; manually resolve ambiguity.
+3. Apply additive schemas before new payloads; allow temporary null UUID only during controlled transition.
+4. Assign one canonical UUID per logical entry and distribute the same mapping to counterparts. Preserve unmatched valid rows for review.
+5. Verify all mapped identities, then apply the separate finalization migration.
+6. Coordinate sender/receiver/provisioning contracts and capabilities. Gate writes and delivery until required columns/identity handling exist.
+7. Deliver masters, reconcile snapshots/checkpoints and test repeated initial/incremental delivery.
+8. Enable guarded writes only after scope, validation, audit and compatibility requirements pass.
+
+Mixed-version receivers must not silently fall back to the unsafe key. Pause affected delivery or refuse activation with a clear upgrade requirement. Schema presence on development alone does not establish vessel readiness.
+
+## 8. Audit and lifecycle
+
+Use trusted actor context and existing component audit conventions, recording entry UUID, component UUID, vessel, action, old/new changes and time.
+
+| Action | Required future lifecycle |
+|---|---|
+| Create | Set creation/update actors and times; active state; deletion metadata null |
+| Edit | Preserve identity/creation metadata; update actor/time; record changes |
+| Remove | Set is_deleted, deleted_by_uuid/deleted_at; advance updater/time; retain row |
+| Restore | Preserve UUID/local id; reactivate same row; advance updater/time; audit restoration |
+| Sync apply | Preserve origin; do not attribute the change to receiver mock/system user |
+
+**Proposed — needs confirmation:** deletion metadata describes current removed state and is cleared on restore; historical removal remains in audit. List removed/restore is authorized and scoped. Normal reads/details/reports exclude removed rows; no physical DELETE.
+
+Existing component logging is best-effort (`componentService.ts:220–240`). **Proposed — needs confirmation:** commit required lifecycle audit atomically with mutation; audit failure must not yield unaudited success. Define transaction boundaries before implementation. Do not enable writes before audit hooks are ready, even though delivery Phase 4 groups broader audit/regression work.
+
+## 9. Delivery phases
+
+These are future implementation phases, not work performed by this documentation task. Each includes migration and sync/field-log impact.
+
+### Phase 1 — Local authorization, schema, UUID and soft deletion
+
+**Files:** components routes/controller/subEntityService/componentRepository; scoped policy module if needed; `server/postgresStorage.ts`; `shared/schema.ts`; `shared/syncConfig.ts`; sync oneWayApplier/service/provisioningService. Read/reuse auth/permission helpers without changing global aliases.
+
+**Migrations:** proposed 185, then controlled reconciliation, then separate later-release 188, as named in Section 6.
+
+**Work:** genuine forwarded Office/admin policy, deny none/mock, authoritative scope, entry/parent checks for all mutations including restore, schema/UUID identity, normal deleted filtering and lifecycle metadata. Include minimal audit protection before activation.
+
+**Sync/field logs:** one-way UUID transition, tombstone/restore delivery and origin preservation; no implied BOTH_EDITABLE logs or direction change.
+
+**Tests:** permission matrix and spoofed/missing scope; cross-vessel ids; duplicate natural-key entries; society/type edit; migration replay; provisioning/retries; deletion/restore metadata.
+
+**Completion gate:** role/scope policy approved, schema/identity reconciled, receiver compatible, audit protected; do not expose writes early.
+
+### Phase 2 — Shared masters, server validation and Class Code
+
+This is delivery phase 2 of release one, not the deferred product Phase 2.
+
+**Files:** `shared/schema.ts`; existing master registry/services/repositories and validation/seed paths located during implementation; `client/src/pages/admin/MasterListsManagement.tsx`; Section H service/controller; relevant master sync paths.
+
+**Migrations:** proposed 186/187; conditional reference fields only after approval. Name any verified prerequisite alignment explicitly.
+
+**Work:** 19/46 dataset, canonical RINA, controlled selections, type validation, server-derived code, legacy mapping, text/date checks, friendly errors; maintain Phase 1 policy.
+
+**Sync/field logs:** master-first one-way delivery; verified updated_at updates; stable reference resolution rather than local ids. No category change.
+
+**Tests:** repeated survey names, retired/wrong-type masters, forged codes, seed replay, blank/limit/date cases, historical preservation.
+
+**Completion gate:** master reference and retirement rules approved; both schemas and master delivery ready.
+
+### Phase 3 — Multi-entry UI, dates and error handling
+
+**Files:** `client/src/pages/pms/Components.tsx`; `client/src/components/ComponentRegisterAddEdit.tsx`; `client/src/components/AddEditComponentForm.tsx`; focused H entry components. Reuse ComponentDateInput and componentDatePresentation.
+
+**Migrations:** none.
+
+**Work:** all rows, independent Save/Cancel, failure retention, controlled masters, read-only code, office lifecycle/removed view, vessel read-only, Class Item No notice and explicit field mapping.
+
+**Sync/field logs:** UI displays authoritative/synchronized state; no vessel mutations or client regeneration of existing UUIDs.
+
+**Tests:** separate same-pair rows, failed-save input retention, Component Save independence, scope switches, DD-MM-YYYY/unchanged raw dates, correct buttons and direct API denial.
+
+**Completion gate:** connected per-entry persistence works and no false-success/hidden-data path remains.
+
+### Phase 4 — Audit completion and functional/sync regression
+
+**Files:** Section H service/repository/storage and audit integration; `server/modules/reports/services/equipmentReportService.ts`; `client/src/pages/reports/ClassItemsMasterList.tsx`; affected form/export consumers; focused unit/integration/sync tests.
+
+**Migrations:** none expected beyond approved preceding files; any new audit schema requirement returns for approval.
+
+**Work:** lifecycle audit completeness/failure semantics, report/consumer mappings, deleted filtering, full authorization and historical rollout regression.
+
+**Sync/field logs:** initial/incremental/replay tests, null/origin/timestamp handling, applicable bidirectional logging/failure checks, no echo, mixed-version refusal.
+
+**Tests:** acceptance matrix below; unrelated legacy routes unchanged; failed authorization causes no mutation; required audit failure cannot be described as success.
+
+**Completion gate:** regression evidence and confirmed failure/transaction policy before release.
+
+### Phase 5 — Deferred product Phase 2
+
+**Work:** per-entry attachments and private bytes/metadata sync; child-entry Modify PMS targeting, approval application/return flow; red/orange/green survey indicators with approved boundaries.
+
+**Files:** separate design must identify change-request targets/services, attachment storage/schema/sync and UI consumers. Existing component documents do not automatically provide an entry attachment association.
+
+**Migrations:** no attachment/approval tables or migration files authorized here. Specify them only in a separately approved design.
+
+**Sync/field logs:** file delivery and approval return need explicit contracts; no implicit bidirectional H ownership.
+
+**Tests/completion:** define with separately approved scope; no implementation task created by this document.
+
+## 10. Acceptance and regression checks
+
+### 10.1 Functional
+
+- All active entries display; same-society/type different certificates remain separate.
+- Edit targets the selected entry, not the first component row.
+- Each entry saves through its endpoint; Component Save never pretends to save H drafts.
+- Failed operations retain values and identify actual outcomes.
+- New component must be saved before adding entries.
+- Class Item No hides/deletes nothing under the approved proposal.
+- Only society/type are mandatory user-entered fields; correct master type/code and limits are validated server-side.
+- Impossible dates and reversed order fail at both layers; equal dates pass; optional dates remain optional.
+- UI is DD-MM-YYYY; untouched raw date representations/hidden legacy fields remain unchanged.
+- Soft delete retains data; normal reads exclude removed entries; authorized restore recovers the same identity.
+- No certificate uniqueness or natural-key merge is introduced.
+- Class Items UI/available Excel/PDF paths preserve columns, row expansion, placeholder behavior and deleted exclusion.
+
+### 10.2 Authorization
+
+- Direct POST/PUT/DELETE/restore refuse absent RBAC, source none/mock, unapproved office and all Ship identities.
+- PMS_AUTH_MOCK_RBAC cannot gain writes through Sail Admin helper bypass.
+- Approved forwarded office admin succeeds only with approved rights and verified scope.
+- DELETE/restore load stored entry/parent; cross-vessel integer-id tampering fails.
+- Client ownership fields cannot authorize access or reparent an entry.
+- Reads/removed lists use real scope; missing assignment is not unrestricted.
+- Global requirePMSAdmin and unrelated legacy routes are unchanged.
+- Trusted forwarding/spoofing assumptions are validated before release.
+
+### 10.3 Sync and migration
+
+- Two same-pair entries survive provisioning, incremental sync and retries as two UUID rows.
+- Editing society/type updates the same row without duplicate leftovers.
+- Delete/restore reach vessel with correct UUID, originating metadata and explicit null clearing.
+- Reconciled shore/vessel counterparts share identities; ambiguity is never auto-deleted/merged.
+- First apply/direct replay/boot replay/partial-rollout recovery are safe.
+- Seed rerun preserves user edits and retirement state.
+- Finalization refuses unresolved/missing/duplicate UUIDs and is delivered only after reconciliation.
+- Masters precede entries; stable reference resolution and watermark updates work.
+- UUID/code vessel scope representations and precise checkpoint behavior remain supported.
+- No unsafe mixed-version key fallback or unintended bidirectional H writes.
+- Write-path matrix covers future raw/bulk/import paths, applicable field-log failure handling and receiver echo prevention.
+- No independent historical user-edit log backlog is manufactured; initial delivery still occurs.
+- Audit and applicable logging failures match the approved transaction/recovery contract.
+
+## 11. Open decisions
+
+| Decision | Recommended default | Status |
 |---|---|---|
-| Class | Initial Survey | CLS-INI |
-| Class | Annual Survey | CLS-ANN |
-| Class | Intermediate Survey | CLS-INT |
-| Class | Special Survey | CLS-SPC |
-| Class | Renewal Survey | CLS-REN |
-| Class | Continuous Survey | CLS-CON |
-| Class | Occasional Survey | CLS-OCC |
-| Class | Damage Survey | CLS-DMG |
-| Class | Repair Survey | CLS-RPR |
-| Class | Modification Survey | CLS-MOD |
-| Class | Additional Survey | CLS-ADD |
-| Class | Docking Survey | CLS-DCK |
-| Class | In-Water Survey | CLS-IWS |
-| Class | Bottom Survey | CLS-BTM |
-| Statutory | Initial Survey | STT-INI |
-| Statutory | Annual Survey | STT-ANN |
-| Statutory | Intermediate Survey | STT-INT |
-| Statutory | Periodical Survey | STT-PER |
-| Statutory | Renewal Survey | STT-REN |
-| Statutory | Additional Survey | STT-ADD |
-| Statutory | Occasional Survey | STT-OCC |
-| Flag State | Initial Survey | FLG-INI |
-| Flag State | Annual Survey | FLG-ANN |
-| Flag State | Intermediate Survey | FLG-INT |
-| Flag State | Renewal Survey | FLG-REN |
-| Flag State | Additional Survey | FLG-ADD |
-| Port State | PSC Inspection | PSC-INS |
-| ISM | Initial Verification | ISM-INI |
-| ISM | Annual Verification | ISM-ANN |
-| ISM | Intermediate Verification | ISM-INT |
-| ISM | Renewal Verification | ISM-REN |
-| ISPS | Initial Verification | ISP-INI |
-| ISPS | Intermediate Verification | ISP-INT |
-| ISPS | Renewal Verification | ISP-REN |
-| ISPS | Additional Verification | ISP-ADD |
-| MLC | Initial Inspection | MLC-INI |
-| MLC | Intermediate Inspection | MLC-INT |
-| MLC | Renewal Inspection | MLC-REN |
-| MLC | Additional Inspection | MLC-ADD |
-| Other | Condition Survey | OTH-CON |
-| Other | Pre-Purchase Survey | OTH-PPS |
-| Other | On-Hire Survey | OTH-ONH |
-| Other | Off-Hire Survey | OTH-OFH |
-| Other | Bunker Survey | OTH-BNK |
-| Other | Damage Survey | OTH-DMG |
-| Other | Other Survey | OTH-OTH |
+| Sail Admin treatment | Explicitly decide whether genuine forwarded Sail Admin + Office may write; helper bypass alone is not approval | Proposed — needs confirmation |
+| Qualifying forwarded office-admin role names | Exact allowlist/mapping, not guessed names or blanket Office | Proposed — needs confirmation |
+| Permission resource/actions | Verified component/admin rights, enforcement on, unconfigured deny, bypass policy reconciled | Proposed — needs confirmation |
+| Trusted scope source and office vessel entitlements | Authenticated forwarded canonical identity plus authoritative assignments; deny unresolved scope | Proposed — needs confirmation |
+| Initial ownership | Office PMS Admin writes; vessel read-only | Proposed — needs confirmation |
+| UUID representation/reconciliation | Project TEXT UUID, shore-authoritative reviewed mapping, manual ambiguity resolution | Proposed — needs confirmation |
+| Stable master references | Approve conditional key columns or another explicit cross-installation-safe design | Proposed — needs confirmation |
+| Master metadata/administration | Shared nullable country/category/description; Components grouping initially; confirm any new section | Proposed — needs confirmation |
+| Master dataset/lifecycle | 19/46 supplied values, one RINA, retire references without destroying history | Proposed — needs confirmation |
+| Legacy fields | Hidden but retained; no automatic conversion | Proposed — needs confirmation |
+| Date/text rules | Trim; 100/2,000/2,000; real dates; last ≤ next with equality | Proposed — needs confirmation |
+| Invalid historical dates on unrelated edit | Keep readable/flagged; explicitly agree retention versus correction requirement | Proposed — needs confirmation |
+| Class Item No/report scope | H visible with notice; report population unchanged | Proposed — needs confirmation |
+| Restore metadata | Clear current deletion fields; retain event history | Proposed — needs confirmation |
+| Audit failure semantics | Atomic mutation + required audit; no unaudited success | Proposed — needs confirmation |
+| Additional H field logs | No implied logs under current one-way contract; approve explicit supported extension if required | Proposed — needs confirmation |
+| Ordering/navigation | Stable sort_order/identity; warn on discarded drafts | Proposed — needs confirmation |
+| Deferred scope | Attachments, H Modify PMS and colours outside release one | Proposed — needs confirmation |
 
-Seed counts: Class 14, Statutory 7, Flag State 5, Port State 1, ISM 4, ISPS 4, MLC 4, Other 7; **46 total**. Duplicate display names are expected; survey code/master ID must distinguish the selected row.
+Missing/mock identity write refusal is required, not an optional permissive fallback. Role, scope, master-reference and audit decisions must be resolved before implementation activation.
 
-## 8. Attachments, storage and synchronization
+## 12. Differences from the 14 October summary and stop condition
 
-### 8.1 Storage
+- Retain shared-master recommendations, canonical dataset, stable identity and lifecycle direction; distinguish proposed content from installed state.
+- Explicitly document live pass-through/mock-role/null-vessel authorization and make the local fix a first-phase prerequisite; global aliases remain unchanged.
+- Narrow initial delivery: attachments/file sync, H-specific Modify PMS and survey colours are deferred.
+- Retain integer ids locally; reconcile UUIDs before coordinated sync activation.
+- Specify exact proposed file-based idempotent migration locations and staged finalization.
+- Distinguish migration-defined master watermark from omitted ORM declaration.
+- Make conditional master references explicit rather than assuming local integer FK portability.
+- Explain one-way transport versus BOTH_EDITABLE field logs and their different failure contracts.
+- Preserve legacy columns, report population/columns and existing deleted-row report filtering.
+- Retain the companion unchanged; its broader design is not permission to implement deferred features.
 
-Reuse the established private object/local storage approach where suitable, but add a separate metadata association to `class_regulatory_id`. Keep file keys private. Validate upload size before buffering/writing where the upload stack supports it.
-
-Use an atomic/recoverable sequence:
-
-1. Validate authenticated user, parent record and vessel/component scope.
-2. Validate extension, content and file limit.
-3. Store bytes.
-4. Insert attachment metadata.
-5. If step 4 fails, delete uploaded bytes or record an explicit cleanup failure for retry.
-
-Download rechecks parent record and scope; a guessed ID or key is not permission.
-
-### 8.2 Shore/vessel sync
-
-Current `component_class_regulatory` registry entry is **shore-to-ship**. Proposed default is to preserve that ownership: office/PMS admins edit; vessel side reads. This is consistent with current registry but **must be confirmed** if vessel users are expected to create/edit/delete.
-
-If vessel mutations are required, re-plan explicit direction, conflict ownership, offline/master availability, IDs, attachments and review policy before enabling writes. Merely registering an attachment table or uploading a file does not prove its metadata/content will sync.
-
-The existing file sync processor should be inspected and extended only under the chosen policy. Exclude soft-deleted records from ordinary reads while preserving the sync/audit evidence required for deletion replication.
-
-## 9. Migration and rollout
-
-1. Check ordered migrations and target schemas for existing master/API alternatives and deployed schema drift.
-2. Confirm the open decisions in Section 15 and approve the master seed list.
-3. Add a migration for accepted master tables, attachment metadata and the two nullable references/indexes on `component_class_regulatory`.
-4. Seed masters idempotently.
-5. Backfill only unambiguous legacy matches. Report ambiguous/unmatched records for review.
-6. Keep old text snapshots and read support while any legacy rows lack master references.
-7. Require valid master IDs for new writes; keep old rows readable under an explicit legacy-edit rule.
-8. Verify attachment permissions, storage cleanup and the approved office/vessel behaviour in a non-production environment.
-9. Consider making reference fields non-null only in a later migration after backfill and operational verification.
-10. Follow repository migration safeguards. Do not use `db:push` on the existing database.
-
-Rollback must not silently discard uploaded user files or delete existing classification records.
-
-## 10. Areas needing attention
-
-| Risk/decision | Why it matters | Proposed handling |
-|---|---|---|
-| Society code conflict (`RINA`) | Unique master code/index and legacy backfill become ambiguous. | Domain owner decides canonical row/alias/code before seeding. |
-| Repeated Survey Type labels | “Annual Survey” is not unique across categories. | Persist master ID/unique code; show category and code. |
-| UI/backend naming mismatch | `certificateNo` vs `certificateNumber`; `nextClassSurvey` vs `nextSurveyDue`. | Explicit map in both read and write flows; test round trip. |
-| Component tree IDs | Visible tree `id` can be component code, while the database relationship is UUID. | Pass/resolve canonical `cuuid` on the server; verify selected node mapping. |
-| First record only | Multiple records are supported by backend but hidden in view. | List all non-deleted entries and edit the selected row by its ID. |
-| Physical deletion | Conflicts with requested retention and destroys history. | Soft-delete entry and attachment metadata; no physical deletion. |
-| Parent component Save | Current save payload excludes Section H local state. | Independent record save or explicit integrated save; no silent partial save. |
-| Attachment relationship | Component-level documents do not identify their applicable survey entry. | New parent-record attachment metadata. |
-| 25 MB upload | Client-only limit can be bypassed and large in-memory uploads risk resource exhaustion. | Enforce server/upload middleware cap before storage; decide 25 MB vs MiB. |
-| Vessel authorization | UI filtering alone is not sufficient; delete lacks equivalent visible guard. | Check permission + parent component/vessel on every mutation/download. |
-| Master lifecycle | Deleting a master can break existing records. | Deactivate; preserve snapshots and historical master IDs. |
-| Date boundary/time zone | Inclusive month thresholds can differ at month ends or around UTC. | Approve calendar-month/business-date rule and test exact boundaries. |
-| Text date compatibility | Existing data is stored as text and uses older formats. | Parse/format in UI; preserve established backend representation. |
-| Sync and files | Current class records are shore-to-ship; new writes/files may not follow automatically. | Confirm ownership and file synchronization before enabling ship edits. |
-| Uploaded plan data accuracy | Master list is proposed data, including aliases/agency naming. | Domain-review before authoritative seeding. |
-
-## 11. Permissions and data integrity
-
-- Use generated entry ID and component UUID; do not use component code as a globally unique key.
-- Resolve component, vessel and master fields on the server.
-- Enforce permissions on API routes/services for list, create, edit, delete, upload and download.
-- On ship, validate selected component belongs to the caller’s vessel.
-- On soft delete, preserve row and set audit update information. Existing `updated_by` / `updated_at` may suffice; a new `deleted_at` is optional and should have a clear purpose.
-- Do not cascade-delete children, master rows, component records or stored files.
-- Do not select inactive masters for a new entry; keep historical display values.
-- Keep class/survey text snapshots readable if the master is renamed or deactivated.
-- Make master seeds repeatable.
-- Keep attachment object keys private and avoid filenames as authorization keys.
-- Avoid logging file contents, sensitive information or credentials.
-
-## 12. Acceptance criteria
-
-### Component and record workflow
-
-1. Section H displays all and only non-deleted rows for the selected component UUID.
-2. A user with permission can add an entry; the generated record ID is returned and the row survives refresh/reopen.
-3. Selecting another component or vessel shows only that component’s records.
-4. A user can edit one chosen record without changing sibling entries.
-5. Delete marks that record `is_deleted = true`; it disappears from ordinary view but remains stored.
-6. Existing records without new master references remain viewable; their edit behaviour is explicitly defined and tested.
-7. Component Create/Edit cannot report success while silently discarding entered classification data.
-
-### Master and dates
-
-8. Society options show the approved name and country.
-9. Class Code comes from the selected society on both client display and server save.
-10. Survey options show category, name and unique code; repeated names remain distinct.
-11. Inactive masters cannot be newly selected; referenced values cannot be hard-deleted.
-12. `DD-MM-YYYY` date display round-trips existing data without altering other backend conventions.
-13. Today/overdue/month-boundary/later/missing dates display the approved indicator with accessible text.
-14. Invalid dates and any approved date-order error are rejected on the server.
-15. RINA duplicate and all seed rows receive domain-approved, repeatable handling.
-
-### Attachments, access and sync
-
-16. PDF, Word, Excel and CSV uploads up to the confirmed per-file cap succeed; unsupported or oversized files fail clearly.
-17. Uploads are linked to the exact classification record and downloadable only by an authorized user in its vessel scope.
-18. A metadata write failure cleans up stored file bytes or records a recoverable orphan.
-19. Entry/attachment soft deletion hides records but retains metadata/files according to policy.
-20. Every read/write/download enforces authorization and vessel/component scope server-side.
-21. Ship/shore behaviour and attachment transfer match the explicitly approved ownership design.
-
-### Regression
-
-22. Component tree, component detail, existing component documents and unrelated date fields still work.
-23. No accidental changes to unrelated masters, reports, Work Orders or sync behaviours.
-
-## 13. Test plan
-
-After scope approval, add:
-
-- Service tests for master lookup/snapshots, legacy records, dates, soft deletes, component/vessel scope and file limits.
-- API tests for every permission path, cross-vessel ID, missing/deleted row, validation and storage failure.
-- Repository tests for all-record listing, update isolation, and persistent soft deletion.
-- UI tests for multiple entries, add/edit/delete, selected-record loading, dropdowns, errors/empty/loading, date format/colour boundaries and attachment limit/errors.
-- Migration and repeatable-seed tests.
-- Sync tests only for approved direction and attachment delivery.
-- Manual non-production verification with two components in separate vessels, legacy data, multiple records, every date boundary, deleted record, file-size boundary and authorized/unauthorized roles.
-
-No application/test run is represented as completed by this specification.
-
-## 14. Proposed implementation sequence
-
-1. Resolve open decisions and approve master seed content.
-2. Confirm deployed schema/migration conventions and existing master/attachment services.
-3. Implement additive database migration, indexes and idempotent seed.
-4. Implement repository/service/API validation, permissions, soft delete and attachments.
-5. Implement master selection, record list/edit actions, date indicator and file UI.
-6. Extend synchronization/file delivery only as approved.
-7. Add tests, perform non-production migration and acceptance walkthrough.
-8. Roll out and monitor read/write/file/sync errors; leave ambiguous legacy references identifiable.
-
-## 15. Decisions for validation
-
-| Decision | Current proposal | Status |
-|---|---|---|
-| Existing entries must be editable | Yes; user confirmed | Confirmed |
-| Multiple entries per component | List every entry; one row edited at a time | Implied by per-entry ID and confirmed edit request |
-| Per-file attachment cap | 25 MB | Confirmed; binary vs decimal unit to define |
-| Society and Survey Type storage | Dedicated typed master tables unless existing master infrastructure fits all required fields | Proposed; inspect/approve |
-| RINA duplicate | Canonical row plus approved alias, or domain-approved distinct code | Needs domain decision |
-| Date thresholds | Calendar months; overdue/today red; missing neutral; boundaries inclusive | Proposed |
-| Last survey later than next survey | Reject | Proposed; confirm valid correction cases |
-| Text-length limits | 2,000 chars free text; 100 chars certificate | Proposed |
-| Master administration UI | Existing Master Data area, if suitable | Proposed |
-| Add/Edit permissions | Preserve/refine current PMS-admin policy | Needs role confirmation |
-| Ship-side writes | Preserve current shore-to-ship policy unless user requires vessel mutation | Needs explicit confirmation |
-| Attachment removal and parent deletion | Soft-delete metadata; retain stored bytes | Proposed |
-| Restore soft-deleted entry | No ordinary restore in initial scope | Proposed |
-| File sync | Only implement after owner/direction is confirmed | Needs explicit confirmation |
-
-## 16. Files checked
-
-The implementation review should begin with these existing sources:
-
-- `client/src/pages/pms/Components.tsx`
-- `client/src/components/ComponentRegisterAddEdit.tsx`
-- `server/modules/components/routes.ts`
-- `server/modules/components/controllers/subEntityController.ts`
-- `server/modules/components/services/subEntityService.ts`
-- `server/modules/components/services/documentService.ts`
-- `server/modules/components/repositories/componentRepository.ts`
-- `server/postgresStorage.ts`
-- `shared/schema.ts`
-- `shared/syncConfig.ts`
-- `attached_assets/Plan_1791960563406.docx`
-
-## 17. Explicitly not done
-
-- No application source code was modified.
-- No table, column, index, master row or migration was created or run.
-- No component/classification record or attachment was changed.
-- No permissions, shore/vessel ownership or synchronization direction was changed.
-- No project database was queried or modified for this document.
-
-**End of proposal — implementation should begin only after the user validates this scope and the open decisions.**
+**Stop condition:** only this plan document is changed. No SQL file, schema, code, seed, sync configuration, environment setting or database mutation is delivered. Report findings, plan corrections and open decisions, then wait for explicit approval before implementation.
