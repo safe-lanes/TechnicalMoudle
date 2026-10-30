@@ -7,6 +7,7 @@ import * as componentCtrl from './controllers/componentController';
 import * as uploadCtrl from './controllers/componentUploadController';
 import * as subCtrl from './controllers/subEntityController';
 import * as classCtrl from './controllers/classRegulatoryController';
+import * as attachmentCtrl from './controllers/sectionHAttachmentController';
 import { requireSectionHIdentity, requireSectionHReadIdentity, requireSectionHView, requireSectionHOffice } from './services/classRegulatoryAccess';
 
 const router = Router();
@@ -72,6 +73,13 @@ router.post('/component-class-regulatory', ...sectionHWrite, classCtrl.create);
 router.put('/component-class-regulatory/:id', ...sectionHWrite, classCtrl.update);
 router.delete('/component-class-regulatory/:id', ...sectionHWrite, classCtrl.remove);
 router.post('/component-class-regulatory/:id/restore', ...sectionHWrite, classCtrl.restore);
+
+const attachments = '/section-h-entries/:entryUuid/attachments';
+router.get(attachments, ...sectionHView, attachmentCtrl.list);
+router.post(attachments, ...sectionHWrite, attachmentCtrl.uploadBody, attachmentCtrl.upload);
+router.get(`${attachments}/:attachmentUuid/download`, ...sectionHView, attachmentCtrl.download);
+router.delete(`${attachments}/:attachmentUuid`, ...sectionHWrite, attachmentCtrl.remove);
+router.post(`${attachments}/:attachmentUuid/restore`, ...sectionHWrite, attachmentCtrl.restore);
 
 // ── Component Requisitions ──
 

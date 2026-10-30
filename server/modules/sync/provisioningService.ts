@@ -40,6 +40,7 @@ export interface ProvisioningManifest {
   totalRows: number;
   version: string;
   requiredCapabilities?: string[];
+  sectionHFiles?: { count: number; bytes: number; delivery: "separate-file-sync" };
   // Phase 4a (optional, additive — absent in pre-4a bundles):
   // per-tenant sync key the ship seeds into its sync_settings on import (dormant until 4b).
   syncApiKey?: string;
@@ -78,6 +79,11 @@ export async function generateProvisioningBundle(
   if (regulatory.rows.length && !opts?.receiverCapabilities?.includes(CLASS_REGULATORY_CAPABILITY)) {
     throw new Error("Confirm the receiving vessel supports component_class_regulatory_uuid_v1 before provisioning Section H.");
   }
+  const sectionHFiles = await pool.query(`SELECT count(*)::int AS count, COALESCE(sum(file_size),0)::bigint AS bytes
+    FROM component_class_regulatory_attachments WHERE vessel_id=$1`, [vesselId]);
+  const attachmentCount = Number(sectionHFiles.rows[0]?.count || 0);
+  if (attachmentCount && !opts?.receiverCapabilities?.includes('section_h_attachments_v1'))
+    throw new Error("Confirm migration 190 and section_h_attachments_v1 on the receiving vessel before provisioning attachments.");
 
   const bundle: ProvisioningBundle = {
     manifest: {
@@ -90,7 +96,11 @@ export async function generateProvisioningBundle(
       tables: [],
       totalRows: 0,
       version: '1.0',
-      requiredCapabilities: regulatory.rows.length ? [CLASS_REGULATORY_CAPABILITY] : [],
+      requiredCapabilities: [
+        ...(regulatory.rows.length ? [CLASS_REGULATORY_CAPABILITY] : []),
+        ...(attachmentCount ? ['section_h_attachments_v1'] : []),
+      ],
+      sectionHFiles: { count: attachmentCount, bytes: Number(sectionHFiles.rows[0]?.bytes || 0), delivery: "separate-file-sync" },
     },
     data: [],
   };
@@ -306,6 +316,7 @@ const PROVISION_FILE_TABLES: Array<{ table: string; idCol: string; keyCol: strin
   { table: 'work_order_documents', idCol: 'id', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
   { table: 'component_documents', idCol: 'cduuid', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
   { table: 'job_work_instruction_files', idCol: 'jwfuuid', keyCol: 'file_key', nameCol: 'file_name', sizeCol: 'file_size', localUrlOnly: false },
+  { table: 'component_class_regulatory_attachments', idCol: 'ccrauuid', keyCol: 'file_key', nameCol: 'original_filename', sizeCol: 'file_size', localUrlOnly: false },
   // base64 data URIs travel inside the row; only stored files (local:// / .private/) need a transfer
   { table: 'defect_attachments', idCol: 'datuuid', keyCol: 'url', nameCol: 'filename', sizeCol: null, localUrlOnly: true },
   { table: 'change_request_attachment', idCol: 'crauuid', keyCol: 'url', nameCol: 'filename', sizeCol: null, localUrlOnly: true },
@@ -461,6 +472,16 @@ export async function importProvisioningBundle(
   let rowsImported = 0;
   const errors: string[] = [];
   const regulatoryRows = bundle.data.find(item => item.tableName === 'component_class_regulatory')?.rows || [];
+  const attachmentRows = bundle.data.find(item => item.tableName === 'component_class_regulatory_attachments')?.rows || [];
+  if (attachmentRows.length) {
+    const { ATTACHMENT_COLUMNS } = await import('./sectionHAttachmentSync');
+    const meta = await getColumnMeta(pool, 'component_class_regulatory_attachments');
+    if (!bundle.manifest.requiredCapabilities?.includes('section_h_attachments_v1') ||
+        ATTACHMENT_COLUMNS.some(column => !meta.allCols.has(column)))
+      throw new Error("Provisioning Section H attachments requires migration 190 and section_h_attachments_v1.");
+    if (attachmentRows.some(row => row.vessel_id !== bundle.manifest.vesselId))
+      throw new Error("Provisioning Section H attachments have an inconsistent vessel scope.");
+  }
   if (regulatoryRows.length) {
     if (!bundle.manifest.requiredCapabilities?.includes(CLASS_REGULATORY_CAPABILITY) ||
         regulatoryRows.some(row => !row.ccruuid)) {
@@ -624,8 +645,9 @@ export async function importProvisioningBundle(
     if (tableData.rows.length === 0) continue;
 
     try {
-      if (tableData.tableName === 'component_class_regulatory') {
-        const applied = await applyOneWayRows(tableData.tableName, tableData.rows);
+      if (tableData.tableName === 'component_class_regulatory' ||
+          tableData.tableName === 'component_class_regulatory_attachments') {
+        const applied = await applyOneWayRows(tableData.tableName, tableData.rows, bundle.manifest.vesselId);
         if (applied.errors.length) throw new Error(applied.errors[0].error);
         rowsImported += tableData.rows.length;
         tablesImported++;

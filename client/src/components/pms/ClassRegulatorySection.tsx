@@ -11,6 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
+import ClassRegulatoryAttachments from "@/components/pms/ClassRegulatoryAttachments";
 import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { classSurveyDay, validateClassRegulatoryDates } from "@shared/classRegulatory";
 import type { ClassRegulatoryEntry } from "@shared/classRegulatory";
@@ -529,11 +530,16 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Class Code</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{entry.classCode || "—"}</span></div>
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Information</span><span className="block whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm text-slate-700">{entry.information || "—"}</span></div>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Attachment</span>
-              <Button type="button" size="sm" variant="outline" className="h-7" disabled>Attach File</Button>
-              <span className="text-xs text-slate-500">Attachment upload is not available yet.</span>
-            </div>
+            <ClassRegulatoryAttachments
+              key={`${securityScope}:${entry.ccruuid || `missing-${entry.id}`}`}
+              entryUuid={entry.ccruuid}
+              parentDeleted={entry.isDeleted === true}
+              componentId={id}
+              securityScope={securityScope}
+              canEdit={canEdit}
+              canViewRemoved={canViewRemoved}
+              currentUser={currentUser}
+            />
           </article>)}
         </div>
       )}

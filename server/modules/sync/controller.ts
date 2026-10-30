@@ -20,6 +20,7 @@ import { getFieldLogFailureSessionCount } from './fieldLogger';
 import { getPool } from '../../db';
 import { isShipInstanceId, isShipInstance } from './syncRole';
 import { getSyncLogPath, getSyncLogDir, syncDiag } from './syncDiagLogger';
+import { assertSectionHFilePeer, assertSectionHQueuePeer } from './sectionHFileProtocolAccess';
 
 // ── POST /sync/initiate ──
 
@@ -347,6 +348,8 @@ export async function fetchRowsHandler(req: Request, res: Response) {
 export async function uploadChunkHandler(req: Request, res: Response) {
   try {
     const chunk = req.body;
+    if (chunk.tableName === 'component_class_regulatory_attachments')
+      return res.status(403).json({ error: 'Section H bytes are received only by the vessel-initiated shore pull, not this upload endpoint.' });
     if (!chunk.queueUuid || chunk.chunkIndex === undefined || !chunk.totalChunks || !chunk.data) {
       return res.status(400).json({ error: 'queueUuid, chunkIndex, totalChunks, and data are required' });
     }
@@ -370,6 +373,7 @@ const FILE_CATEGORY_LABELS: Record<string, string> = {
   component_documents: 'Component',
   defect_attachments: 'Defect',
   change_request_attachment: 'Change Request',
+  component_class_regulatory_attachments: 'Section H',
 };
 function fileCategoryLabel(tableName: string): string {
   return FILE_CATEGORY_LABELS[tableName]
@@ -443,8 +447,10 @@ export async function pendingFilesHandler(req: Request, res: Response) {
   try {
     const { vesselId, maxBytes } = req.body;
     if (!vesselId) return res.status(400).json({ error: 'vesselId is required' });
+    if (Array.isArray(req.body.capabilities) && req.body.capabilities.includes('section_h_attachments_v1'))
+      await assertSectionHFilePeer(req, vesselId);
     const processor = new FileSyncProcessor();
-    const result = await processor.listPendingForPull(vesselId, Number(maxBytes) || DEFAULT_FILE_DRAIN_MAX_BYTES);
+    const result = await processor.listPendingForPull(vesselId, Number(maxBytes) || DEFAULT_FILE_DRAIN_MAX_BYTES, req.body.capabilities);
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
@@ -461,6 +467,7 @@ export async function downloadChunkHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'queueUuid and chunkIndex are required' });
     }
     const processor = new FileSyncProcessor();
+    await assertSectionHQueuePeer(req, queueUuid);
     const chunk = await processor.readChunkForPull(queueUuid, Number(chunkIndex));
     if (!chunk) return res.status(404).json({ error: 'File not found in local storage' });
     res.json(chunk);
@@ -475,6 +482,7 @@ export async function downloadChunkHandler(req: Request, res: Response) {
 // the shore marks its shore_to_ship entry completed so it stops re-offering it.
 export async function completeFileHandler(req: Request, res: Response) {
   try {
+    await assertSectionHQueuePeer(req, req.params.queueUuid);
     const { queueUuid } = req.params;
     if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
     await syncRepo.markFileCompleted(queueUuid);
@@ -491,11 +499,13 @@ export async function completeFileHandler(req: Request, res: Response) {
 export async function failFileHandler(req: Request, res: Response) {
   try {
     const { queueUuid } = req.params;
+    await assertSectionHQueuePeer(req, queueUuid);
     if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
     const reason = (req.body?.reason as string) || 'Dead-lettered after repeated failed pull attempts';
     await syncRepo.updateFileStatus(queueUuid, 'failed', undefined, reason);
     res.json({ success: true });
   } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] file fail error:', error);
     res.status(500).json({ error: 'Failed to mark file failed' });
   }

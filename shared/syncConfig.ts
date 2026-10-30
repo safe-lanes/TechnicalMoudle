@@ -617,6 +617,19 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
     notes: 'Office-owned regulatory entries. UUID identity; schema-first rollout and historical reconciliation required. Never match by mutable society/type or local integer id.',
   },
 
+  component_class_regulatory_attachments: {
+    tableName: 'component_class_regulatory_attachments',
+    category: 'ONE_WAY_SHORE_TO_SHIP',
+    direction: 'shore_to_ship',
+    identityColumn: 'ccrauuid',
+    vesselScopeColumn: 'vessel_id',
+    vesselScopeJoinPath: null,
+    isGlobal: false,
+    isConfigurable: false,
+    businessRules: null,
+    notes: 'Office-owned per-entry files. Parent ccruuid precedes metadata; bytes follow via private file queue. No field logs.',
+  },
+
   // ── Approval workflow: office-managed config + approver registry (global) ──
 
   approval_workflow_config: {

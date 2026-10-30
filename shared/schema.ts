@@ -2364,6 +2364,37 @@ export const insertComponentClassRegulatorySchema = createInsertSchema(component
 export type InsertComponentClassRegulatory = z.infer<typeof insertComponentClassRegulatorySchema>;
 export type ComponentClassRegulatory = typeof componentClassRegulatory.$inferSelect;
 
+export const componentClassRegulatoryAttachments = pgTable("component_class_regulatory_attachments", {
+  ccrauuid: text("ccrauuid").primaryKey(),
+  classRegulatoryUuid: text("class_regulatory_uuid").notNull().references(() => componentClassRegulatory.ccruuid),
+  componentId: text("component_id").notNull().references(() => components.cuuid),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  originalFilename: text("original_filename").notNull(),
+  fileKey: text("file_key").notNull().unique(),
+  contentType: text("content_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  storageBackend: text("storage_backend").notNull(),
+  uploadedByUuid: text("uploaded_by_uuid").notNull(),
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdBy: text("created_by").notNull(),
+  updatedBy: text("updated_by").notNull(),
+  createdByUuid: text("created_by_uuid").notNull(),
+  updatedByUuid: text("updated_by_uuid").notNull(),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedByUuid: text("deleted_by_uuid"),
+  isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
+}, table => ({
+  parentIdx: index("idx_section_h_attachment_parent").on(table.classRegulatoryUuid, table.isDeleted),
+  vesselIdx: index("idx_section_h_attachment_vessel").on(table.vesselId, table.isDeleted),
+  updatedIdx: index("idx_section_h_attachment_updated").on(table.vesselId, table.updatedAt),
+}));
+export type SectionHAttachment = typeof componentClassRegulatoryAttachments.$inferSelect;
+
 // Component Maintenance History Table - Immutable maintenance records (NO EDITS/DELETES ALLOWED)
 export const componentMaintenanceHistory = pgTable("component_maintenance_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

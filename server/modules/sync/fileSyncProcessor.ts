@@ -33,6 +33,9 @@ import * as crypto from 'crypto';
 import * as syncRepo from './repository';
 import { syncDiag } from './syncDiagLogger';
 import { isShipInstanceId } from './syncRole';
+import { sectionHTransferOwner, sectionHTransferPath, SECTION_H_ATTACHMENT_TABLE } from './sectionHAttachmentFiles';
+import { sectionHLocalPath } from '../components/services/sectionHAttachmentStorage';
+import { SECTION_H_UUID, SECTION_H_FILE_BYTES } from '@shared/sectionHAttachments';
 
 const CHUNK_SIZE_BYTES = 256 * 1024; // 256KB per chunk
 const MAX_FILE_RETRIES = 3;
@@ -69,6 +72,7 @@ function getStorageDir(tableName: string): string {
   switch (tableName) {
     case 'component_documents': return COMPONENT_DOCS_DIR;
     case 'job_work_instruction_files': return JOB_DOCS_DIR;
+    case 'component_class_regulatory_attachments': return path.resolve(process.cwd(), '.private', 'component-class-regulatory');
     case 'defect_attachments':  return DEFECT_DOCS_DIR;
     case 'change_request_attachment': return CR_DOCS_DIR;
     default: return WO_DOCS_DIR; // work_order_documents and fallback
@@ -84,6 +88,10 @@ function getStorageDir(tableName: string): string {
  * Object-backed keys have no local copy → returns null (correctly stays 'unsendable').
  */
 function resolveLocalFilePath(fileKey: string, tableName: string): string | null {
+  if (tableName === SECTION_H_ATTACHMENT_TABLE) {
+    const target = sectionHLocalPath(fileKey);
+    return fs.existsSync(target) ? target : null;
+  }
   if (fileKey.startsWith('local://')) {
     const fullPath = path.join(getStorageDir(tableName), fileKey.replace('local://', ''));
     if (fs.existsSync(fullPath)) return fullPath;
@@ -335,6 +343,25 @@ export class FileSyncProcessor {
   async receiveChunk(
     chunk: FileChunk
   ): Promise<{ received: boolean; complete: boolean }> {
+    if (chunk.tableName === SECTION_H_ATTACHMENT_TABLE) {
+      if (!isShipInstanceId(this.instanceId)) throw Object.assign(new Error("Shore refuses Ship-origin Section H file uploads."), { statusCode: 403 });
+      if (!SECTION_H_UUID.test(chunk.queueUuid) || !Number.isInteger(chunk.totalChunks) ||
+          !Number.isInteger(chunk.chunkIndex) || chunk.chunkIndex < 0 || chunk.chunkIndex >= chunk.totalChunks ||
+          !chunk.fileSizeBytes || chunk.fileSizeBytes > SECTION_H_FILE_BYTES ||
+          chunk.totalChunks !== Math.ceil(chunk.fileSizeBytes / CHUNK_SIZE_BYTES) ||
+          !/^[a-f0-9]{64}$/i.test(chunk.fileHash) || chunk.data.length > Math.ceil(CHUNK_SIZE_BYTES / 3) * 4)
+        throw new Error("Invalid Section H file chunk.");
+      await sectionHTransferOwner(chunk.fileKey, chunk.vesselId, chunk.fileSizeBytes);
+      const expected = Math.min(CHUNK_SIZE_BYTES, chunk.fileSizeBytes - chunk.chunkIndex * CHUNK_SIZE_BYTES);
+      if (Buffer.from(chunk.data, "base64").length !== expected) throw new Error("Invalid Section H chunk size.");
+      // A resumed transfer must keep the same immutable descriptor across all chunks.
+      const dir = path.join(TEMP_DIR, chunk.queueUuid);
+      fs.mkdirSync(dir, { recursive: true });
+      const descriptor = JSON.stringify([chunk.fileKey, chunk.vesselId, chunk.fileSizeBytes, chunk.fileHash, chunk.totalChunks]);
+      const descriptorPath = path.join(dir, "section-h.json");
+      if (fs.existsSync(descriptorPath) && fs.readFileSync(descriptorPath, "utf8") !== descriptor) throw new Error("Section H transfer identity changed.");
+      fs.writeFileSync(descriptorPath, descriptor);
+    }
     const tempPath = path.join(TEMP_DIR, chunk.queueUuid);
 
     // Create temp directory for this file's chunks
@@ -367,7 +394,9 @@ export class FileSyncProcessor {
         await syncRepo.queueFileWithUuid({
           queueUuid: chunk.queueUuid,
           tableName: chunk.tableName,
-          rowUuid: chunk.queueUuid, // placeholder — actual rowUuid not needed for receive
+          rowUuid: chunk.tableName === SECTION_H_ATTACHMENT_TABLE
+            ? (await sectionHTransferOwner(chunk.fileKey, chunk.vesselId, chunk.fileSizeBytes)).ccrauuid
+            : chunk.queueUuid,
           fileKey: chunk.fileKey,
           fileName: chunk.fileName,
           fileSizeBytes: chunk.fileSizeBytes,
@@ -381,6 +410,7 @@ export class FileSyncProcessor {
         console.log(`[FileSyncProcessor] Created mirror queue entry for ${chunk.queueUuid}`);
       }
     } catch (mirrorErr: any) {
+      if (chunk.tableName === SECTION_H_ATTACHMENT_TABLE) throw mirrorErr;
       // Non-fatal — we can still save the file using chunk metadata
       console.warn(`[FileSyncProcessor] Mirror queue entry creation failed: ${mirrorErr.message}`);
     }
@@ -389,6 +419,8 @@ export class FileSyncProcessor {
     if (chunk.chunkIndex === chunk.totalChunks - 1) {
       // Reassemble the file
       const assembled = this.assembleChunks(tempPath, chunk.totalChunks);
+      if (chunk.tableName === SECTION_H_ATTACHMENT_TABLE && assembled.length !== chunk.fileSizeBytes)
+        throw new Error("Section H assembled size mismatch.");
 
       // Verify hash
       const hash = crypto
@@ -480,6 +512,19 @@ export class FileSyncProcessor {
     buffer: Buffer
   ): Promise<void> {
     let targetPath: string;
+    if (tableName === SECTION_H_ATTACHMENT_TABLE) {
+      targetPath = sectionHLocalPath(fileKey);
+      await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
+      try {
+        const existing = await fs.promises.readFile(targetPath);
+        if (!existing.equals(buffer)) throw new Error("An existing Section H file cannot be replaced in place.");
+        return;
+      } catch (error: any) { if (error.code !== "ENOENT") throw error; }
+      const staging = `${targetPath}.received`;
+      await fs.promises.writeFile(staging, buffer);
+      await fs.promises.rename(staging, targetPath);
+      return;
+    }
 
     if (fileKey.startsWith('local://')) {
       const relativePath = fileKey.replace('local://', '');
@@ -561,12 +606,17 @@ export class FileSyncProcessor {
    */
   async listPendingForPull(
     vesselId: string,
-    maxBytes: number
+    maxBytes: number,
+    capabilities?: string[],
   ): Promise<{ files: any[]; remainingSmallCount: number }> {
     const pending = await syncRepo.getPendingFiles(vesselId, 'shore_to_ship', 50);
     const files: any[] = [];
     for (const f of pending) {
-      const local = resolveLocalFilePath(f.fileKey, f.tableName);
+      if (f.tableName === SECTION_H_ATTACHMENT_TABLE && !capabilities?.includes('section_h_attachments_v1')) continue;
+      try {
+      const local = f.tableName === SECTION_H_ATTACHMENT_TABLE
+        ? await sectionHTransferPath(f.fileKey, f.vesselId, f.fileSizeBytes)
+        : resolveLocalFilePath(f.fileKey, f.tableName);
       if (!local) {
         // Part C: pending but the bytes don't resolve on THIS (serving) side — it can never be
         // served, so it would inflate remainingSmallCount forever while never appearing in the
@@ -590,8 +640,27 @@ export class FileSyncProcessor {
         queueUuid: f.queueUuid, tableName: f.tableName, fileKey: f.fileKey,
         fileName: f.fileName ?? null, fileSizeBytes: size, totalChunks, fileHash,
       });
+      } catch (error: any) {
+        if (f.tableName !== SECTION_H_ATTACHMENT_TABLE) throw error;
+        // Keep this document pending and repairable; one missing/corrupt/object-
+        // backed source must not hide unrelated files from the vessel's list.
+        try {
+          await syncRepo.updateFileStatus(f.queueUuid, 'pending', undefined,
+            'Section H source unavailable or inconsistent; repair storage and retry.');
+        } catch (queueError: any) {
+          syncDiag(`Section H pending-source status could not be recorded: ${queueError.message}`);
+        }
+        syncDiag(`Section H source held pending independently: ${f.queueUuid} — ${error.message}`);
+      }
     }
     const remainingSmallCount = await syncRepo.getPendingFileCountBySize(vesselId, 'shore_to_ship', maxBytes);
+    if (!capabilities?.includes('section_h_attachments_v1')) {
+      const { getPool } = await import('../../db');
+      const held = await (await getPool()).query(`SELECT count(*)::int AS n FROM sync_file_queue
+        WHERE vessel_id=$1 AND direction='shore_to_ship' AND status IN ('pending','in_progress')
+        AND table_name=$2 AND file_size_bytes <= $3`, [vesselId, SECTION_H_ATTACHMENT_TABLE, maxBytes]);
+      return { files, remainingSmallCount: Math.max(0, remainingSmallCount - held.rows[0].n) };
+    }
     return { files, remainingSmallCount };
   }
 
@@ -605,7 +674,10 @@ export class FileSyncProcessor {
   ): Promise<{ data: string; bytesRead: number } | null> {
     const entry = await syncRepo.getFileQueueEntry(queueUuid);
     if (!entry) return null;
-    const local = resolveLocalFilePath(entry.fileKey, entry.tableName);
+    if (!Number.isSafeInteger(chunkIndex) || chunkIndex < 0) throw new Error("Invalid chunk index.");
+    const local = entry.tableName === SECTION_H_ATTACHMENT_TABLE
+      ? await sectionHTransferPath(entry.fileKey, entry.vesselId, entry.fileSizeBytes)
+      : resolveLocalFilePath(entry.fileKey, entry.tableName);
     if (!local) return null;
     const size = (await fs.promises.stat(local)).size;
     const start = chunkIndex * CHUNK_SIZE_BYTES;
@@ -660,7 +732,7 @@ export class FileSyncProcessor {
 
     let listResp: { files: any[]; remainingSmallCount: number };
     try {
-      listResp = await this.callShore('/sync/file/pending', { vesselId, maxBytes });
+      listResp = await this.callShore('/sync/file/pending', { vesselId, maxBytes, capabilities: ['section_h_attachments_v1'] });
     } catch (err: any) {
       syncDiag(`FILE-PULL: list request failed — ${err.message}`);
       return { filesProcessed, filesFailed, bytesTransferred, remainingSmall: 0 };
@@ -766,6 +838,19 @@ export class FileSyncProcessor {
     fileSizeBytes: number | null,
     vesselId: string | null
   ): Promise<void> {
+    if (tableName === SECTION_H_ATTACHMENT_TABLE) {
+      const { isShipInstance, getEffectiveInstanceId } = await import('./syncRole');
+      if (await isShipInstance()) throw new Error("Section H files originate on shore only.");
+      const row = await sectionHTransferOwner(fileKey, vesselId, fileSizeBytes);
+      const local = await sectionHTransferPath(fileKey, vesselId, fileSizeBytes);
+      await syncRepo.queueFile({
+        tableName, rowUuid: row.ccrauuid, fileKey, fileName, fileSizeBytes,
+        fileHash: await hashFileStreamed(local), direction: 'shore_to_ship', vesselId,
+        instanceId: await getEffectiveInstanceId(),
+        totalChunks: Math.ceil(row.file_size / CHUNK_SIZE_BYTES), priority: row.file_size < 100 * 1024 ? 10 : 0,
+      });
+      return;
+    }
     try {
       const instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
       const direction = isShipInstanceId(instanceId)

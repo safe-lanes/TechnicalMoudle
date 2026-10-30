@@ -952,7 +952,7 @@ export class SyncEngine {
       instanceId: this.instanceId,
       lastCheckpoint: floor ? floor.toISOString() : null,
       // 13-Oct-2026: this ship matches component_documents on cduuid (mig 182) — the shore may send UUID-keyed changes.
-      capabilities: ['component_documents_uuid', 'spare_classification_pair', 'component_class_regulatory_uuid_v1'],
+      capabilities: ['component_documents_uuid', 'spare_classification_pair', 'component_class_regulatory_uuid_v1', 'section_h_attachments_v1'],
       ...(havePerTable
         ? {
             tableCheckpoints: Object.fromEntries(
@@ -989,7 +989,7 @@ export class SyncEngine {
 
       for (const tableData of pullData.oneWayRows) {
         try {
-          const result = await applyOneWayRows(tableData.tableName, tableData.rows);
+          const result = await applyOneWayRows(tableData.tableName, tableData.rows, vesselId);
           syncDiag(`PULL ONE-WAY: ${tableData.tableName} — inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
           totalPulled += result.inserted + result.updated + result.softDeleted;
           totalApplyErrors += result.errors.length;

@@ -16,7 +16,7 @@ type Db = Awaited<ReturnType<typeof getDb>>;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Connection = Db | Tx;
 
-async function parent(db: Connection, componentId: string, actor: SectionHActor) {
+export async function parent(db: Connection, componentId: string, actor: SectionHActor) {
   const [component] = await db.select().from(components)
     .where(eq(components.cuuid, componentId)).limit(1);
   if (!component || component.isDeleted) throw new NotFoundError("Component not found");

@@ -1097,7 +1097,13 @@ export async function preparePullData(
   // 1. Gather ONE_WAY_SHORE_TO_SHIP full-row snapshots (148: per-table watermarks,
   //    falling back to the shared floor for any table without one)
   const oneWayGather = await gatherOneWayShoreRows(vesselId, lastCheckpoint, tableCheckpoints);
-  const oneWayRows = oneWayGather.batches;
+  let oneWayRows = oneWayGather.batches;
+  if (!capabilities?.includes('section_h_attachments_v1') &&
+      oneWayRows.some(batch => batch.tableName === 'component_class_regulatory_attachments' && batch.rows.length > 0)) {
+    oneWayRows = oneWayRows.filter(batch => batch.tableName !== 'component_class_regulatory_attachments');
+    delete oneWayGather.tableMax['component_class_regulatory_attachments'];
+    syncDiag('Section H attachments held pending: vessel must support section_h_attachments_v1 and migration 190. Other entities continue.');
+  }
   if (!capabilities?.includes('component_class_regulatory_uuid_v1') &&
       oneWayRows.some(batch => batch.tableName === 'component_class_regulatory' && batch.rows.length > 0)) {
     throw Object.assign(new Error('Section H synchronization is pending: upgrade, migrate and reconcile this vessel before retrying. No regulatory changes have been acknowledged.'), { statusCode: 409 });
@@ -1601,7 +1607,8 @@ async function gatherOneWayShoreRows(
       // Per-table watermark (148) with fallback to the shared floor. Missing row =
       // "never diverged from the single checkpoint", so behaviour is unchanged.
       const sinceForTable =
-        (tableCheckpoints && tableCheckpoints[config.tableName]) || sinceCheckpoint;
+        (tableCheckpoints && tableCheckpoints[config.tableName]) ||
+        (config.tableName === 'component_class_regulatory_attachments' ? new Date(0) : sinceCheckpoint);
 
       const vesselCol = config.vesselScopeColumn;
 

@@ -127,6 +127,7 @@ export function installRankFetchInterceptor(): void {
       const sectionHDefault = isReplit() && h.get("x-section-h-development") === "default-user" &&
         (path === `${API_PREFIX}/component-class-regulatory` ||
           path.startsWith(`${API_PREFIX}/component-class-regulatory/`) ||
+          /^\/technical\/api\/section-h-entries\/[0-9a-f-]+\/attachments(?:\/[0-9a-f-]+(?:\/(?:download|restore))?)?$/i.test(path) ||
           (path === `${API_PREFIX}/fleet/master-lists` &&
             ["classificationSociety", "surveyType"].includes(new URL(url, window.location.origin).searchParams.get("listType") || "")));
       if (sectionHDefault) h.delete("authorization");

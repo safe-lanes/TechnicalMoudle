@@ -303,7 +303,8 @@ export function evaluateJobTrackingGuard(localRow: Record<string, any>, incoming
 
 export async function applyOneWayRows(
   tableName: string,
-  rows: any[]
+  rows: any[],
+  vesselId?: string,
 ): Promise<ApplyResult> {
   if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
 
@@ -325,6 +326,11 @@ export async function applyOneWayRows(
 
   // Schema-aware column metadata (GENERATED ALWAYS + JSON detection)
   const meta = await getColumnMeta(pool, tableName);
+  if (tableName === 'component_class_regulatory_attachments') {
+    const { applySectionHAttachmentRows } = await import('./sectionHAttachmentSync');
+    if (!vesselId) throw new Error('Section H attachments require a canonical batch/provisioning vessel scope.');
+    return applySectionHAttachmentRows(pool, rows, meta.allCols, vesselId);
+  }
   if (tableName === 'component_class_regulatory') {
     const { applyClassRegulatoryRows } = await import('./classRegulatorySync');
     return applyClassRegulatoryRows(pool, rows, meta.allCols);
