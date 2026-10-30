@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { getRbacIdentity, type AuthenticatedRequest } from '../../../middleware/auth';
+import { isShipInstance } from '../../sync/syncRole';
 import * as defectsService from '../services/defectsService';
 import type { DefectActor } from '../services/defectsApprovalHooks';
 
@@ -185,7 +186,13 @@ export async function loadDefectVesselAccess(req: Request, res: Response, next: 
   next();
 }
 
-/** Enforce the forwarded identity before the legacy requireVesselAccess compatibility guard. */
+/** Enforce the forwarded identity before the legacy requireVesselAccess compatibility guard.
+ *
+ *  30-Oct-2026 (QA R3 retest JB-05 / EN-06 / RG-03, PROVEN on the pilot ship): on a VESSEL installation a Ship user was
+ *  always refused (403) on the defect read routes, because the shore-side check below looks up `master_user_vessels` —
+ *  a shore-only table (NO_SYNC, written by the Shipskart mapping) that a ship never holds. A ship installation serves
+ *  exactly one vessel and holds only that vessel's data (provisioning + vessel-scoped sync), so on a ship instance a
+ *  Ship user may read the defects present on it; the assignment-table check stays for the shore, where it is meaningful. */
 export async function enforceDefectVesselIdentity(req: Request, res: Response, next: NextFunction) {
   const identity = getRbacIdentity(req as AuthenticatedRequest);
   if (identity.userType === 'Office' || ['PMS Admin', 'Sail Admin', 'Super Admin'].includes(identity.role ?? '')) {
@@ -193,6 +200,9 @@ export async function enforceDefectVesselIdentity(req: Request, res: Response, n
   }
   if (identity.userType !== 'Ship') {
     return res.status(403).json({ error: 'Forbidden - Vessel access requires a forwarded identity' });
+  }
+  if (await isShipInstance()) {
+    return next();
   }
   const userUuid = (req as any).user?.userUuid;
   const vesselId = req.params.vesselId;

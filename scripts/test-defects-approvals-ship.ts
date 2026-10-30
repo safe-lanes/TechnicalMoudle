@@ -137,6 +137,18 @@ async function cleanup() {
   const c1 = { confirmCompleted: true, dateCompleted: iso(-1), closedByName: 'DFS Master', closedByRank: 'Master' };
   check('SHIP: non-Master closeout → 403', (await call(SHIP, 'PATCH', `/defects/${d2.id}`, c1, OFFICER)).status === 403);
   check('SHIP: Master closes d2 and d3', (await call(SHIP, 'PATCH', `/defects/${d2.id}`, c1, MASTER)).status < 300 && (await call(SHIP, 'PATCH', `/defects/${d3.id}`, c1, MASTER)).status < 300);
+
+  // 30-Oct-2026 (QA R3 retest JB-05 / EN-06 / RG-03): the defect READ routes on the SHIP as Ship users. They used to answer
+  // 403 for every Ship user (the guard consulted the shore-only master_user_vessels table). Office access is unchanged.
+  for (const who of [MASTER, OFFICER]) {
+    const chain = await call(SHIP, 'GET', `/defects/${d2.id}/approval-chain?action=verification`, undefined, who);
+    check(`SHIP: ${who.rank} reads approval-chain → 503 APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE (the "handled ashore" note), not 403`,
+      chain.status === 503 && chain.json?.code === 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE', `${chain.status} ${JSON.stringify(chain.json)}`);
+    check(`SHIP: ${who.rank} reads closure-history → 200`, (await call(SHIP, 'GET', `/defects/${d2.id}/closure-history`, undefined, who)).status === 200);
+    check(`SHIP: ${who.rank} reads approval-process → 200`, (await call(SHIP, 'GET', `/defects/${d2.id}/approval-process`, undefined, who)).status === 200);
+    check(`SHIP: ${who.rank} reads approval-routing → 200`, (await call(SHIP, 'GET', `/defects/${d1.id}/approval-routing?action=extension&newTargetDate=${iso(30)}`, undefined, who)).status === 200);
+  }
+  check('SHIP: office approver still reads approval-process → 200', (await call(SHIP, 'GET', `/defects/${d2.id}/approval-process`, undefined, APPROVER)).status === 200);
   await sync('N');
   check('shore: d1 extension arrived Requested, no engine request (no chain)',
     (await shoreSql(`SELECT target_date_extensions->0->>'status' s FROM defects WHERE duuid=$1`, [d1.duuid]))[0].s === 'Requested' && (await engineReqs(d1.duuid)).length === 0);
