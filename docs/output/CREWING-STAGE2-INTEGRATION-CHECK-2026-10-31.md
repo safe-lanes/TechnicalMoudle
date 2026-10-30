@@ -8,8 +8,8 @@ Evidence: PROVEN = run here, output in the session scratchpad `integ/` and the C
 1. **Trial branches pushed** (normal push, no force) after the outgoing-file scan: Crewing
    `feature/assistant-livedata-trial` = **ec2c42e5e**, assistant `feature/crewing-livedata-trial` = **5a90cec81**.
 2. **Crewing merges cleanly into the latest `crewing_accounts` (782b92935, 15 commits newer than the trial base).** The
-   merged tree type-checks at the target's baseline (229 = 229), builds for production, introduces no new test failure,
-   adds no migration, and passes every trial check on the merged code (direct 132/132, permissions 14/14, SQL 87/87,
+   merged tree type-checks at the target's baseline (229 = 229), builds for production, shows no new regression in the
+   checks performed (§8.1; 133 API integration tests are not executed on either tree), adds no migration, and passes every trial check on the merged code (direct 132/132, permissions 14/14, SQL 87/87,
    model smoke 17/17).
 3. **The assistant is a fast-forward** of `feature/chatbot-enterprise` (12f2aef44, unchanged since the trial began); the code
    is byte-identical to the tested pilot image `crewtrial-1483cb185`. Technical and documentation answers, suggestions, the
@@ -42,7 +42,7 @@ Evidence: PROVEN = run here, output in the session scratchpad `integ/` and the C
 |---|---|---|
 | `tsc --noEmit` errors | 229 | 229 |
 | Full vitest (JSON reporter) | 1211 tests, 70 failed, 62 failed files | 1199 tests, 60 failed, 63 failed files |
-| "New" failures in merged | — | 11 listed, **0 real**: the three files concerned (crew-pool-validation, vessel-management, recruitment-language-import) give an identical 10 failed / 55 passed on BOTH trees when run alone — pre-existing schema-validation failures that the combined target run did not load (the suite is load-sensitive; it also never exits by itself — a runner now stops it once the report is written) |
+| "New" failures in merged | — | 11 listed, none from the trial: the files concerned give identical results on BOTH trees when run alone (§8.1). The full-suite totals are not comparable — the suite is load-sensitive and drops files under load; it also never exits by itself, so a runner stops it once the report is written |
 | Production build (`npm run build`) | stops on the deliberate guard "VITE_PARENT_LOGIN_URL is not set" (deployment setting) | same guard; with a placeholder URL: **built in 1 m 14 s**, server bundle contains the new tools |
 | Migrations | — | none added (server start: 219 skipped, 0 applied) |
 | Trial checks against servers started from the merged tree | — | direct **132/132**, permissions **14/14**, tool vs independent SQL **87/87** |
@@ -84,8 +84,12 @@ Order (each step reversible on its own):
    acceptance follow.
 
 Rollback:
-- **Live data off, no redeploy:** remove `url` / `secret` from the `crewing-dev` registration → documentation-only again (the
-  assistant never calls Crewing without a URL).
+- **Live data off, no Crewing redeploy:** remove BOTH `url` and `secret` from the `crewing-dev` entry of
+  `ASSISTANT_MODULE_INSTANCES` in the assistant's env file, then **create a new container** from the same image with that env
+  file (start it on the spare port, check, switch nginx, stop the old one — the same switch as a release). `docker restart`
+  is NOT enough: the env file is read when a container is created, and the registry is cached for the process lifetime
+  (`config.settings` is `lru_cache`d; manifests are also cached for 5 min). Result: documentation-only again — the assistant
+  never calls Crewing without a URL.
 - **Assistant:** switch nginx back to the v10 container (kept running).
 - **Crewing:** redeploy the previous `crewing_accounts` commit (782b92935); no migration to revert.
 - **Fail-safe if Crewing is unhealthy:** a failing manifest makes the assistant fall back to documentation answers.
@@ -96,3 +100,65 @@ Rollback:
   `node_modules` JUNCTION to `wt-assistant-crewing`; unlink the junction before removing either worktree.
 - Trial servers :6100 / :6101 currently run from the merged tree (allowed roles incl. External 1, pilot only).
 - Pilot assistant container `sail-assistant-py-crewtrial` (crewtrial-1483cb185) and earlier containers kept stopped.
+
+
+## 8. Follow-up checks requested by Astra (31-Oct-2026)
+
+### 8.1 Test comparison reconciled (no full rerun)
+- The two full runs did not record the same files: the JSON reports hold 95 (target) and 96 (merged) files; 7 files appear
+  only in the target report and 8 only in the merged one. The suite is load-sensitive — files whose workers time out or
+  crash under load are dropped from the report — so the raw totals (1211 vs 1199 tests) are not comparable.
+- Those 15 files plus the recruitment-language-import file were run alone, one file at a time, on BOTH trees:
+  **identical per file and per status** on each tree:
+
+  | Status (vitest JSON) | Tests | Files |
+  |---|---|---|
+  | passed | 101 | 6 files with passing tests (3 fully passing) |
+  | failed | 30 | crew-pool-validation 2, vessel-management 8, drug-alcohol-testing 19, debriefing-submission 1 |
+  | skipped — not run | 133 | 9 API integration files: accounts 9, approval-identity 8, contract-detail 15, promotions 30, recruitment 16, reports 3, rotation 12, wage-engine-settlement-skip 5, wage-engine 35 |
+  | **total** | **264** | 16 |
+
+  The 133 are recorded as `skipped` (`numPendingTests` 133, `numTodoTests` 0), and their files as **failed**: each file's
+  `beforeAll` calls `http://localhost:5000/api/health`, no Crewing server was listening on :5000 during these runs
+  (log: `ECONNREFUSED 127.0.0.1:5000`), so the setup failed and vitest did not run the tests in those files. They are
+  **not executed** on either tree — they neither pass nor fail.
+- Is that a verification gap for this change? Not for the areas the trial touches. The trial changes none of those 9 test
+  files and none of the routes they exercise (accounts, contracts, promotions, recruitment, reports, rotation, wage
+  engine). Outside `server/v2/assistant/` and its trial scripts, it changes only: one mount line each in `server/index.ts`
+  and `server/production.ts` (`/api/v2/assistant` with exactly two routes, `GET /manifest` and `POST /execute`; every
+  other path falls through — Stage 1's `GET /token` stays on its own router) and 7 lines in the two widget client files.
+  The new routes and server start were exercised on servers started from the merged tree (direct 132/132, permissions
+  14/14, SQL 87/87). The 9 API files remain **untested on both trees** in this check; running them needs a Crewing
+  server on :5000 with its test database, which neither the target nor the trial provides here.
+- The "11 new failures": 10 are the crew-pool-validation (2) and vessel-management (8) failures, present on the target too
+  (they were absent from the target's combined report); the 11th, recruitment-language-import, **passes on both trees** when
+  run alone — a load-only failure in the combined run.
+- **Conclusion: no new regression found in the checks performed.**
+
+### 8.2 Technical live data on the release configuration (PROVEN)
+Same image `crewtrial-1483cb185` twice: A = both flags OFF (temporary container :8063, removed afterwards), B = the release
+configuration with `ASSISTANT_QUERY_STATE_GUARD=true` and `ASSISTANT_MASK_CONVERSATION_MEMORY=true` (:8062). Registered
+`technical-pilotlocal` → the Technical pilot shore (replit_dev 129b5397f, DB pms_pilot_oct28_test; manifest v1, 30 tools).
+Five conversations with follow-ups and widget-style history, 12 turns:
+
+| Conversation | Tools A = B | Key figures A / B |
+|---|---|---|
+| overdue WOs → only the critical ones → first five as a list | get_overdue_work_orders ×3 | 142 / 142 · 0 / 0 · same first WO |
+| spares below minimum → critical spares | get_low_stock_spares, get_critical_spares | 214 / 214 · 8 / 8 |
+| open defects → raised this month | get_defects ×2 | 109 / 109 · 59 / 59 |
+| main-engine running hours | get_running_hours_analytics | no reading / no reading |
+| fleet overview → WOs due in 30 days | get_fleet_overview, get_work_orders | 18 / 18 vessels · 8 / 8 |
+
+All 12 turns: same gate, same tools, same figures; follow-ups resolved correctly with masking memory on. The query-state
+guard is Crewing-only by code (`agent.py`: active only for `ui_module == "crewing"`). Raw output kept on the AI server:
+`~/central-assistant-py/crewtrial-captures/technical_flags_ab-20261031.json`.
+
+### 8.3 The removed password (value not repeated here — Ghazi checks it separately)
+- It is the `postgres` user's password of the **local Windows service `postgresql-x64-18`** (PostgreSQL 18.2, data
+  directory `C:\Program Files\PostgreSQL\18\data`).
+- Crewing remote history: added in trial commit 4649c86d (`scripts/assistant-trial/expected-results.ts`), removed in
+  ec2c42e5. The remote heads of `crewing_accounts` and the trial branch contain it in 0 tracked files.
+- TechnicalMoudle `origin/replit_dev` carries it in 29 tracked files; `origin/feature/chatbot-enterprise` in 15 of them.
+  This report adds none.
+- No credential was rotated, no local setting edited, no history rewritten. Whether any shared server reuses it is
+  Ghazi's check.
