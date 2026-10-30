@@ -393,7 +393,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   const societyLabel = (entry: RegulatoryEntry) => entry.classificationSociety || societies.find((x) => x.listKey === entry.classificationSocietyKey)?.listValue || entry.classificationSocietyKey || "—";
   const surveyLabel = (entry: RegulatoryEntry) => {
     const master = surveys.find((x) => x.listKey === entry.surveyTypeKey);
-    return [entry.surveyType || master?.listValue || entry.surveyTypeKey || "—", master?.category, master?.listKey].filter(Boolean).join(" · ");
+    return entry.surveyType || master?.listValue || "Unavailable survey type";
   };
   const saveEntry = () => {
     const errors = validateClassRegulatoryDates(draft, originalDates.current);
@@ -423,13 +423,16 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
         )}
         {name === "surveyTypeKey" && originalReferences.current.surveyTypeKey && !surveys.some((item) => item.listKey === originalReferences.current.surveyTypeKey) && (
           <option value={originalReferences.current.surveyTypeKey}>
-            {originalReferences.current.surveyType || originalReferences.current.surveyTypeKey} · saved reference (inactive/unavailable)
+            {originalReferences.current.surveyType || "Unavailable survey type"}
           </option>
         )}
         {(name === "classificationSocietyKey" ? societies : surveys).map((item) => (
-          <option key={item.listKey} value={item.listKey}>{item.listValue}{name === "surveyTypeKey" ? [item.category, item.listKey].filter(Boolean).map((part) => ` · ${part}`).join("") : item.country ? ` · ${item.country}` : ""}</option>
+          <option key={item.listKey} value={item.listKey}>{item.listValue}{name === "classificationSocietyKey" && item.country ? ` · ${item.country}` : ""}</option>
         ))}
       </select>
+      {name === "surveyTypeKey" && originalReferences.current.surveyTypeKey && !surveys.some((item) => item.listKey === originalReferences.current.surveyTypeKey) && (
+        <p className="mt-1 text-xs text-amber-800">The saved survey reference is inactive or unavailable. Leave it unchanged to preserve it.</p>
+      )}
       {fieldErrors[name] && <p id={`h-${name}-error`} role="alert" className="mt-1 text-xs text-red-700">{fieldErrors[name]}</p>}
     </div>
   );

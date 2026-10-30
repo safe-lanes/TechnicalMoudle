@@ -71,6 +71,8 @@ async function master(db: Connection, type: string, value: string, lock = false)
   const matches = await (lock ? query.for("share") : query);
   const codes = matches.filter(row => row.listKey === value);
   const candidates = codes.length ? codes : matches.filter(row => row.listValue === value && row.isActive && !row.isDeleted);
+  if (type === "surveyType" && !codes.length && candidates.length > 1)
+    throw new ValidationError(`Survey Type: "${value}" matches multiple active Survey Types. Use an unambiguous Survey Type value; this row cannot be imported.`);
   if (candidates.length !== 1 || !candidates[0].isActive || candidates[0].isDeleted) throw new ValidationError(
     `${type === "classificationSociety" ? "Classification Society" : "Survey Type"}: ${candidates.length > 1 ? "ambiguous master value" : "unknown, inactive or removed master value"}.`);
   return candidates[0];
@@ -98,6 +100,7 @@ async function evaluate(db: Connection, values: Record<string, string>, vesselId
   if (values.lastClassSurveyDate) business.lastClassSurvey = importSurveyDate(values.lastClassSurveyDate);
   if (values.nextClassSurvey) business.nextSurveyDue = importSurveyDate(values.nextClassSurvey);
   const selectedMasters: unknown[] = [];
+  let surveyTypeValue = target?.surveyType;
   for (const [field, type, key] of [
     ["classificationSociety", "classificationSociety", "classificationSocietyKey"],
     ["surveyType", "surveyType", "surveyTypeKey"],
@@ -108,6 +111,7 @@ async function evaluate(db: Connection, values: Record<string, string>, vesselId
     }
     const selected = await master(db, type, values[field], lock);
     business[key] = selected.listKey;
+    if (type === "surveyType") surveyTypeValue = selected.listValue;
     selectedMasters.push([type, selected.id, selected.listKey, selected.listValue, selected.isActive, selected.isDeleted]);
   }
   const societyCode = business.classificationSocietyKey || target?.classificationSocietyKey || target?.classCode;
@@ -121,7 +125,7 @@ async function evaluate(db: Connection, values: Record<string, string>, vesselId
   // including unchanged keys, since the manual editor intentionally preserves retired snapshots.
   if (proposed !== "skip") await classRegulatoryBusinessFields(db, business, target, true);
   return { vessel, component, target, proposed: proposed as "create" | "update" | "skip", business,
-    masterFingerprint: fingerprint(selectedMasters) };
+    masterFingerprint: fingerprint(selectedMasters), surveyTypeValue };
 }
 
 export async function previewSectionHImport(
@@ -149,6 +153,8 @@ export async function previewSectionHImport(
         business: resolved.business, masterFingerprint: resolved.masterFingerprint });
       result.normalized.action = resolved.proposed;
       result.normalized.Action = resolved.proposed;
+      if (!result.errors.length && resolved.surveyTypeValue)
+        result.normalized["Survey Type"] = resolved.surveyTypeValue;
     } catch (error: any) {
       result.errors.push(...(error.fieldErrors ? Object.entries(error.fieldErrors).map(([k, v]) => `${k}: ${v}`) : [error.message]));
     }

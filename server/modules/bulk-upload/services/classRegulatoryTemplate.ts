@@ -23,12 +23,12 @@ export async function classRegulatoryTemplate(vesselId: string) {
   const reference = workbook.addWorksheet("Master References");
   reference.columns = [
     { header: "Classification Society", width: 60 }, { header: "Class Code", width: 25 },
-    { header: "Survey Type", width: 60 }, { header: "Survey Code", width: 25 },
+    { header: "Survey Type", width: 60 },
   ];
   const societies = masters.filter(m => m.listType === "classificationSociety");
   const surveys = masters.filter(m => m.listType === "surveyType");
   for (let i = 0; i < Math.max(societies.length, surveys.length); i++)
-    reference.addRow([societies[i]?.listValue, societies[i]?.listKey, surveys[i]?.listValue, surveys[i]?.listKey]);
+    reference.addRow([societies[i]?.listValue, societies[i]?.listKey, surveys[i]?.listValue]);
   for (let row = 2; row <= 1001; row++) {
     if (societies.length) sheet.getCell(row, 2).dataValidation = { type: "list", allowBlank: true,
       formulae: [`'Master References'!$A$2:$A$${societies.length + 1}`], showErrorMessage: true, error: "Select an active Classification Society." };
