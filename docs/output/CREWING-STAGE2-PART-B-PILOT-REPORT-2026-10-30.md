@@ -142,7 +142,10 @@ and the documentation regression — the shared change (chat.py) only appends a 
 - "My appraisal" is answered with a question, not the person's data, until Crewing links logins to crew records (not built).
 - Rotation has no personal queue by design of Crewing; the chatbot shows the company's pending plans.
 
-### Versions (local, NOT pushed)
-- Crewing `feature/assistant-livedata-trial` @ **4649c86d** (on faca37ef; pushed base 3457b6718)
-- Assistant `feature/crewing-livedata-trial` code @ **1483cb185** (on cd586d70b; pushed base 77a0c95c5), plus this report commit
-- Pilot image `sail-assistant-py:crewtrial-1483cb185`; previous kept stopped as -pb2 (cd586d70b)
+### Versions (local, NOT pushed) — reconciled 31-Oct-2026
+| Repository | Code that was TESTED | Branch head | What the head adds on top |
+|---|---|---|---|
+| Crewing `feature/assistant-livedata-trial` | **4649c86d** (trial servers ran this server code; `git diff 4649c86d dad841d4 -- server` is empty) | **dad841d4** | only the focused-run result files (v31-focused-1/-2.json, masking-checks-r3.json) |
+| Assistant `feature/crewing-livedata-trial` | **1483cb185** (= pilot image `sail-assistant-py:crewtrial-1483cb185`) | **ce78946dd** + this reconciliation commit | only this report |
+
+Pushed bases: Crewing 3457b6718, assistant 77a0c95c5. Previous pilot image kept stopped as -pb2 (cd586d70b).
