@@ -424,7 +424,7 @@ CREWING_DATA_RULES = (
     "'none' or '0'. Only ok:true with total 0 means 'none'. "
     "RULE — the other live-data areas (confirmed rules): AVAILABILITY → crewing_query_availability ('available to join', 'who can "
     "join as <rank> next month'; default = available now; a person on board with a Next Availability date counts; say how many "
-    "have no availability date from `excluded`). RELIEF DUE / OVERDUE → crewing_query_relief_due (Due Crew rule; when "
+    "have no availability date from `excluded`; 'in <month>' means available by the LAST day of that month; for a named person call crewing_find_crew and pass crewIds — never conclude from a list that omits them). RELIEF DUE / OVERDUE → crewing_query_relief_due (Due Crew rule; when "
     "reliefDueDiffers is true name both the contract end and the recorded relief-due date). REST HOURS → crewing_query_rest_hours "
     "(live recalculation; ALWAYS state the month(s) and `lastUpdated`; OPA only when the user says so, and say whether OPA was "
     "applied). ROTATION APPROVALS → crewing_query_rotation_approvals (waiting plans company-wide; 'for me' only when the user says "
