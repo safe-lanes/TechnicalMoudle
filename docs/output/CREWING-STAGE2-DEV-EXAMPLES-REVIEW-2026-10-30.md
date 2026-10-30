@@ -1,4 +1,4 @@
-# Crewing chatbot — Sagar's dev examples reviewed against the accepted rules and the two-area pilot (30-Oct-2026)
+# Crewing chatbot — Sagar's dev examples reviewed (crew names reduced to initials in this committed copy) against the accepted rules and the two-area pilot (30-Oct-2026)
 
 Source: `Crewing-Chatbot-Business-Rules-Questionnaire_examplefromdev.docx` (Sagar, 30-Oct-2026) — the questionnaire copy with
 the example boxes filled in and two screenshots of a crew member's "Documents & Training Expiry Details" page on dev. The
@@ -15,8 +15,8 @@ superseded by Sahil's decisions (see `CREWING-STAGE2-SAHIL-DECISIONS-2026-10-29.
 2. **No new scenario needed a fixture.** Nothing in the examples contradicts a decided rule or reveals a case the isolated
    pilot does not already exercise, so no fixture was added and no suite re-run (the local copy already holds 23 GMDSS
    licences across 22 people and 51 documents without an expiry date, exercised by the committed checks).
-3. **Reserved for dev acceptance** (not verified locally; dev was not read): "Vessel 8" on board includes Saad Hamid
-   (Master) and Ali Waqas (Chief Officer); their licence / training expiry dates and the windows they fall into are
+3. **Reserved for dev acceptance** (not verified locally; dev was not read): "Vessel 8" on board includes S. H.
+   (Master) and A. W. (Chief Officer); their licence / training expiry dates and the windows they fall into are
    recorded in section 3 with the filters to use — **for these two crew only; they are not the Vessel 8 totals**. The
    screenshot date is not stated, so the as-of date and the current records are checked on the acceptance day.
 4. **Out of scope confirmed.** The screenshots also show passports and seaman's books. Those live in a separate table
@@ -49,13 +49,13 @@ date, so windows below are given relative to the as-of date D).
 
 **Crew on board**
 - Question: "Who is on board Vessel 8?" → filters: vessel "Vessel 8", on board (primary + signed-on secondary), unit people.
-- Expected to include: Saad Hamid (Master), Ali Waqas (Chief Officer). Full count and other names: from the Vessel screen on
+- Expected to include: S. H. (Master), A. W. (Chief Officer). Full count and other names: from the Vessel screen on
   the acceptance day.
 
 **Licences / training certificates** (dates from the screenshots; document numbers deliberately not recorded)
-- Saad Hamid (Master): COC Master 20-Nov-2026; GMDSS 11-Nov-2026; Advanced Fire Fighting 10-Dec-2026; Advanced Training for
+- S. H. (Master): COC Master 20-Nov-2026; GMDSS 11-Nov-2026; Advanced Fire Fighting 10-Dec-2026; Advanced Training for
   Oil Tanker Cargo Operations 15-Dec-2026; two training rows (chemical, liquefied gas) with **no expiry**.
-- Ali Waqas (Chief Officer): COC Chief Mate 25-Nov-2026; GMDSS 11-Nov-2026; Personal Survival Techniques 25-Nov-2026;
+- A. W. (Chief Officer): COC Chief Mate 25-Nov-2026; GMDSS 11-Nov-2026; Personal Survival Techniques 25-Nov-2026;
   Proficiency in Survival Craft & Rescue Boats 18-Nov-2026; one training row (fast rescue boats) with **no expiry**.
 - Questions and expected shape (with D = 1-Nov-2026 as an illustration). **The counts below are the contribution of these two
   crew only; the Vessel 8 total on the acceptance day also includes every other crew member on board and their documents,
