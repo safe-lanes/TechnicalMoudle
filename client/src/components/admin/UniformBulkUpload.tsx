@@ -1,5 +1,5 @@
 import { useAdminUrlState } from "@/hooks/useAdminUrlState";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -63,6 +63,8 @@ import ImportProgressOverlay, { useImportStream, type ImportProgressData, type I
 import { LucideIcon } from "lucide-react";
 import ImportSummaryModal, { ImportSummaryRow } from "./ImportSummaryModal";
 import { isGlobalBulkImportType } from "@shared/bulkImportHistoryScope";
+import { useAuth } from "@/contexts/AuthContext";
+import { sectionHRequest } from "@/lib/sectionHRequest";
 
 interface FieldMapping {
   field: string;
@@ -97,6 +99,7 @@ interface ImportHistory {
   created: number;
   updated: number;
   skipped: number;
+  failed?: number;
   archived: number;
   date: string;
   status: string;
@@ -135,7 +138,7 @@ interface UniformBulkUploadProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs' | 'fleet-spares' | 'wo-history';
+  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs' | 'fleet-spares' | 'wo-history' | 'class-regulatory';
   templateFileName: string;
   fieldMappings: FieldMapping[];
   vesselId?: string;
@@ -146,6 +149,10 @@ interface UniformBulkUploadProps {
   onHistorySubTypeChange?: (value: string) => void;
   onRefreshData?: () => void;
   markers?: MarkerConfig;
+  classRegulatoryReferences?: { societies?: unknown; surveyTypes?: unknown };
+  referenceLoading?: boolean;
+  referenceError?: boolean;
+  onRetryReferences?: () => void;
 }
 
 export default function UniformBulkUpload({
@@ -162,9 +169,15 @@ export default function UniformBulkUpload({
   selectedHistorySubType: selectedHistorySubTypeProp,
   onHistorySubTypeChange,
   onRefreshData,
-  markers
+  markers,
+  classRegulatoryReferences,
+  referenceLoading,
+  referenceError,
+  onRetryReferences
 }: UniformBulkUploadProps) {
   const { isSailAdmin, isExternal } = useUIRole();
+  const { sectionHUser } = useAuth();
+  const isClassRegulatory = templateType === "class-regulatory";
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useAdminUrlState<'add' | 'update' | 'upsert'>(`bulk.${templateType}.mode`, "upsert", ["add", "update", "upsert"]);
   const [selectedStoreType, setSelectedStoreType] = useAdminUrlState<string>(`bulk.${templateType}.storeType`, "", ["", ...(storeTypes || []).map(type => type.value)]);
@@ -202,7 +215,7 @@ export default function UniformBulkUpload({
   const [undoDialogOpen, setUndoDialogOpen] = useState(false);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState(false);
-  const [activeTab, setActiveTab] = useAdminUrlState<string>(`bulk.${templateType}.tab`, "upload", ["upload", ...((isSailAdmin || isExternal) ? ["mapping"] : []), "history"]);
+  const [activeTab, setActiveTab] = useAdminUrlState<string>(`bulk.${templateType}.tab`, "upload", ["upload", ...((isSailAdmin || isExternal || isClassRegulatory) ? ["mapping"] : []), "history"]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -217,6 +230,27 @@ export default function UniformBulkUpload({
   const [sseError, setSseError] = useState<string | null>(null);
   const { toast } = useToast();
   const { consumeStream } = useImportStream();
+  const requestSequence = useRef(0);
+  const modeRef = useRef(importMode);
+  useEffect(() => () => { requestSequence.current += 1; }, []);
+  useEffect(() => {
+    if (isClassRegulatory && modeRef.current !== importMode) {
+      requestSequence.current += 1;
+      setDryRunResult(null);
+      setIsUploading(false);
+      setIsLoadingSheets(false);
+    }
+    modeRef.current = importMode;
+  }, [importMode, isClassRegulatory]);
+  const changeImportMode = (value: 'add' | 'update' | 'upsert') => {
+    if (isClassRegulatory) {
+      requestSequence.current += 1;
+      setDryRunResult(null);
+      setIsUploading(false);
+      setIsLoadingSheets(false);
+    }
+    setImportMode(value);
+  };
 
   const isGlobalHistory = isGlobalBulkImportType(effectiveType);
   const historyVesselId = isGlobalHistory ? undefined : vesselId?.trim();
@@ -227,6 +261,12 @@ export default function UniformBulkUpload({
     enabled: canLoadHistory,
     placeholderData: undefined,
     queryFn: async ({ signal }) => {
+      if (isClassRegulatory) {
+        if (!historyVesselId) return { items: [], total: 0 };
+        const params = new URLSearchParams({ type: "class-regulatory", vesselId: historyVesselId });
+        const response = await sectionHRequest(sectionHUser, "GET", `/technical/api/bulk/class-regulatory/history?${params}`);
+        return response.json();
+      }
       const params = new URLSearchParams({ type: effectiveType, limit: '50' });
       if (historyVesselId) params.set('vesselId', historyVesselId);
       const response = await fetch(`/technical/api/bulk/history?${params}`, { signal });
@@ -239,10 +279,14 @@ export default function UniformBulkUpload({
 
   const handleDownloadTemplate = async () => {
     try {
-      const templateUrl = vesselId 
+      const templateUrl = isClassRegulatory
+        ? `/technical/api/bulk/class-regulatory/template?vesselId=${encodeURIComponent(vesselId || "")}`
+        : vesselId
         ? `/technical/api/bulk/template?type=${effectiveType}&vesselId=${vesselId}`
         : `/technical/api/bulk/template?type=${effectiveType}`;
-      const response = await fetch(templateUrl);
+      const response = isClassRegulatory
+        ? await sectionHRequest(sectionHUser, "GET", templateUrl)
+        : await fetch(templateUrl);
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -268,39 +312,43 @@ export default function UniformBulkUpload({
     }
   };
 
-  const loadSheets = async (file: File) => {
+  const loadSheets = async (file: File, sequence: number) => {
     setIsLoadingSheets(true);
     setAvailableSheets([]);
     setSelectedSheet('');
     
     const formData = new FormData();
     formData.append('file', file);
+    if (isClassRegulatory) {
+      formData.append("vesselId", vesselId || "");
+      formData.append("type", "class-regulatory");
+    }
 
     try {
-      const response = await fetch('/technical/api/bulk/sheets', {
-        method: 'POST',
-        body: formData
-      });
+      const response = isClassRegulatory
+        ? await sectionHRequest(sectionHUser, "POST", "/technical/api/bulk/class-regulatory/sheets", formData)
+        : await fetch('/technical/api/bulk/sheets', { method: 'POST', body: formData });
 
       if (!response.ok) {
         throw new Error('Failed to load sheets');
       }
 
       const result = await response.json();
+      if (isClassRegulatory && sequence !== requestSequence.current) return;
       setAvailableSheets(result.sheets || []);
       
       if (result.sheets && result.sheets.length > 0) {
         setSelectedSheet(result.sheets[0]);
-        await handleDryRun(file, result.sheets[0]);
+        await handleDryRun(file, result.sheets[0], sequence);
       }
     } catch (error) {
-      toast({
+      if (!isClassRegulatory || sequence === requestSequence.current) toast({
         title: 'Error',
         description: 'Failed to read file sheets.',
         variant: 'destructive'
       });
     } finally {
-      setIsLoadingSheets(false);
+      if (!isClassRegulatory || sequence === requestSequence.current) setIsLoadingSheets(false);
     }
   };
 
@@ -308,25 +356,29 @@ export default function UniformBulkUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validTypes = ['.csv', '.xls', '.xlsx'];
-    const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
+    const validTypes = isClassRegulatory ? ['.xls', '.xlsx'] : ['.csv', '.xls', '.xlsx'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     
     if (!validTypes.includes(fileExtension)) {
       toast({
         title: 'Invalid File',
-        description: 'Please upload a .xlsx, .xls, or .csv file',
+        description: isClassRegulatory ? 'Please upload an .xls or .xlsx workbook.' : 'Please upload a .xlsx, .xls, or .csv file',
         variant: 'destructive'
       });
       return;
     }
 
+    const sequence = ++requestSequence.current;
     setSelectedFile(file);
     setDryRunResult(null);
+    setIsUploading(false);
+    setAvailableSheets([]);
+    setSelectedSheet('');
     
     if (fileExtension === '.xlsx' || fileExtension === '.xls') {
-      await loadSheets(file);
+      await loadSheets(file, sequence);
     } else {
-      await handleDryRun(file, '');
+      await handleDryRun(file, '', sequence);
     }
   };
 
@@ -337,25 +389,29 @@ export default function UniformBulkUpload({
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
 
-    const validTypes = ['.csv', '.xls', '.xlsx'];
-    const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
+    const validTypes = isClassRegulatory ? ['.xls', '.xlsx'] : ['.csv', '.xls', '.xlsx'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     
     if (!validTypes.includes(fileExtension)) {
       toast({
         title: 'Invalid File',
-        description: 'Please upload a .xlsx, .xls, or .csv file',
+        description: isClassRegulatory ? 'Please upload an .xls or .xlsx workbook.' : 'Please upload a .xlsx, .xls, or .csv file',
         variant: 'destructive'
       });
       return;
     }
 
+    const sequence = ++requestSequence.current;
     setSelectedFile(file);
     setDryRunResult(null);
+    setIsUploading(false);
+    setAvailableSheets([]);
+    setSelectedSheet('');
     
     if (fileExtension === '.xlsx' || fileExtension === '.xls') {
-      await loadSheets(file);
+      await loadSheets(file, sequence);
     } else {
-      await handleDryRun(file, '');
+      await handleDryRun(file, '', sequence);
     }
   };
 
@@ -364,7 +420,7 @@ export default function UniformBulkUpload({
     e.stopPropagation();
   };
 
-  const handleDryRun = async (file: File, sheetName?: string) => {
+  const handleDryRun = async (file: File, sheetName?: string, sequence = requestSequence.current) => {
     setIsUploading(true);
     setDryRunResult(null);
 
@@ -372,10 +428,11 @@ export default function UniformBulkUpload({
     formData.append('file', file);
     formData.append('type', effectiveType);
     formData.append('mode', importMode);
-    if (vesselId) {
+    if (isClassRegulatory) formData.append("vesselId", vesselId || "");
+    if (vesselId && !isClassRegulatory) {
       formData.append('vesselId', vesselId);
     }
-    formData.append('archiveMissing', 'false');
+    if (!isClassRegulatory) formData.append('archiveMissing', 'false');
     
     if (sheetName) {
       formData.append('sheetName', sheetName);
@@ -389,10 +446,9 @@ export default function UniformBulkUpload({
     }
 
     try {
-      const response = await fetch('/technical/api/bulk/dry-run', {
-        method: 'POST',
-        body: formData
-      });
+      const response = isClassRegulatory
+        ? await sectionHRequest(sectionHUser, "POST", "/technical/api/bulk/class-regulatory/dry-run", formData)
+        : await fetch('/technical/api/bulk/dry-run', { method: 'POST', body: formData });
 
       if (!response.ok) {
         const error = await response.json();
@@ -400,31 +456,34 @@ export default function UniformBulkUpload({
       }
 
       const result = await response.json();
+      if (isClassRegulatory && sequence !== requestSequence.current) return;
       setDryRunResult(result);
       setCurrentPage(1);
       setStatusFilter('all');
       setExpandedRows(new Set());
 
       if (result.summary.errors > 0) {
+        if (isClassRegulatory && sequence !== requestSequence.current) return;
         toast({
           title: 'Validation Complete',
           description: `Found ${result.summary.errors} error(s). Review before importing.`,
           variant: 'destructive'
         });
       } else {
+        if (isClassRegulatory && sequence !== requestSequence.current) return;
         toast({
           title: 'Validation Complete',
           description: 'File is valid and ready to import.'
         });
       }
     } catch (error: any) {
-      toast({
+      if (!isClassRegulatory || sequence === requestSequence.current) toast({
         title: 'Validation Failed',
         description: error.message || 'Failed to validate file',
         variant: 'destructive'
       });
     } finally {
-      setIsUploading(false);
+      if (!isClassRegulatory || sequence === requestSequence.current) setIsUploading(false);
     }
   };
 
@@ -468,8 +527,11 @@ export default function UniformBulkUpload({
     setSseOverlayVisible(true);
 
     try {
+      const streamUrl = isClassRegulatory
+        ? "/technical/api/bulk/class-regulatory/import-stream"
+        : "/technical/api/bulk/import-stream";
       await consumeStream(
-        '/technical/api/bulk/import-stream',
+        streamUrl,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -481,8 +543,9 @@ export default function UniformBulkUpload({
             setSseComplete(result);
 
             toast({
-              title: 'Import Successful',
-              description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
+              title: isClassRegulatory && (result.failed ?? 0) > 0 ? 'Import completed with errors' : 'Import Successful',
+              description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}${isClassRegulatory ? `, Failed: ${result.failed || 0}` : ''}`,
+              variant: isClassRegulatory && (result.failed ?? 0) > 0 ? 'destructive' : 'default',
             });
 
             const summaryRows: ImportSummaryRow[] = buildImportSummary(result, dryRunResult, skipErrors);
@@ -498,6 +561,9 @@ export default function UniformBulkUpload({
             setPartialImportDialogOpen(false);
 
             queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', effectiveType] });
+            if (isClassRegulatory) {
+              queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/import-history'] });
+            }
             invalidateAfterBulkImport(effectiveType, vesselId);
 
             if (onRefreshData) {
@@ -515,6 +581,19 @@ export default function UniformBulkUpload({
             });
             setIsImporting(false);
           },
+          ...(isClassRegulatory ? {
+            fetcher: (url: string, options?: RequestInit) => {
+              const method = options?.method || "GET";
+              let data: unknown;
+              if (typeof options?.body === "string") {
+                try { data = JSON.parse(options.body); } catch { data = options.body; }
+              } else {
+                data = options?.body;
+              }
+              return sectionHRequest(sectionHUser, method, url, data);
+            },
+            statusUrl: (historyId: string) => `/technical/api/bulk/class-regulatory/import-status/${encodeURIComponent(historyId)}`,
+          } : {}),
         }
       );
     } catch (error: any) {
@@ -550,13 +629,16 @@ export default function UniformBulkUpload({
         });
       }
     } else if (dryRun) {
+      const failedRows = new Map<number, string>(isClassRegulatory && Array.isArray(importResult.errors)
+        ? importResult.errors.filter((error: any) => typeof error?.row === "number")
+            .map((error: any) => [error.row, error.message] as [number, string]) : []);
       for (const dr of dryRun.rows) {
         if (dr.status === 'ok' || dr.status === 'warning') {
           rows.push({
             rowNumber: dr.row,
             primaryIdentifier: dr.normalized?.[primaryCol] || '',
-            status: 'success',
-            error: dr.status === 'warning' ? dr.errors.join('; ') : undefined,
+            status: failedRows.has(dr.row) ? 'failed' : isClassRegulatory && dr.normalized?.action === "skip" ? 'skipped' : 'success',
+            error: failedRows.get(dr.row) || (dr.status === 'warning' ? dr.errors.join('; ') : undefined),
             data: dr.normalized,
           });
         }
@@ -712,9 +794,27 @@ export default function UniformBulkUpload({
     }
   };
 
+  const downloadSectionHReport = async (url: string, filename: string) => {
+    try {
+      const response = await sectionHRequest(sectionHUser, "GET", url);
+      const link = document.createElement("a");
+      const objectUrl = URL.createObjectURL(await response.blob());
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error: any) {
+      toast({ title: "Report download failed", description: error.message, variant: "destructive" });
+    }
+  };
+
   const handleDownloadOriginalFile = async (historyId: string, fileName?: string) => {
     try {
-      const response = await fetch(`/technical/api/bulk/history/${historyId}/download-original`);
+      const response = isClassRegulatory
+        ? await sectionHRequest(sectionHUser, "GET", `/technical/api/bulk/class-regulatory/history/${encodeURIComponent(historyId)}/download-original`)
+        : await fetch(`/technical/api/bulk/history/${historyId}/download-original`);
       
       if (!response.ok) {
         const error = await response.json();
@@ -772,11 +872,11 @@ export default function UniformBulkUpload({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`grid w-full ${(isSailAdmin || isExternal) ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <TabsList className={`grid w-full ${(isSailAdmin || isExternal || isClassRegulatory) ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="upload" data-testid={markers?.tabUpload || "tab-upload"}>
             Upload
           </TabsTrigger>
-          {(isSailAdmin || isExternal) && (
+          {(isSailAdmin || isExternal || isClassRegulatory) && (
             <TabsTrigger value="mapping" data-testid={markers?.tabMapping || "tab-mapping"}>
               Field Mapping Guide
             </TabsTrigger>
@@ -787,6 +887,28 @@ export default function UniformBulkUpload({
         </TabsList>
 
         <TabsContent value="upload" className="space-y-6 pt-4">
+          {isClassRegulatory && (
+            <Card className="border-sky-200 bg-sky-50/70">
+              <CardContent className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium text-sky-950">Vessel-scoped Section H workbook</p>
+                  <p className="text-sm text-sky-800">Use the selected vessel’s actual Vessel Code. Blank optional update cells preserve existing values. No attachment files are accepted.</p>
+                  <p className="text-xs text-sky-700 mt-1">
+                    {referenceLoading
+                      ? "Loading Classification Society and Survey Type reference lists…"
+                      : referenceError
+                        ? "Reference list preview is unavailable; validation still checks active master values."
+                        : classRegulatoryReferences
+                          ? "Master reference data is available for this import."
+                          : "Master values are validated against active Section H reference lists."}
+                  </p>
+                </div>
+                {referenceError && onRetryReferences && (
+                  <Button variant="outline" size="sm" onClick={onRetryReferences}>Retry reference lists</Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
           {storeTypes && (
             <Card data-testid={markers?.storeTypeSection || "store-type-section"}>
               <CardHeader className="pb-3">
@@ -854,25 +976,25 @@ export default function UniformBulkUpload({
             <CardContent>
               <RadioGroup 
                 value={importMode} 
-                onValueChange={(value) => setImportMode(value as any)}
+                onValueChange={(value) => changeImportMode(value as 'add' | 'update' | 'upsert')}
                 className="space-y-3"
               >
                 <div className="flex items-start space-x-3" data-testid={markers?.radioAddOnly || "radio-add-only"}>
-                  <RadioGroupItem value="add" id="mode-add" className="mt-1" />
+                  <RadioGroupItem value="add" id="mode-add" className="mt-1" disabled={isImporting} />
                   <Label htmlFor="mode-add" className="font-normal cursor-pointer">
                     <div className="font-medium">Add Only</div>
                     <div className="text-sm text-gray-500">Only create new records, skip existing ones</div>
                   </Label>
                 </div>
                 <div className="flex items-start space-x-3" data-testid={markers?.radioUpdateOnly || "radio-update-only"}>
-                  <RadioGroupItem value="update" id="mode-update" className="mt-1" />
+                  <RadioGroupItem value="update" id="mode-update" className="mt-1" disabled={isImporting} />
                   <Label htmlFor="mode-update" className="font-normal cursor-pointer">
                     <div className="font-medium">Update Only</div>
                     <div className="text-sm text-gray-500">Only update existing records, skip new ones</div>
                   </Label>
                 </div>
                 <div className="flex items-start space-x-3" data-testid={markers?.radioUpsert || "radio-upsert"}>
-                  <RadioGroupItem value="upsert" id="mode-upsert" className="mt-1" />
+                  <RadioGroupItem value="upsert" id="mode-upsert" className="mt-1" disabled={isImporting} />
                   <Label htmlFor="mode-upsert" className="font-normal cursor-pointer">
                     <div className="font-medium">Add + Update (Recommended)</div>
                     <div className="text-sm text-gray-500">Create new records and update existing ones</div>
@@ -888,7 +1010,7 @@ export default function UniformBulkUpload({
                 Upload File
               </CardTitle>
               <CardDescription data-testid={markers?.uploadDescription || "upload-description"}>
-                Upload CSV, XLS, or XLSX files containing {templateType} data
+                {isClassRegulatory ? "Upload Excel (.xls or .xlsx) files containing Classification & Regulatory Data" : `Upload CSV, XLS, or XLSX files containing ${templateType} data`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -901,7 +1023,7 @@ export default function UniformBulkUpload({
               >
                 <input
                   type="file"
-                  accept=".csv,.xls,.xlsx"
+                  accept={isClassRegulatory ? ".xls,.xlsx" : ".csv,.xls,.xlsx"}
                   onChange={handleFileSelect}
                   className="hidden"
                   id={`file-upload-${templateType}`}
@@ -913,7 +1035,7 @@ export default function UniformBulkUpload({
                   Click to upload or drag and drop
                 </span>
                 <span className="block text-xs text-gray-500 mt-1">
-                  CSV, XLS, or XLSX (max 20MB)
+                  {isClassRegulatory ? "Excel workbook only: XLS or XLSX (max 20MB)" : "CSV, XLS, or XLSX (max 20MB)"}
                 </span>
                 {selectedFile && (
                   <div className="mt-4 flex items-center justify-center gap-2 text-sm font-medium text-sky-600">
@@ -927,7 +1049,14 @@ export default function UniformBulkUpload({
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <Label className="text-sm font-medium">Select Sheet</Label>
                   <div className="flex gap-2 mt-2">
-                    <Select value={selectedSheet} onValueChange={setSelectedSheet}>
+                    <Select value={selectedSheet} onValueChange={(sheet) => {
+                      if (isClassRegulatory) {
+                        requestSequence.current += 1;
+                        setDryRunResult(null);
+                        setIsUploading(false);
+                      }
+                      setSelectedSheet(sheet);
+                    }}>
                       <SelectTrigger className="flex-1" data-testid="select-sheet">
                         <SelectValue placeholder="Select sheet..." />
                       </SelectTrigger>
@@ -946,6 +1075,17 @@ export default function UniformBulkUpload({
                     </Button>
                   </div>
                 </div>
+              )}
+
+              {isClassRegulatory && selectedFile && availableSheets.length <= 1 && !isLoadingSheets && !isUploading && !dryRunResult && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleDryRun(selectedFile, selectedSheet || undefined, requestSequence.current)}
+                  data-testid="button-validate-class-regulatory"
+                >
+                  Validate workbook
+                </Button>
               )}
 
               {(isUploading || isLoadingSheets) && (
@@ -1204,7 +1344,7 @@ export default function UniformBulkUpload({
           </Card>
         </TabsContent>
 
-        {(isSailAdmin || isExternal) && (
+        {(isSailAdmin || isExternal || isClassRegulatory) && (
           <TabsContent value="mapping" className="pt-4">
             <Card>
               <CardHeader>
@@ -1240,6 +1380,19 @@ export default function UniformBulkUpload({
                     </TableBody>
                   </Table>
                 </div>
+                {isClassRegulatory && (
+                  <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                    <p className="font-semibold">Workbook notes</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      <li>Use the exact A–J headers. Component Code and Vessel Code must resolve to the selected vessel.</li>
+                      <li>Dates accept DD-MM-YYYY text or actual Excel date cells; alternate date strings are not accepted.</li>
+                      <li>Certificate Number is trimmed at the ends only; case and internal characters are preserved.</li>
+                      <li>Blank optional cells on updates preserve existing values, including master references and the derived Class Code.</li>
+                      <li>Classification Society and Survey Type must match active master entries; missing master data is never created by this import.</li>
+                      <li>The workbook contains data only. Supporting document attachments are neither uploaded nor changed.</li>
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1249,8 +1402,8 @@ export default function UniformBulkUpload({
           <Card>
             <CardHeader>
               <CardTitle>Import History</CardTitle>
-              <CardDescription>
-                View past imports and undo if needed
+                  <CardDescription>
+                  {isClassRegulatory ? "View past vessel-specific imports. Undo is not available for this import type." : "View past imports and undo if needed"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1283,6 +1436,7 @@ export default function UniformBulkUpload({
                         <TableHead className="text-right">Created</TableHead>
                         <TableHead className="text-right">Updated</TableHead>
                         <TableHead className="text-right">Skipped</TableHead>
+                        {isClassRegulatory && <TableHead className="text-right">Failed</TableHead>}
                         <TableHead>Status</TableHead>
                         <TableHead className="text-center">Actions</TableHead>
                       </TableRow>
@@ -1305,6 +1459,7 @@ export default function UniformBulkUpload({
                           <TableCell className="text-right text-green-600 font-medium">{h.created}</TableCell>
                           <TableCell className="text-right text-blue-600 font-medium">{h.updated}</TableCell>
                           <TableCell className="text-right text-gray-500">{h.skipped}</TableCell>
+                          {isClassRegulatory && <TableCell className="text-right text-red-600">{h.failed || 0}</TableCell>}
                           <TableCell>
                             <Badge variant={h.status === 'complete' ? 'default' : h.status === 'undone' ? 'secondary' : 'destructive'}>
                               {h.status}
@@ -1312,7 +1467,13 @@ export default function UniformBulkUpload({
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-1">
-                              {h.status === 'complete' && (
+                              {isClassRegulatory && (
+                                <Button variant="ghost" size="sm" title="Download error report"
+                                  onClick={() => downloadSectionHReport(`/technical/api/bulk/class-regulatory/history/${encodeURIComponent(h.id)}/error-report`, "class_regulatory_errors.xlsx")}>
+                                  <FileWarning className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {h.status === 'complete' && !isClassRegulatory && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1324,7 +1485,7 @@ export default function UniformBulkUpload({
                                   Undo
                                 </Button>
                               )}
-                              {h.storedFilePath && (
+                              {(h.storedFilePath || isClassRegulatory) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1335,6 +1496,9 @@ export default function UniformBulkUpload({
                                 >
                                   <FileDown className="h-4 w-4" />
                                 </Button>
+                              )}
+                              {isClassRegulatory && (
+                                <span className="px-2 text-xs text-muted-foreground">Undo unavailable</span>
                               )}
                             </div>
                           </TableCell>
@@ -1359,6 +1523,12 @@ export default function UniformBulkUpload({
             <DialogDescription>
               These rows have validation errors and will not be imported
             </DialogDescription>
+            {isClassRegulatory && dryRunResult?.errorReportUrl && (
+              <Button variant="outline" size="sm"
+                onClick={() => downloadSectionHReport(dryRunResult.errorReportUrl!, "class_regulatory_validation_errors.xlsx")}>
+                <Download className="h-4 w-4 mr-2" />Download error report
+              </Button>
+            )}
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="rounded-lg border overflow-hidden">

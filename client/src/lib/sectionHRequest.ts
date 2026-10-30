@@ -20,6 +20,7 @@ export async function sectionHRequest(
     return response;
   }
   if (!/^\/technical\/api\/component-class-regulatory(?:\/[^?#]*)?(?:\?includeDeleted=true)?$/.test(url) &&
+      !/^\/technical\/api\/bulk\/class-regulatory(?:\/[^?#]*)?(?:\?[^#]*)?$/.test(url) &&
       !/^\/technical\/api\/section-h-entries\/[0-9a-f-]+\/attachments(?:\/[0-9a-f-]+(?:\/(?:download|restore))?)?(?:\?includeDeleted=true)?$/i.test(url) &&
       !/^\/technical\/api\/fleet\/master-lists\?listType=(classificationSociety|surveyType)$/.test(url)) {
     throw new Error("Development Section H access cannot be used for this endpoint.");

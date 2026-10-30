@@ -13,7 +13,8 @@ export class ClassRegulatoryValidationError extends AppError {
   }
 }
 type Db = Awaited<ReturnType<typeof getDb>>;
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+export type ClassRegulatoryTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+type Tx = ClassRegulatoryTx;
 type Connection = Db | Tx;
 
 export async function parent(db: Connection, componentId: string, actor: SectionHActor) {
@@ -41,7 +42,7 @@ async function assertReconciled(db: Connection) {
   if (missing.length) throw new ConflictError("Section H is read-only until historical shore/vessel identities have been reconciled.");
 }
 
-async function businessFields(db: Connection, raw: unknown, existing?: typeof entries.$inferSelect) {
+export async function classRegulatoryBusinessFields(db: Connection, raw: unknown, existing?: typeof entries.$inferSelect, refreshMasters = false) {
   const result = classRegulatoryInput.safeParse(raw);
   if (!result.success) throw new ClassRegulatoryValidationError(Object.fromEntries(
     result.error.issues.map(issue => [issue.path[0] || "form", issue.code === "unrecognized_keys" ?
@@ -55,7 +56,7 @@ async function businessFields(db: Connection, raw: unknown, existing?: typeof en
   ] as const) {
     const key = input[keyField];
     // Preserve a legacy/retired snapshot on unrelated edits; selection changes must be valid.
-    if (existing && (key === undefined || (key === existing[keyField] && key))) {
+    if (existing && (key === undefined || (!refreshMasters && key === existing[keyField] && key))) {
       delete fields[keyField];
       continue;
     }
@@ -78,14 +79,43 @@ function assertWrite(actor: SectionHActor) {
   if (!sectionHOfficeCanManage(actor)) throw new ForbiddenError("A verified Office session is required to manage Classification & Regulatory Data.");
 }
 async function audit(tx: Tx, actor: SectionHActor, action: string,
-  saved: typeof entries.$inferSelect, before?: typeof entries.$inferSelect) {
+  saved: typeof entries.$inferSelect, before?: typeof entries.$inferSelect, source = "web_ui") {
   await tx.insert(auditLog).values({
     userId: actor.userId, entityType: "component_class_regulatory", entityId: saved.ccruuid!,
     actionType: action, vesselCode: saved.vesselCode, componentCode: saved.componentCode,
     oldValue: before ? JSON.stringify(before) : null, newValue: JSON.stringify(saved),
-    source: "web_ui", createdByUuid: actor.userId, updatedByUuid: actor.userId,
+    source, createdByUuid: actor.userId, updatedByUuid: actor.userId,
     payload: { componentUuid: saved.componentId, entryUuid: saved.ccruuid },
   });
+}
+
+/** Caller owns the transaction and parent/entry locks. Shared by manual and bulk writes. */
+export async function writeClassEntryInTransaction(
+  tx: Tx, componentId: string, raw: unknown, actor: SectionHActor,
+  existing?: typeof entries.$inferSelect, source = "web_ui",
+) {
+  assertWrite(actor);
+  const { component, vessel } = await parent(tx, componentId, actor);
+  await assertReconciled(tx);
+  if (existing && (existing.componentId !== component.cuuid || existing.isDeleted))
+    throw new ConflictError("Classification entry ownership or deletion state changed.");
+  const values = await classRegulatoryBusinessFields(tx, raw, existing, source === "bulk_import");
+  let saved: typeof entries.$inferSelect;
+  if (existing) {
+    [saved] = await tx.update(entries).set({
+      ...values, updatedBy: actor.userId, updatedByUuid: actor.userId, updatedAt: new Date(), isSync: false,
+    }).where(eq(entries.id, existing.id)).returning();
+  } else {
+    [saved] = await tx.insert(entries).values({
+      ...values, ccruuid: randomUUID(), componentId: component.cuuid,
+      componentCode: component.componentCode || component.id, vesselCode: vessel.code,
+      classificationSociety: values.classificationSociety as string, surveyType: values.surveyType as string,
+      createdBy: actor.userId, updatedBy: actor.userId, createdByUuid: actor.userId,
+      updatedByUuid: actor.userId, updatedAt: new Date(), isDeleted: false,
+    }).returning();
+  }
+  await audit(tx, actor, existing ? "update" : "create", saved, existing, source);
+  return saved;
 }
 
 export async function createClassEntry(componentId: string, raw: unknown, actor: SectionHActor) {
@@ -94,18 +124,7 @@ export async function createClassEntry(componentId: string, raw: unknown, actor:
   return db.transaction(async tx => {
     // Serializes same-component changes with reconciliation and scope checks.
     await tx.execute(sql`SELECT cuuid FROM components WHERE cuuid = ${componentId} FOR UPDATE`);
-    const { component, vessel } = await parent(tx, componentId, actor);
-    await assertReconciled(tx);
-    const values = await businessFields(tx, raw);
-    const [saved] = await tx.insert(entries).values({
-      ...values, ccruuid: randomUUID(), componentId: component.cuuid,
-      componentCode: component.componentCode || component.id, vesselCode: vessel.code,
-      classificationSociety: values.classificationSociety as string, surveyType: values.surveyType as string,
-      createdBy: actor.userId, updatedBy: actor.userId, createdByUuid: actor.userId,
-      updatedByUuid: actor.userId, updatedAt: new Date(), isDeleted: false,
-    }).returning();
-    await audit(tx, actor, "create", saved);
-    return saved;
+    return writeClassEntryInTransaction(tx, componentId, raw, actor);
   });
 }
 
@@ -119,9 +138,9 @@ export async function mutateClassEntry(id: number, raw: unknown, action: "update
     await assertReconciled(tx);
     if (action === "update" && existing.isDeleted) throw new ConflictError("Restore this entry before editing it.");
     if ((action === "delete" && existing.isDeleted) || (action === "restore" && !existing.isDeleted)) return existing;
+    if (action === "update") return writeClassEntryInTransaction(tx, existing.componentId, raw, actor, existing);
     const now = new Date();
-    const changes = action === "update" ? await businessFields(tx, raw, existing) :
-      { isDeleted: action === "delete", deletedByUuid: action === "delete" ? actor.userId : null,
+    const changes = { isDeleted: action === "delete", deletedByUuid: action === "delete" ? actor.userId : null,
         deletedAt: action === "delete" ? now : null };
     const [saved] = await tx.update(entries).set({
       ...changes, updatedBy: actor.userId, updatedByUuid: actor.userId, updatedAt: now, isSync: false,

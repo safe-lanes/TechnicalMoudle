@@ -17,12 +17,14 @@ import MasterListsUpload from "./bulk/MasterListsUpload";
 import LocationsUpload from "./bulk/LocationsUpload";
 import RotationalItemsUpload from "./bulk/RotationalItemsUpload";
 import WoHistoryUpload from "./bulk/WoHistoryUpload";
+import ClassRegulatoryUpload from "./bulk/ClassRegulatoryUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
 import { useVessels } from "@/hooks/useVessels";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useAuth } from "@/contexts/AuthContext";
 
-type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations' | 'rotational-items' | 'wo-history';
+type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations' | 'rotational-items' | 'wo-history' | 'class-regulatory';
 type FleetTemplateType = 'maker-list' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 type ViewMode = 'upload' | 'history';
 
@@ -35,6 +37,7 @@ export interface PageMarkers {
   templateJobs: string;
   templateSpares: string;
   templateStores: string;
+  templateClassRegulatory?: string;
   // Vessel controls (top header bar)
   vesselLabel: string;
   vesselDropdown: string;
@@ -246,18 +249,22 @@ const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
   locations: LOCATIONS_PAGE_MARKERS,
   'rotational-items': LOCATIONS_PAGE_MARKERS,
   'wo-history': WO_HISTORY_PAGE_MARKERS,
+  'class-regulatory': WO_HISTORY_PAGE_MARKERS,
 };
 
 export default function BulkDataImport() {
   const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { canCreate, canEdit } = usePermissions();
   const canImport = canCreate("admin-masters") || canEdit("admin-masters");
+  const { currentUser } = useAuth();
+  const canImportSectionH = currentUser?.userType !== "Ship" &&
+    (canImport || currentUser?.userType === "Office");
   const { data: vessels = [], isLoading: isLoadingVessels, error: vesselsError } = useVessels();
   // Fleet mode is available for Sail Admin and External
   const [isFleetModeState, setIsFleetModeState] = useAdminUrlState<boolean>("bulk.fleet", false);
   const isFleetMode = (isSailAdmin || isExternal) ? isFleetModeState : false;
   const setIsFleetMode = (isSailAdmin || isExternal) ? setIsFleetModeState : () => {};
-  const [selectedVesselTemplate, setSelectedVesselTemplate] = useAdminUrlState<VesselTemplateType>("bulk.vesselTemplate", "machinery", ["machinery", "stores", "spares", "jobs", "locations", "rotational-items", "wo-history"]);
+  const [selectedVesselTemplate, setSelectedVesselTemplate] = useAdminUrlState<VesselTemplateType>("bulk.vesselTemplate", "machinery", ["machinery", "stores", "spares", "jobs", "locations", "rotational-items", "wo-history", "class-regulatory"]);
   const [requestedFleetTemplate, setSelectedFleetTemplate] = useAdminUrlState<FleetTemplateType>("bulk.fleetTemplate", "maker-list", ["maker-list", "fleet-component", "fleet-jobs", "fleet-spares", "master-list"]);
   const selectedFleetTemplate = isExternal ? "maker-list" : requestedFleetTemplate;
   const [selectedVessel, setSelectedVessel] = useAdminUrlState<string>("bulk.vessel", "");
@@ -273,6 +280,7 @@ export default function BulkDataImport() {
     { id: 'locations' as VesselTemplateType, number: 5, name: 'Locations' },
     { id: 'rotational-items' as VesselTemplateType, number: 6, name: 'Rotation Items' },
     { id: 'wo-history' as VesselTemplateType, number: 7, name: 'History' },
+    { id: 'class-regulatory' as VesselTemplateType, number: 8, name: 'Classification & Regulatory Data' },
   ];
 
   const fleetTemplates = [
@@ -339,6 +347,7 @@ export default function BulkDataImport() {
                 'locations': `${currentMarkers.templatesHeader}-locations`,
                 'rotational-items': `${currentMarkers.templatesHeader}-rotational-items`,
                 'wo-history': `${currentMarkers.templatesHeader}-wo-history`,
+                'class-regulatory': `${currentMarkers.templatesHeader}-class-regulatory`,
               };
               const markerId = !isFleetMode ? templateMarkerMap[template.id as VesselTemplateType] : undefined;
               const isLast = index === currentTemplates.length - 1;
@@ -411,7 +420,7 @@ export default function BulkDataImport() {
         <div className="p-6">
           {viewMode === 'history' ? (
           <BulkImportHistory vesselId={selectedVessel} onVesselChange={setSelectedVessel} />
-          ) : !canImport ? (
+          ) : (!isFleetMode && selectedVesselTemplate === 'class-regulatory' ? !canImportSectionH : !canImport) ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileSpreadsheet className="h-16 w-16 text-gray-300 mb-4" />
@@ -461,6 +470,17 @@ export default function BulkDataImport() {
                 selectedHistorySubType={selectedHistorySubType}
                 onHistorySubTypeChange={setSelectedHistorySubType}
               />
+            ) : selectedVesselTemplate === 'class-regulatory' ? (
+              selectedVessel ? (
+                <ClassRegulatoryUpload key={selectedVessel} vesselId={selectedVessel} />
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Ship className="h-12 w-12 text-gray-300 mb-4" />
+                    <p className="text-gray-600 text-center">Choose a vessel to import Classification & Regulatory Data.</p>
+                  </CardContent>
+                </Card>
+              )
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

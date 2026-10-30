@@ -3,8 +3,10 @@ import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
 import { requirePermission } from '../../middleware/permissions';
 import * as ctrl from './controllers/bulkController';
+import classRegulatoryRoutes from './classRegulatoryRoutes';
 
 const router = Router();
+router.use(classRegulatoryRoutes);
 
 // ── Permission policy (requirePermission, resource 'admin-masters') ──
 // All bulk write routes are create/update-shaped (import/upsert), so POST/PUT/PATCH

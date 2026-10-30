@@ -27,6 +27,8 @@ import {
 import { format } from "date-fns";
 import { useVessels } from "@/hooks/useVessels";
 import type { BulkImportHistory as BulkImportHistoryType, BulkImportError } from "@shared/schema";
+import { useAuth } from "@/contexts/AuthContext";
+import { sectionHRequest } from "@/lib/sectionHRequest";
 
 interface BulkImportHistoryProps {
   vesselId?: string;
@@ -36,6 +38,7 @@ interface BulkImportHistoryProps {
 
 export default function BulkImportHistory({ vesselId, onVesselChange, moduleType }: BulkImportHistoryProps) {
   const { data: vessels = [] } = useVessels();
+  const { sectionHUser } = useAuth();
   const [storedVessel, setStoredVessel] = useAdminUrlState<string>("bulk.vessel", "");
   const selectedVessel = (onVesselChange ? vesselId : storedVessel) || "all";
   const [page, setPage] = useAdminUrlState<number>("bulk.history.page", 0);
@@ -44,7 +47,7 @@ export default function BulkImportHistory({ vesselId, onVesselChange, moduleType
     setPage(0);
   };
   const [selectedModule, setModule] = useAdminUrlState<string>("bulk.history.module", moduleType || "all",
-    ["all", "machinery", "jobs", "spares", "stores", "fleet-component", "fleet-jobs", "fleet-spares", "maker-list", "master-data", "master-list"]);
+    ["all", "machinery", "jobs", "spares", "stores", "fleet-component", "fleet-jobs", "fleet-spares", "maker-list", "master-data", "master-list", "class-regulatory"]);
   const [selectedStatus, setStatus] = useAdminUrlState<string>("bulk.history.status", "all", ["all", "completed", "partial", "failed", "processing"]);
   const [searchTerm, setSearch] = useAdminUrlState<string>("bulk.history.search", "");
   const setSelectedModule = (value: string) => { setModule(value); setPage(0); };
@@ -63,6 +66,17 @@ export default function BulkImportHistory({ vesselId, onVesselChange, moduleType
   const { data: historyData, isLoading, refetch } = useQuery<{ items: BulkImportHistoryType[], total: number }>({
     queryKey: ['/technical/api/fleet-admin/import-history', selectedVessel, selectedModule, selectedStatus, page],
     queryFn: async () => {
+      if (selectedModule === "class-regulatory" || (selectedModule === "all" && sectionHUser?.userType === "Office")) {
+        const params = new URLSearchParams({
+          moduleType: selectedModule,
+          limit: pageSize.toString(),
+          offset: (page * pageSize).toString(),
+          status: selectedStatus,
+        });
+        if (selectedVessel !== "all") params.set("vesselCode", selectedVessel);
+        const response = await sectionHRequest(sectionHUser, "GET", `/technical/api/bulk/class-regulatory/history?${params}`);
+        return response.json();
+      }
       const response = await fetch(`/technical/api/fleet-admin/import-history?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch import history');
       return response.json();
@@ -70,8 +84,16 @@ export default function BulkImportHistory({ vesselId, onVesselChange, moduleType
   });
 
   const { data: selectedImportErrors, isLoading: isLoadingErrors } = useQuery<BulkImportError[]>({
-    queryKey: ['/technical/api/fleet-admin/import-history', selectedImport?.id, 'errors'],
+    queryKey: ['/technical/api/fleet-admin/import-history', selectedModule, selectedImport?.id, 'errors'],
     queryFn: async () => {
+      if (selectedModule === "class-regulatory" && selectedImport?.id) {
+        const response = await sectionHRequest(
+          sectionHUser,
+          "GET",
+          `/technical/api/bulk/class-regulatory/history/${encodeURIComponent(selectedImport.id)}/errors`,
+        );
+        return response.json();
+      }
       const response = await fetch(`/technical/api/fleet-admin/import-history/${selectedImport?.id}/errors`);
       if (!response.ok) throw new Error('Failed to fetch import errors');
       return response.json();
@@ -97,6 +119,7 @@ export default function BulkImportHistory({ vesselId, onVesselChange, moduleType
     { value: 'maker-list', label: 'Maker List' },
     { value: 'master-data', label: 'Master Data' },
     { value: 'master-list', label: 'Master Lists' },
+    { value: 'class-regulatory', label: 'Classification & Regulatory Data' },
   ];
 
   const statusOptions = [
@@ -111,7 +134,7 @@ export default function BulkImportHistory({ vesselId, onVesselChange, moduleType
     if (status === 'processing') {
       return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><Clock className="h-3 w-3 mr-1" />Processing</Badge>;
     }
-    if (failedCount === 0 && successCount > 0) {
+    if (failedCount === 0 && (successCount > 0 || status === 'completed')) {
       return <Badge className="bg-green-100 text-green-800 border-green-200"><CheckCircle2 className="h-3 w-3 mr-1" />Completed</Badge>;
     }
     if (successCount === 0 && failedCount > 0) {

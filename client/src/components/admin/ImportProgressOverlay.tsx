@@ -220,7 +220,7 @@ async function pollImportStatus(
     onProgress: (data: ImportProgressData) => void;
   },
   lastProgress: ImportProgressData | null,
-  opts: { intervalMs?: number; timeoutMs?: number } = {}
+  opts: { intervalMs?: number; timeoutMs?: number; fetcher?: (url: string, options?: RequestInit) => Promise<Response>; statusUrl?: (historyId: string) => string } = {}
 ): Promise<{ status: string; created: number; updated: number; skipped: number; archived: number; failed?: number } | null> {
   const intervalMs = opts.intervalMs ?? 3000;
   // Cover even very long imports (~30 min) — server-side write work can outlast
@@ -230,7 +230,7 @@ async function pollImportStatus(
 
   while (Date.now() < deadline) {
     try {
-      const resp = await fetch(`/technical/api/bulk/import-status/${historyId}`);
+      const resp = await (opts.fetcher ?? fetch)(opts.statusUrl?.(historyId) ?? `/technical/api/bulk/import-status/${historyId}`);
       if (resp.ok) {
         const data = await resp.json();
         if (data.status === 'complete' || data.status === 'failed') {
@@ -264,9 +264,11 @@ export function useImportStream() {
       onProgress: (data: ImportProgressData) => void;
       onComplete: (data: ImportCompleteData) => void;
       onError: (message: string) => void;
+      fetcher?: (url: string, options?: RequestInit) => Promise<Response>;
+      statusUrl?: (historyId: string) => string;
     }
   ) => {
-    const response = await fetch(url, options);
+    const response = await (callbacks.fetcher ?? fetch)(url, options);
 
     if (!response.ok) {
       let errMsg = "Import request failed";
@@ -337,7 +339,10 @@ export function useImportStream() {
     // historyId, poll the status endpoint to recover the real outcome
     // instead of falsely reporting failure.
     if (knownHistoryId) {
-      const final = await pollImportStatus(knownHistoryId, { onProgress: callbacks.onProgress }, lastProgress);
+      const final = await pollImportStatus(knownHistoryId, { onProgress: callbacks.onProgress }, lastProgress, {
+        fetcher: callbacks.fetcher,
+        statusUrl: callbacks.statusUrl,
+      });
       if (final && final.status === 'complete') {
         callbacks.onComplete({
           created: final.created,

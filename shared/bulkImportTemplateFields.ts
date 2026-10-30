@@ -69,3 +69,25 @@ export function getMachineryComponentFieldMappings() {
     description: f.description,
   }));
 }
+
+// Classification & Regulatory Data — exact A–J Section H template contract.
+export const CLASS_REGULATORY_TEMPLATE_FIELDS: BulkImportTemplateField[] = [
+  { header: "Component Code", key: "componentCode", required: true, description: "Exact existing vessel component code. Preserved as text, including leading zeros." },
+  { header: "Classification Society", key: "classificationSociety", required: true, description: "Required for new records; resolve to an active master. Blank update cells preserve the existing society." },
+  { header: "Certificate Number", key: "certificateNumber", required: true, description: "Required; outer whitespace is trimmed. Maximum 100 characters." },
+  { header: "Last Class Survey Date", key: "lastClassSurveyDate", required: false, description: "Optional DD-MM-YYYY date or true Excel date cell." },
+  { header: "Next Class Survey", key: "nextClassSurvey", required: false, description: "Optional DD-MM-YYYY date or true Excel date cell; cannot precede Last Class Survey Date." },
+  { header: "Survey Type", key: "surveyType", required: true, description: "Required for new records; resolve to an active master. Blank update cells preserve the existing type." },
+  { header: "Class Requirement", key: "classRequirements", required: false, description: "Optional text, up to 2,000 characters. Blank update cells preserve existing values." },
+  { header: "Class Code", key: "classCode", required: false, description: "Optional; must match the selected society’s canonical master code. Derived when blank." },
+  { header: "Information", key: "information", required: false, description: "Optional text, up to 2,000 characters. Blank update cells preserve existing values." },
+  { header: "Vessel Code", key: "vesselCode", required: true, description: "Must exactly match the selected vessel’s code (not its name or UUID)." },
+];
+
+export function getClassRegulatoryFieldMappings() {
+  return CLASS_REGULATORY_TEMPLATE_FIELDS.map(({ header, required, description }) => ({
+    field: header,
+    required,
+    description,
+  }));
+}

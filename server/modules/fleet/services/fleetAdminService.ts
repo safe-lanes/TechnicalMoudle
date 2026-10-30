@@ -564,6 +564,9 @@ export async function getImportHistory(query: any) {
     vesselCode as string | undefined,
     moduleType as string | undefined
   );
+  // Section H imports have their own verified Office/tenant-scoped history endpoint.
+  // Never expose them through the legacy mock-authorized global history transport.
+  history = history.filter((h: any) => h.moduleType !== "class-regulatory");
 
   // Apply additional status filter
   if (status) {
@@ -588,7 +591,7 @@ export async function getImportHistory(query: any) {
 
 export async function getImportHistoryItem(id: string) {
   const entry = await repo.getBulkImportHistoryItem(id);
-  if (!entry) {
+  if (!entry || entry.moduleType === "class-regulatory") {
     const err: any = new Error('Import history entry not found');
     err.statusCode = 404;
     throw err;
@@ -597,6 +600,7 @@ export async function getImportHistoryItem(id: string) {
 }
 
 export async function getImportErrors(importId: string) {
+  await getImportHistoryItem(importId);
   return repo.getBulkImportErrors(importId);
 }
 

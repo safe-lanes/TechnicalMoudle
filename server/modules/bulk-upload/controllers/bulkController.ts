@@ -44,7 +44,7 @@ import { logFieldChanges } from '../../sync';
 // Stores uploaded import files. On Replit, uses Replit Object Storage.
 // On ship/local servers, saves directly to disk (skips Replit SDK entirely
 // to avoid a 30-120s TCP timeout connecting to the non-existent sidecar).
-async function storeUploadedFile(
+export async function storeUploadedFile(
   fileBuffer: Buffer,
   originalName: string,
   effectiveType: string
@@ -82,6 +82,8 @@ async function storeUploadedFile(
 
 // ── Template ──
 export async function getTemplate(req: Request, res: Response) {
+  if (req.params.type === 'class-regulatory')
+    return res.status(400).json({ error: 'Use the authorized Classification & Regulatory Data import option.' });
   const { type, vesselId } = req.query;
   
   // Handle fleet-master-data as special case with multi-sheet Excel template
@@ -720,6 +722,8 @@ export async function getSheets(req: Request, res: Response) {
 
 // ── Dry Run ──
 export async function dryRun(req: Request, res: Response) {
+  if (req.body.type === 'class-regulatory')
+    return res.status(400).json({ error: 'Use the authorized Classification & Regulatory Data import option.' });
   // TEMP-TRACE: domain is stashed on req by tenantMiddleware (survives multer);
   // tuid reads the ALS context. domain present + tuid=NONE ⇒ context dropped at multer.
   console.log('[TRACE-d] dryRun entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE') + ' reqDomain=' + ((req as any).tenantDomain ?? 'NONE')); // TEMP-TRACE
@@ -866,6 +870,8 @@ export async function dryRun(req: Request, res: Response) {
 
 // ── Import ──
 export async function doImport(req: Request, res: Response) {
+  if (req.body.type === 'class-regulatory')
+    return res.status(400).json({ error: 'Use the authorized Classification & Regulatory Data import option.' });
   const historyId = uuidv4();
   const startedAt = new Date();
   
@@ -984,6 +990,8 @@ export async function doImport(req: Request, res: Response) {
 
 // ── SSE Streaming Import ──
 export async function doImportStream(req: Request, res: Response) {
+  if (req.body.type === 'class-regulatory')
+    return res.status(400).json({ error: 'Use the authorized Classification & Regulatory Data import option.' });
   console.log(`📦 [IMPORT_STREAM] Request received at ${new Date().toISOString()}`);
   console.log('[TRACE-a] doImportStream entry tuid=' + (getCurrentTenantContext()?.tuid ?? 'NONE')); // TEMP-TRACE
   // Capture the tenant context HERE (while it exists) so the streamed import work
@@ -1386,6 +1394,12 @@ export async function undoImport(req: Request, res: Response) {
   const { historyId } = req.params;
   
   try {
+    const { importHistory } = await import('@shared/schema');
+    const [protectedImport] = await (await getDb()).select({ type: importHistory.type })
+      .from(importHistory).where(eq(importHistory.id, historyId));
+    if (protectedImport?.type === 'class-regulatory') {
+      return res.status(400).json({ error: 'Undo is not available for this import type.' });
+    }
     // 1. Fetch and Validate Import History from file-based storage
     const history = await getFileBasedHistoryById(historyId);
     if (!history) {
