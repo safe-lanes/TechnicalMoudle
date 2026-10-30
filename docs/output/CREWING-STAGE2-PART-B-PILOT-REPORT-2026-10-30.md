@@ -94,3 +94,55 @@ relay the note that Crewing has no per-plan approver. Data correct; wording only
 2. Crewing team (Datta): decide whether a trusted login → crew mapping will exist; until then "my appraisal" stays refused.
 3. Then the release path already agreed: harden for merge (trial report §10), genuine-login test, dev acceptance with
    Sahil/Sagar's examples on the acceptance day.
+
+
+---
+
+## 7. Update 31-Oct-2026 — Sahil's appraisal-access decision and two corrections
+
+**Sahil's decision:** the chatbot is shore-only, so office users already authorised to use it may view crew appraisals
+across all vessels of their own company, with no additional appraisal permission. This supersedes the "Appraisals All"
+requirement and the own-score "gap" in §1.3 / §4.
+
+| Change | Before (30-Oct) | Now |
+|---|---|---|
+| Appraisal access | required the Crewing "Appraisals All" view right | no extra right; verified login, Office-only, chatbot role allow-list and company isolation unchanged |
+| "My appraisal" | refused (identity_mapping_unavailable) | `identity_not_linked`: the login is not linked to a crew record → the chatbot says so and asks which crew member is meant; no guess, no new linking system |
+| Appraisal vessel | **wrong:** the crew member's CURRENT vessel | the vessel the APPRAISAL was made on. The record stores only free text (`appraisal_results_v2.vessel`, no vessel id — READ); matched only when exactly one non-deleted vessel has the same case/space-normalised name; `vesselAssociation` reports unmatched / ambiguous / missing, counted outside the vessel filter, with a note when a vessel filter is used |
+| "Waiting for my approval" | **meaning error:** equated holding the Rotation edit right with personal assignment; the explanation was an optional note the model omitted (P12) | Crewing records no individual approver → no personal queue is identified; the company's pending plans are returned (Rotation view right still required) with `personalQueue.identifiable = false` and a fixed statement that the assistant appends verbatim (not left to the model) |
+| Scores | overall score of completed appraisals, on request | unchanged, now always with the appraisal date; draft scores, assessment scores, remarks still never selected |
+
+### Expected vs actual (focused checks, final build)
+
+| Check | Expected (hand / independent SQL) | Actual |
+|---|---|---|
+| A status counts | pending 5, drafts 2, completed 3 | 5 / 2 / 3 (B6-1, P14) |
+| Historical vessel | Tamsin appraised on Alpha Star, now on Alpha Trader → in Alpha Star (6 appraisals), not in Alpha Trader (0) | 6 / 0 (B6-9, B6-10, P17 SQL 6) |
+| Spacing / case variant "  mv   ALPHA star " | matched to MV Alpha Star | matched (in the 6) |
+| Unmatched / ambiguous / missing (A) | 1 / 0 / 1 | 1 / 0 / 1 (B6-11, P16) |
+| Ambiguous (B: two vessels named "MV Delta Sky") | 1, not assigned | 1 (I14) |
+| Beta Ocean filter with an untied appraisal in the company | 2 + note "could not be tied" | 2 + note (B6-8; the first run showed the note missing because the counts were taken inside the filter — fixed) |
+| Scores | completed only, with date; none for pending / draft | Aldric B 2026-09-15, Orrin A, Tamsin A; pending 5 × null, drafts 2 × null; no remark text anywhere (B6-3..5) |
+| Own appraisal | identity_not_linked + "Which crew member do you mean?" | as expected (B6-6, E14; chat P18 2/2 runs) |
+| Role without any appraisal menu (External 1, chatbot-allowed) | sees status and scores | ok: 3 completed with scores, counts 5/2/3 (E11, E12) |
+| Ship user / unauthorised user | refused | not_allowed (B6-12, R1, role gate B6-7) |
+| Cross-company | B never sees A's appraisals or crew ids | I12, I13, I15 pass |
+| Rotation "for me" | 2 company plans + fixed statement; no Rotation-right shortcut | as expected (B4-4); chat P12 2/2 runs states it verbatim |
+| Rotation without the Rotation view right | refused | not_allowed (E13) |
+
+Totals on the final build: direct checks 132/132 + external 14/14; tool vs independent SQL 87/87 (P16, P17 added);
+volume 17/17 within 5 s (appraisals ≤ 0.2 s); focused chat cases P11, P12, P15–P19, P22, P23: **9/9 in two runs**
+(held-out 2/2 each); masking T1–T8 unchanged; pytest 131; Crewing tsc 229. Not re-run on purpose: the full v2 two-area set
+and the documentation regression — the shared change (chat.py) only appends a line when a result carries
+`personalQueue`, which no two-area tool returns (unit-tested).
+
+### Remaining limitations
+- Appraisal vessel association depends on the typed vessel name; renamed vessels or typos stay unmatched (reported). A
+  vessel id on the appraisal record would remove this; that is a Crewing data-model choice.
+- "My appraisal" is answered with a question, not the person's data, until Crewing links logins to crew records (not built).
+- Rotation has no personal queue by design of Crewing; the chatbot shows the company's pending plans.
+
+### Versions (local, NOT pushed)
+- Crewing `feature/assistant-livedata-trial` @ **4649c86d** (on faca37ef; pushed base 3457b6718)
+- Assistant `feature/crewing-livedata-trial` code @ **1483cb185** (on cd586d70b; pushed base 77a0c95c5), plus this report commit
+- Pilot image `sail-assistant-py:crewtrial-1483cb185`; previous kept stopped as -pb2 (cd586d70b)
