@@ -63120,6 +63120,7 @@ import { Router as Router10 } from "express";
 
 // server/modules/defects/controllers/defectsController.ts
 init_auth();
+init_syncRole();
 init_defectsService();
 import { z as z6 } from "zod";
 function defectActor(req) {
@@ -63277,6 +63278,9 @@ async function enforceDefectVesselIdentity(req, res, next) {
   }
   if (identity.userType !== "Ship") {
     return res.status(403).json({ error: "Forbidden - Vessel access requires a forwarded identity" });
+  }
+  if (await isShipInstance()) {
+    return next();
   }
   const userUuid = req.user?.userUuid;
   const vesselId = req.params.vesselId;
