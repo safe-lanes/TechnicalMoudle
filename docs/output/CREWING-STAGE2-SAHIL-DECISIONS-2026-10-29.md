@@ -12,37 +12,39 @@ Evidence labels: **PROVEN** = run on the isolated pilot with output recorded her
 
 ## 1. Short version
 
-1. Sahil answered Part A: certificates = both kinds (A2), ask for a period (A3), **list expired together with expiring (A4)**,
-   **rank groups must come from Rank Administration, not a fixed table (A5)**, exclude terminated / include inactive (A6),
-   output fields OK (A7). A1 was not ticked; his comment corrects our understanding of "secondary" (handover state, not a
-   second ship). He gave no expected-result examples (the yellow boxes are empty).
-2. All six are now applied on the pilot and verified three ways: hand-derived expectations, an independent plain-SQL script,
-   and the live-data tool — they agree on all three trial databases (42/42), the direct endpoint checks pass 84/84, tsc is at
-   the baseline (229) and the assistant's unit tests pass (128).
+1. Sahil's Part A rules are all **resolved**: certificates = both kinds (A2); ask for a period (A3); list expired documents
+   together with expiring ones, no age cut-off (A4); rank groups come from each company's Rank Administration — Company tab —
+   never a fixed table (A5); terminated crew excluded, inactive included (A6); output fields unchanged (A7). A1 was not
+   ticked, but his comment settles it: "secondary" is the handover state (both people count while on board; a planned
+   reliever does not).
+2. All of them are applied on the isolated pilot and verified three ways: hand-derived expectations, an independent
+   plain-SQL script and the live-data tool agree on all three trial databases (42/42); direct endpoint checks 84/84; chat run
+   3 on the final image 46/47 with all 11 held-out turns; masking T1–T8 green; tsc 229 = baseline; pytest 130. This is the
+   pilot's evidence — Sahil's own examples are not a prerequisite for it (environment acceptance later is a separate step).
 3. The on-board SQL did not need to change: the Vessel-screen rule it already used (primary or secondary, signed on, not
    archived) is exactly Sahil's handover definition. The wrong part was our *explanation* and a fixture that put one person on
    two ships; that fixture is corrected (kept only as a labelled invalid-data case).
-4. Part B is recorded for later (section 5): the "Next Availability while on board" case, company-wide approvals with "for
-   me" on request, manning following the signed-on rule, relief = Due Crew rule, rest hours = live, OPA off unless asked.
-   B2/B3 discrepancies were investigated read-only (section 6). Appraisal scores stay excluded; one clarification is drafted
-   for you to send (section 7).
-5. Genuine open points for Sahil: whether very old expired documents should be listed (no lower bound today), the
-   "Terminated" definition tick, Electrical Officer / cadets (both now follow the Company tab), and the appraisal-score line.
+4. Part B is recorded for later (section 5). B2/B3 are **separate findings for the Crewing team** (section 6): they explain
+   the discrepancies Sahil noticed, they do not change any report and they do not block the pilot.
+5. **The only genuine unanswered question is the appraisal-score line (B6)** — relevant to later development only; the
+   question is drafted in section 7 and scores stay excluded meanwhile. Everything else in section 9 is either resolved or a
+   configuration observation (the local Company tab leaves six ranks unclassified; the chatbot reports that, as instructed).
+6. No concrete blocker remains in the two-area pilot.
 
 ---
 
 ## 2. Decision mapping (question → Sahil's answer → what changed → open point)
 
-| Q | Sahil's answer | Applied where | Tests | Unresolved |
+| Q | Sahil's answer | Applied where | Tests | Status |
 |---|---|---|---|---|
-| **A1** secondary = on board? | **No tick.** Comment: a seafarer is on ONE vessel at a time; a planned reliever appears in the reliever status but does not add to the count. "Primary/secondary" is the **handover** state: the reliever who signs on becomes *secondary*, the person already on board is *primary*; after "Takes over" they swap; **both count while both are on board.** | On-board SQL unchanged (`ON_BOARD_VP`: crew_status primary/secondary, not archived/deleted, crew + vessel + sign-on date set — the Vessel-screen rule). Wording of `DEFINITIONS.onBoard`, the tool manifest and the assistant rules rewritten to the handover meaning; `crewStatus` filter described as "only when the user says so". Fixture v2: handover case (Nadira primary + Oswin secondary, Beta Ocean Chief Officer), planned reliever stored on the primary's row (Kestrel on Corvina's row; not on board). | A2, A14, A14b, A17, A17b, N01, N02, N08; Q01–Q03 on all three DBs | Whether the "Crew on board" **report** (which lists people not yet signed on) should be aligned — not our scope; mention to Sahil. |
-| **A2** "certificates" | **A** — both kinds (ticked). | Already the trial rule; definition now CONFIRMED; manifest + assistant text say "both unless the user names one kind". | D1, Q07 | — |
-| **A3** no period given | **A** — ask (ticked). | Already the trial rule (assistant rule unchanged, re-worded). | C11 (chat) | — |
-| **A4** expired documents | **B** — list expired together with expiring (ticked). | New expiry state `expired_or_expiring` = **default** when a window is given and no state: documents already expired (any age) + those expiring by the window end. Every row carries `expiryState` expired/upcoming; results carry `breakdown` (expired / upcoming counts, documents and people) and `expiryWindow`; the assistant appends a deterministic line "Of these, N … already expired …; M … expire by <date>." from the server's counts. `not_expired` = "only upcoming" on request. A future window never narrows "expired" (bug found by direct check A9 and fixed). | D3, D3b, D4, D4b, D5, D6, D6b, D12, D13b, D16, A9, A9b; Q10–Q15; C05, C06, C19, C21, N04 (chat) | **No lower bound**: a document that expired years ago is listed as expired (Ulric's 2024 training in the fixture). Ask Sahil whether to cap (e.g. ignore documents expired more than 12 months). |
-| **A5** rank groups | Green note: **"Always use reference from this Admin section for rank categories, rather than relying on a hard coded table."** + screenshot of Rank Administration → Company tab. Table not confirmed; Electrical-Officer question not ticked. | Hard-coded `RANK_GROUPS` **removed**. New `rankConfig.ts` loads `adm_company_ranks_v2` (Company tab) flags: officer, rating, senior_officer, deck_officer, eng_officer, petty_officer, deck_rating, engine_rating, general_rating, catering_rating → groups `officers, ratings, senior_officers, deck_officers, engine_officers, petty_officers, deck_ratings, engine_ratings, general_ratings, catering_ratings`; word unions `engineers` = engine_officers, `deck`, `engine`. **`cadets` removed** (no flag exists). Rank → config row by `rank_id` (R001…), else by normalised name (company rank, role variant AB_1, Rank Master name of the same rank_id). Ranks with no category or not configured = **unclassified**: reported in `rankConfig.unclassifiedOnBoard / unclassifiedInResult` and `unclassifiedConfiguredRanks`; configuration contradictions in `rankConfig.issues`. Never substituted. | A5, A5b, A12, A13, A13b, A15, A16–A16c, A18, A19, U7, D7; Q04, Q05, Q15; N03, N05 (chat) | Electrical Officer counts as an engineer **because the Company tab flags it Eng Officer** (local and in Sahil's screenshot) — confirm that is intended. Cadets: no category → not in any group (local tab and screenshot differ: screenshot ticks Deck Officer for Deck Cadet). See 4.2 for the inheritance trace and the local configuration gaps. |
-| **A6** inactive / terminated | **A** — exclude terminated, include inactive (ticked). "Terminated definition OK?" **not ticked**. | Documents area: crew with status starting with `Terminated` excluded (`NOT ILIKE 'Terminated%'`), inactive (`is_active=false`) included; archived/deleted exclusions kept. Lookups (`find_crew`) unchanged. | D1, D15, D15b, Q07, Q08; N06, N07 (chat) | Definition "status starting with Terminated" assumed (covers the UT/BT/General/NFR spellings the reports use three ways). Local data uses lower-case `active / inactive / on_leave`, code writes `Terminated` — both handled. Ask Sahil to tick. |
-| **A7** output fields | **OK as is** (ticked). | Unchanged: name, rank, vessel, document name/expiry, sign-on / relief-due dates, counts. The only additions are counts and flags (`expiredDocuments`, "(expired)" marker in the document list, `rankConfig`, `breakdown`) — no new personal field. | masking T-checks (section 3.4) | — |
-| **Examples** | Empty (yellow boxes blank). | Generated locally instead: fixture v2 (hand-derived), independent SQL, isolated copy of the local database (section 3). | — | Sahil's own two cases per area would still be the acceptance evidence on dev data. |
+| **A1** secondary = on board? | **No tick.** Comment: a seafarer is on ONE vessel at a time; a planned reliever appears in the reliever status but does not add to the count. "Primary/secondary" is the **handover** state: the reliever who signs on becomes *secondary*, the person already on board is *primary*; after "Takes over" they swap; **both count while both are on board.** | On-board SQL unchanged (`ON_BOARD_VP`: crew_status primary/secondary, not archived/deleted, crew + vessel + sign-on date set — the Vessel-screen rule). Wording of `DEFINITIONS.onBoard`, the tool manifest and the assistant rules rewritten to the handover meaning; `crewStatus` filter described as "only when the user says so". Fixture v2: handover case (Nadira primary + Oswin secondary, Beta Ocean Chief Officer), planned reliever stored on the primary's row (Kestrel on Corvina's row; not on board). | A2, A14, A14b, A17, A17b, N01, N02, N08; Q01–Q03 on all three DBs | **Resolved.** Separate finding for the Crewing team (section 6.3): the "Crew on board" report lists people not yet signed on; the chatbot follows the Vessel-screen rule. Not a chatbot question. |
+| **A2** "certificates" | **A** — both kinds (ticked). | Already the trial rule; definition now CONFIRMED; manifest + assistant text say "both unless the user names one kind"; the query guard keeps "licence or certificate" as both. | D1, Q07; C06 (chat) | **Resolved.** |
+| **A3** no period given | **A** — ask (ticked). | Already the trial rule (assistant rule unchanged, re-worded). | C11 (chat) | **Resolved.** |
+| **A4** expired documents | **B** — list expired together with expiring (ticked). | New expiry state `expired_or_expiring` = **default** when a window is given and no state: documents already expired (any age) + those expiring by the window end. Every row carries `expiryState` expired/upcoming; results carry `breakdown` (expired / upcoming counts, documents and people) and `expiryWindow`; the assistant appends a deterministic line "Of these, N … already expired …; M … expire by <date>." from the server's counts. `not_expired` = "only upcoming" on request. A future window never narrows "expired" (bug found by direct check A9 and fixed). | D3, D3b, D4, D4b, D5, D6, D6b, D12, D13b, D16, A9, A9b; Q10–Q15; C05, C06, C19, C21, N04 (chat) | **Resolved for this scope.** Expired documents of any age are included, as Sahil selected; paging and the expired/upcoming totals keep long lists readable (Ulric's 2024 training in the fixture shows the behaviour). No age cut-off is introduced or requested. |
+| **A5** rank groups | Green note: **"Always use reference from this Admin section for rank categories, rather than relying on a hard coded table."** + screenshot of Rank Administration → Company tab. Table not confirmed; Electrical-Officer question not ticked. | Hard-coded `RANK_GROUPS` **removed**. New `rankConfig.ts` loads `adm_company_ranks_v2` (Company tab) flags: officer, rating, senior_officer, deck_officer, eng_officer, petty_officer, deck_rating, engine_rating, general_rating, catering_rating → groups `officers, ratings, senior_officers, deck_officers, engine_officers, petty_officers, deck_ratings, engine_ratings, general_ratings, catering_ratings`; word unions `engineers` = engine_officers, `deck`, `engine`. **`cadets` removed** (no flag exists). Rank → config row by `rank_id` (R001…), else by normalised name (company rank, role variant AB_1, Rank Master name of the same rank_id). Ranks with no category or not configured = **unclassified**: reported in `rankConfig.unclassifiedOnBoard / unclassifiedInResult` and `unclassifiedConfiguredRanks`; configuration contradictions in `rankConfig.issues`. Never substituted. | A5, A5b, A12, A13, A13b, A15, A16–A16c, A18, A19, U7, D7; Q04, Q05, Q15; N03, N05 (chat) | **Resolved.** The Company tab is the rule; the screenshot identifies the source, not values to copy. Whatever a company ticks is what the chatbot uses (Electrical Officer is an engineer wherever Eng Officer is ticked; a rank with no tick is reported as unclassified). Configuration observation, not a question: the local tab leaves six ranks unclassified and differs from the dev screenshot — see 4.2. No company setting was changed and nothing was substituted. |
+| **A6** inactive / terminated | **A** — exclude terminated, include inactive (ticked). "Terminated definition OK?" **not ticked**. | Documents area: crew with status starting with `Terminated` excluded (`NOT ILIKE 'Terminated%'`), inactive (`is_active=false`) included; archived/deleted exclusions kept. Lookups (`find_crew`) unchanged. | D1, D15, D15b, Q07, Q08; N06, N07 (chat) | **Resolved by code trace (section 4.4):** the application stores exactly `Terminated`; the "(UT)/(BT)/(Gen)/- NFR" forms are display labels, never stored. The chatbot's prefix match covers the stored value and any prefixed variant. No business ambiguity remains, so nothing to ask. |
+| **A7** output fields | **OK as is** (ticked). | Unchanged: name, rank, vessel, document name/expiry, sign-on / relief-due dates, counts. The only additions are counts and flags (`expiredDocuments`, "(expired)" marker in the document list, `rankConfig`, `breakdown`) — no new personal field. | masking T-checks (section 3.4) | **Resolved.** |
+| **Examples** | Empty (yellow boxes blank). | Covered locally: fixture v2 (hand-derived), independent SQL, isolated copy of the local database (section 3). | section 3 | **Covered.** The pilot's evidence is complete without Sahil's examples; acceptance on a later environment is a separate step. |
 
 ---
 
@@ -138,11 +140,13 @@ READ (`AdminModule.tsx`, `companyRanksRepository.ts`, `vesselRevisionsService.ge
    "officers / engineers / ratings" the Company tab is the authority and no vessel override exists; duty roles (SSO etc.)
    are per vessel and are not offered as groups by the chatbot (they would need the vessel revision data).
 
-Local configuration (the template of all three trial DBs) — PROVEN by query, data points not a pattern:
+Configuration observations on the local Company tab (the template of all three trial DBs) — PROVEN by query; these are
+environment differences, not business questions, and no company setting was changed:
 
-- Ranks with **no category flag**: Gas Engineer, Fifth Engineer, Motorman, Wiper, Deck Cadet, Engine Cadet → unclassified.
-  Sahil's screenshot (dev) differs: Gas Engineer has Eng Officer ticked and Deck Cadet has Deck Officer ticked there.
-  The chatbot follows whichever configuration the company has; it reports the unclassified ranks instead of guessing.
+- Ranks with **no category flag** locally: Gas Engineer, Fifth Engineer, Motorman, Wiper, Deck Cadet, Engine Cadet →
+  reported as unclassified. Sahil's screenshot (dev) is configured differently (Gas Engineer has Eng Officer ticked, Deck
+  Cadet has Deck Officer ticked). The chatbot follows whichever configuration each company has — the screenshot identifies
+  the source, it is not a set of values to copy — and reports unclassified ranks instead of guessing.
 - Company rank names differ from Rank Master names ("2nd Officer" vs "Second Officer", "AB" vs "Able Bodied Seaman");
   matching by `rank_id` and by the Rank Master name of the same id covers both spellings.
 - One assignment row carries the rank_id `RO16` (letter O) — the by-name fallback catches it; the fixture reproduces it
@@ -155,6 +159,19 @@ Local configuration (the template of all three trial DBs) — PROVEN by query, d
 Each list/count with an expiry condition now reports `breakdown.expired` and `breakdown.upcoming` (documents and people)
 and `expiryWindow {from, to, state}`; rows carry `expiryState`; the person-level list adds `expiredDocuments` and marks
 expired names "(expired)". The assistant appends the deterministic sentence from these counts (never from the model).
+
+### 4.4 Terminated crew — stored values traced (A6), READ
+
+- Writers of the crew status: `crewMembersService.terminateEmployment` (line ~840) and the matching restore/re-terminate path
+  (line ~924) write **exactly `Terminated`** and `is_active = false`; the import writes `Terminated` or `On Leave`; nothing
+  else writes a terminated value. The forms "Terminated - NFR" (dashboard), "Terminated(UT)/(BT)/(Gen)" (Crew Pool report)
+  are **display labels** built from `not_for_hire` / `last_termination_category` at read time — never stored.
+- Readers: `status === 'Terminated'`, `<> 'Terminated'`, `startsWith('Terminated')`, `ILIKE 'Terminated%'` (Crew Pool, dashboard,
+  promotions, three reports) — all agree on the stored value.
+- Stored values in the local copy (PROVEN): `active`, `inactive`, `on_leave` only (no terminated crew in local data; the
+  fixture and the SYN cases add them).
+- Conclusion: the chatbot's `status NOT ILIKE 'Terminated%'` excludes exactly the crew the application has terminated and
+  would also cover any prefixed variant a future build might store. **No business ambiguity remains; nothing to ask Sahil.**
 
 ---
 
@@ -198,9 +215,20 @@ expired names "(expired)". The assistant appends the deterministic sentence from
   is the mechanism of the discrepancy. Which process refreshes the stored totals, and when, was not traced (out of scope for
   the read-only check); the chatbot rule "live recalculation" avoids the stored figure altogether.
 
+### 6.3 Other separate findings for the Crewing team (recorded, not acted on)
+
+- The "Crew on board" report lists people who have not signed on yet; the Vessel screen count and the chatbot do not (A1).
+- The local Company tab leaves six ranks without a category (4.2); the dev configuration differs. Configuration, not code.
+- The sign-on conflict guard forbids one person being signed on on two vessels, yet nothing prevents such rows arriving by
+  import or direct edit; the chatbot reports them as 1 person / 2 assignments (tenant B invalid-data case).
+- One real assignment row carries a mistyped rank id (`RO16`, letter O) in the local data; the chatbot falls back to the
+  rank name. Worth a data check on dev.
+
+None of these authorises a change to a Crewing screen or report, and none blocks the pilot.
+
 ---
 
-## 7. Clarification to send on appraisal scores (one question)
+## 7. Clarification on appraisal scores — the one genuine open question (later development only)
 
 > Sahil — in the questionnaire, A7 keeps appraisal scores out of the chatbot ("OK as is"), but under B6 you ticked "scores:
 > needed for" without saying for what. Appraisals are a later area, so this does not hold up the current work. When we get to
@@ -250,17 +278,26 @@ number was changed to make a run pass.
 
 ---
 
-## 9. Genuine remaining ambiguities (for Sahil / Sagar)
+## 9. Status of every point — resolved rules, configuration observations, separate findings, open questions
 
-1. **Expired without limit** (A4): list documents expired years ago as "expired"? If not, what cut-off?
-2. **Terminated definition** (A6): "status starting with Terminated" — please tick.
-3. **Electrical Officer / cadets / Gas Engineer** (A5): the chatbot follows the Company tab; on the local configuration Gas
-   Engineer, Fifth Engineer, Motorman, Wiper and both cadets have no category and are reported as unclassified. Should the
-   Company tab on dev be completed, and are Electrical Officer = engineer and Deck Cadet = deck officer intended (as in your
-   screenshot)?
-4. **Appraisal scores** (B6): section 7.
-5. **"Crew on board" report** vs the chatbot (A1): the report lists people not yet signed on; the chatbot does not. Align or
-   leave?
+**Resolved rules (decided by Sahil, applied and verified — not to be reopened)**
+- A1 handover / planned reliever · A2 certificates = both kinds · A3 ask for a period · A4 expired listed with expiring, no
+  age cut-off · A5 Rank Administration (Company tab) is the authority, unclassified reported · A6 terminated excluded
+  (stored value traced, 4.4), inactive included · A7 output fields unchanged · examples covered locally (section 3).
+
+**Configuration observations (environment facts, no question to anyone)**
+- The local Company tab leaves Gas Engineer, Fifth Engineer, Motorman, Wiper, Deck Cadet and Engine Cadet without a category;
+  the dev configuration in Sahil's screenshot differs. The chatbot reports unclassified ranks per company; settings untouched.
+
+**Separate findings for the Crewing team (recorded in 6.1–6.3; no report changed, nothing blocked)**
+- B2 recorded relief-due vs Due Crew rule (mechanism; local data shows no divergence).
+- B3 stored monthly rest-hour totals vs live recalculation (mechanism).
+- "Crew on board" report lists people not yet signed on; mistyped rank id in local data; invalid two-vessel rows possible by import.
+
+**Genuine open question (later development only)**
+- B6 appraisal scores — section 7. Scores stay excluded until answered. Does not affect the current two-area pilot.
+
+**Blockers in the two-area pilot:** none.
 
 ---
 
