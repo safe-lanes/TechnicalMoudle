@@ -26,7 +26,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-QUERY_TOOLS = ("crewing_query_assignments", "crewing_query_documents")
+QUERY_TOOLS = ("crewing_query_assignments", "crewing_query_documents",
+               # Part B (30-Oct-2026)
+               "crewing_query_availability", "crewing_query_relief_due", "crewing_query_rest_hours", "crewing_query_rotation_approvals",
+               "crewing_query_manning", "crewing_query_appraisals")
 PRESENTATION_KEYS = {"mode", "unit", "groupBy", "sort", "limit", "offset"}
 SHARED_KEYS = {"vessels", "ranks", "rankGroups"}           # inherited when the follow-up switches tool
 FILTER_KEYS: dict[str, set[str]] = {
@@ -34,10 +37,37 @@ FILTER_KEYS: dict[str, set[str]] = {
                                   "signOnTo", "reliefDueWithin", "reliefDueBefore", "hasDocument"},
     "crewing_query_documents": {"documentTypes", "documentNameContains", "expiryState", "expiryWithin", "expiryFrom", "expiryTo",
                                 "crewOnBoard", "vessels", "ranks", "rankGroups", "crewIds"},
+    "crewing_query_availability": {"availableBy", "availableWithin", "ranks", "rankGroups", "nationalities", "crewStatus", "vessels", "includeNotForHire"},
+    "crewing_query_relief_due": {"dueWithin", "dueState", "vessels", "ranks", "rankGroups"},
+    "crewing_query_rest_hours": {"months", "lastMonths", "vessels", "ranks", "rankGroups", "crewIds", "opa", "violationsOnly"},
+    "crewing_query_rotation_approvals": {"status", "vessels", "forMe"},
+    "crewing_query_manning": {"state", "vessels", "ranks", "rankGroups"},
+    "crewing_query_appraisals": {"statusClass", "vessels", "ranks", "rankGroups", "crewIds", "appraisalDateWithin", "appraisalDateFrom",
+                                 "appraisalDateTo", "includeScores", "own"},
 }
 # words in the user's message that justify a change of that filter (None = only the value itself counts)
 EVIDENCE: dict[str, str | None] = {
     "crewStatus": r"\b(primary|secondary|second(ary)? assignments?|double|two assignments|both assignments)\b",
+    # Part B (30-Oct-2026)
+    "crewStatusAvailability": r"\b(on ?board|on ?leave|ashore|at home|currently sailing|sailing)\b",   # the availability tool's crewStatus values
+    "availableBy": r"\d{4}|\b(by|before|until|on or before|available|join)\b",
+    "availableWithin": r"\d+\s*(day|week|month|year)|\b(next|within|coming|upcoming|this|available|join|month|week)\b",
+    "includeNotForHire": r"not for (re)?hire|nfr|rehire|do not rehire|blacklist",
+    "dueWithin": r"\d+\s*(day|week|month|year)|\b(next|within|coming|upcoming|this|due|relie|month|week)\b",
+    "dueState": r"overdue|due|past|late|relie",
+    "months": r"\d{4}|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*|\b(month|last|this|previous)\b",
+    "lastMonths": r"\d+\s*month|\b(last|past|previous|recent)\b.*month",
+    "opa": r"\bopa\b|oil pollution",
+    "violationsOnly": r"violat|all crew|everyone|every record|without violation|no violation|clean",
+    "status": r"draft|proposed|waiting|pending|approv|all plans|every plan",
+    "forMe": r"\b(me|my|mine|myself|i am|i'm|for me|assigned to me)\b",
+    "state": r"vacan|filled|open position|empty|unfilled|manning|short",
+    "statusClass": r"draft|pending|completed|reviewed|submitted|finished|done|all appraisals|every appraisal",
+    "appraisalDateWithin": r"\d+\s*(day|week|month|year)|\b(last|past|recent|this|within|since)\b",
+    "appraisalDateFrom": r"\d{4}|\b(from|after|since|between)\b",
+    "appraisalDateTo": r"\d{4}|\b(to|until|before|by|between)\b",
+    "includeScores": r"score|rating|grade|mark|result|how did .* do|perform",
+    "own": r"\b(my|mine|myself|me|i\b|own)\b",
     "expiryState": r"expir|valid|laps|current|out of date|overdue|still good",
     "expiryWithin": r"\d+\s*(day|week|month|year)|\b(next|last|within|coming|upcoming|soon|expir|month|week|year)",
     "expiryFrom": r"\d{4}|\b(from|after|since|between|expir)",
@@ -154,6 +184,9 @@ def evidence(key: str, value: Any, text: str) -> bool:
     """True when the user's current message asks for this filter value (filter words or the value's own words)."""
     t = (text or "").lower()
     rx = EVIDENCE.get(key)
+    # the availability tool reuses the key crewStatus with the values on_leave / on_board: their evidence is different words
+    if key == "crewStatus" and any(str(v).lower() in ("on_leave", "on_board") for v in (value if isinstance(value, list) else [value])):
+        rx = EVIDENCE["crewStatusAvailability"]
     if rx and re.search(rx, t, re.I):
         return True
     return any(w in t for w in _value_words(value))
