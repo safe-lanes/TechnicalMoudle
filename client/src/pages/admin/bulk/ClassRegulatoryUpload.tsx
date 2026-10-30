@@ -14,7 +14,7 @@ export default function ClassRegulatoryUpload({ vesselId }: ClassRegulatoryUploa
   const { sectionHUser } = useAuth();
   const masters = useQuery({
     queryKey: ["/technical/api/bulk/class-regulatory/reference", vesselId],
-    enabled: !!sectionHUser && !!vesselId,
+    enabled: !!sectionHUser,
     queryFn: async () => {
       const [societies, surveyTypes] = await Promise.all([
         sectionHRequest(sectionHUser, "GET", "/technical/api/fleet/master-lists?listType=classificationSociety").then(r => r.json()),

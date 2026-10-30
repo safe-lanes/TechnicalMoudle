@@ -65,6 +65,7 @@ import ImportSummaryModal, { ImportSummaryRow } from "./ImportSummaryModal";
 import { isGlobalBulkImportType } from "@shared/bulkImportHistoryScope";
 import { useAuth } from "@/contexts/AuthContext";
 import { sectionHRequest } from "@/lib/sectionHRequest";
+import { classRegulatoryImportFeedback } from "@/lib/classRegulatoryImportFeedback";
 
 interface FieldMapping {
   field: string;
@@ -178,6 +179,7 @@ export default function UniformBulkUpload({
   const { isSailAdmin, isExternal } = useUIRole();
   const { sectionHUser } = useAuth();
   const isClassRegulatory = templateType === "class-regulatory";
+  const needsSectionHVessel = isClassRegulatory && !vesselId?.trim();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useAdminUrlState<'add' | 'update' | 'upsert'>(`bulk.${templateType}.mode`, "upsert", ["add", "update", "upsert"]);
   const [selectedStoreType, setSelectedStoreType] = useAdminUrlState<string>(`bulk.${templateType}.storeType`, "", ["", ...(storeTypes || []).map(type => type.value)]);
@@ -239,6 +241,9 @@ export default function UniformBulkUpload({
       setDryRunResult(null);
       setIsUploading(false);
       setIsLoadingSheets(false);
+      setExpandedRows(new Set());
+      setErrorDialogOpen(false);
+      setPartialImportDialogOpen(false);
     }
     modeRef.current = importMode;
   }, [importMode, isClassRegulatory]);
@@ -248,6 +253,9 @@ export default function UniformBulkUpload({
       setDryRunResult(null);
       setIsUploading(false);
       setIsLoadingSheets(false);
+      setExpandedRows(new Set());
+      setErrorDialogOpen(false);
+      setPartialImportDialogOpen(false);
     }
     setImportMode(value);
   };
@@ -313,6 +321,7 @@ export default function UniformBulkUpload({
   };
 
   const loadSheets = async (file: File, sequence: number) => {
+    if (needsSectionHVessel) return;
     setIsLoadingSheets(true);
     setAvailableSheets([]);
     setSelectedSheet('');
@@ -344,7 +353,9 @@ export default function UniformBulkUpload({
     } catch (error) {
       if (!isClassRegulatory || sequence === requestSequence.current) toast({
         title: 'Error',
-        description: 'Failed to read file sheets.',
+        description: isClassRegulatory
+          ? classRegulatoryImportFeedback(error, 'The workbook could not be read. Upload a valid, unencrypted Excel file.')
+          : 'Failed to read file sheets.',
         variant: 'destructive'
       });
     } finally {
@@ -353,8 +364,20 @@ export default function UniformBulkUpload({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (needsSectionHVessel) return;
     const file = e.target.files?.[0];
     if (!file) return;
+    if (isClassRegulatory) {
+      requestSequence.current += 1;
+      setDryRunResult(null);
+      setSelectedFile(null);
+      setAvailableSheets([]);
+      setSelectedSheet('');
+      setIsUploading(false);
+      setIsLoadingSheets(false);
+      setErrorDialogOpen(false);
+      setPartialImportDialogOpen(false);
+    }
 
     const validTypes = isClassRegulatory ? ['.xls', '.xlsx'] : ['.csv', '.xls', '.xlsx'];
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -385,9 +408,21 @@ export default function UniformBulkUpload({
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    if (needsSectionHVessel) return;
     
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
+    if (isClassRegulatory) {
+      requestSequence.current += 1;
+      setDryRunResult(null);
+      setSelectedFile(null);
+      setAvailableSheets([]);
+      setSelectedSheet('');
+      setIsUploading(false);
+      setIsLoadingSheets(false);
+      setErrorDialogOpen(false);
+      setPartialImportDialogOpen(false);
+    }
 
     const validTypes = isClassRegulatory ? ['.xls', '.xlsx'] : ['.csv', '.xls', '.xlsx'];
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -421,8 +456,13 @@ export default function UniformBulkUpload({
   };
 
   const handleDryRun = async (file: File, sheetName?: string, sequence = requestSequence.current) => {
+    if (needsSectionHVessel) return;
     setIsUploading(true);
     setDryRunResult(null);
+    if (isClassRegulatory) {
+      setErrorDialogOpen(false);
+      setPartialImportDialogOpen(false);
+    }
 
     const formData = new FormData();
     formData.append('file', file);
@@ -479,7 +519,9 @@ export default function UniformBulkUpload({
     } catch (error: any) {
       if (!isClassRegulatory || sequence === requestSequence.current) toast({
         title: 'Validation Failed',
-        description: error.message || 'Failed to validate file',
+        description: isClassRegulatory
+          ? classRegulatoryImportFeedback(error, 'Failed to validate file')
+          : error.message || 'Failed to validate file',
         variant: 'destructive'
       });
     } finally {
@@ -495,7 +537,7 @@ export default function UniformBulkUpload({
   }, []);
 
   const handleImport = async (skipErrors: boolean = false) => {
-    if (!dryRunResult) return;
+    if (!dryRunResult || needsSectionHVessel) return;
 
     setIsImporting(true);
 
@@ -1014,6 +1056,12 @@ export default function UniformBulkUpload({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {needsSectionHVessel && (
+                <div role="status" className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900" data-testid="class-regulatory-vessel-required">
+                  <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>Choose a vessel above before uploading, validating or importing data. You can download the template and review the Field Mapping Guide now.</span>
+                </div>
+              )}
               <div 
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-sky-400 transition-colors cursor-pointer"
                 onDrop={handleDrop}
@@ -1027,7 +1075,7 @@ export default function UniformBulkUpload({
                   onChange={handleFileSelect}
                   className="hidden"
                   id={`file-upload-${templateType}`}
-                  disabled={isUploading || isImporting || isStoresAndNoType}
+                  disabled={isUploading || isImporting || isStoresAndNoType || needsSectionHVessel}
                   data-testid="input-file-upload"
                 />
                 <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
@@ -1054,6 +1102,8 @@ export default function UniformBulkUpload({
                         requestSequence.current += 1;
                         setDryRunResult(null);
                         setIsUploading(false);
+                        setErrorDialogOpen(false);
+                        setPartialImportDialogOpen(false);
                       }
                       setSelectedSheet(sheet);
                     }}>
@@ -1068,7 +1118,7 @@ export default function UniformBulkUpload({
                     </Select>
                     <Button
                       onClick={() => selectedFile && handleDryRun(selectedFile, selectedSheet)}
-                      disabled={!selectedSheet || isUploading}
+                      disabled={!selectedSheet || isUploading || needsSectionHVessel}
                       data-testid="button-revalidate"
                     >
                       {isUploading ? 'Validating...' : 'Re-validate'}
@@ -1082,6 +1132,7 @@ export default function UniformBulkUpload({
                   variant="outline"
                   className="w-full"
                   onClick={() => handleDryRun(selectedFile, selectedSheet || undefined, requestSequence.current)}
+                  disabled={needsSectionHVessel}
                   data-testid="button-validate-class-regulatory"
                 >
                   Validate workbook
@@ -1319,7 +1370,7 @@ export default function UniformBulkUpload({
                   {dryRunResult.summary.errors === 0 ? (
                     <Button 
                       onClick={() => handleImport(false)} 
-                      disabled={isImporting || dryRunResult.summary.ok === 0}
+                      disabled={isImporting || dryRunResult.summary.ok === 0 || needsSectionHVessel}
                       className="w-full bg-sky-600 hover:bg-sky-700"
                       data-testid="button-import"
                     >
@@ -1329,7 +1380,7 @@ export default function UniformBulkUpload({
                     <div className="flex gap-3">
                       <Button 
                         onClick={() => setPartialImportDialogOpen(true)}
-                        disabled={isImporting || getValidRowsCount() === 0}
+                        disabled={isImporting || getValidRowsCount() === 0 || needsSectionHVessel}
                         className="flex-1 bg-amber-600 hover:bg-amber-700"
                         data-testid="button-import-valid"
                       >

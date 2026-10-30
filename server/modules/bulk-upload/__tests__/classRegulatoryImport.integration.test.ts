@@ -238,4 +238,30 @@ describe("Section H bulk import — isolated PostgreSQL TEMP tables", () => {
     const xls = XLSX.write(XLSX.read(workbook(), { type: "buffer" }), { type: "buffer", bookType: "biff8" });
     expect(readSectionHWorkbook(xls, "legacy.xls").rows).toHaveLength(1);
   });
+  it("generates a generic template without a vessel but still refuses unscoped validation", async () => {
+    const template = await classRegulatoryTemplate("");
+    const book = XLSX.read(template, { type: "buffer" });
+    expect(XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1 })[0])
+      .toEqual(CLASS_REGULATORY_TEMPLATE_FIELDS.map(f => f.header));
+    const guide = XLSX.utils.sheet_to_json(book.Sheets["Field Mapping Guide"], { header: 1 }) as string[][];
+    const instruction = guide.find(row => row[0] === "Selected vessel")?.[1];
+    expect(instruction).toContain("Select a vessel");
+    expect(instruction).not.toContain("undefined");
+    expect(book.Sheets["Master References"]).toBeDefined();
+    await expect(classRegulatoryTemplate(otherComponent)).rejects.toThrow(/vessel/);
+    await expect(previewSectionHImport(actor, "", "upsert", workbook(), "fixture.xlsx"))
+      .rejects.toThrow(/vessel UUID/);
+  });
+  it("returns row-level validation lists for real Excel dates and field-specific invalid calendars", async () => {
+    const p = await previewSectionHImport(actor, vessel, "upsert",
+      workbook([changed({ 2: "NUMERIC", 3: 46296, 4: 46297 }), changed({ 2: "BAD-DATE", 3: "31-02-2026" })]),
+      "dates.xlsx");
+    expect(p.summary).toEqual({ ok: 1, errors: 1, warnings: 0 });
+    expect(p.rows[0]).toMatchObject({ row: 2, status: "ok", normalized: {
+      "Last Class Survey Date": "01-10-2026", "Next Class Survey": "02-10-2026", Action: "create",
+    } });
+    expect(p.rows[1]).toMatchObject({ row: 3, status: "error" });
+    expect(p.rows[1].errors.join("; ")).toContain("Last Class Survey Date:");
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.component_class_regulatory")).rows[0].n).toBe(0);
+  });
 });

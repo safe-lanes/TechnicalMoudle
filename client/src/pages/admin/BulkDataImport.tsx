@@ -471,16 +471,7 @@ export default function BulkDataImport() {
                 onHistorySubTypeChange={setSelectedHistorySubType}
               />
             ) : selectedVesselTemplate === 'class-regulatory' ? (
-              selectedVessel ? (
-                <ClassRegulatoryUpload key={selectedVessel} vesselId={selectedVessel} />
-              ) : (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Ship className="h-12 w-12 text-gray-300 mb-4" />
-                    <p className="text-gray-600 text-center">Choose a vessel to import Classification & Regulatory Data.</p>
-                  </CardContent>
-                </Card>
-              )
+              <ClassRegulatoryUpload key={selectedVessel} vesselId={selectedVessel} />
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

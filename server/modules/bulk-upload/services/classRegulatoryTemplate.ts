@@ -7,7 +7,7 @@ import { importVessel } from "./classRegulatoryImport";
 
 export async function classRegulatoryTemplate(vesselId: string) {
   const db = await getDb();
-  const vessel = await importVessel(db, vesselId);
+  const vessel = vesselId.trim() ? await importVessel(db, vesselId) : undefined;
   const masters = await db.select().from(masterLists).where(and(eq(masterLists.isActive, true),
     or(isNull(masterLists.isDeleted), eq(masterLists.isDeleted, false))));
   const workbook = new ExcelJS.Workbook();
@@ -38,7 +38,9 @@ export async function classRegulatoryTemplate(vesselId: string) {
   const guide = workbook.addWorksheet("Field Mapping Guide");
   guide.columns = [{ header: "Field", width: 28 }, { header: "Rule", width: 110 }];
   CLASS_REGULATORY_TEMPLATE_FIELDS.forEach(f => guide.addRow([f.header, f.description]));
-  guide.addRow(["Selected vessel", `${vessel.name}; Vessel Code: ${vessel.code}. Enter this exact code in column J.`]);
+  guide.addRow(["Selected vessel", vessel
+    ? `${vessel.name}; Vessel Code: ${vessel.code}. Enter this exact code in column J.`
+    : "Select a vessel on the import page before validation or import. Enter that vessel's exact Vessel Code in column J."]);
   guide.addRow(["Matching", "Selected vessel + exact Component Code + exact Certificate Number (outer whitespace trimmed). No case/punctuation normalization."]);
   guide.addRow(["Blank updates", "Blank optional cells keep saved values. Clearing values is not supported by this import."]);
   guide.addRow(["Limits", "Maximum 1,000 worksheet data rows; Excel only. Import does not upload attachments. Undo is unavailable."]);

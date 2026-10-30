@@ -1,4 +1,6 @@
-import * as XLSX from "xlsx";
+// xlsx is CommonJS in the server runtime: SSF is on the default export, not
+// Node's synthetic named-export namespace (which differs from Vitest/Vite).
+import XLSX from "xlsx";
 import { CLASS_REGULATORY_TEMPLATE_FIELDS } from "@shared/bulkImportTemplateFields";
 import { classSurveyDay } from "@shared/classRegulatory";
 import { ValidationError } from "../../shared/errors";
@@ -48,6 +50,10 @@ export function readSectionHWorkbook(buffer: Buffer, name: string, sheetName?: s
       if ((c === 3 || c === 4) && cell?.t === "n") {
         const date = XLSX.SSF.parse_date_code(cell.v, { date1904: !!workbook.Workbook?.WBProps?.date1904 });
         value = date ? `${String(date.d).padStart(2, "0")}-${String(date.m).padStart(2, "0")}-${String(date.y).padStart(4, "0")}` : "INVALID";
+      }
+      if ((c === 3 || c === 4) && value) {
+        try { importSurveyDate(value); }
+        catch { errors.push(`${field.header}: use a valid calendar date in DD-MM-YYYY format.`); }
       }
       values[field.key] = value;
     });
