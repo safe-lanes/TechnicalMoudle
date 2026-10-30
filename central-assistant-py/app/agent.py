@@ -75,6 +75,7 @@ class Deps:
     paging: dict[str, Any] | None = None   # server totals of the LAST list-mode Crewing result (review item 1)
     breakdown: str | None = None           # expired / upcoming line of the LAST Crewing result with an expiry condition (A4)
     rank_line: str | None = None           # unclassified-ranks line of the LAST Crewing result that used rank groups (A5)
+    queue_line: str | None = None          # fixed 'no personal approval queue' statement (31-Oct-2026)
 
 
 # ── module manifests (Data API discovery) ─────────────────────────────────────────
@@ -215,6 +216,9 @@ class ManifestToolset(AbstractToolset[Deps]):
                 rl = query_guard.rank_config_line(result)
                 if rl is not None or result.get("ok") is True:
                     deps.rank_line = rl
+                ql = query_guard.queue_line(result)
+                if ql is not None or result.get("ok") is True:
+                    deps.queue_line = ql
             if decision is not None and isinstance(result, dict):
                 state = query_guard.state_from_result(name, result)
                 if state and deps.conv_key:
@@ -339,6 +343,7 @@ class LoopResult:
     paging: dict[str, Any] | None = None
     breakdown: str | None = None
     rank_line: str | None = None
+    queue_line: str | None = None
 
 
 # Answer-prompt version record (owner rule 14-Sep-2026: deploy the EXACT wording that was measured).
@@ -427,11 +432,13 @@ CREWING_DATA_RULES = (
     "have no availability date from `excluded`; 'in <month>' means available by the LAST day of that month; for a named person call crewing_find_crew and pass crewIds — never conclude from a list that omits them). RELIEF DUE / OVERDUE → crewing_query_relief_due (Due Crew rule; when "
     "reliefDueDiffers is true name both the contract end and the recorded relief-due date). REST HOURS → crewing_query_rest_hours "
     "(live recalculation; ALWAYS state the month(s) and `lastUpdated`; OPA only when the user says so, and say whether OPA was "
-    "applied). ROTATION APPROVALS → crewing_query_rotation_approvals (waiting plans company-wide; 'for me' only when the user says "
-    "so — relay `notes`). MANNING / VACANCIES → crewing_query_manning (a position is filled only by a signed-on person; quote "
-    "`summary`). APPRAISALS → crewing_query_appraisals (pending by default, drafts and completed separately; SCORES only when the "
-    "user explicitly asks — set includeScores and relay not_allowed as 'your role cannot view appraisals'; a request for the "
-    "user's OWN appraisal → own: true and relay the refusal reason; never show assessment scores or remarks). "
+    "applied). ROTATION APPROVALS → crewing_query_rotation_approvals (waiting plans company-wide; for 'waiting for MY approval' set "
+    "forMe: Crewing records no individual approver, so never say or imply that the plans are assigned to the user — present them "
+    "as the company's pending plans). MANNING / VACANCIES → crewing_query_manning (a position is filled only by a signed-on person; quote "
+    "`summary`). APPRAISALS → crewing_query_appraisals (pending by default, drafts and completed separately; the vessel is the vessel the "
+    "appraisal was made on — mention appraisals that could not be tied to a vessel; SCORES only when the user explicitly asks — "
+    "set includeScores and give the overall score with the appraisal date; for the user's OWN appraisal set own: true, then say "
+    "the login is not linked to a crew record and ask which crew member they mean; never show assessment scores or remarks). "
     "RULE — data the tools do not cover: if the user asks for live data that no crewing_* tool provides (for example wages, "
     "contracts, medical results, passports), say plainly that the assistant cannot access that data yet and name what it can "
     "answer — do not search the manual for it and do not describe it as a documentation gap. "
@@ -599,7 +606,7 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
     if deps.partial:
         text = f"{text}{PARTIAL_NOTE}"
     return LoopResult(text=text, tools_used=deps.tools_used, usage=_usage(result), partial=deps.partial, citations=deps.citations,
-                      paging=deps.paging, breakdown=deps.breakdown, rank_line=deps.rank_line)
+                      paging=deps.paging, breakdown=deps.breakdown, rank_line=deps.rank_line, queue_line=deps.queue_line)
 
 
 async def answer_docs(system: str, user: str, masker: Masker | None, history: list[ModelMessage] | None = None) -> tuple[str, dict[str, int] | None]:

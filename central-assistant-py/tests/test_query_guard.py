@@ -235,3 +235,12 @@ def test_licence_or_certificate_means_both_kinds():
     a = qg.decide("crewing_query_assignments", {"mode": "count", "hasDocument": {"documentTypes": ["licence"], "expiryWithin": {"direction": "next", "amount": 30, "unit": "days"}}}, None,
                   "crew on board with a licence or certificate expiring within 30 days")
     assert "documentTypes" not in a.effective["hasDocument"]
+
+
+def test_queue_line_states_no_personal_queue_verbatim():
+    # 31-Oct-2026: "waiting for my approval" — Crewing records no individual approver; the statement is the server's, verbatim
+    stmt = "Crewing does not record an individual approver for rotation plans, so a personal approval queue cannot be identified. The plans shown are all plans waiting for approval in your company."
+    assert qg.queue_line({"ok": True, "personalQueue": {"identifiable": False, "statement": stmt}}) == stmt
+    assert qg.queue_line({"ok": True, "total": 2}) is None                                  # not asked 'for me' → no line
+    assert qg.queue_line({"ok": False, "code": "not_allowed", "personalQueue": {"identifiable": False, "statement": stmt}}) is None
+    assert qg.queue_line({"ok": True, "personalQueue": {"identifiable": True, "statement": stmt}}) is None

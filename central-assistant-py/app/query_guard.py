@@ -60,7 +60,7 @@ EVIDENCE: dict[str, str | None] = {
     "opa": r"\bopa\b|oil pollution",
     "violationsOnly": r"violat|all crew|everyone|every record|without violation|no violation|clean",
     "status": r"draft|proposed|waiting|pending|approv|all plans|every plan",
-    "forMe": r"\b(me|my|mine|myself|i am|i'm|for me|assigned to me)\b",
+    "forMe": r"\b(me|my|mine|myself|i am|i'm|for me|assigned to me)\b",   # 31-Oct: never narrows — the server answers with the company queue
     "state": r"vacan|filled|open position|empty|unfilled|manning|short",
     "statusClass": r"draft|pending|completed|reviewed|submitted|finished|done|all appraisals|every appraisal",
     "appraisalDateWithin": r"\d+\s*(day|week|month|year)|\b(last|past|recent|this|within|since)\b",
@@ -324,6 +324,18 @@ def breakdown_line(result: dict[str, Any]) -> str | None:
     to = str(win.get("to") or "")
     upcoming = part(b["upcoming"], f"expire by {to}" if to else "have not expired yet")
     return f"Of these, {expired}; {upcoming}."
+
+
+# ── personal-queue line (31-Oct-2026, Ghazi: "waiting for my approval" must never imply a personal queue) ──────────────
+def queue_line(result: dict[str, Any]) -> str | None:
+    """The server's fixed statement when a personal approval queue cannot be identified (Crewing records no individual
+    approver for rotation plans). Appended verbatim, never paraphrased by the model."""
+    if not isinstance(result, dict) or result.get("ok") is not True:
+        return None
+    pq = result.get("personalQueue")
+    if isinstance(pq, dict) and pq.get("identifiable") is False and isinstance(pq.get("statement"), str) and pq["statement"].strip():
+        return pq["statement"].strip()
+    return None
 
 
 # ── rank-configuration line (29-Oct-2026, Sahil A5: groups come from Rank Administration; gaps are reported, never guessed) ──
