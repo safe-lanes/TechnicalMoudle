@@ -60,8 +60,8 @@ export const readiness = fileHandler(async (req, res) => {
 });
 export const peerReports = fileHandler(async (req, res) => {
   const actor = await defectFileActor(req);
-  if (actor.userType !== 'Office' || !['Sail Admin', 'PMS Admin'].includes(actor.role)) throw fileError('Office administrator access is required.', 403);
-  res.json({ readOnly: true, protocolImplemented: false, reports: await listDefectPeerReports() });
+  if (actor.userType !== 'Office' || !['sail admin', 'pms admin'].includes(actor.role.replaceAll('_', ' ').toLowerCase())) throw fileError('Office administrator access is required.', 403);
+  res.json(await (await import('../../sync/defectFileReadiness')).defectStatusDashboard());
 });
 export const download = fileHandler(async (req, res) => {
   const actor = await defectFileActor(req);
@@ -73,7 +73,7 @@ export const download = fileHandler(async (req, res) => {
   res.send(file.bytes);
 });
 export const status = fileHandler(async (req, res) => {
-  await defectFileContent(await defectFileActor(req), req.params.defectId, req.params.section as DefectFileSection, req.params.attachmentId);
+  await defectFileContent(await defectFileActor(req), req.params.defectId, req.params.section as DefectFileSection, req.params.attachmentId, true);
   res.json({ state: 'available' });
 });
 export const stagedDownload = fileHandler(async (req, res) => {

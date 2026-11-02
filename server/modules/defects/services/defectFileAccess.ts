@@ -33,8 +33,9 @@ export async function defectFileActor(req: Request): Promise<DefectFileActor> {
   const mapped = await findMasterUserById(identity.userId);
   if (!mapped || mapped.userType !== identity.userType) throw fileError('The user identity is not mapped in this installation.', 403);
   return {
-    userUuid: identity.userId, name: (mapped as any).fullName || identity.userId,
-    role: identity.role, userType: identity.userType, rank: developmentRank || r.user?.rank_name || r.user?.crewDesignation || '',
+    userUuid: identity.userId, name: mapped.fullName || identity.userId,
+    role: identity.role, userType: identity.userType,
+    rank: String(developmentRank || r.verifiedUser?.rank_name || r.verifiedUser?.rankName || mapped.designation || ''),
     tenant: getCurrentTenantContext()?.tuid ?? 'single-tenant',
   };
 }

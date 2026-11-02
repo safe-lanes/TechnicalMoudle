@@ -14,7 +14,10 @@ describe('defect private file authorization', () => {
   it('uses verified canonical identity, not the mock role', async () => {
     mock.mapped.mockResolvedValue({ role: 'Vessel User', userType: 'Ship' });
     expect(await defectFileActor({ headers: {}, verifiedUser: { userId: 'real-user', role: 'Vessel User', userType: 'Ship' }, user: { role: 'Sail Admin', rank_name: 'Master' } } as any))
-      .toMatchObject({ userUuid: 'real-user', role: 'Vessel User', userType: 'Ship' });
+      .toMatchObject({ userUuid: 'real-user', role: 'Vessel User', userType: 'Ship', rank: '' });
+    mock.mapped.mockResolvedValue({ role: 'Vessel User', userType: 'Ship', designation: 'Master' });
+    expect(await defectFileActor({ headers: {}, verifiedUser: { userId: 'real-user', role: 'Vessel User', userType: 'Ship' } } as any))
+      .toMatchObject({ rank: 'Master' });
   });
   it('keeps vessel callers within active assignments and permits office access across vessels', async () => {
     mock.rows = [];

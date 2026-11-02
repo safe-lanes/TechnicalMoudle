@@ -13,13 +13,15 @@ import { getDb } from '../../db';
 export interface MasterUserIdentity {
   role: string | null;
   userType: 'Office' | 'Ship' | null;
+  fullName?: string | null;
+  designation?: string | null;
 }
 
 export async function findMasterUserById(userId: string): Promise<MasterUserIdentity | null> {
   const db = await getDb();
   if (!db) return null;
   const rows = await db
-    .select({ role: masterUsers.role, userType: masterUsers.userType })
+    .select({ role: masterUsers.role, userType: masterUsers.userType, fullName: masterUsers.fullName, designation: masterUsers.designation })
     .from(masterUsers)
     .where(and(eq(masterUsers.id, userId), eq(masterUsers.isDeleted, false)))
     .limit(1);
@@ -28,5 +30,7 @@ export async function findMasterUserById(userId: string): Promise<MasterUserIden
   return {
     role: (rows[0].role || '').trim() || null,
     userType: ut === 'Office' || ut === 'Ship' ? ut : null,
+    fullName: rows[0].fullName,
+    designation: (rows[0].designation || '').trim() || null,
   };
 }

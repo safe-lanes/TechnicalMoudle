@@ -6,7 +6,7 @@ import { assertDefectFileAccess, fileError, type DefectFileActor } from './defec
 import { defectFileStore, fileHash } from './defectFileStorage';
 import * as repo from '../repositories/defectsRepository';
 
-export async function defectFileContent(actor: DefectFileActor, defectId: string, section: DefectFileSection, attachmentId: string) {
+export async function defectFileContent(actor: DefectFileActor, defectId: string, section: DefectFileSection, attachmentId: string, statusOnly = false) {
   const current = await repo.getDefect(defectId);
   if (!current) throw fileError('Defect not found.', 404);
   await assertDefectFileAccess(actor, current.vesselId);
@@ -25,14 +25,19 @@ export async function defectFileContent(actor: DefectFileActor, defectId: string
   if (key.defect !== current.duuid || key.vessel !== current.vesselId || key.section !== section || key.id !== file.id) {
     throw fileError('The file identity does not belong to this defect and section.', 403);
   }
-  try { bytes = await defectFileStore.read(file.fileKey, file.backend); }
+  if (statusOnly) {
+    const rows = await (await getDb()).select({ status: syncFileQueue.status }).from(syncFileQueue).where(and(
+      eq(syncFileQueue.tableName, 'defects'), eq(syncFileQueue.rowUuid, current.duuid), eq(syncFileQueue.fileKey, file.fileKey)));
+    if (rows.some(q => ['failed', 'dead_letter', 'unsendable'].includes(q.status))) throw fileError('Transfer failed – contact support', 409, 'DEFECT_FILE_TRANSFER_FAILED');
+  }
+  try { bytes = await (await import('../../sync/defectFileProtocol')).readDefectTransferBytes(file); }
   catch (error: any) {
     if (error.code !== 'ENOENT' && error.code !== 404) throw error;
     const db = await getDb();
     const queues = await db.select({ status: syncFileQueue.status }).from(syncFileQueue).where(and(
       eq(syncFileQueue.tableName, 'defects'), eq(syncFileQueue.rowUuid, current.duuid), eq(syncFileQueue.fileKey, file.fileKey),
     ));
-    const failed = queues.some(row => ['failed', 'dead_letter'].includes(row.status));
+    const failed = queues.some(row => ['failed', 'dead_letter', 'unsendable'].includes(row.status));
     throw fileError(failed ? 'Transfer failed – contact support' : 'Awaiting synchronization', 409,
       failed ? 'DEFECT_FILE_TRANSFER_FAILED' : 'DEFECT_FILE_PENDING');
   }

@@ -5,8 +5,12 @@ import * as conflictReviewCtrl from './conflictReviewController';
 import { requireOfflineAdmin } from './middleware';
 import { syncTenantGuard } from '../../middleware/syncTenantGuard';
 import { requirePermission } from '../../middleware/permissions';
+import * as defectFiles from './defectFileController';
 
 const router = Router();
+router.post('/sync/defects/handshake', syncTenantGuard, defectFiles.handshake);
+router.post('/sync/defects/files', syncTenantGuard, defectFiles.transfer);
+router.post('/sync/defects/files/:queueUuid/retry', requirePermission('admin-sync-dashboard', 'edit', { enforce: true }), defectFiles.retry);
 
 // ── Permission policy (requirePermission — SESSION admin routes only) ──
 // Machine-authenticated sync protocol routes (syncTenantGuard) are NEVER touched.

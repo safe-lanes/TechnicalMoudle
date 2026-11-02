@@ -16,6 +16,10 @@ export async function prepareDefectPdfAttachments(
           const url = file.stagedRef
             ? `/technical/api/defects/file-staging/${file.stagedRef}?sessionId=${sessionId}&backend=${file.backend}`
             : defectFileUrl(defectId!, section, file.id);
+          if (!file.stagedRef) {
+            const state = await fetch(`${url}/status`, { headers, credentials: 'include' });
+            if (!state.ok) fileNotes.push(`${label} — ${(await state.json()).error || 'File status unavailable'}`);
+          }
           const blob = await fetchDefectFile(url, headers);
           data = await new Promise((resolve, reject) => {
             const reader = new FileReader(); reader.onload = () => resolve(String(reader.result));

@@ -21,12 +21,25 @@ import { getPool } from '../../db';
 import { isShipInstanceId, isShipInstance } from './syncRole';
 import { getSyncLogPath, getSyncLogDir, syncDiag } from './syncDiagLogger';
 import { assertSectionHFilePeer, assertSectionHQueuePeer } from './sectionHFileProtocolAccess';
+import { authenticateDefectPeer, defectReadiness, revokeDefectPeerTrust } from './defectFileReadiness';
+import { filterDefectLogs, filterDefectRows, protectDefectPushAcknowledgement } from './defectMetadataCompatibility';
+async function authorizedDefectMetadata(req: Request, vesselId: string) {
+  if (!req.body.capabilities?.includes('defect_files_v1')) return false;
+  await authenticateDefectPeer(req, vesselId);
+  return (await defectReadiness(vesselId)).ready;
+}
 
 // ── POST /sync/initiate ──
 
 export async function initiateSyncHandler(req: Request, res: Response) {
   try {
     const { instanceId, vesselId, lastCheckpoint } = req.body;
+    if (req.body.defectProtocol !== 1) {
+      try {
+        await authenticateDefectPeer(req, vesselId);
+        await revokeDefectPeerTrust(vesselId, 'The authenticated vessel is now using software without the defect file protocol.');
+      } catch { /* Preserve old unauthenticated single-tenant metadata behavior; it cannot change trust. */ }
+    }
     if (!instanceId || !vesselId) {
       return res.status(400).json({ error: 'instanceId and vesselId are required' });
     }
@@ -53,13 +66,21 @@ export async function pushHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'batchUuid and vesselId are required' });
     }
 
+    const peerReady = await authorizedDefectMetadata(req, vesselId);
+    const allowedLogs = new Set(filterDefectLogs(fieldLogs ?? [], peerReady));
+    const heldRows = new Set<string>((fieldLogs ?? []).filter((l: any) => !allowedLogs.has(l)).map((l: any) => l.rowUuid ?? l.row_uuid));
+    const safeFullRows = filterDefectRows(fullRows ?? [], peerReady);
+    if (!peerReady) for (const batch of fullRows ?? []) if (batch.tableName === 'defects') {
+      const permitted = safeFullRows.find(b => b.tableName === 'defects')?.rows ?? [];
+      for (const row of batch.rows) if (!permitted.some(p => p.duuid === row.duuid)) heldRows.add(row.duuid);
+    }
     const result = await syncService.receivePushData(batchUuid, vesselId, {
       oneWayRows,
-      fieldLogs,
+      fieldLogs: (fieldLogs ?? []).filter((l: any) => !heldRows.has(l.rowUuid ?? l.row_uuid)),
       masterRecordHints,
-      fullRows, // self-heal delivery (optional; absent from old ships)
+      fullRows: safeFullRows,
     });
-    res.json(result);
+    res.json(protectDefectPushAcknowledgement(result, heldRows));
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] push error:', error);
@@ -97,7 +118,8 @@ export async function pullHandler(req: Request, res: Response) {
       instanceId,
       lastCheckpoint ? new Date(lastCheckpoint) : null,
       tableCheckpoints,
-      Array.isArray(req.body?.capabilities) ? req.body.capabilities.filter((c: unknown) => typeof c === 'string') : undefined
+      Array.isArray(req.body?.capabilities) ? req.body.capabilities.filter((c: unknown) => typeof c === 'string') : undefined,
+      await authorizedDefectMetadata(req, vesselId),
     );
     res.json(result);
   } catch (error: any) {
@@ -335,7 +357,10 @@ export async function fetchRowsHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'vesselId, instanceId, and requests[] are required' });
     }
     const tables = await syncService.fetchFullRowsForHeal(requests);
-    res.json({ tables });
+    // Canonical owning-vessel scope, including full-row recovery paths.
+    const owned = tables.map(t => t.tableName !== 'defects' ? t : { ...t,
+      rows: t.rows.filter(r => (r.vessel_id ?? r.vesselId) === vesselId) });
+    res.json({ tables: filterDefectRows(owned, await authorizedDefectMetadata(req, vesselId)) });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] fetch-rows error:', error);
@@ -346,6 +371,7 @@ export async function fetchRowsHandler(req: Request, res: Response) {
 // ── POST /sync/file/upload-chunk ──
 
 export async function uploadChunkHandler(req: Request, res: Response) {
+  if (req.body?.tableName === 'defects' || (req.body?.queueUuid && (await syncRepo.getFileQueueEntry(req.body.queueUuid))?.tableName === 'defects')) return res.status(403).json({ error: 'Defect files require the authenticated defect protocol.' });
   try {
     const chunk = req.body;
     if (chunk.tableName === 'component_class_regulatory_attachments')
@@ -372,6 +398,7 @@ const FILE_CATEGORY_LABELS: Record<string, string> = {
   work_order_documents: 'Work Order',
   component_documents: 'Component',
   defect_attachments: 'Defect',
+  defects: 'Defect documents',
   change_request_attachment: 'Change Request',
   component_class_regulatory_attachments: 'Section H',
 };
@@ -415,6 +442,9 @@ export async function fileQueueHandler(req: Request, res: Response) {
 
 // ── POST /sync/file/:queueUuid/retry ──  (B-P1.1)
 export async function retryFileHandler(req: Request, res: Response) {
+  if ((await syncRepo.getFileQueueEntry(req.params.queueUuid))?.tableName === 'defects') {
+    return (await import('./defectFileController')).retry(req, res);
+  }
   try {
     const { queueUuid } = req.params;
     if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
@@ -429,6 +459,7 @@ export async function retryFileHandler(req: Request, res: Response) {
 
 // ── POST /sync/file/:queueUuid/skip ──  (B-P1.1)
 export async function skipFileHandler(req: Request, res: Response) {
+  if ((await syncRepo.getFileQueueEntry(req.params.queueUuid))?.tableName === 'defects') return res.status(403).json({ error: 'Defect transfers cannot be skipped.' });
   try {
     const { queueUuid } = req.params;
     if (!queueUuid) return res.status(400).json({ error: 'queueUuid is required' });
@@ -461,6 +492,7 @@ export async function pendingFilesHandler(req: Request, res: Response) {
 
 // ── POST /sync/file/download-chunk ──  shore→ship pull: stream one chunk of a queued file
 export async function downloadChunkHandler(req: Request, res: Response) {
+  if ((await syncRepo.getFileQueueEntry(req.body.queueUuid))?.tableName === 'defects') return res.status(403).json({ error: 'Use the authenticated defect file protocol.' });
   try {
     const { queueUuid, chunkIndex } = req.body;
     if (!queueUuid || chunkIndex === undefined) {
@@ -481,6 +513,7 @@ export async function downloadChunkHandler(req: Request, res: Response) {
 // ── POST /sync/file/:queueUuid/complete ──  shore→ship pull: ship confirms a verified file;
 // the shore marks its shore_to_ship entry completed so it stops re-offering it.
 export async function completeFileHandler(req: Request, res: Response) {
+  if ((await syncRepo.getFileQueueEntry(req.params.queueUuid))?.tableName === 'defects') return res.status(403).json({ error: 'Use the authenticated defect file protocol.' });
   try {
     await assertSectionHQueuePeer(req, req.params.queueUuid);
     const { queueUuid } = req.params;
@@ -497,6 +530,7 @@ export async function completeFileHandler(req: Request, res: Response) {
 // failed attempts; the shore marks its entry terminal 'failed' (leaves 'pending' → drops from the
 // drain count). Mirror of the push's dead-letter.
 export async function failFileHandler(req: Request, res: Response) {
+  if ((await syncRepo.getFileQueueEntry(req.params.queueUuid))?.tableName === 'defects') return res.status(403).json({ error: 'Use the authenticated defect file protocol.' });
   try {
     const { queueUuid } = req.params;
     await assertSectionHQueuePeer(req, queueUuid);

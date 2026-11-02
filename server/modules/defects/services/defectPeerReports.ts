@@ -8,6 +8,7 @@ export interface DefectPeerReport {
   instanceId: string; vesselUuid: string | null; softwareVersion: string;
   capabilities: string[]; migration191: boolean; receivedAt: string; expiresAt: string;
   sessionIdentity: string; sequence: number;
+  trustLostAt?: string; trustLossReason?: string;
 }
 /**
  * Internal-only persistence boundary for M3's authenticated handshake. There is
@@ -30,7 +31,7 @@ export async function recordAuthenticatedDefectPeerReport(
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
     const [row] = await tx.select().from(syncSettings).where(eq(syncSettings.settingKey, key)).for('update');
     const old = row?.settingValue ? JSON.parse(row.settingValue) as DefectPeerReport : null;
-    if (old?.sessionIdentity === report.sessionIdentity && old.sequence >= report.sequence) throw fileError('Peer report replay rejected.', 409);
+    if (old && old.sequence >= report.sequence) throw fileError('Peer report replay rejected.', 409);
     const saved = { ...report, receivedAt: new Date().toISOString() };
     await tx.insert(syncSettings).values({
       settingKey: key, settingValue: JSON.stringify(saved), settingType: 'json', isEditable: false,

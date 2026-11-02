@@ -1068,7 +1068,8 @@ export async function preparePullData(
   /** 13-Oct-2026: what the pulling ship understands. ABSENT (old ship) → UUID-keyed changes of tables whose identity
    *  moved to a UUID (component_documents) are HELD BACK — left pending and re-offered after the ship updates — since
    *  an old ship matches them by its integer id and would fail on a UUID value. */
-  capabilities?: string[]
+  capabilities?: string[],
+  authenticatedDefectPeer = false,
 ) {
   // Validate batch
   const batch = await repo.getBatch(batchUuid);
@@ -1117,7 +1118,9 @@ export async function preparePullData(
     shipInstanceId,
     vesselCode
   );
-  let shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
+  const defectReady = authenticatedDefectPeer && (await (await import('./defectFileReadiness')).defectReadiness(vesselId)).ready;
+  const { filterDefectLogs } = await import('./defectMetadataCompatibility');
+  let shoreFieldLogs = filterDefectLogs(shoreFieldLogsRaw.map(normalizeFieldLog), defectReady);
   if (!capabilities?.includes('spare_classification_pair') &&
       (shoreFieldLogs.some(log => log.tableName === 'spares' &&
         ['spareCategory', 'optimumQty', 'spare_category', 'optimum_qty'].includes(log.fieldName)) ||
@@ -1224,6 +1227,16 @@ export async function preparePullData(
   }
 
   // Update batch stats
+  // Exact delivered defect log IDs, not just row IDs: a base-row acknowledgement
+  // must not acknowledge a C1/default/external field withheld from an older peer.
+  {
+    const { syncSettings } = await import('@shared/schema');
+    const db = await (await import('../../db')).getDb();
+    const key = `defects_peer_report:delivery-${batchUuid}`;
+    const value = JSON.stringify({ logUuids: nonConflictingLogs.filter(l => l.tableName === 'defects').map(l => l.logUuid) });
+    await db.insert(syncSettings).values({ settingKey: key, settingValue: value, settingType: 'json', isEditable: false })
+      .onConflictDoUpdate({ target: syncSettings.settingKey, set: { settingValue: value } });
+  }
   await repo.updateBatch(batchUuid, {
     recordsSent: nonConflictingLogs.length + oneWayRows.reduce((sum, t) => sum + t.rows.length, 0),
     conflictsFound: conflicts.length,
@@ -1418,6 +1431,13 @@ export async function completeSyncSession(
     // Legacy ship (marks the whole window): never mark changes that were held back from it (13-Oct-2026).
     logsToMark = holdBackForOldShip(shoreLogs, undefined).logs;
   }
+  // A row acknowledgement must never acknowledge C1/external fields held from an
+  // older peer, including explicit [] defaults on initial insertion.
+  logsToMark = (await import('./defectMetadataCompatibility')).filterDefectLogs(logsToMark,
+    (await (await import('./defectFileReadiness')).defectReadiness(vesselId)).ready);
+  const delivered = await repo.getSetting(`defects_peer_report:delivery-${batchUuid}`);
+  const deliveredIds = new Set<string>(delivered ? JSON.parse(delivered).logUuids : []);
+  logsToMark = logsToMark.filter(l => l.tableName !== 'defects' || deliveredIds.has(l.logUuid));
   syncDiag(`COMPLETE-SESSION: ${shoreLogs.length} shore logs in window; marking ${logsToMark.length} synced (ack=${Array.isArray(appliedRowUuids) ? appliedRowUuids.length : 'legacy-all'})`);
   if (logsToMark.length > 0) {
     await repo.markFieldLogsSynced(

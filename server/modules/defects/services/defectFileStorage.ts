@@ -30,6 +30,19 @@ export class DefectFileStore {
     if (!bucket) throw new Error('Private defect storage is not configured.');
     return objectStorageClient.bucket(bucket).file(`.private/${relative}`);
   }
+  private async localPath(relative: string) {
+    const target = path.resolve(this.root, relative);
+    if (!target.startsWith(path.resolve(this.root) + path.sep)) throw new Error('Defect storage path escaped its private root.');
+    let cursor = path.resolve(this.root);
+    for (const part of ['', ...relative.split(path.sep)]) {
+      if (part) cursor = path.join(cursor, part);
+      try {
+        const stat = await fs.lstat(cursor);
+        if (stat.isSymbolicLink()) throw new Error('Symbolic links are not permitted in defect storage.');
+      } catch (error: any) { if (error.code !== 'ENOENT') throw error; }
+    }
+    return target;
+  }
   async write(key: string, bytes: Buffer, backend: string, staging = false) {
     if (!['local', 'object'].includes(backend)) throw new Error('Unknown defect storage backend.');
     const relative = this.location(key, staging);
@@ -37,8 +50,9 @@ export class DefectFileStore {
       // Atomic object creation; never overwrite a committed object.
       await this.object(relative).save(bytes, { resumable: false, preconditionOpts: { ifGenerationMatch: 0 } });
     } else {
-      const target = path.join(this.root, relative);
+      const target = await this.localPath(relative);
       await fs.mkdir(path.dirname(target), { recursive: true });
+      await this.localPath(relative);
       const temporary = `${target}.${randomUUID()}.tmp`;
       try {
         await fs.writeFile(temporary, bytes, { flag: 'wx', mode: 0o600 });
@@ -50,13 +64,13 @@ export class DefectFileStore {
     if (!['local', 'object'].includes(backend)) throw new Error('Unknown defect storage backend.');
     const relative = this.location(key, staging);
     if (backend === 'object') return (await this.object(relative).download())[0];
-    return fs.readFile(path.join(this.root, relative));
+    return fs.readFile(await this.localPath(relative));
   }
   async remove(key: string, backend: string, staging = false) {
     if (!['local', 'object'].includes(backend)) throw new Error('Unknown defect storage backend.');
     const relative = this.location(key, staging);
     if (backend === 'object') await this.object(relative).delete({ ignoreNotFound: true });
-    else await fs.unlink(path.join(this.root, relative)).catch(error => { if (error.code !== 'ENOENT') throw error; });
+    else await fs.unlink(await this.localPath(relative)).catch(error => { if (error.code !== 'ENOENT') throw error; });
   }
   async manifests(backend: string): Promise<string[]> {
     if (backend === 'object') {

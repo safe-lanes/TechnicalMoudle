@@ -19,6 +19,7 @@ export type DefectAttachment = InlineDefectAttachment | ExternalDefectAttachment
 export const isExternalDefectAttachment = (file: any): file is ExternalDefectAttachment =>
   file?.storageVersion === 1;
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const isUuid = (value: unknown): value is string => typeof value === 'string' && UUID.test(value);
 
 export function defectFileKey(vessel: string, defect: string, section: DefectFileSection, id: string, extension: string) {
   if (![vessel, defect, id].every(value => UUID.test(value)) ||

@@ -27,6 +27,8 @@ import { partitionNonSyncedTableLogs } from './service';
 import { applyOneWayRows, getColumnMeta, applyFieldLogInserts, applyFullRowsIfAbsent, gatherFullRows, SYNC_COLUMN_ALIASES, coerceArrayValue, evaluateInsertOriginGuard, evaluateStaleSkipGuard, getLatestRotationDate, isReadingPreRotation } from './oneWayApplier';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
+import { exchangeDefectCapabilities, processDefectTransfers } from './defectFileWorker';
+import { filterDefectLogs, filterDefectRows } from './defectMetadataCompatibility';
 import {
   getTablesByCategory,
   getTableSyncConfig,
@@ -91,6 +93,7 @@ export interface SyncResult {
 export class SyncEngine {
   private instanceId: string;
   private remoteSupportsSparePair = false;
+  private remoteDefectReady = false;
   private shoreBaseUrl: string;
   private syncApiKey: string;
   // Phase 4a: per-instance tunables, resolved DB-then-env in loadSettings().
@@ -269,9 +272,20 @@ export class SyncEngine {
       const initResult = await this.callSyncApi('POST', '/sync/initiate', {
         instanceId: this.instanceId,
         vesselId,
+        defectProtocol: 1,
         lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null,
       });
       batchUuid = initResult.batchUuid;
+      // The authenticated handshake is additive. Older shore software returns 404;
+      // never break its established metadata/inline A/B synchronization.
+      try {
+        this.remoteDefectReady = false;
+        if (!this.isLocalMode() && this.shoreBaseUrl.startsWith('https://')) this.remoteDefectReady = await exchangeDefectCapabilities(vesselId, this.syncApiKey,
+          (path, body) => this.callSyncApi('POST', path, body));
+      } catch (error: any) {
+        if ([403, 404].includes(error.statusCode)) await (await import('./defectFileReadiness')).revokeDefectPeerTrust(vesselId, 'Shore defect capability verification failed or the protocol is no longer available.');
+        syncDiag(`Defect compatibility remains unverified: ${error.message}`);
+      }
       this.remoteSupportsSparePair = Array.isArray(initResult.capabilities) &&
         initResult.capabilities.includes('spare_classification_pair');
       console.log(`[SyncEngine] Batch initiated: ${batchUuid}`);
@@ -394,12 +408,19 @@ export class SyncEngine {
       // so normal attachments fully arrive in one Sync Now (large files excluded, don't block).
       let remainingFilePull = 0;
       try {
+        if (!this.isLocalMode()) {
+          try {
+            const defectFiles = await processDefectTransfers(vesselId, (path, body) => this.callSyncApi('POST', path, body));
+            filesProcessedCount += defectFiles.sent + defectFiles.received;
+            remainingFilePull += defectFiles.remaining;
+          } catch (error: any) { console.warn(`[SyncEngine] Defect file phase paused: ${error.message}`); }
+        }
         const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl, this.instanceId, this.syncApiKey);
         // B-P0.2: bound the file phase so it cannot hang the cycle. processQueue returns
         // cleanly once the budget is exceeded (remaining files stay pending/resumable).
         // Field-data success is already independent of files (this block is non-fatal).
         const fileResult = await fileProcessor.processQueue(vesselId, batchUuid!, FILE_PHASE_MAX_MS);
-        filesProcessedCount = fileResult.filesProcessed;
+        filesProcessedCount += fileResult.filesProcessed;
         filesFailedCount = fileResult.filesFailed;
         console.log(
           `[SyncEngine] Files (push): ${fileResult.filesProcessed} processed, ${fileResult.filesFailed} failed, ${fileResult.bytesTransferred} bytes`
@@ -411,7 +432,7 @@ export class SyncEngine {
         const pullResult = await fileProcessor.pullQueue(vesselId, FILE_PHASE_MAX_MS, this.fileDrainMaxBytes, this.filePullRetryCount);
         filesProcessedCount += pullResult.filesProcessed;
         filesFailedCount += pullResult.filesFailed;
-        remainingFilePull = pullResult.remainingSmall;
+        remainingFilePull += pullResult.remainingSmall;
         console.log(
           `[SyncEngine] Files (pull): ${pullResult.filesProcessed} processed, ${pullResult.filesFailed} failed, ${pullResult.bytesTransferred} bytes, remainingSmall=${pullResult.remainingSmall}`
         );
@@ -718,6 +739,8 @@ export class SyncEngine {
 
     // C. Send in chunks
     //    Field logs may come from raw SQL (snake_case) or Drizzle (camelCase) — handle both
+    fieldLogs = filterDefectLogs(fieldLogs, this.remoteDefectReady &&
+      (await (await import('./defectFileReadiness')).defectReadiness(vesselId)).ready);
     const fieldLogPayloads = fieldLogs.map((log: any) => ({
       tableName: log.tableName ?? log.table_name,
       rowUuid: log.rowUuid ?? log.row_uuid,
@@ -801,12 +824,13 @@ export class SyncEngine {
       // Self-heal delivery: full rows the shore requested in earlier push responses. Gathered
       // fresh from our DB (current state) and sent with the FIRST chunk only. Drained now —
       // if the shore still can't apply, the fragments re-fail there and the request regenerates.
-      const fullRowsPayload = await this.drainFullRowRequests();
+      const fullRowsPayload = filterDefectRows(await this.drainFullRowRequests(), this.remoteDefectReady);
 
       for (let idx = 0; idx < chunks.length; idx++) {
         const result = await this.callSyncApiWithRetry('POST', '/sync/push', {
           batchUuid,
           vesselId,
+          capabilities: this.remoteDefectReady ? ['defect_files_v1'] : [],
           oneWayRows: idx === 0 ? shipOnlyRows : [], // One-way rows with first chunk only
           fieldLogs: chunks[idx],
           masterRecordHints: idx === 0 ? masterRecordHints : [], // Hints with first chunk only
@@ -838,6 +862,7 @@ export class SyncEngine {
       const result = await this.callSyncApiWithRetry('POST', '/sync/push', {
         batchUuid,
         vesselId,
+        capabilities: this.remoteDefectReady ? ['defect_files_v1'] : [],
         oneWayRows: [],
         fieldLogs: [],
         ...(fullRowsPayload.length > 0 ? { fullRows: fullRowsPayload } : {}),
@@ -952,7 +977,7 @@ export class SyncEngine {
       instanceId: this.instanceId,
       lastCheckpoint: floor ? floor.toISOString() : null,
       // 13-Oct-2026: this ship matches component_documents on cduuid (mig 182) — the shore may send UUID-keyed changes.
-      capabilities: ['component_documents_uuid', 'spare_classification_pair', 'component_class_regulatory_uuid_v1', 'section_h_attachments_v1'],
+      capabilities: ['component_documents_uuid', 'spare_classification_pair', 'component_class_regulatory_uuid_v1', 'section_h_attachments_v1', ...(this.remoteDefectReady ? ['defect_files_v1'] : [])],
       ...(havePerTable
         ? {
             tableCheckpoints: Object.fromEntries(
@@ -1192,6 +1217,7 @@ export class SyncEngine {
         const resp = await this.callSyncApi('POST', '/sync/fetch-rows', {
           vesselId,
           instanceId: this.instanceId,
+          capabilities: this.remoteDefectReady ? ['defect_files_v1'] : [],
           requests,
         });
         for (const t of (resp?.tables || [])) {
@@ -1455,7 +1481,9 @@ export class SyncEngine {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Sync API ${response.status}: ${errorText}`);
+      const error = Object.assign(new Error(`Sync API ${response.status}: ${errorText}`), { statusCode: response.status, code: undefined as string | undefined });
+      if (path.startsWith('/sync/defects/')) { try { error.code = JSON.parse(errorText).code; } catch {} }
+      throw error;
     }
 
     return response.json();

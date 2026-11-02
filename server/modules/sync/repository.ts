@@ -453,6 +453,7 @@ export async function getPendingFiles(
       eq(syncFileQueue.vesselId, vesselId),
       eq(syncFileQueue.direction, direction),
       eq(syncFileQueue.status, 'pending'),
+      ne(syncFileQueue.tableName, 'defects'),
     ))
     // B-P1.3: small files first (within a priority band) so one large file doesn't block
     // many small ones behind it. NULL sizes sort last (Postgres ASC NULLS LAST).
@@ -474,7 +475,7 @@ export async function getPendingFileCountBySize(
   const result = await pool.query(
     `SELECT count(*)::int AS c FROM sync_file_queue
      WHERE vessel_id = $1 AND direction = $2 AND status = 'pending'
-       AND (file_size_bytes IS NULL OR file_size_bytes <= $3)`,
+       AND table_name <> 'defects' AND (file_size_bytes IS NULL OR file_size_bytes <= $3)`,
     [vesselId, direction, maxBytes]
   );
   return result.rows[0]?.c ?? 0;
@@ -746,7 +747,7 @@ export async function getSetting(key: string): Promise<string | null> {
 }
 
 export async function updateSetting(key: string, value: string, userId?: string): Promise<void> {
-  if (key.startsWith('defects_peer_report:')) {
+  if (key.startsWith('defects_peer_report:') || key.startsWith('defects_file_receipt:')) {
     throw Object.assign(new Error('Peer capability reports are system-generated and cannot be edited.'), { statusCode: 403 });
   }
   const db = await getDb();
@@ -766,7 +767,7 @@ export async function updateSetting(key: string, value: string, userId?: string)
  * this is UPDATE-only and no-ops if the key is absent. Used by provisioning import.
  */
 export async function seedSettingIfEmpty(key: string, value: string): Promise<void> {
-  if (key.startsWith('defects_peer_report:')) {
+  if (key.startsWith('defects_peer_report:') || key.startsWith('defects_file_receipt:')) {
     throw Object.assign(new Error('Peer reports cannot be seeded or copied by provisioning.'), { statusCode: 403 });
   }
   if (value === undefined || value === null || value === '') return;
@@ -787,7 +788,7 @@ export async function seedSettingIfEmpty(key: string, value: string): Promise<vo
 }
 
 export async function updateSettings(settings: Record<string, string>, userId?: string): Promise<void> {
-  if (Object.keys(settings).some(key => key.startsWith('defects_peer_report:'))) {
+  if (Object.keys(settings).some(key => key.startsWith('defects_peer_report:') || key.startsWith('defects_file_receipt:'))) {
     throw Object.assign(new Error('Peer capability reports are system-generated and cannot be edited.'), { statusCode: 403 });
   }
   for (const [key, value] of Object.entries(settings)) {

@@ -12,6 +12,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { defectFileHeaders } from "@/pages/defects/DefectAttachmentDialog";
 import { VesselContext } from "@/contexts/VesselContext";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,7 @@ import {
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import AutoSyncSettingsCard from "@/components/sync/AutoSyncSettingsCard";
 import { countState, resultState } from "./syncConflictStates";
+import DefectFilePeerReports from "./DefectFilePeerReports";
 
 // ── Types ──
 
@@ -195,6 +198,7 @@ function statusBadge(status: string) {
 
 export default function SyncDashboard() {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   const { canEdit, canViewMenu } = usePermissions();
   const canEditSync = canEdit("admin-sync-dashboard");
   const canViewConflicts = canViewMenu("admin-sync-conflicts");
@@ -203,6 +207,9 @@ export default function SyncDashboard() {
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
   const [, setLocation] = useLocation();
+  const canViewDefectFileReports =
+    currentUser?.userType === "Office" &&
+    ["sail admin", "pms admin"].includes(currentUser.role.replaceAll("_", " ").toLowerCase());
 
   const [selectedVesselId, setSelectedVesselId] = useState<string>("");
   const [syncProgress, setSyncProgress] = useState(0);
@@ -259,8 +266,11 @@ export default function SyncDashboard() {
 
   // ── File queue actions (B-P1.1): Retry re-queues (resumes from chunk_offset); Skip stops retrying ──
   const fileActionMutation = useMutation({
-    mutationFn: async ({ queueUuid, action }: { queueUuid: string; action: "retry" | "skip" }) => {
-      const res = await apiRequest("POST", `/technical/api/sync/file/${queueUuid}/${action}`, {});
+    mutationFn: async ({ queueUuid, action, isDefect }: { queueUuid: string; action: "retry" | "skip"; isDefect?: boolean }) => {
+      const res = isDefect && currentUser
+        ? await fetch(`/technical/api/sync/defects/files/${queueUuid}/retry`, { method: "POST", credentials: "include", headers: defectFileHeaders(currentUser) })
+        : await apiRequest("POST", `/technical/api/sync/file/${queueUuid}/${action}`, {});
+      if (!res.ok) throw new Error((await res.json()).error || "File retry failed");
       return res.json();
     },
     onSuccess: (_data, vars) => {
@@ -530,6 +540,8 @@ export default function SyncDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {canViewDefectFileReports && <DefectFilePeerReports currentUser={currentUser} />}
 
       {/* ── Section B: Sync Now (ship-only — sync is ship-initiated) ── */}
       {isShip && selectedVesselId && (
@@ -928,18 +940,18 @@ export default function SyncDashboard() {
                       <TableCell className="text-right text-sm text-muted-foreground">{formatAge(f.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {canEditSync && (
+                          {canEditSync && (f.category !== "Defect documents" || canViewDefectFileReports) && (
                             <>
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={fileActionMutation.isPending}
-                            onClick={() => fileActionMutation.mutate({ queueUuid: f.queueUuid, action: "retry" })}
-                            title="Re-queue (resumes from last sent chunk)"
+                            disabled={fileActionMutation.isPending || (f.category === "Defect documents" && !["failed", "dead_letter", "unsendable"].includes(f.status))}
+                            onClick={() => fileActionMutation.mutate({ queueUuid: f.queueUuid, action: "retry", isDefect: f.category === "Defect documents" })}
+                            title={f.category === "Defect documents" ? "Verify ownership and re-queue the failed transfer" : "Re-queue (resumes from last sent chunk)"}
                           >
                             <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
                           </Button>
-                          <Button
+                          {f.category !== "Defect documents" && <Button
                             variant="ghost"
                             size="sm"
                             disabled={fileActionMutation.isPending || f.status === "skipped"}
@@ -947,7 +959,7 @@ export default function SyncDashboard() {
                             title="Stop retrying this file"
                           >
                             <XCircle className="h-3.5 w-3.5 mr-1" /> Skip
-                          </Button>
+                          </Button>}
                             </>
                           )}
                         </div>
