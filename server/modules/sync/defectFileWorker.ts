@@ -115,9 +115,12 @@ export async function processDefectTransfers(vesselId: string, call: Transport, 
       }
     }
   }
-  const outstanding = await available() ? await call('/sync/defects/files', { op: 'list', vesselId }) : { remaining: 0 };
+  // Deadline exhaustion pauses work; it is not proof that the queue is empty.
+  // Keep eligible counts so Sync Now's drain starts another resumable cycle.
+  const compatible = (await defectReadiness(vesselId)).ready;
+  const outstanding = compatible ? await call('/sync/defects/files', { op: 'list', vesselId }) : { remaining: 0 };
   return { sent, received, remaining: Number(outstanding.remaining ?? 0) +
-    (await available() ? (await pendingDefectDescriptors(vesselId, 'ship_to_shore')).length : 0) };
+    (compatible ? (await pendingDefectDescriptors(vesselId, 'ship_to_shore')).length : 0) };
 }
 async function transferFailure(queueUuid: string, error: any) {
   if (['DEFECT_PARENT_PENDING', 'DEFECT_FILES_UNAVAILABLE', 'DEFECT_RETRY_STALE'].includes(error.code) || error.statusCode === 425) return false;

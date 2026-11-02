@@ -69,6 +69,24 @@ describe('strict authenticated defect file protocol', () => {
     return { d, bytes, file };
   }
   const chunk = (bytes: Buffer, i: number) => bytes.subarray(i * DEFECT_CHUNK_BYTES, (i + 1) * DEFECT_CHUNK_BYTES).toString('base64');
+  it('keeps eligible drain counts when the transfer time budget expires', async () => {
+    fixture.ship = true; await report();
+    const { d, file, bytes } = await attachment('part-a');
+    await defectFileStore.write(file.fileKey, bytes, 'local');
+    await fixture.db.insert(schema.syncFileQueue).values({ queueUuid: d.queueUuid, tableName: 'defects',
+      rowUuid: d.rowUuid, vesselId: vessel, fileKey: file.fileKey, fileHash: file.sha256,
+      fileSizeBytes: bytes.length, direction: 'ship_to_shore', instanceId: 'SHIP-FIXTURE' });
+    const now = Date.now(); let elapsed = 0;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now + elapsed);
+    try {
+      const result = await processDefectTransfers(vessel, async (_url, body) => {
+        if (body.op === 'retries') { elapsed = 100; return { files: [] }; }
+        expect(body.op).toBe('list'); return { files: [], remaining: 2 };
+      }, 20);
+      expect(result).toEqual({ sent: 0, received: 0, remaining: 3 });
+      expect((await fixture.db.select().from(schema.syncFileQueue))[0].status).toBe('pending');
+    } finally { clock.mockRestore(); }
+  });
   it('starts unknown and includes every expected vessel, not just reporting vessels', async () => {
     expect(await defectReadiness(vessel)).toMatchObject({ ready: false, state: 'unknown' });
     const dashboard = await defectStatusDashboard();
