@@ -1,10 +1,6 @@
 
 import React from 'react';
 import { MicroFrontendWrapper } from './MicroFrontendWrapper';
-import ElementCrewAppraisals from '../pages/ElementCrewAppraisals';
-import AppraisalForm from '../pages/AppraisalForm';
-import AdminModule from '../pages/AdminModule';
-import FormEditor from '../pages/FormEditor';
 import App from '../App';
 import './micro-frontend.css';
 
@@ -12,10 +8,6 @@ import './micro-frontend.css';
 export { default as App } from '../App';
 
 // Individual component exports for micro frontend consumption
-export { default as ElementCrewAppraisals } from '../pages/ElementCrewAppraisals';
-export { default as AppraisalForm } from '../pages/AppraisalForm';
-export { default as AdminModule } from '../pages/AdminModule';
-export { default as FormEditor } from '../pages/FormEditor';
 
 // Wrapper export
 export { MicroFrontendWrapper, useMicroFrontendConfig } from './MicroFrontendWrapper';
@@ -45,10 +37,6 @@ export const bootstrap = (config?: any) => {
       const ReactDOM = require('react-dom/client');
       
       const components = {
-        ElementCrewAppraisals,
-        AppraisalForm,
-        AdminModule,
-        FormEditor
       };
       
       const Component = components[component as keyof typeof components];
@@ -76,10 +64,6 @@ if (typeof window !== 'undefined') {
     bootstrap,
     MicroFrontendWrapper,
     components: {
-      ElementCrewAppraisals,
-      AppraisalForm,
-      AdminModule,
-      FormEditor,
       App
     }
   };

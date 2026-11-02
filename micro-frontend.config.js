@@ -5,11 +5,7 @@ export const moduleFederationConfig = {
   name: "element-crew-appraisals",
   filename: "remoteEntry.js",
   exposes: {
-    "./App": "./client/src/App.tsx",
-    "./ElementCrewAppraisals": "./client/src/pages/ElementCrewAppraisals.tsx",
-    "./AppraisalForm": "./client/src/pages/AppraisalForm.tsx",
-    "./AdminModule": "./client/src/pages/AdminModule.tsx",
-    "./FormEditor": "./client/src/pages/FormEditor.tsx"
+    "./App": "./client/src/App.tsx"
   },
   shared: {
     react: {
