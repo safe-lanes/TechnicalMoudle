@@ -40,6 +40,7 @@ import { parseDate } from "@/lib/dateUtils";
 import { formatComponentDate, formatComponentChangeValue } from "@/lib/componentDatePresentation";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
 import ClassRegulatorySection from "@/components/pms/ClassRegulatorySection";
+import { isClassComponent } from "@shared/classRegulatory";
 import {
   Select,
   SelectContent,
@@ -3099,6 +3100,16 @@ const Components: React.FC = () => {
     hydratedViewStateVesselRef.current = vesselId;
   }, [vesselId, isLoadingComponents, componentTreeData]);
 
+  // Rebind the selection to refreshed saved data (including approved Class Item changes).
+  useEffect(() => {
+    if (isLoadingComponents) return;
+    setSelectedComponent(previous => {
+      if (!previous) return previous;
+      return findComponentNode(componentTreeData, node =>
+        previous.actualId ? node.actualId === previous.actualId : node.id === previous.id);
+    });
+  }, [componentTreeData, isLoadingComponents]);
+
   // Persist after each view change, once the current vessel has been hydrated.
   useEffect(() => {
     persistComponentViewState();
@@ -3764,7 +3775,7 @@ const Components: React.FC = () => {
     });
   };
 
-  const isClassItem = selectedComponent?.classItem === true || selectedComponent?.classItem === "Yes";
+  const isClassItem = isClassComponent(selectedComponent?.classItem);
 
   const formSections = [
     { id: "A", title: "Component Information", marker: "B7.A" },
@@ -3776,7 +3787,7 @@ const Components: React.FC = () => {
     { id: "G", title: "Drawings & Manuals", marker: "B7.G" },
     { id: "H", title: "Classification & Regulatory Data", marker: "B7.H" },
     { id: "I", title: "Requisitions", marker: "B7.I" }
-  ];
+  ].filter(section => section.id !== "H" || isClassItem);
 
   // Build proposed changes from tracked modifications
   const buildProposedChanges = () => {

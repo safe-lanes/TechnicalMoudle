@@ -73,7 +73,13 @@ export interface ClassRegulatorySectionProps {
 }
 
 /** Multi-entry, independently saved register for component Section H. */
-export default function ClassRegulatorySection({ componentId, readOnly = false, classItem = true }: ClassRegulatorySectionProps) {
+export default function ClassRegulatorySection(props: ClassRegulatorySectionProps) {
+  if (props.classItem !== true) return null;
+  // Unmount drafts, attachment dialogs and queries when saved classification changes.
+  return <ClassRegulatoryRegister key={String(props.componentId)} {...props} />;
+}
+
+function ClassRegulatoryRegister({ componentId, readOnly = false }: ClassRegulatorySectionProps) {
   const { sectionHUser: currentUser, domain } = useAuth();
   const apiRequest = (method: string, url: string, data?: unknown) => sectionHRequest(currentUser, method, url, data);
   const [storageEpoch, setStorageEpoch] = useState(0);
@@ -486,7 +492,6 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   return (
     <section className="space-y-3" aria-label="Classification and regulatory data">
       {confirmationDialog}
-      {!classItem && <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">This component is marked “Class Item: No”. Records remain visible and are not removed.</div>}
       {switchNotice && <p role="status" className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{switchNotice}</p>}
       {!readOnly && accessQuery.isLoading && <div className="h-8 animate-pulse rounded-sm bg-slate-100" />}
       {accessQuery.isError && <div role="alert" className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorDetails(accessQuery.error).message} This register is read-only until access can be confirmed. <Button size="sm" variant="outline" className="ml-2 h-7" onClick={() => accessQuery.refetch()}>Retry access</Button></div>}

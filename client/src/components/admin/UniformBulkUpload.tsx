@@ -1,5 +1,5 @@
 import { useAdminUrlState } from "@/hooks/useAdminUrlState";
-import { useState, useCallback, useEffect, useRef } from "react";
+import { Fragment, useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useUIRole } from "@/contexts/UIRoleContext";
@@ -85,6 +85,7 @@ interface DryRunResult {
     row: number;
     status: 'ok' | 'warning' | 'error';
     errors: string[];
+    warnings?: string[];
     normalized: Record<string, any>;
   }>;
   totalRows: number;
@@ -680,7 +681,7 @@ export default function UniformBulkUpload({
             rowNumber: dr.row,
             primaryIdentifier: dr.normalized?.[primaryCol] || '',
             status: failedRows.has(dr.row) ? 'failed' : isClassRegulatory && dr.normalized?.action === "skip" ? 'skipped' : 'success',
-            error: failedRows.get(dr.row) || (dr.status === 'warning' ? dr.errors.join('; ') : undefined),
+            error: failedRows.get(dr.row) || (!isClassRegulatory && dr.status === 'warning' ? dr.errors.join('; ') : undefined),
             data: dr.normalized,
           });
         }
@@ -727,9 +728,8 @@ export default function UniformBulkUpload({
 
   const getValidRowsCount = () => {
     if (!dryRunResult) return 0;
-    // summary.ok already includes rows with warnings (they're importable)
-    // Don't add summary.warnings again - that would double-count
-    return dryRunResult.summary.ok;
+    // Section H uses disjoint status counts; legacy import types include warnings in ok.
+    return dryRunResult.summary.ok + (isClassRegulatory ? dryRunResult.summary.warnings : 0);
   };
 
   const getFilteredRows = () => {
@@ -1235,15 +1235,17 @@ export default function UniformBulkUpload({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {getPaginatedRows().map((row) => (
-                            <>
+                          {getPaginatedRows().map((row) => {
+                            const issues = [...row.errors, ...(isClassRegulatory ? row.warnings || [] : [])];
+                            return (
+                            <Fragment key={row.row}>
                               <TableRow 
                                 key={row.row} 
-                                className={`${row.errors.length > 0 ? 'cursor-pointer hover:bg-gray-50' : ''}`}
-                                onClick={() => row.errors.length > 0 && toggleRowExpansion(row.row)}
+                                className={`${issues.length > 0 ? 'cursor-pointer hover:bg-gray-50' : ''} ${isClassRegulatory && row.status === 'warning' ? 'bg-amber-50' : ''}`}
+                                onClick={() => issues.length > 0 && toggleRowExpansion(row.row)}
                               >
                                 <TableCell className="w-12">
-                                  {row.errors.length > 0 && (
+                                  {issues.length > 0 && (
                                     <button className="p-1 hover:bg-gray-200 rounded" data-testid={`expand-row-${row.row}`}>
                                       {expandedRows.has(row.row) ? (
                                         <ChevronUp className="h-4 w-4 text-gray-500" />
@@ -1265,11 +1267,11 @@ export default function UniformBulkUpload({
                                   </TableCell>
                                 ))}
                                 <TableCell>
-                                  {row.errors.length > 0 ? (
+                                  {issues.length > 0 ? (
                                     <div className="flex items-center gap-1 text-sm">
                                       <Info className={`h-4 w-4 ${row.status === 'error' ? 'text-red-500' : 'text-yellow-500'}`} />
                                       <span className={row.status === 'error' ? 'text-red-600' : 'text-yellow-600'}>
-                                        {row.errors.length} issue{row.errors.length > 1 ? 's' : ''} - click to expand
+                                        {issues.length} {isClassRegulatory && row.status === 'warning' ? 'warning' : 'issue'}{issues.length > 1 ? 's' : ''} - click to expand
                                       </span>
                                     </div>
                                   ) : (
@@ -1277,13 +1279,13 @@ export default function UniformBulkUpload({
                                   )}
                                 </TableCell>
                               </TableRow>
-                              {expandedRows.has(row.row) && row.errors.length > 0 && (
+                              {expandedRows.has(row.row) && issues.length > 0 && (
                                 <TableRow key={`${row.row}-details`} className="bg-gray-50">
                                   <TableCell colSpan={5 + (previewColumns || dryRunResult.columns.slice(0, 3)).length} className="py-3">
                                     <div className="px-4">
                                       <div className="text-sm font-medium text-gray-700 mb-2">Row {row.row} Issues:</div>
                                       <ul className="space-y-1">
-                                        {row.errors.map((error, idx) => (
+                                        {issues.map((error, idx) => (
                                           <li key={idx} className={`text-sm flex items-start gap-2 ${row.status === 'error' ? 'text-red-600' : 'text-yellow-600'}`}>
                                             {row.status === 'error' ? (
                                               <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
@@ -1298,8 +1300,8 @@ export default function UniformBulkUpload({
                                   </TableCell>
                                 </TableRow>
                               )}
-                            </>
-                          ))}
+                            </Fragment>
+                          ); })}
                         </TableBody>
                       </Table>
                     </div>
@@ -1370,11 +1372,11 @@ export default function UniformBulkUpload({
                   {dryRunResult.summary.errors === 0 ? (
                     <Button 
                       onClick={() => handleImport(false)} 
-                      disabled={isImporting || dryRunResult.summary.ok === 0 || needsSectionHVessel}
+                      disabled={isImporting || getValidRowsCount() === 0 || needsSectionHVessel}
                       className="w-full bg-sky-600 hover:bg-sky-700"
                       data-testid="button-import"
                     >
-                      {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok} Records`}
+                      {isImporting ? 'Importing...' : `Import ${getValidRowsCount()} Records`}
                     </Button>
                   ) : (
                     <div className="flex gap-3">

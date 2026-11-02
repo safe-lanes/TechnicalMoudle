@@ -21,7 +21,7 @@ const migrations = [
   "186_section_h_master_metadata.sql",
   "187_section_h_master_seed.sql",
 ];
-const tables = ["vessels", "components", "component_class_regulatory", "master_lists", "master_list_types", "audit_log", "master_user_vessels", "sync_settings"];
+const tables = ["vessels", "components", "component_class_regulatory", "component_class_regulatory_attachments", "master_lists", "master_list_types", "audit_log", "master_user_vessels", "sync_settings"];
 
 describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
   beforeAll(async () => {
@@ -47,6 +47,38 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     for (const migration of migrations) await conn.query(await readFile(`migrations/${migration}`, "utf8"));
     await conn.query("INSERT INTO pg_temp.vessels (id,vuuid,code,name) VALUES ('TEST-V',$1,'TEST-V','Section H Test')", [vessel]);
     await conn.query("INSERT INTO pg_temp.components (id,cuuid,vessel_id,vessel_code,name,component_code) VALUES ('test-component',$1,$2,'TEST-V','Test Component','601.001')", [component, vessel]);
+    await conn.query("UPDATE pg_temp.components SET class_item=true");
+  });
+  it.each([false, null])("refuses manual creation for saved class_item=%s without writing data or audit", async flag => {
+    await conn.query("UPDATE pg_temp.components SET class_item=$1", [flag]);
+    await expect(createClassEntry(component, business, actor)).rejects.toMatchObject({
+      statusCode: 409, message: expect.stringContaining("Class Item = Yes"),
+    });
+    await expect(createClassEntry(component, { ...business, source: "bulk_import", classItem: true }, actor)).rejects.toMatchObject({ statusCode: 409 });
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.component_class_regulatory")).rows[0].n).toBe(0);
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.audit_log")).rows[0].n).toBe(0);
+    await conn.query("UPDATE pg_temp.components SET class_item=true");
+    expect(await createClassEntry(component, business, actor)).toMatchObject({ componentId: component });
+  });
+  it("keeps saved entries and attachment identities byte-identical through saved Yes/No transitions", async () => {
+    const saved = await createClassEntry(component, business, actor);
+    await conn.query(`INSERT INTO pg_temp.component_class_regulatory_attachments
+      (ccrauuid,class_regulatory_uuid,component_id,vessel_id,original_filename,file_key,content_type,file_size,storage_backend,
+       uploaded_by_uuid,uploaded_by,created_by,updated_by,created_by_uuid,updated_by_uuid)
+      VALUES ('8eb5b00d-55cb-4c0f-8b62-000000000194',$1,$2,$3,'certificate.pdf','test/vessel/certificate.pdf','application/pdf',123,'local',$4,'Editor','Editor','Editor',$4,$4)`,
+      [saved.ccruuid, component, vessel, actor.userId]);
+    const snapshot = async () => ({
+      entries: (await conn.query("SELECT * FROM pg_temp.component_class_regulatory ORDER BY id")).rows,
+      attachments: (await conn.query("SELECT * FROM pg_temp.component_class_regulatory_attachments")).rows,
+      audit: (await conn.query("SELECT * FROM pg_temp.audit_log ORDER BY id")).rows,
+    });
+    const before = await snapshot();
+    for (const classItem of [false, true]) {
+      await conn.query("UPDATE pg_temp.components SET class_item=$1", [classItem]);
+      expect(await snapshot()).toEqual(before);
+      // Reads and synchronization remain authorized and independent of display visibility.
+      expect((await listClassEntries(component, actor))[0].ccruuid).toBe(saved.ccruuid);
+    }
   });
   it("replays all three SQL files without duplicating or resetting masters", async () => {
     await conn.query("UPDATE pg_temp.master_lists SET list_value = 'Edited DNV', is_active = false WHERE list_type='classificationSociety' AND list_key='DNV'");
@@ -135,6 +167,7 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     const secondComponent = "8eb5b00d-55cb-4c0f-8b62-000000000199";
     await conn.query("INSERT INTO pg_temp.vessels (id,vuuid,code,name) VALUES ('TEST-V2',$1,'TEST-V2','Other Vessel')", [secondVessel]);
     await conn.query("INSERT INTO pg_temp.components (id,cuuid,vessel_id,vessel_code,name,component_code) VALUES ('other-component',$1,$2,'TEST-V2','Other Component','602.001')", [secondComponent, secondVessel]);
+    await conn.query("UPDATE pg_temp.components SET class_item=true");
     for (const componentId of [component, secondComponent]) {
       expect(await componentClassAccess(componentId, office)).toMatchObject({
         canEdit: true, canViewRemoved: true, identityMode: "verified", reasonCode: "EDIT_ALLOWED",

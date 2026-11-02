@@ -3,7 +3,7 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { components, vessels, masterLists, componentClassRegulatory as entries,
   importHistory, importChangeLog, bulkImportHistory, bulkImportErrors } from "@shared/schema";
 import { CLASS_REGULATORY_TEMPLATE_FIELDS } from "@shared/bulkImportTemplateFields";
-import { surveyTypeCategoryLabel } from "@shared/classRegulatory";
+import { isClassComponent, surveyTypeCategoryLabel } from "@shared/classRegulatory";
 import { getDb } from "../../../db";
 import { getCurrentTenantContext } from "../../../utils/asyncLocalStorage";
 import { ConflictError, ForbiddenError, ValidationError } from "../../shared/errors";
@@ -15,7 +15,7 @@ type Db = Awaited<ReturnType<typeof getDb>>;
 type Connection = Db | ClassRegulatoryTx;
 type Entry = typeof entries.$inferSelect;
 type PlannedRow = {
-  row: number; status: "ok" | "error"; errors: string[]; normalized: Record<string, any>;
+  row: number; status: "ok" | "warning" | "error"; errors: string[]; warnings: string[]; normalized: Record<string, any>;
   values: Record<string, string>; componentUuid?: string; target?: Entry;
   targetFingerprint?: string; proposed?: "create" | "update" | "skip"; business?: Record<string, any>;
   masterFingerprint?: string;
@@ -156,7 +156,7 @@ export async function previewSectionHImport(
   }
   const rows: PlannedRow[] = [];
   for (const source of parsed.rows) {
-    const result: PlannedRow = { ...source, status: "ok", normalized: { ...source.values }, errors: [...source.errors] };
+    const result: PlannedRow = { ...source, status: "ok", normalized: { ...source.values }, errors: [...source.errors], warnings: [] };
     for (const field of CLASS_REGULATORY_TEMPLATE_FIELDS) result.normalized[field.header] = source.values[field.key];
     try {
       if (keys.get(JSON.stringify([source.values.componentCode, source.values.certificateNumber]))! > 1)
@@ -169,6 +169,10 @@ export async function previewSectionHImport(
       result.normalized.Action = resolved.proposed;
       if (!result.errors.length && resolved.surveyTypeValue)
         result.normalized["Survey Type/Category"] = resolved.surveyTypeValue;
+      if (!result.errors.length && !isClassComponent(resolved.component.classItem)) {
+        result.warnings.push(`Component ${source.values.componentCode} is not marked as a Class Item. Otherwise valid data can be imported, but Section H will remain hidden until Class Item is saved as Yes.`);
+        result.status = "warning";
+      }
     } catch (error: any) {
       result.errors.push(...(error.fieldErrors ? Object.entries(error.fieldErrors).map(([k, v]) => `${k}: ${v}`) : [error.message]));
     }
@@ -183,8 +187,8 @@ export async function previewSectionHImport(
   previews.set(token, { token, binding: binding(actor), vesselId, vesselCode: vessel.code, mode,
     sheet: parsed.sheet, file, originalName: name, timestamp: Date.now(), rows, state: "ready", workbookHash: fingerprint(file) });
   return { fileToken: token, columns: headers(), summary: { ok: rows.filter(r => r.status === "ok").length,
-    warnings: 0, errors: rows.filter(r => r.status === "error").length },
-    rows: rows.map(({ row, status, errors, normalized }) => ({ row, status, errors, normalized })), totalRows: rows.length,
+    warnings: rows.filter(r => r.status === "warning").length, errors: rows.filter(r => r.status === "error").length },
+    rows: rows.map(({ row, status, errors, warnings, normalized }) => ({ row, status, errors, warnings, normalized })), totalRows: rows.length,
     errorReportUrl: `/technical/api/bulk/class-regulatory/preview/${token}/errors?vesselId=${encodeURIComponent(vesselId)}` };
 }
 
@@ -215,7 +219,7 @@ export function selectedSectionHRows(preview: Preview, indices: unknown) {
     throw new ValidationError("Select a nonempty, unique set of validated Excel row numbers.");
   const selected = indices.map(index => {
     const row = Number.isInteger(index) ? preview.rows.find(r => r.row === index) : undefined;
-    if (!row || row.status !== "ok") throw new ValidationError("Selected rows must reference the server's valid Excel rows.");
+    if (!row || (row.status !== "ok" && row.status !== "warning")) throw new ValidationError("Selected rows must reference the server's valid Excel rows.");
     return row;
   });
   return selected;

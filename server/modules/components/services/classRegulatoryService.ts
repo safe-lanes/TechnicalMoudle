@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { auditLog, componentClassRegulatory as entries, components, masterLists, vessels } from "@shared/schema";
-import { classRegulatoryInput, validateClassRegulatoryDates } from "@shared/classRegulatory";
+import { classRegulatoryInput, isClassComponent, validateClassRegulatoryDates } from "@shared/classRegulatory";
 import { getDb } from "../../../db";
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from "../../shared/errors";
 import { assertSectionHScope, DEVELOPMENT_READONLY_REASON, sectionHOfficeCanManage, type SectionHActor } from "./classRegulatoryAccess";
@@ -108,6 +108,9 @@ export async function writeClassEntryInTransaction(
   await assertReconciled(tx);
   if (existing && (existing.componentId !== component.cuuid || existing.isDeleted))
     throw new ConflictError("Classification entry ownership or deletion state changed.");
+  // source is supplied by trusted server code, never by the request body.
+  if (!existing && source !== "bulk_import" && !isClassComponent(component.classItem))
+    throw new ConflictError("Mark the component as Class Item = Yes and save it before adding a Classification & Regulatory Data entry.");
   const values = await classRegulatoryBusinessFields(tx, raw, existing, source === "bulk_import");
   let saved: typeof entries.$inferSelect;
   if (existing) {

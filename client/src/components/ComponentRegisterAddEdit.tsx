@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
 import ClassRegulatorySection from "@/components/pms/ClassRegulatorySection";
+import { isClassComponent } from "@shared/classRegulatory";
+import { resolveSectionHComponent } from "@/lib/sectionHComponent";
 import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { Textarea } from "@/components/ui/textarea";
 import StampSelect from "@/components/StampSelect";
@@ -290,6 +292,13 @@ function ComponentEditorSession({
   });
 
   const activeComponentId = componentId || selectedComponentId;
+  // Section H follows the current tree selection, not the original route prop.
+  // The register is authoritative after refresh; the form's editable values are not.
+  const sectionHComponent = resolveSectionHComponent(
+    isLoadingComponents ? undefined : components,
+    treeLoadedDraftRef.current ? draftRecord : existingComponent,
+    vesselId,
+  );
 
   const { data: maintenanceHistory = [], error: historyError } = useQuery<any[]>({
     queryKey: ['/technical/api/component-maintenance-history', activeComponentId],
@@ -1056,6 +1065,8 @@ function ComponentEditorSession({
   const loadComponentDataFromTree = (comp: any) => {
     if (!comp || isMainCategory(comp.id)) {
       setSelectedComponentId(null);
+      setDraftRecord(null);
+      treeLoadedDraftRef.current = true;
       return;
     }
     
@@ -2062,7 +2073,7 @@ function ComponentEditorSession({
                 )}
               </Card>
 
-              <Card className="rounded-sm border border-gray-200 shadow-none">
+              {isEditMode && isClassComponent(sectionHComponent?.classItem) && <Card className="rounded-sm border border-gray-200 shadow-none">
                 <CardHeader
                   className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
                   onClick={() => toggleSection('H')}
@@ -2073,10 +2084,10 @@ function ComponentEditorSession({
                 </CardHeader>
                 {!collapsedSections['H'] && (
                 <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
-                  <ClassRegulatorySection componentId={isEditMode ? activeComponentId : null} classItem={componentData.classItem === "Yes"} />
+                  <ClassRegulatorySection componentId={sectionHComponent?.cuuid} classItem={true} />
                 </CardContent>
                 )}
-              </Card>
+              </Card>}
 
           </div>
         </div>

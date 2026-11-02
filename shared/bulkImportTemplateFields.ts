@@ -72,7 +72,7 @@ export function getMachineryComponentFieldMappings() {
 
 // Classification & Regulatory Data — exact A–J Section H template contract.
 export const CLASS_REGULATORY_TEMPLATE_FIELDS: BulkImportTemplateField[] = [
-  { header: "Component Code", key: "componentCode", required: true, description: "Exact existing vessel component code. Preserved as text, including leading zeros." },
+  { header: "Component Code", key: "componentCode", required: true, description: "Exact existing vessel component code. Preserved as text, including leading zeros. Non-class components receive a non-blocking warning: data can be imported, but Section H remains hidden until Class Item is saved as Yes. Import never changes Class Item." },
   { header: "Classification Society", key: "classificationSociety", required: true, description: "Required for new records; resolve to an active master. Blank update cells preserve the existing society." },
   { header: "Certificate Number", key: "certificateNumber", required: true, description: "Required; outer whitespace is trimmed. Maximum 100 characters." },
   { header: "Last Class Survey Date", key: "lastClassSurveyDate", required: false, description: "Optional DD-MM-YYYY date or true Excel date cell." },

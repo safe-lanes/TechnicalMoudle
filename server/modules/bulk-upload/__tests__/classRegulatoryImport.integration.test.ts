@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import * as schema from "@shared/schema";
 import { CLASS_REGULATORY_TEMPLATE_FIELDS } from "@shared/bulkImportTemplateFields";
 import { resolvePostgres } from "../../../postgresClient";
-import { previewSectionHImport, commitSectionHImport, sectionHPreview, selectedSectionHRows } from "../services/classRegulatoryImport";
+import { previewSectionHImport, commitSectionHImport, sectionHPreview, selectedSectionHRows, previewErrorRows } from "../services/classRegulatoryImport";
 import { readSectionHWorkbook, importSurveyDate } from "../services/classRegulatoryWorkbook";
 import { classRegulatoryTemplate } from "../services/classRegulatoryTemplate";
 import { tenantStorage } from "../../../utils/asyncLocalStorage";
@@ -64,12 +64,49 @@ describe("Section H bulk import — isolated PostgreSQL TEMP tables", () => {
     await conn.query(`INSERT INTO pg_temp.components(id,cuuid,vessel_id,component_code,name) VALUES
       ('legacy-id-not-cuuid',$1,$2,'001.010','Import Component A'),
       ('other-legacy-id',$3,$4,'001.010','Import Component B')`, [component, vessel, otherComponent, otherVessel]);
+    await conn.query("UPDATE pg_temp.components SET class_item=true");
     await conn.query(`INSERT INTO pg_temp.master_lists(list_type,list_key,list_value) VALUES
       ('classificationSociety','DNV','Det Norske Veritas'),('classificationSociety','ABS','American Bureau'),
       ('surveyType','ANN','Annual Survey')`);
     await conn.query("UPDATE pg_temp.master_lists SET category='Class' WHERE list_type='surveyType'");
   });
 
+  it.each([false, null])("warns, but imports non-class rows (%s) normally and by explicit selection", async flag => {
+    await conn.query("UPDATE pg_temp.components SET class_item=$1 WHERE cuuid=$2", [flag, component]);
+    for (const explicit of [false, true]) {
+      const p = await preview();
+      expect(p.summary).toEqual({ ok: 0, errors: 0, warnings: 1 });
+      expect(p.rows[0]).toMatchObject({ status: "warning", errors: [], warnings: [expect.stringContaining("001.010")] });
+      expect(p.rows[0].warnings[0]).toContain("hidden until Class Item is saved as Yes");
+      expect(previewErrorRows(actor, p.fileToken, vessel)).toEqual([]);
+      expect(await commit(p.fileToken, explicit ? { rowIndices: [2] } : {}))
+        .toMatchObject({ created: explicit ? 0 : 1, updated: explicit ? 1 : 0, failed: 0, errors: [] });
+    }
+    expect((await conn.query("SELECT component_id FROM pg_temp.component_class_regulatory")).rows)
+      .toEqual([{ component_id: component }]);
+    expect((await conn.query("SELECT class_item FROM pg_temp.components WHERE cuuid=$1", [component])).rows[0].class_item).toBe(flag);
+    expect((await conn.query("SELECT count(*)::int AS n FROM pg_temp.bulk_import_errors")).rows[0].n).toBe(0);
+    expect((await conn.query("SELECT DISTINCT source FROM pg_temp.audit_log")).rows).toEqual([{ source: "bulk_import" }]);
+  });
+  it("imports both OK and warning rows while genuine errors stay excluded and reported", async () => {
+    await conn.query("UPDATE pg_temp.components SET class_item=false WHERE cuuid=$1", [component]);
+    await conn.query(`INSERT INTO pg_temp.components(id,cuuid,vessel_id,component_code,name,class_item)
+      VALUES ('class-component','adf68a19-27d7-4a1a-855f-000000000719',$1,'001.011','Class Component',true)`, [vessel]);
+    const p = await preview([values, changed({ 0: "001.011", 2: "SECOND" }), changed({ 2: "INVALID", 3: "31-02-2026" })]);
+    expect(p.summary).toEqual({ ok: 1, warnings: 1, errors: 1 });
+    expect(p.rows.map(row => row.status)).toEqual(["warning", "ok", "error"]);
+    await expect(commit(p.fileToken)).rejects.toMatchObject({ statusCode: 400 });
+    await expect(commit(p.fileToken, { rowIndices: [4] })).rejects.toMatchObject({ statusCode: 400 });
+    expect(await commit(p.fileToken, { rowIndices: [2, 3] })).toMatchObject({ created: 2, failed: 1 });
+    expect((await conn.query("SELECT DISTINCT row_number FROM pg_temp.bulk_import_errors")).rows).toEqual([{ row_number: 4 }]);
+  });
+  it.each([true, false])("allows classification-only changes after dry run (initial=%s) without changing the flag", async initial => {
+    await conn.query("UPDATE pg_temp.components SET class_item=$1 WHERE cuuid=$2", [initial, component]);
+    const p = await preview();
+    await conn.query("UPDATE pg_temp.components SET class_item=$1 WHERE cuuid=$2", [!initial, component]);
+    expect(await commit(p.fileToken)).toMatchObject({ created: 1, failed: 0 });
+    expect((await conn.query("SELECT class_item FROM pg_temp.components WHERE cuuid=$1", [component])).rows[0].class_item).toBe(!initial);
+  });
   it("dry-run is read-only; commit uses selected vessel cuuid, not legacy id or the other vessel's code match", async () => {
     const p = await preview();
     expect(p.summary).toEqual({ ok: 1, errors: 0, warnings: 0 });

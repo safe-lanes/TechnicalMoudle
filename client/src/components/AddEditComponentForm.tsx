@@ -39,6 +39,7 @@ import { FEATURES } from '@/config/features';
 import { formatComponentDate } from "@/lib/componentDatePresentation";
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
 import ClassRegulatorySection from "@/components/pms/ClassRegulatorySection";
+import { isClassComponent } from "@shared/classRegulatory";
 import { buildDraftJobPayload } from "@/lib/jobFormPayload";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
 import { componentErrorDescription, componentResponseError } from "@/lib/componentErrorFeedback";
@@ -986,7 +987,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
             </div>
           ) : (
           <div className="space-y-4">
-            {formSections.map((section) => {
+            {formSections.filter(section => section.id !== "H" || (isEditMode && isClassComponent(existingComponent?.classItem))).map((section) => {
               const isExpanded = expandedSections.has(section.id);
 
               return (
@@ -1768,7 +1769,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
                       {/* Section G: Classification & Regulatory Data - EXACT REPLICA */}
                       {section.id === "H" && (
-                        <ClassRegulatorySection componentId={isEditMode ? componentId : null} readOnly={true} classItem={componentData.classItem === "Yes"} />
+                        <ClassRegulatorySection componentId={componentId} readOnly={true} classItem={isClassComponent(existingComponent?.classItem)} />
                       )}
 
                       {/* Section H: Requisitions */}

@@ -4,6 +4,11 @@ import type { ComponentClassRegulatory } from "./schema";
 // Read-only display metadata resolved from the saved master key; never persisted.
 export type ClassRegulatoryEntry = ComponentClassRegulatory & { surveyTypeCategory?: string | null };
 
+/** Only an explicit, persisted classification enables the manual register. */
+export function isClassComponent(value: unknown): boolean {
+  return value === true || value === "Yes";
+}
+
 export function surveyTypeCategoryLabel(value?: string | null, category?: string | null): string {
   return `${value?.trim() || "Unavailable survey type"}/${category?.trim() || "Category unavailable"}`;
 }
