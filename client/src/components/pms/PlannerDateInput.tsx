@@ -74,39 +74,41 @@ export function PlannerDateInput({
     void commit(next);
   };
 
+  const inputProps: React.ComponentProps<typeof Input> & { "data-testid": PlannerDateInputProps["data-testid"] } = {
+    type: "text", value: draft, disabled: blocked, placeholder: "DD-MM-YYYY",
+    inputMode: "numeric", maxLength: 10,
+    className: `h-7 min-w-0 pr-8 ${className} ${error ? "border-red-500" : ""}`,
+    "data-testid": testId, "aria-label": label,
+    "aria-invalid": Boolean(error), "aria-describedby": error ? errorId : undefined,
+    title: error || undefined,
+    onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextDraft = normalizeWorkOrderDateTyping(event.target.value);
+      setDraft(nextDraft);
+      setError("");
+      if (commitOnChange) {
+        // Only the bulk selection state is cleared, never a saved inline plan.
+        void commit(plannerDateDraftValue(nextDraft) ?? "");
+      }
+    },
+    onBlur: commitDraft,
+    onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commitDraft();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        setDraft(formatWorkOrderDateDDMMYYYY(value));
+        setError("");
+      }
+    },
+  };
+
   return React.createElement("div", {
     className: containerClassName,
     onClick: (event: React.MouseEvent) => event.stopPropagation(),
   },
     React.createElement("div", { className: "relative" },
-      React.createElement(Input, {
-        type: "text", value: draft, disabled: blocked, placeholder: "DD-MM-YYYY",
-        inputMode: "numeric", maxLength: 10,
-        className: `h-7 min-w-0 pr-8 ${className} ${error ? "border-red-500" : ""}`,
-        "data-testid": testId, "aria-label": label,
-        "aria-invalid": Boolean(error), "aria-describedby": error ? errorId : undefined,
-        title: error || undefined,
-        onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-          const nextDraft = normalizeWorkOrderDateTyping(event.target.value);
-          setDraft(nextDraft);
-          setError("");
-          if (commitOnChange) {
-            // Only the bulk selection state is cleared, never a saved inline plan.
-            void commit(plannerDateDraftValue(nextDraft) ?? "");
-          }
-        },
-        onBlur: commitDraft,
-        onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commitDraft();
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            setDraft(formatWorkOrderDateDDMMYYYY(value));
-            setError("");
-          }
-        },
-      }),
+      React.createElement(Input, inputProps),
       !disabled && React.createElement("input", {
         ref: picker, type: "date", value: workOrderDateInputValue(value), disabled: saving,
         tabIndex: -1, "aria-hidden": true, className: "sr-only",

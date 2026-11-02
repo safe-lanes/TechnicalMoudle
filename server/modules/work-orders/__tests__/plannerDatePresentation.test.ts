@@ -5,8 +5,12 @@ import { PlannerDateInput } from "@/components/pms/PlannerDateInput";
 import { formatPlannerDueInfo, plannerDateCommitValue, plannerDateDraftValue } from "@/lib/plannerDatePresentation";
 
 // The server test configuration does not transform JSX in the shared UI primitive.
+const { captureInputProps } = vi.hoisted(() => ({ captureInputProps: vi.fn() }));
 vi.mock("@/components/ui/input", () => ({
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => React.createElement("input", props),
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => {
+    captureInputProps(props);
+    return React.createElement("input", props);
+  },
 }));
 
 describe("Planner date presentation leaves raw row data unchanged", () => {
@@ -80,6 +84,27 @@ describe("Planner date drafts and autosave commits", () => {
 });
 
 describe("Planner controls show locale-independent dates without saving on render", () => {
+  it.each([
+    { value: "2026-10-08", disabled: false, commitOnChange: false, expected: "08-10-2026" },
+    { value: "", disabled: false, commitOnChange: true, expected: "" },
+    { value: "2026-10-08", disabled: true, commitOnChange: false, expected: "08-10-2026" },
+  ])("retains the complete rendered Input props for $value / disabled=$disabled / bulk=$commitOnChange", ({ expected, ...props }) => {
+    captureInputProps.mockClear();
+    renderToStaticMarkup(React.createElement(PlannerDateInput, {
+      ...props, onChange: vi.fn(), className: "date-column",
+      "data-testid": "planner-props", "aria-label": "Planned date",
+    }));
+    expect(captureInputProps).toHaveBeenCalledTimes(1);
+    expect(captureInputProps.mock.calls[0][0]).toEqual({
+      type: "text", value: expected, disabled: props.disabled, placeholder: "DD-MM-YYYY",
+      inputMode: "numeric", maxLength: 10,
+      className: "h-7 min-w-0 pr-8 date-column ",
+      "data-testid": "planner-props", "aria-label": "Planned date",
+      "aria-invalid": false, "aria-describedby": undefined, title: undefined,
+      onChange: expect.any(Function), onBlur: expect.any(Function), onKeyDown: expect.any(Function),
+    });
+  });
+
   it.each(["2026-10-08", "08-Oct-2026", "08-10-2026"])("shows raw %s numerically over an ISO calendar", (value) => {
     const change = vi.fn();
     const html = renderToStaticMarkup(React.createElement(PlannerDateInput, {

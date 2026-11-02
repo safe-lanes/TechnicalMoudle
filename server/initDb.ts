@@ -324,7 +324,7 @@ async function runIndexMigrations(db: any): Promise<void> {
       
       // Build vessel sequence map from distinct vessel IDs (since vessels table may be empty)
       const vesselSeqMap = new Map<string, number>();
-      const distinctVesselIds = [...new Set((oldFormatDefects.rows as any[]).map(r => r.vessel_id))].sort();
+      const distinctVesselIds = Array.from(new Set((oldFormatDefects.rows as any[]).map(r => r.vessel_id))).sort();
       distinctVesselIds.forEach((vid, idx) => vesselSeqMap.set(vid, idx + 1));
       
       // Group defects by vessel and year using nested Map (avoids string splitting issues with UUIDs)
@@ -351,8 +351,8 @@ async function runIndexMigrations(db: any): Promise<void> {
       }
       
       // Process each vessel-year group
-      for (const [vesselId, yearMap] of defectsByVesselYear) {
-        for (const [year, defectList] of yearMap) {
+      for (const [vesselId, yearMap] of Array.from(defectsByVesselYear)) {
+        for (const [year, defectList] of Array.from(yearMap)) {
           const yearShort = year % 100;
           
           // Check existing sequence for this vessel/year
