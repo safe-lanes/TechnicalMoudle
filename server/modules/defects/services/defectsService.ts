@@ -14,6 +14,8 @@ import {
 import type { RequestRow, RequestSlotRow, StoredWorkflow } from '../../approval-engine';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { defects } from '@shared/schema';
+import { defectAttachmentAvailability, STALE_CLOSURE_MESSAGE } from '@shared/defectEvidence';
+import { isDeepStrictEqual } from 'node:util';
 import {
   apprvWorkflows, apprvWorkflowNodes, apprvNodeSlots,
   apprvRequests, apprvRequestSlots,
@@ -624,6 +626,7 @@ export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: 
 
 export async function createDefect(body: any, _actor?: import('./defectsApprovalHooks').DefectActor) {
   const validatedData = insertDefectSchema.parse(body);
+  await assertDefectEvidenceRules({ duuid: null, attachments: [], partCAttachments: [], closureFiles: [] }, validatedData);
   const { assertDefectCreationApprovalStateAllowed } = await import('./defectsApprovalHooks');
   assertDefectCreationApprovalStateAllowed(validatedData);
 
@@ -677,10 +680,8 @@ export function dropRetiredClosureFields<T extends Record<string, any>>(body: T)
 
 /**
  * 25-Sep-2026 (Sahil E10 / Q11: "uploaded files only; restriction applies only after the record
- * is closed"). C1 evidence lives in defects.attachments (uploaded through the form, each with an
- * id). Rules:
- *  - closureFiles, when sent, may only reference ids of the defect's own uploaded attachments
- *    (defects.attachments[].id) or its defect_attachments rows (datuuid) — no free-text URLs.
+ * is closed"). New evidence must reference C1. Previously saved legacy IDs
+ * remain valid without rewriting old records or history.
  *  - once the defect is CLOSED (C1 confirmed / closed status), its attachments cannot be removed;
  *    attachments referenced by a rejected-closure history row can never be removed.
  */
@@ -691,29 +692,47 @@ const attachmentIds = (list: unknown): string[] =>
 
 export async function protectedEvidenceIds(current: any): Promise<Set<string>> {
   const ids = new Set<string>();
-  if (isClosedDefect(current)) attachmentIds(current.attachments).forEach((x) => ids.add(x));
-  for (const h of await defectsRepo.getDefectClosureHistory(current.duuid)) {
+  if (isClosedDefect(current)) {
+    [...attachmentIds(current.attachments), ...attachmentIds(current.partCAttachments), ...(current.closureFiles ?? [])]
+      .forEach((x) => ids.add(x));
+  }
+  for (const h of current.duuid ? await defectsRepo.getDefectClosureHistory(current.duuid) : []) {
     for (const f of (h.closureFiles ?? [])) if (typeof f === 'string' && f) ids.add(f);
   }
   return ids;
 }
 
 export async function assertDefectEvidenceRules(current: any, body: any): Promise<void> {
+  if (body?.partCAttachments !== undefined && !Array.isArray(body.partCAttachments)) {
+    throw Object.assign(new Error('Part C1 attachments must be a list.'), { statusCode: 400 });
+  }
+  if (!defectAttachmentAvailability().c1Upload && Array.isArray(body?.partCAttachments)) {
+    // Unchanged saved/sync-received C1 content remains readable and saveable.
+    // Do not allow replacement bytes under an existing ID to bypass readiness.
+    const saved = current.partCAttachments ?? [];
+    if (body.partCAttachments.some((file: any) =>
+      !saved.some((old: any) => isDeepStrictEqual(old, file)))) {
+      throw Object.assign(new Error(defectAttachmentAvailability().reason), { statusCode: 409, code: 'C1_UNAVAILABLE' });
+    }
+  }
   if (Array.isArray(body?.closureFiles) && body.closureFiles.length > 0) {
     const allowed = new Set<string>([
-      ...attachmentIds(body.attachments ?? current.attachments),
-      ...(await defectsRepo.getDefectAttachments(current.duuid)).map((a: any) => a.datuuid).filter(Boolean),
+      ...attachmentIds(body.partCAttachments ?? current.partCAttachments),
+      ...(current.closureFiles ?? []),
     ]);
     const bad = body.closureFiles.filter((f: unknown) => typeof f !== 'string' || !allowed.has(f));
     if (bad.length > 0) {
-      throw Object.assign(new Error('Closure files must be files uploaded to this defect.'), { statusCode: 400, code: 'CLOSURE_FILE_NOT_UPLOADED' });
+      throw Object.assign(new Error(STALE_CLOSURE_MESSAGE), { statusCode: 400, code: 'CLOSURE_FILE_NOT_UPLOADED' });
     }
   }
-  if (Array.isArray(body?.attachments)) {
+  if (Array.isArray(body?.attachments) || Array.isArray(body?.partCAttachments)) {
     const protectedIds = await protectedEvidenceIds(current);
     if (protectedIds.size > 0) {
-      const kept = new Set(attachmentIds(body.attachments));
-      const removed = Array.from(protectedIds).filter((x) => attachmentIds(current.attachments).includes(x) && !kept.has(x));
+      const removed = ['attachments', 'partCAttachments'].flatMap((field) => {
+        if (!Array.isArray(body[field])) return [];
+        const kept = new Set(attachmentIds(body[field]));
+        return attachmentIds(current[field]).filter((id) => protectedIds.has(id) && !kept.has(id));
+      });
       if (removed.length > 0) {
         throw Object.assign(new Error('Closure evidence cannot be removed once the defect is closed, or after a closure was rejected with it.'), { statusCode: 409, code: 'CLOSURE_EVIDENCE_PROTECTED' });
       }

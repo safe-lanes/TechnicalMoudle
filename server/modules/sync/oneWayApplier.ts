@@ -64,7 +64,9 @@ const columnMetaCache = new Map<string, ColumnMeta>();
 export async function getColumnMeta(pool: any, tableName: string): Promise<ColumnMeta> {
   const cached = columnMetaCache.get(tableName);
   // A pre-upgrade cache must not strip the new fields after schema-first rollout.
-  if (cached && (!(tableName === 'spares' || tableName === 'fleet_spares') ||
+  if (cached &&
+      (tableName !== 'defects' || cached.allCols.has('part_c_attachments')) &&
+      (!(tableName === 'spares' || tableName === 'fleet_spares') ||
       (cached.allCols.has('spare_category') && cached.allCols.has('optimum_qty')))) return cached;
 
   let identityAlwaysCols = new Set<string>();

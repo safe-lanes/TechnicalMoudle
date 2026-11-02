@@ -37,6 +37,15 @@ const ext = (n: number, status: string) => ({
 });
 
 describe('defect report PDF', () => {
+  it('prints current and rejected legacy evidence without changing the portrait form', () => {
+    const pdf = render({
+      closureEvidence: 'old.pdf - Legacy evidence',
+      rejectedClosures: [{ attemptNumber: '1', closureEvidence: 'rejected.pdf - Legacy evidence' }],
+    });
+    expect(pdf).toContain('old.pdf - Legacy evidence');
+    expect(pdf).toContain('rejected.pdf - Legacy evidence');
+    expect(pdf).toContain('C2. Verification');
+  });
   it('prints every extension with its number and status', () => {
     const pdf = render({ targetDateExtensions: [ext(1, 'Approved'), ext(2, 'Approved'), ext(3, 'Rejected')] });
     expect(pdf).toContain('B5. Target Date Extension 1 of 3');

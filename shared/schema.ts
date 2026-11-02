@@ -1744,7 +1744,16 @@ export const defects = pgTable("defects", {
     data: string;
     uploadedAt: string;
   }>>().default([]),
-  // Attachments (stored inline for form wizard)
+  // Part C1 documents are independent of Part B. No legacy backfill.
+  partCAttachments: json("part_c_attachments").$type<Array<{
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    data: string;
+    uploadedAt: string;
+  }>>().default([]),
+  // Part B rectification documentation (existing inline content remains readable)
   attachments: json("attachments").$type<Array<{
     id: string;
     name: string;

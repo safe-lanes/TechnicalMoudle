@@ -115,9 +115,11 @@ export interface DefectReportPdfData {
     rejectedBy: string;
     rejectedAt: string;
     rejectionReason: string;
+    closureEvidence?: string;
   }>;
 
   confirmCompleted: boolean;
+  closureEvidence?: string;
   dateCompleted: string;
   closedByName: string;
   closedByRank: string;
@@ -1352,6 +1354,10 @@ class PDFReportGenerator {
     y1 = this.addFormField(margin, y, 'Closed By (Name)', defectData.closedByName, col2Width);
     y2 = this.addFormField(margin + col2Width, y, 'Closed By (Rank)', defectData.closedByRank, col2Width);
     y = Math.max(y1, y2) + 2;
+    if (defectData.closureEvidence) {
+      y = this.addFormField(margin, y, 'Closure evidence', defectData.closureEvidence, contentWidth);
+      y += 2;
+    }
 
     y = this.checkPageBreak(y, 30);
     this.doc.setFontSize(10);
@@ -1387,6 +1393,9 @@ class PDFReportGenerator {
         y2 = this.addFormField(margin + col2Width, y, 'Rejected On', attempt.rejectedAt, col2Width);
         y = Math.max(y1, y2) + 2;
         y = this.addFormField(margin, y, 'Rejection Reason', attempt.rejectionReason, contentWidth);
+        if (attempt.closureEvidence) {
+          y = this.addFormField(margin, y, 'Closure evidence', attempt.closureEvidence, contentWidth);
+        }
         y += 4;
       }
     }

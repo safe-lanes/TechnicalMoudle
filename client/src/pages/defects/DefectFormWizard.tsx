@@ -22,7 +22,8 @@ import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
 import { FileAttachmentDialog, FileAttachment } from "@/components/FileAttachmentDialog";
-import { closureEvidenceRemovalRefusal } from "./closureEvidenceGuard";
+import { defectAttachmentAvailability, resolveDefectEvidence, defectEvidenceLabel, type LegacyEvidenceFile } from "@shared/defectEvidence";
+import { DefectEvidenceList } from "./DefectEvidenceList";
 import { useVessels } from "@/hooks/useVessels";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 import { defectSources, findSourceById } from "@/data/defectSources";
@@ -114,7 +115,7 @@ type RejectedClosureAttempt = {
   approvalRequestUuid?: string | null;
 };
 
-function RejectedClosureHistory({ attempts, attachmentNames = {} }: { attempts: RejectedClosureAttempt[]; attachmentNames?: Record<string, string> }) {
+function RejectedClosureHistory({ attempts, resolveEvidence }: { attempts: RejectedClosureAttempt[]; resolveEvidence: (ids: string[]) => ReturnType<typeof resolveDefectEvidence> }) {
   const historyProjection = projectRejectedClosureHistory(attempts);
   const orderedAttempts = historyProjection.attempts;
   const [expanded, setExpanded] = useState<Set<string>>(
@@ -193,18 +194,7 @@ function RejectedClosureHistory({ attempts, attachmentNames = {} }: { attempts: 
                   {fields.closureFiles.length > 0 && (
                     <div className="md:col-span-2">
                       <span className="text-xs text-slate-500">Closure files</span>
-                      <ul className="mt-1 list-inside list-disc">
-                        {fields.closureFiles.map((file, fileIndex) => (
-                          <li key={`${file}-${fileIndex}`}>
-                            {/* 25-Sep-2026 (Sahil E10): never render a stored string straight into href.
-                                Closure files are attachment ids → show the attachment name; only an
-                                http(s) address is a link. */}
-                            {/^https?:\/\//i.test(file)
-                              ? <a className="break-all text-blue-700 underline" href={file} target="_blank" rel="noopener noreferrer">{file}</a>
-                              : <span className="break-all">{attachmentNames[file] ?? file}</span>}
-                          </li>
-                        ))}
-                      </ul>
+                      <DefectEvidenceList files={resolveEvidence(fields.closureFiles)} />
                     </div>
                   )}
                 </div>
@@ -575,6 +565,9 @@ export default function DefectFormWizard({
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
+  const [partCAttachments, setPartCAttachments] = useState<FileAttachment[]>([]);
+  const [isPartCAttachmentDialogOpen, setIsPartCAttachmentDialogOpen] = useState(false);
+  const attachmentAvailability = defectAttachmentAvailability();
   // QA round 2 (DF-09): ids of uploaded defect files chosen as C1 closure evidence.
   const [closureFiles, setClosureFiles] = useState<string[]>([]);
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
@@ -635,6 +628,17 @@ export default function DefectFormWizard({
   });
   
   const currentDefect = defect || fetchedDefect;
+  const separateEvidence = useQuery<LegacyEvidenceFile[]>({
+    queryKey: ["/technical/api/defects", currentDefect?.duuid, "attachments"],
+    enabled: Boolean(currentDefect?.duuid),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/technical/api/defects/${encodeURIComponent(currentDefect.duuid)}/attachments`);
+      return response.json();
+    },
+  });
+  const resolveEvidence = (ids: string[]) =>
+    resolveDefectEvidence(ids, partCAttachments, fileAttachments, separateEvidence.data ?? []);
+  const selectedEvidence = resolveEvidence(closureFiles);
   const approvalDefectId = currentDefect?.id ?? params.id ?? createdDefectId ?? null;
   const closureHistory = useQuery<RejectedClosureAttempt[]>({
     queryKey: ["/technical/api/defects", approvalDefectId, "closure-history"],
@@ -885,13 +889,12 @@ export default function DefectFormWizard({
         setActions(currentDefect.actions);
       }
       
-      if (currentDefect.partAAttachments && Array.isArray(currentDefect.partAAttachments)) {
-        setPartAAttachments(currentDefect.partAAttachments);
-      }
-      
-      if (currentDefect.attachments && Array.isArray(currentDefect.attachments)) {
-        setFileAttachments(currentDefect.attachments);
-      }
+      setPartAAttachments(Array.isArray(currentDefect.partAAttachments) ? currentDefect.partAAttachments : []);
+      setFileAttachments(Array.isArray(currentDefect.attachments) ? currentDefect.attachments : []);
+      setPartCAttachments(Array.isArray(currentDefect.partCAttachments) ? currentDefect.partCAttachments : []);
+      setIsAttachmentDialogOpen(false);
+      setIsPartCAttachmentDialogOpen(false);
+      setIsPartAAttachmentDialogOpen(false);
       setClosureFiles(Array.isArray(currentDefect.closureFiles) ? currentDefect.closureFiles : []);
       
       if (currentDefect.targetDateExtensions && Array.isArray(currentDefect.targetDateExtensions)) {
@@ -1045,8 +1048,9 @@ export default function DefectFormWizard({
         reference: defectId,
         partAAttachments: partAAttachments,
         attachments: fileAttachments,
-        // only files still uploaded to this defect (server accepts nothing else)
-        closureFiles: closureFiles.filter((id) => fileAttachments.some((a) => a.id === id)),
+        partCAttachments,
+        // Preserve saved legacy/unavailable IDs; the API validates new selections.
+        closureFiles,
         targetDateExtensions: extensionsOverride ?? targetDateExtensions,
       };
       
@@ -1378,10 +1382,12 @@ export default function DefectFormWizard({
               rejectedBy: [h.rejectedByName, h.rejectedByPosition].filter(Boolean).join(' — '),
               rejectedAt: formatDate(h.rejectedAt ?? ''),
               rejectionReason: h.rejectionReason || '',
+              closureEvidence: resolveEvidence(h.closureFiles ?? []).map(defectEvidenceLabel).join('\n'),
             }))
         : undefined,
 
       confirmCompleted: data.confirmCompleted || false,
+      closureEvidence: selectedEvidence.map(defectEvidenceLabel).join('\n'),
       dateCompleted: formatDate(data.dateCompleted),
       closedByName: data.closedByName || '',
       closedByRank: data.closedByRank || '',
@@ -2654,7 +2660,7 @@ export default function DefectFormWizard({
                         className="border-gray-300"
                       >
                         <Paperclip className="h-4 w-4 mr-2" />
-                        Attachment(s)
+                        Part B - Rectification Documentation
                         {fileAttachments.length > 0 && (
                           <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
                             {fileAttachments.length}
@@ -2685,7 +2691,7 @@ export default function DefectFormWizard({
                   <div className="space-y-6">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C1. Closeout</h3>
                     {closureHistory.data && closureHistory.data.length > 0 && (
-                      <RejectedClosureHistory attempts={closureHistory.data} attachmentNames={Object.fromEntries(fileAttachments.map((a) => [a.id, a.name]))} />
+                      <RejectedClosureHistory attempts={closureHistory.data} resolveEvidence={resolveEvidence} />
                     )}
                     {hasPendingExtensionRequest && isMasterRank && (
                       <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c1-extension-pending-warning">
@@ -2755,22 +2761,23 @@ export default function DefectFormWizard({
                     <div className="space-y-2" data-testid="c1-closure-evidence">
                       <div className="flex items-center justify-between">
                         <label className="text-sm text-gray-600">Closure evidence</label>
-                        {!isViewMode && isMasterRank && !hasPendingExtensionRequest && (
                           <Button type="button" variant="outline" size="sm" className="border-gray-300"
-                            onClick={() => setIsAttachmentDialogOpen(true)} data-testid="button-c1-attachments">
+                            disabled={!attachmentAvailability.c1Upload && partCAttachments.length === 0}
+                            onClick={() => setIsPartCAttachmentDialogOpen(true)} data-testid="button-c1-attachments">
                             <Paperclip className="h-4 w-4 mr-2" />
-                            Attachment(s)
-                            {fileAttachments.length > 0 && (
-                              <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{fileAttachments.length}</span>
+                            Part C1 - Closure documents
+                            {partCAttachments.length > 0 && (
+                              <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{partCAttachments.length}</span>
                             )}
                           </Button>
-                        )}
                       </div>
-                      {fileAttachments.length === 0 ? (
-                        <p className="text-sm text-gray-500">No files uploaded to this defect yet. Upload rectification documents with Attachment(s), then tick the ones that evidence the closure.</p>
+                      {!attachmentAvailability.c1Upload && <p className="text-sm text-amber-800">{attachmentAvailability.reason}</p>}
+                      {separateEvidence.isError && <p className="text-sm text-red-700">Legacy evidence could not be loaded. <button type="button" className="underline" onClick={() => void separateEvidence.refetch()}>Retry</button></p>}
+                      {partCAttachments.length === 0 ? (
+                        <p className="text-sm text-gray-500">No Part C1 documents uploaded.</p>
                       ) : (
                         <ul className="space-y-1">
-                          {fileAttachments.map((file) => (
+                          {partCAttachments.map((file) => (
                             <li key={file.id} className="flex items-center gap-2 text-sm">
                               <Checkbox
                                 id={`closure-file-${file.id}`}
@@ -2785,6 +2792,7 @@ export default function DefectFormWizard({
                           ))}
                         </ul>
                       )}
+                      <DefectEvidenceList files={selectedEvidence} />
                     </div>
 
                     {/* Submit Button for C1 */}
@@ -2806,6 +2814,10 @@ export default function DefectFormWizard({
                   {/* C2. Verification Section */}
                   <div className="space-y-6 pt-4">
                     <h3 className="text-base font-semibold text-[#1e3a5f]">C2. Verification</h3>
+                    <div data-testid="c2-closure-evidence">
+                      <p className="text-sm font-medium text-gray-600 mb-1">Closure evidence</p>
+                      <DefectEvidenceList files={selectedEvidence} />
+                    </div>
                     <ApprovalProcessSection blocks={[{ title: "Verification", process: defectApprovalProcess.data?.verification }]} />
                     {hasPendingExtensionRequest && (
                       <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c2-extension-pending-warning">
@@ -2886,9 +2898,19 @@ export default function DefectFormWizard({
         onOpenChange={setIsAttachmentDialogOpen}
         attachments={fileAttachments}
         onAttachmentsChange={setFileAttachments}
-        title="C1 Attachments - Rectification Documentation"
+        readOnly={isViewMode}
+        title="Part B - Rectification Documentation"
         itemName="Rectification"
-        canRemove={(a) => closureEvidenceRemovalRefusal(a.id, currentDefect, closureHistory.data)}
+      />
+
+      <FileAttachmentDialog
+        open={isPartCAttachmentDialogOpen}
+        onOpenChange={setIsPartCAttachmentDialogOpen}
+        attachments={partCAttachments}
+        onAttachmentsChange={setPartCAttachments}
+        readOnly={isViewMode || !isMasterRank || hasPendingExtensionRequest || !attachmentAvailability.c1Upload}
+        title="Part C1 - Closure documents"
+        itemName="Closure document"
       />
 
       <FileAttachmentDialog

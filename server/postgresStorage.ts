@@ -379,12 +379,14 @@ export async function reopenDefectAfterVerificationReturnTx(
     closureComment: current.closureComment,
     closedBy: current.closedBy,
     closedOn: current.closedOn,
-    // 25-Sep-2026 (Sahil E10): the live form keeps C1 evidence in defects.attachments (not
-    // closure_files), so a rejected closure recorded an empty file list. Record the ids of the
-    // C1 attachments the office rejected; those ids are then protected from deletion.
+    // Preserve explicit IDs. Retain the old shared-list fallback for pre-separation
+    // closures; new C1 documents never migrate/copy the legacy list.
     closureFiles: (Array.isArray(current.closureFiles) && current.closureFiles.length > 0)
       ? current.closureFiles
-      : (Array.isArray(current.attachments) ? (current.attachments as any[]).map((a: any) => a?.id).filter((id: any) => typeof id === 'string' && id.length > 0) : []),
+      : (Array.isArray(current.partCAttachments) && current.partCAttachments.length > 0
+        ? current.partCAttachments
+        : Array.isArray(current.attachments) ? current.attachments : [])
+          .map((a: any) => a?.id).filter((id: any) => typeof id === 'string' && id.length > 0),
     rejectedByUserUuid: input.rejectedByUserUuid,
     rejectedByName: input.rejectedByName,
     rejectedByPosition: input.rejectedByPosition,

@@ -8,6 +8,7 @@
  */
 export function shouldRetryUnknownSyncColumn(tableName: string, columnName: string): boolean {
   return (tableName === 'vessel_certificate_data' && columnName === 'certificate_number') ||
+    (tableName === 'defects' && columnName === 'part_c_attachments') ||
     (['spares', 'fleet_spares'].includes(tableName) &&
       ['spare_category', 'optimum_qty'].includes(columnName));
 }
