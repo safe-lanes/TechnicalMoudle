@@ -16,7 +16,7 @@ import time
 from typing import Any
 
 from . import agent, db, llm, mask_memory, notify, query_guard, retrieval
-from .config import MODULE_LABELS, settings
+from .config import MODULE_LABELS, capability, instance_modules, settings
 from .masking import Masker
 
 RATE_MSG = "You're sending requests too quickly — please wait a moment and try again."
@@ -55,10 +55,18 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
     ui_module = str(ctx.get("module") or "technical").lower()
     tenant = str(identity.get("tenantDomain") or "single-tenant")
 
+    # 24-Sep-2026: live data ONLY for a token whose issuer is a registered instance serving the module the widget says it
+    # is embedded in (2-Nov-2026: an instance may serve several modules — `modules`); any other token (no issuer, other
+    # module) gets documentation answers only.
+    live = instance if (instance and ui_module in instance_modules(instance)) else None
     masking_on = s.masking_enabled and tenant not in s.masking_disabled_tenants
-    masker = Masker(name_parts=(ui_module == "crewing")) if masking_on else None
+    # 2-Nov-2026: name-part masking is the serving instance's `maskNameParts` capability (absent → module == "crewing",
+    # i.e. exactly the former rule for Crewing and Technical).
+    masker = Masker(name_parts=capability(live, "maskNameParts", ui_module)) if masking_on else None
     raw_history = body.get("conversationHistory")
-    mem_key = (str(identity.get("iss") or ""), tenant, str(identity.get("userId")), body.get("conversationId"))
+    # 2-Nov-2026 (review requirement 3): the conversation key includes the widget module, so a conversation id reused
+    # under another module (Audit → Safety) recalls neither the earlier names nor the earlier query state.
+    mem_key = (str(identity.get("iss") or ""), tenant, str(identity.get("userId")), body.get("conversationId"), ui_module)
     if masker:
         if identity.get("userName"):
             masker.register(identity["userName"], "PERSON")
@@ -118,9 +126,6 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
 
     try:
         # ── Stage 3: module with a Data API → tool loop (data tools + search_module_docs) ──
-        # 24-Sep-2026: live data ONLY for a token whose issuer is a registered instance of the module the widget
-        # says it is embedded in; any other token (no issuer, other module) gets documentation answers only.
-        live = instance if (instance and instance["module"] == ui_module) else None
         if preview:
             # 1-Oct-2026: an owner's draft test takes the SAME answering path, model and settings as the widget (the tool
             # loop) with documentation search only — the module's live-data tools need the user's own short-lived token,
@@ -141,16 +146,19 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
             if state_key:
                 mask_memory.remember(masker, *state_key)
             text = r.text
-            if ui_module == "crewing" and r.breakdown:
+            # 2-Nov-2026: these server-built lines are appended whenever the loop result carries them — the loop sets them
+            # only from Crewing query tools and from module-tagged tools (agent.ManifestToolset), so Crewing's output is
+            # unchanged and Technical (untagged manifest) never gets them.
+            if r.breakdown:
                 # 29-Oct-2026 (Sahil A4): expired vs upcoming counts come from the server's breakdown, never from the model
                 text += "\n\n" + r.breakdown
-            if ui_module == "crewing" and r.queue_line:
+            if r.queue_line:
                 # 31-Oct-2026: the 'no personal approval queue' statement comes from the server, verbatim
                 text += "\n\n" + r.queue_line
-            if ui_module == "crewing" and r.rank_line:
+            if r.rank_line:
                 # 29-Oct-2026 (Sahil A5): ranks without a category in Rank Administration are reported from the server's rankConfig
                 text += "\n\n" + r.rank_line
-            if ui_module == "crewing" and r.paging:
+            if r.paging:
                 # 28-Oct-2026 review item 1: the paging line comes from the server's totals, never from the model's memory
                 text += "\n\n" + query_guard.paging_line(r.paging)
             if discarded:

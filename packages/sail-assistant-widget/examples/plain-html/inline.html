@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inline (embedded) host — SAIL assistant widget</title>
+  <style>
+    /* Deliberately hostile host styles (as in index.html): they must not leak into the widget. */
+    * { letter-spacing: 1px !important; }
+    body { font-family: Georgia, serif; color: #402; background: #fffbe8; margin: 0; padding: 24px; }
+    button { background: #c00; color: #fff; border-radius: 0; padding: 6px 14px; font-family: Georgia, serif; }
+    .mock-banner { background: #ffe08a; padding: 8px 12px; border: 1px solid #c90; margin-bottom: 16px; }
+    .layout { display: flex; gap: 24px; align-items: stretch; height: 560px; }
+    .page { flex: 1; min-width: 0; border: 1px dashed #c90; padding: 16px; overflow: auto; }
+    /* The box the assistant fills. The HOST decides its size; the widget takes 100% of it. */
+    #assistant { width: 420px; flex: none; border: 1px solid #c90; }
+    @media (max-width: 760px) { .layout { flex-direction: column; height: auto; } #assistant { width: auto; height: 480px; } }
+  </style>
+</head>
+<body>
+  <div class="mock-banner" role="note"><strong>DEMO — MOCK identity and MOCK assistant.</strong> No real login or assistant is involved on this page.</div>
+  <h1>Inline host</h1>
+  <p>Signed in as <span id="who">—</span></p>
+  <p>
+    <button id="login-a" type="button">Sign in as user A</button>
+    <button id="login-b" type="button">Sign in as user B (other tenant)</button>
+    <button id="logout" type="button">Sign out</button>
+    <button id="mount" type="button">Mount widget</button>
+    <button id="unmount" type="button">Unmount widget</button>
+  </p>
+  <label>Module <select id="module"><option>crewing</option><option>audit</option><option>safety</option><option>incident</option></select></label>
+
+  <div class="layout">
+    <div class="page">
+      <h2>Host page content</h2>
+      <p>The assistant is embedded in the box on the right: <code>mode: 'inline'</code> with <code>container</code> set to that box.
+        There is no launcher button and no close button — the panel is always open, and the host decides its size and placement.</p>
+      <p>Everything else is the same as the floating widget: starter questions, answers with sources, follow-ups,
+        <em>New chat</em>, context changes (module / vessel / user) and sign-out (which empties the box).</p>
+    </div>
+    <div id="assistant"></div>
+  </div>
+
+  <!-- 1. the pinned bundle (same file every host uses) -->
+  <script src="/widget/1.0.2/sail-assistant-widget.1.0.2.js"></script>
+  <script>
+    // 2. the host's session (MOCK). In a real module this is its own login.
+    let session = null; // 'userId|tenant|role'
+    const who = document.getElementById('who');
+    const params = new URLSearchParams(location.search);
+    const assistantUrl = params.get('assistant') || 'http://localhost:4802';
+    let widget = null;
+
+    function mount() {
+      if (widget) return;
+      widget = SailAssistant.init({
+        assistantUrl,
+        module: document.getElementById('module').value,
+        mode: 'inline',                                   // 1.0.2: fill the container instead of floating
+        container: document.getElementById('assistant'),  // required in inline mode
+        title: 'SAIL Assistant',
+        subtitle: 'Inline demo',
+        // 3. token provider → the host module's OWN authenticated backend (here a MOCK endpoint)
+        getToken: async ({ forceRefresh, signal }) => {
+          const r = await fetch('/mock-token/plain', { headers: { Authorization: 'Bearer mock-session:' + (session || '') }, signal, cache: 'no-store' });
+          if (!r.ok) throw new Error('token endpoint HTTP ' + r.status);
+          return (await r.json()).token;
+        },
+        context: session ? { userKey: session.split('|')[0], tenantKey: session.split('|')[1] } : { userKey: null },
+      });
+      window.__widget = widget;
+    }
+    function setSession(s) {
+      session = s;
+      who.textContent = s ? s : 'nobody';
+      widget && widget.updateContext(s ? { userKey: s.split('|')[0], tenantKey: s.split('|')[1] } : { userKey: null });
+    }
+    document.getElementById('login-a').onclick = () => setSession('101|acme|Sail Admin');
+    document.getElementById('login-b').onclick = () => setSession('202|globex|Sail Admin');
+    document.getElementById('logout').onclick = () => setSession(null);
+    document.getElementById('mount').onclick = mount;
+    document.getElementById('unmount').onclick = () => { widget && widget.destroy(); widget = null; window.__widget = null; };
+    document.getElementById('module').onchange = (e) => widget && widget.updateContext({ module: e.target.value });
+    setSession('101|acme|Sail Admin');
+    mount();
+  </script>
+</body>
+</html>

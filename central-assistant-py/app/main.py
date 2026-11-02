@@ -94,7 +94,9 @@ async def health() -> dict[str, Any]:
     return {"ok": True, "store": "pgvector", "indexSet": settings().assistant_index_set, "chunks": chunks,
             "db": "connected" if db_ok else "unreachable", "llmCalls": llm.llm_calls, "prompt": prompt_record(),
             "chatModel": settings().chat_model, "temperature": ms.get("temperature", "default"),
-            "instances": sorted(settings().module_instances), "instancesRejected": sorted({i for i, _ in settings().registry_violations()})}
+            "instances": sorted(settings().module_instances), "instancesRejected": sorted({i for i, _ in settings().registry_violations()}),
+            # 2-Nov-2026: the modules each registered instance serves (names only — never url, secret or key)
+            "instanceModules": {iss: list(e["modules"]) for iss, e in sorted(settings().module_instances.items())}}
 
 
 # ── admin (nginx denies publicly; tunnel-only) ─────────────────────────────────────

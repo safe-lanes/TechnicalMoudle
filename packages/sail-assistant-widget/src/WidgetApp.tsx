@@ -17,6 +17,8 @@ interface Props {
   labels: WidgetLabels;
   /** id prefix so two widgets on one page (never intended, but possible) cannot collide on aria ids. */
   uid: string;
+  /** Inline (embedded) mode, 1.0.2: no launcher, no close button, the panel is always open and never steals focus. */
+  inline?: boolean;
 }
 
 function Citations({ items }: { items: NonNullable<Message['citations']> }) {
@@ -69,7 +71,7 @@ function Bubble({ m }: { m: Message }) {
   );
 }
 
-export function WidgetApp({ session, labels, uid }: Props) {
+export function WidgetApp({ session, labels, uid, inline = false }: Props) {
   const s = useSyncExternalStore((cb) => session.subscribe(cb), () => session.getState());
   const [draft, setDraft] = useState('');
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -77,12 +79,14 @@ export function WidgetApp({ session, labels, uid }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
 
-  // Focus: into the input when the panel opens, back to the launcher when it closes.
+  // Focus: into the input when the panel opens, back to the launcher when it closes. (Inline: part of the host page —
+  // it must never take the focus by itself.)
   useEffect(() => {
+    if (inline) return;
     if (s.open && !wasOpen.current) inputRef.current?.focus();
     if (!s.open && wasOpen.current) launcherRef.current?.focus();
     wasOpen.current = s.open;
-  }, [s.open]);
+  }, [s.open, inline]);
 
   useLayoutEffect(() => {
     const el = listRef.current;
@@ -107,10 +111,11 @@ export function WidgetApp({ session, labels, uid }: Props) {
 
   return (
     <div className="sa-root" onKeyDown={(e) => {
-      if (e.key === 'Escape' && s.open) { e.stopPropagation(); session.setOpen(false); }
+      if (e.key === 'Escape' && s.open && !inline) { e.stopPropagation(); session.setOpen(false); }
     }}>
       {s.open ? (
-        <section id={panelId} className="sa-panel" role="dialog" aria-modal="false" aria-labelledby={titleId}>
+        <section id={panelId} className="sa-panel" role={inline ? 'region' : 'dialog'} aria-modal={inline ? undefined : 'false'}
+                 aria-labelledby={titleId}>
           <header className="sa-head">
             <div className="sa-head-text">
               <h2 id={titleId} className="sa-title">{labels.title}</h2>
@@ -122,9 +127,11 @@ export function WidgetApp({ session, labels, uid }: Props) {
                     title="New chat" disabled={s.messages.length === 0 && !s.pending}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
             </button>
-            <button type="button" className="sa-icon-btn" onClick={() => session.setOpen(false)} aria-label="Close assistant" title="Close">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-            </button>
+            {inline ? null : (
+              <button type="button" className="sa-icon-btn" onClick={() => session.setOpen(false)} aria-label="Close assistant" title="Close">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            )}
           </header>
 
           <div className="sa-list" ref={listRef} role="log" aria-live="polite" aria-relevant="additions" aria-busy={s.pending}>
@@ -173,19 +180,21 @@ export function WidgetApp({ session, labels, uid }: Props) {
         </section>
       ) : null}
 
-      <button
-        ref={launcherRef}
-        type="button"
-        className="sa-launcher"
-        aria-label={s.open ? 'Close assistant' : labels.launcher}
-        aria-expanded={s.open}
-        aria-controls={s.open ? panelId : undefined}
-        onClick={() => session.setOpen(!s.open)}
-      >
-        {s.open
-          ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z" /></svg>}
-      </button>
+      {inline ? null : (
+        <button
+          ref={launcherRef}
+          type="button"
+          className="sa-launcher"
+          aria-label={s.open ? 'Close assistant' : labels.launcher}
+          aria-expanded={s.open}
+          aria-controls={s.open ? panelId : undefined}
+          onClick={() => session.setOpen(!s.open)}
+        >
+          {s.open
+            ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z" /></svg>}
+        </button>
+      )}
     </div>
   );
 }

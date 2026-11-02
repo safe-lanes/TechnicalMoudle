@@ -52,9 +52,13 @@ export interface SessionOptions {
   /** Messages sent back as history (the assistant uses the last 8). */
   historyMessages: number;
   maxMessageChars: number;
+  /** Inline (embedded) widget, 1.0.2: the panel is open whenever the user is signed in and setOpen() is ignored. */
+  alwaysOpen: boolean;
 }
 
-export const DEFAULT_SESSION_OPTIONS: SessionOptions = { suggestions: true, maxMessages: 40, historyMessages: 8, maxMessageChars: 2000 };
+export const DEFAULT_SESSION_OPTIONS: SessionOptions = {
+  suggestions: true, maxMessages: 40, historyMessages: 8, maxMessageChars: 2000, alwaysOpen: false,
+};
 
 export const MSG_UNAVAILABLE = 'The assistant is temporarily unavailable. Please try again in a moment.';
 export const MSG_SESSION = 'Your session could not be verified. Please sign in again, then reopen the assistant.';
@@ -84,10 +88,12 @@ export class WidgetSession {
 
   constructor(private readonly transport: AssistantTransport, context: WidgetContext,
               private readonly opts: SessionOptions = DEFAULT_SESSION_OPTIONS) {
+    const signedIn = context.userKey !== null;
     this.state = {
-      open: false, signedIn: context.userKey !== null, messages: [], pending: false,
+      open: opts.alwaysOpen && signedIn, signedIn, messages: [], pending: false,
       suggestions: opts.suggestions ? null : [], suggestionsLoading: false, context: { ...context }, retryable: null,
     };
+    if (this.state.open) this.loadSuggestions(); // inline: the panel is open from the start, so its starter questions load now
   }
 
   getState(): SessionState {
@@ -117,7 +123,7 @@ export class WidgetSession {
     this.set({
       messages: [], pending: false, retryable: null, context: { ...context }, signedIn,
       suggestions: this.opts.suggestions ? null : [], suggestionsLoading: false,
-      open: signedIn ? this.state.open : false,
+      open: this.opts.alwaysOpen ? signedIn : signedIn ? this.state.open : false,
     });
     if (signedIn && this.state.open) this.loadSuggestions();
   }
@@ -130,8 +136,9 @@ export class WidgetSession {
     else this.set({ context: next }); // e.g. vesselName or currentPage only — same conversation
   }
 
+  /** Show / hide the floating panel. Ignored by an inline widget (alwaysOpen): it is open whenever the user is signed in. */
   setOpen(open: boolean): void {
-    if (this.destroyed || (open && !this.state.signedIn)) return;
+    if (this.destroyed || this.opts.alwaysOpen || (open && !this.state.signedIn)) return;
     this.set({ open });
     if (open && this.state.suggestions === null) this.loadSuggestions();
   }

@@ -95,6 +95,15 @@ class Settings(BaseSettings):
     #    "technical-prod": {"module":"technical","env":"prod","url":"https://app.../technical/api","secret":"…","signingKey":"…"}}
     # A token is verified with ITS issuer's signingKey and its live-data calls go ONLY to that issuer's registered url,
     # with that issuer's secret. Tokens without `iss` verify with IDENTITY_SIGNING_KEY and are documentation-only.
+    # 2-Nov-2026 (audit/safety/incident pilot) — two OPTIONAL fields per entry, both backward compatible:
+    #   "modules": ["audit","safety","incident"]   every widget module this one instance serves; `module` stays the primary
+    #                                               and is always included. Default: [module].
+    #   "capabilities": {"queryState": bool, "maskNameParts": bool}
+    #                                               per-instance switches; a key that is ABSENT defaults to module == "crewing",
+    #                                               so Crewing's existing registration keeps its query-state guard and name-part
+    #                                               masking exactly as before and Technical stays off. Wrong types are ignored.
+    #   {"audit-pilot": {"module":"audit","modules":["audit","safety","incident"],"env":"dev","url":"…","secret":"…",
+    #                    "signingKey":"…","capabilities":{"queryState":true,"maskNameParts":true}}}
     assistant_module_instances: str = "{}"
     assistant_capture_outbound: str = ""              # test seam: file path; captures ACTUAL wire bodies
     # 21-Oct-2026 (Crewing live-data PILOT TRIAL): remember, per conversation, the names the masker learned from tool
@@ -207,8 +216,10 @@ class Settings(BaseSettings):
             url, sec = str(e.get("url") or "").strip(), str(e.get("secret") or "").strip()
             if bool(url) != bool(sec):
                 continue  # half a data API registration — dropped
-            out[str(iss)] = {"iss": str(iss), "module": e["module"].lower(), "env": str(e.get("env") or ""),
-                             "url": url.rstrip("/"), "secret": sec, "signingKey": e["signingKey"]}
+            mod = e["module"].lower()
+            out[str(iss)] = {"iss": str(iss), "module": mod, "modules": _modules_of(e, mod), "env": str(e.get("env") or ""),
+                             "url": url.rstrip("/"), "secret": sec, "signingKey": e["signingKey"],
+                             "capabilities": _capabilities_of(e, mod)}
         # Credential reuse is rejected (24-Sep-2026, reviewer requirement): a signing key or a service secret shared by
         # two instances, or an instance signing key equal to the shared documentation key, would let one environment's
         # token or secret pass as another's. Every instance involved in a reuse is DROPPED (fail closed); the reasons
@@ -241,6 +252,49 @@ class Settings(BaseSettings):
 
 def _csv(s: str) -> set[str]:
     return {x.strip() for x in (s or "").split(",") if x.strip()}
+
+
+# ── registration extras (2-Nov-2026) ───────────────────────────────────────────────
+CAPABILITY_KEYS = ("queryState", "maskNameParts")
+
+
+def _modules_of(entry: dict[str, Any], module: str) -> list[str]:
+    """`modules` of a registration: the primary first, then every other well-formed name (lower-cased, de-duplicated).
+    Anything that is not a list of strings is ignored → [module]."""
+    out = [module]
+    raw = entry.get("modules")
+    for m in (raw if isinstance(raw, list) else []):
+        if isinstance(m, str) and m.strip() and m.strip().lower() not in out:
+            out.append(m.strip().lower())
+    return out
+
+
+def _capabilities_of(entry: dict[str, Any], module: str) -> dict[str, bool]:
+    """Every known capability resolved to a bool: the registered value when it is a bool, else the historical rule
+    (module == 'crewing'). Unknown keys and non-bool values are ignored."""
+    raw = entry.get("capabilities")
+    raw = raw if isinstance(raw, dict) else {}
+    default = module == "crewing"
+    return {k: (raw[k] if isinstance(raw.get(k), bool) else default) for k in CAPABILITY_KEYS}
+
+
+def instance_modules(instance: dict[str, Any] | None) -> list[str]:
+    """The modules an instance serves; an entry built elsewhere without `modules` serves its `module` only."""
+    if not instance:
+        return []
+    mods = instance.get("modules")
+    if isinstance(mods, list) and mods:
+        return [str(m).lower() for m in mods]
+    return [str(instance.get("module") or "").lower()]
+
+
+def capability(instance: dict[str, Any] | None, name: str, ui_module: str) -> bool:
+    """A capability of the SERVING instance. Without an instance, or for an entry that carries no `capabilities`
+    (hand-built in tests), the historical rule applies: on for Crewing, off for everything else."""
+    caps = (instance or {}).get("capabilities")
+    if isinstance(caps, dict) and isinstance(caps.get(name), bool):
+        return caps[name]
+    return ui_module == "crewing"
 
 
 @lru_cache(maxsize=1)

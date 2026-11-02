@@ -12,6 +12,14 @@ import styles from './widgetStyles.css?inline';
 
 export const VERSION: string = typeof __WIDGET_VERSION__ === 'string' ? __WIDGET_VERSION__ : '0.0.0-dev';
 
+/**
+ * 'floating' (default): a launcher button at a screen corner opens a pop-up panel.
+ * 'inline' (1.0.2): the panel is always open and fills `container` — for a host page, tab or side pane that embeds the
+ * assistant. No launcher, no close button; `open()`/`close()` do nothing. Everything else (context, new chat,
+ * suggestions, token refresh, history, sign-out hiding it) behaves exactly as in floating mode.
+ */
+export type WidgetMode = 'floating' | 'inline';
+
 export interface WidgetConfig {
   /** Central assistant base URL, e.g. https://assistant.sl-sail.com (https required except localhost). */
   assistantUrl: string;
@@ -37,7 +45,13 @@ export interface WidgetConfig {
   zIndex?: number;
   accentColor?: string;
   theme?: 'auto' | 'light' | 'dark';
-  /** Element to mount into (default document.body). The widget renders fixed-position inside its own shadow root. */
+  /** Default 'floating'. See WidgetMode. */
+  mode?: WidgetMode;
+  /**
+   * Element to mount into (default document.body). Floating: the widget renders fixed-position inside its own shadow
+   * root, wherever it is mounted. Inline: REQUIRED — the widget fills this element (give it a height); `position`,
+   * `offset` and `zIndex` do not apply.
+   */
   container?: HTMLElement;
 }
 
@@ -45,7 +59,9 @@ export interface WidgetHandle {
   readonly version: string;
   /** Change module / vessel / user / tenant / page. Any change of module, vessel, user or tenant starts a new conversation. */
   updateContext(patch: Partial<WidgetContext>): void;
+  /** Show the floating panel. No-op in inline mode (always open). */
   open(): void;
+  /** Hide the floating panel. No-op in inline mode. */
   close(): void;
   /** Unmount, abort pending requests, remove every element; the handle is dead afterwards. Safe to call twice. */
   destroy(): void;
@@ -75,11 +91,25 @@ function checkModule(m: unknown): string {
   return v;
 }
 
+function checkMode(m: unknown): WidgetMode {
+  if (m === undefined || m === 'floating') return 'floating';
+  if (m === 'inline') return 'inline';
+  throw new Error('SailAssistant: mode must be "floating" (default) or "inline"');
+}
+
+/** An element (nodeType 1) — duck-typed, so a container from another realm (an iframe) is accepted too. */
+const isElement = (el: unknown): el is HTMLElement => !!el && typeof el === 'object' && (el as Node).nodeType === 1;
+
 export function init(config: WidgetConfig): WidgetHandle {
   if (!config || typeof config !== 'object') throw new Error('SailAssistant: config is required');
   const baseUrl = checkUrl(config.assistantUrl);
   const module = checkModule(config.module);
   if (typeof config.getToken !== 'function') throw new Error('SailAssistant: getToken(…) is required');
+  const mode = checkMode(config.mode);
+  const inline = mode === 'inline';
+  if (inline && !isElement(config.container)) {
+    throw new Error('SailAssistant: mode "inline" requires container — the element the assistant fills (give it a height)');
+  }
   if (typeof document === 'undefined') throw new Error('SailAssistant: needs a browser document');
 
   // One widget per page: a second init (React StrictMode, an Angular component re-created without destroy) replaces the
@@ -91,6 +121,7 @@ export function init(config: WidgetConfig): WidgetHandle {
 
   const host = document.createElement('div');
   host.setAttribute('data-sail-assistant', VERSION);
+  host.setAttribute('data-mode', mode); // the stylesheet scopes every inline rule by this; floating rules are untouched
   host.setAttribute('data-position', config.position === 'bottom-left' ? 'bottom-left' : 'bottom-right');
   if (config.theme === 'light' || config.theme === 'dark') host.setAttribute('data-theme', config.theme);
   const shadow = host.attachShadow({ mode: 'open' });
@@ -107,7 +138,7 @@ export function init(config: WidgetConfig): WidgetHandle {
   const transport = new AssistantTransport(baseUrl, config.getToken);
   const ctx = config.context ?? {};
   const session = new WidgetSession(transport, { ...ctx, module },
-    { ...DEFAULT_SESSION_OPTIONS, suggestions: config.suggestions !== false });
+    { ...DEFAULT_SESSION_OPTIONS, suggestions: config.suggestions !== false, alwaysOpen: inline });
   const labels: WidgetLabels = {
     title: config.title ?? 'SAIL Assistant',
     subtitle: config.subtitle,
@@ -116,7 +147,7 @@ export function init(config: WidgetConfig): WidgetHandle {
     intro: config.intro ?? 'Ask how to do something in this module. Answers come from the user manuals and show their sources.',
   };
   let root: Root | null = createRoot(mount);
-  root.render(createElement(WidgetApp, { session, labels, uid: `sa${++uidSeq}` }));
+  root.render(createElement(WidgetApp, { session, labels, uid: `sa${++uidSeq}`, inline }));
 
   const handle: WidgetHandle = {
     version: VERSION,
@@ -127,10 +158,10 @@ export function init(config: WidgetConfig): WidgetHandle {
       session.updateContext(p);
     },
     open() {
-      if (root) session.setOpen(true);
+      if (root && !inline) session.setOpen(true);
     },
     close() {
-      if (root) session.setOpen(false);
+      if (root && !inline) session.setOpen(false);
     },
     destroy() {
       if (!root) return;

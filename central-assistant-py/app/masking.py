@@ -22,6 +22,58 @@ NAME_KEY_RE = re.compile(
     r"reported_by|completed_by|created_by|updated_by|master|chief|requestedBy|assignee)",
     re.I,
 )
+# 2-Nov-2026 (audit/safety/incident pilot): ANY other key ending in `name` registers a PERSON name (personName, witnessName,
+# proposerName, inspectorName, closedByName, first_name …) and a camel-case `…By` key does too (issuedBy, closedBy) — EXCEPT
+# the keys below, which name things, not people. The list holds every non-person *Name key the Technical and Crewing data
+# tools emit today (componentName, partName, roleName, rankName, doc_name …): for them nothing changes. Matching is on the
+# key with underscores removed, lower-cased, by suffix — so fleetEquipmentName, report_type_name and CrewingToolName are
+# covered by equipment / type / tool. A vessel/ship key is a VESSEL, as before.
+GENERIC_NAME_KEY_RE = re.compile(r"^(?=.{5,})[A-Za-z0-9_]*[A-Za-z0-9_]name$", re.I)   # not the bare key 'name'
+GENERIC_BY_KEY_RE = re.compile(r"^[A-Za-z0-9_]*[a-z]By$")                            # camelCase only; snake *_by is legacy
+NOT_PERSON_NAME_SUFFIXES = (
+    # explicit exclusions (spec)
+    "file", "document", "doc", "ra", "stage", "module", "menu", "reporttype", "severity",
+    # Technical data tools (server/services/chatbotService.ts) — equipment and records
+    "component", "comp", "part", "equipment", "item", "tool", "certificate", "survey", "job", "spare", "maker", "manufacturer",
+    # Crewing data tools (server/v2/assistant) — roles, ranks, documents, countries
+    "role", "rank", "country", "nationality", "flag", "port", "company", "department", "designation", "fleet", "group",
+    # generic record / lookup names
+    "type", "status", "category", "class", "course", "training", "meeting", "topic", "hazard", "template", "form", "field",
+    "column", "table", "host", "domain", "tenant", "database", "schema", "index", "set", "report", "location", "office",
+    "area", "section", "chapter", "question", "checklist", "procedure", "project", "task", "action", "plan", "route", "screen",
+    "page", "button", "label", "product", "brand", "model", "system", "engine", "machine", "unit", "lookup", "key", "token",
+)
+NOT_PERSON_BY_KEYS = re.compile(r"^(sort|sorted|order|ordered|group|grouped|filter|filtered|split|keyed|indexed|paged|"
+                                r"divided|multiplied|scaled|powered|ranked|weighted|partition|partitioned|search|query|"
+                                r"lookup|expires?|due|needed|required|valid|effective|stand|side)By$", re.I)
+_DATE_LIKE = re.compile(r"^\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{10,})")
+
+
+def name_key_kind(key: str) -> str | None:
+    """'VESSEL' / 'PERSON' when a JSON key carries a name to register, None otherwise. The legacy NAME_KEY_RE decides
+    first (unchanged); the generic rules only ADD person keys."""
+    if NAME_KEY_RE.search(key):
+        return "VESSEL" if re.search("vessel", key, re.I) else "PERSON"
+    flat = key.replace("_", "").lower()
+    if GENERIC_NAME_KEY_RE.match(key):
+        if flat in ("shipname",):
+            return "VESSEL"
+        stem = flat[:-4]
+        if any(stem.endswith(sfx) for sfx in NOT_PERSON_NAME_SUFFIXES):
+            return None
+        return "PERSON"
+    if GENERIC_BY_KEY_RE.match(key) and not NOT_PERSON_BY_KEYS.match(key):
+        return "PERSON"
+    return None
+
+
+def _person_value_ok(key: str, value: str) -> bool:
+    """A value under a GENERIC person key must look like a name: at least one letter, not a date / timestamp / number
+    (an `issuedBy` that holds a date is a date). Legacy keys keep their former, unconditional behaviour."""
+    if NAME_KEY_RE.search(key):
+        return True
+    v = value.strip()
+    return bool(re.search(r"[^\W\d_]", v)) and not _DATE_LIKE.match(v) and len(v) <= 120
 UUID_RE = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I)
 IMO_RE = re.compile(r"\b\d{7}\b")
 # Accepts the token WITH or WITHOUT its brackets: models (gpt-4o-mini, spike 11-Sep) sometimes
@@ -87,8 +139,8 @@ class Masker:
             for k, v in obj.items():
                 k = str(k)
                 if isinstance(v, str):
-                    if NAME_KEY_RE.search(k):
-                        kind = "VESSEL" if re.search("vessel", k, re.I) else "PERSON"
+                    kind = name_key_kind(k)
+                    if kind is not None and (kind == "VESSEL" or _person_value_ok(k, v)):
                         self.register(v, kind)
                         if kind == "PERSON" and self._name_parts:
                             for part in re.findall(r"[^\W\d_]{4,}", v):

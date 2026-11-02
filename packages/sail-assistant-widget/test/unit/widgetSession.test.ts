@@ -297,6 +297,48 @@ describe('suggestions — late answers', () => {
   });
 });
 
+describe('alwaysOpen (inline widget, 1.0.2)', () => {
+  it('is open from the start when signed in, loads suggestions at once, and ignores setOpen(false)', async () => {
+    const { calls, fetchImpl } = immediateFetch(() => json({ module: 'crewing', questions: ['How do I create a new crew record?'] }));
+    const { s } = make(fetchImpl, { alwaysOpen: true });
+    expect(s.getState().open).toBe(true);
+    await flush(); await flush();
+    expect(calls).toHaveLength(1);
+    expect(s.getState().suggestions).toEqual(['How do I create a new crew record?']);
+    s.setOpen(false);
+    expect(s.getState().open).toBe(true);
+    s.newChat();
+    expect(s.getState().open).toBe(true);
+  });
+
+  it('sign-out closes it (nothing requested); sign-in re-opens it and reloads suggestions', async () => {
+    const { calls, fetchImpl } = immediateFetch(() => json({ module: 'crewing', questions: ['q?'] }));
+    const { s } = make(fetchImpl, { alwaysOpen: true });
+    await flush(); await flush();
+    s.updateContext({ userKey: null });
+    expect(s.getState()).toMatchObject({ open: false, signedIn: false, suggestions: null });
+    s.setOpen(true);
+    await flush();
+    expect(s.getState().open).toBe(false);
+    expect(calls).toHaveLength(1);
+    s.updateContext({ userKey: 'u2' });
+    expect(s.getState().open).toBe(true);
+    await flush(); await flush();
+    expect(calls).toHaveLength(2);
+  });
+
+  it('signed out from the start: closed, nothing requested; the default (floating) session is still closed at start', async () => {
+    const { calls, fetchImpl } = immediateFetch(() => json({ module: 'crewing', questions: ['q?'] }));
+    const t = new AssistantTransport('https://assistant.example', async () => tok(1), fetchImpl);
+    const inline = new WidgetSession(t, { module: 'crewing', userKey: null }, { ...DEFAULT_SESSION_OPTIONS, alwaysOpen: true });
+    expect(inline.getState()).toMatchObject({ open: false, signedIn: false });
+    const floating = make(fetchImpl).s;
+    expect(floating.getState().open).toBe(false);
+    await flush();
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('destroy', () => {
   it('aborts in-flight work, drops late answers and stops notifying', async () => {
     const { calls, fetchImpl } = controllableFetch();
