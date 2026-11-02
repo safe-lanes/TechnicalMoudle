@@ -70,6 +70,7 @@ class Deps:
     # 28-Oct-2026 (Astra round 3): server-held query state — the conversation key (None = no state is read or written)
     # and the user's CURRENT message (unmasked), the only text a filter change is checked against.
     conv_key: tuple[str, ...] | None = None   # (iss, tenant, user, conversationId[, module]) — see mask_memory
+    conversation_id: str | None = None        # the widget's conversationId, sent in every execute body (2-Nov-2026)
     user_message: str = ""
     query_guard: bool = False
     paging: dict[str, Any] | None = None   # server totals of the LAST list-mode Crewing result (review item 1)
@@ -116,16 +117,19 @@ async def manifest_for(instance: dict[str, Any] | None) -> dict[str, Any] | None
 
 
 async def execute_module_tool(instance: dict[str, Any] | None, tool: str, args: dict[str, Any], identity_token: str, request_id: str,
-                              module: str | None = None) -> dict[str, Any]:
+                              module: str | None = None, conversation_id: str | None = None) -> dict[str, Any]:
     """Call ONE registered instance's /assistant/execute with THAT instance's secret; the user's token is forwarded
     only there (24-Sep-2026). Redirects are never followed and are reported as failures.
-    2-Nov-2026: `module` (the widget module the call is made for) travels in the body — additive; a multi-module
-    instance can check it against the tool's own module server-side."""
+    2-Nov-2026: `module` (the widget module the call is made for) and `conversationId` travel in the body — additive
+    (Technical and Crewing read only tool/args/requestId from the body: controller.ts:80, assistantDataService.ts:240);
+    the SAILERP backend keys its own query state by them."""
     if not instance or not instance.get("url"):
         return {"ok": False, "error": "no registered data API for this token's issuer"}
     body: dict[str, Any] = {"tool": tool, "args": args, "requestId": request_id}
     if module:
         body["module"] = module
+    if conversation_id:
+        body["conversationId"] = str(conversation_id)
     try:
         r = await llm.module_client().post(
             f"{instance['url']}/assistant/execute",
@@ -232,10 +236,15 @@ class ManifestToolset(AbstractToolset[Deps]):
                 out = {"ok": True, "data": decision.refusal()}
             else:
                 args = {k: v for k, v in args.items() if k != "conversation"}
+                if decision is not None and name in query_guard.AREA_QUERY_TOOLS:
+                    # 2-Nov-2026 DECISION: the assistant's guard is the authority. The SAILERP backend receives the COMPLETE
+                    # validated filter set as a fresh query (basis 'new'), so it never has to inherit from its own copy of
+                    # the state and its `no_previous_query` refusal cannot arise from a lost backend state.
+                    args["conversation"] = {"basis": "new"}
                 try:
                     out = await asyncio.wait_for(
                         execute_module_tool(deps.instance, name, args, deps.identity_token, f"{int(deps.started_at)}-{len(deps.tools_used)}",
-                                            module=deps.ui_module),
+                                            module=deps.ui_module, conversation_id=deps.conversation_id),
                         timeout=s.tool_timeout_ms / 1000.0)
                 except TimeoutError:
                     out = {"ok": False, "error": f"{deps.ui_module}/{name} timed out"}  # G1: timeout as data
@@ -517,7 +526,8 @@ AREA_CLOSING_RULES_GUARD = (
     "filter_change_not_requested, the refused condition was NOT part of the previous question — you introduced it: tell "
     "the user which filters are kept (keptFilters) and that this condition was not applied because they did not ask for "
     "it, then ask whether they want it; never present it as something the earlier question already had, and do not retry "
-    "it on your own. On follow_up_needs_previous_basis call again with basis 'previous'. The result's `query` is the "
+    "it on your own. On follow_up_needs_previous_basis call again with basis 'previous'. On no_previous_query the server has "
+    "no earlier question to build on: ask the user to restate the question in full. The result's `query` is the "
     "filter set that actually ran — write the 'Filters:' line from it. "
     "If a tool returns an error or a permission refusal, relay it politely and do not retry the same call. "
     "RULE — options: whenever you offer the user a choice of what to ask, include documentation how-to questions (for example "
@@ -720,16 +730,22 @@ def vessel_context_prefix(ctx: dict[str, Any] | None) -> str:
 PARTIAL_NOTE = "\n\n(Note: answered from partial data — some lookups did not complete in time.)"
 
 
+def guard_in_force(instance: dict[str, Any] | None, ui_module: str, manifest_tools: list[dict[str, Any]]) -> bool:
+    """2-Nov-2026: the query-state guard applies when ASSISTANT_QUERY_STATE_GUARD is on AND the serving instance's
+    `queryState` capability is on (absent → module == "crewing", the former rule) AND at least one tool offered for the
+    widget module is one the guard knows — otherwise the model would be told about a `conversation` parameter its tools
+    do not have."""
+    return bool(settings().assistant_query_state_guard and capability(instance, "queryState", ui_module)
+                and has_guarded_tools(tools_for_module(manifest_tools, ui_module)))
+
+
 async def run_tool_loop(message: str, ui_module: str, identity_token: str, masker: Masker | None, manifest_tools: list[dict[str, Any]],
                         history: list[ModelMessage] | None = None, instance: dict[str, Any] | None = None,
-                        conv_key: tuple[str, ...] | None = None, user_message: str = "") -> LoopResult:
-    # 2-Nov-2026: the guard is the serving instance's `queryState` capability (absent → module == "crewing", the former
-    # rule) AND at least one offered tool is one the guard knows — otherwise the model would be told about a
-    # `conversation` parameter its tools do not have.
-    guard = bool(settings().assistant_query_state_guard and capability(instance, "queryState", ui_module)
-                 and has_guarded_tools(tools_for_module(manifest_tools, ui_module)))
+                        conv_key: tuple[str, ...] | None = None, user_message: str = "", conversation_id: str | None = None) -> LoopResult:
+    guard = guard_in_force(instance, ui_module, manifest_tools)
     deps = Deps(masker=masker, ui_module=ui_module, identity_token=identity_token, started_at=time.monotonic(), instance=instance,
-                conv_key=conv_key, user_message=user_message, query_guard=guard)
+                conv_key=conv_key, user_message=user_message, query_guard=guard,
+                conversation_id=str(conversation_id) if conversation_id else None)
     token = current_masker.set(masker)
     try:
         agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=tool_loop_instructions(ui_module, guard=guard),

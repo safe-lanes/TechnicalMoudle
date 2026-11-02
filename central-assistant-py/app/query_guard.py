@@ -26,13 +26,26 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-QUERY_TOOLS = ("crewing_query_assignments", "crewing_query_documents",
-               # Part B (30-Oct-2026)
-               "crewing_query_availability", "crewing_query_relief_due", "crewing_query_rest_hours", "crewing_query_rotation_approvals",
-               "crewing_query_manning", "crewing_query_appraisals")
+CREWING_QUERY_TOOLS = ("crewing_query_assignments", "crewing_query_documents",
+                       # Part B (30-Oct-2026)
+                       "crewing_query_availability", "crewing_query_relief_due", "crewing_query_rest_hours", "crewing_query_rotation_approvals",
+                       "crewing_query_manning", "crewing_query_appraisals")
+# 2-Nov-2026 (audit/safety/incident pilot): the SAILERP area tools, same contract (mode list|count|group, validated filters,
+# `query` echoed). sail_resolve_vessel is a lookup, not a query tool. The state is keyed by module (mask_memory), so a
+# Safety follow-up can never inherit an Audit query even with a reused conversation id.
+AREA_QUERY_TOOLS = ("audit_query_observations", "safety_query_moc", "incident_query_incidents")
+QUERY_TOOLS = CREWING_QUERY_TOOLS + AREA_QUERY_TOOLS
 PRESENTATION_KEYS = {"mode", "unit", "groupBy", "sort", "limit", "offset"}
 SHARED_KEYS = {"vessels", "ranks", "rankGroups"}           # inherited when the follow-up switches tool
 FILTER_KEYS: dict[str, set[str]] = {
+    # SAILERP (2-Nov-2026) — every other key of these tools is presentation (mode, groupBy, sort, limit, offset, conversation)
+    "audit_query_observations": {"status", "riskLevels", "inspectionTypes", "categories", "viqChapter", "includeRecommended", "includeLae",
+                                 "excludeDryDock", "vessels", "dueWithin", "closedWithin", "inspectionDateWithin", "inspectionDateFrom",
+                                 "inspectionDateTo"},
+    "safety_query_moc": {"statuses", "typeOfChange", "initialRisk", "stages", "effectivenessReviewDue", "vessels", "initiatedWithin",
+                         "initiatedFrom", "initiatedTo", "targetWithin", "targetFrom", "targetTo"},
+    "incident_query_incidents": {"categories", "statuses", "severityMin", "severityIn", "vessels", "incidentDateWithin", "incidentDateFrom",
+                                 "incidentDateTo", "reportDateWithin"},
     "crewing_query_assignments": {"vessels", "ranks", "rankGroups", "nationalities", "crewStatus", "signOnWithin", "signOnFrom",
                                   "signOnTo", "reliefDueWithin", "reliefDueBefore", "hasDocument"},
     "crewing_query_documents": {"documentTypes", "documentNameContains", "expiryState", "expiryWithin", "expiryFrom", "expiryTo",
@@ -59,7 +72,9 @@ EVIDENCE: dict[str, str | None] = {
     "lastMonths": r"\d+\s*month|\b(last|past|previous|recent)\b.*month",
     "opa": r"\bopa\b|oil pollution",
     "violationsOnly": r"violat|all crew|everyone|every record|without violation|no violation|clean",
-    "status": r"draft|proposed|waiting|pending|approv|all plans|every plan",
+    # `status` is shared by crewing_query_rotation_approvals and audit_query_observations (2-Nov-2026): one pattern, the
+    # Crewing words first and unchanged, the observation words (open / closed / dry dock / overdue …) appended.
+    "status": r"draft|proposed|waiting|pending|approv|all plans|every plan|open|closed|close|dry ?dock|overdue|outstanding|status|all observations|every observation",
     "forMe": r"\b(me|my|mine|myself|i am|i'm|for me|assigned to me)\b",   # 31-Oct: never narrows — the server answers with the company queue
     "state": r"vacan|filled|open position|empty|unfilled|manning|short",
     "statusClass": r"draft|pending|completed|reviewed|submitted|finished|done|all appraisals|every appraisal",
@@ -86,7 +101,39 @@ EVIDENCE: dict[str, str | None] = {
     "reliefDueBefore": r"relie|due",
     "hasDocument": r"licen|certif|document|training|course|expir",
     "crewIds": r".",   # always: produced by crewing_find_crew in the same turn
+    # ── SAILERP areas (2-Nov-2026). `status` and `dueWithin` are shared with Crewing tools (see above). None = only the
+    # value's own words count (a vessel, category or inspection type the user typed).
+    "riskLevels": r"risk|high|medium|low|critical|major|minor",
+    "inspectionTypes": r"sire|psc|cdi|\bviq\b|vetting|oil major|internal|external|flag state|class|port state|navigation audit|inspection type|type of inspection",
+    "categories": r"categor",
+    "viqChapter": r"viq|chapter|\d",
+    "includeRecommended": r"recommend",
+    "includeLae": r"\blae\b|less than adequate",
+    "excludeDryDock": r"dry ?dock",
+    "closedWithin": r"\d+\s*(day|week|month|year)|\b(closed|last|past|recent|within|since|this|month|week|year)\b",
+    "inspectionDateWithin": r"\d+\s*(day|week|month|year)|\b(last|past|recent|within|since|this|inspect|month|week|year)\b",
+    "inspectionDateFrom": r"\d{4}|\b(from|after|since|between|inspect)\b",
+    "inspectionDateTo": r"\d{4}|\b(to|until|before|by|between|inspect)\b",
+    "statuses": r"open|closed|close|pending|approv|reject|draft|in progress|complet|verif|implement|status|all (mocs?|incidents?)|every (moc|incident)",
+    "typeOfChange": r"temporary|permanent|emergency|type of change|change type",
+    "initialRisk": r"risk|high|medium|low|critical",
+    "stages": r"stage|proposal|approval|implementation|verification|effectiveness|review|closed",
+    "effectivenessReviewDue": r"effectiveness|review|due|overdue",
+    "initiatedWithin": r"\d+\s*(day|week|month|year)|\b(initiat|raised|started|created|last|past|recent|within|since|this|month|week|year)\b",
+    "initiatedFrom": r"\d{4}|\b(from|after|since|between|initiat|raised)\b",
+    "initiatedTo": r"\d{4}|\b(to|until|before|by|between|initiat|raised)\b",
+    "targetWithin": r"\d+\s*(day|week|month|year)|\b(target|due|complet|next|within|coming|upcoming|this|month|week|year)\b",
+    "targetFrom": r"\d{4}|\b(from|after|since|between|target|due)\b",
+    "targetTo": r"\d{4}|\b(to|until|before|by|between|target|due)\b",
+    "severityMin": r"severit|serious|major|minor|high|critical|at least|above|or (higher|worse)|and up",
+    "severityIn": r"severit|serious|major|minor|high|low|critical|negligible|moderate",
+    "incidentDateWithin": r"\d+\s*(day|week|month|year)|\b(last|past|recent|within|since|this|happen|occur|incident|month|week|year)\b",
+    "incidentDateFrom": r"\d{4}|\b(from|after|since|between|happen|occur)\b",
+    "incidentDateTo": r"\d{4}|\b(to|until|before|by|between|happen|occur)\b",
+    "reportDateWithin": r"\d+\s*(day|week|month|year)|\b(report|last|past|recent|within|since|this|month|week|year)\b",
 }
+# `dueWithin` is shared with crewing_query_relief_due; its pattern above (due / next / within …) already fits observations.
+CODE_NO_PREVIOUS = "no_previous_query"   # the SAILERP backend's own refusal when IT has nothing to inherit (never expected: see agent)
 REMOVAL = r"\b(remove|drop|without|regardless|ignore|any|all|every|whole|entire|no longer|instead|clear|reset|everyone|everybody|fleet|across|overall|altogether)\b"
 FOLLOWUP = r"(^\s*(and|or|also|but)\b)|\b(them|those|these|same|more|again|too|only|just|instead|what about|how about|the rest|others?|ones?)\b"
 
@@ -144,7 +191,8 @@ def _describe(v: dict[str, Any]) -> str:
 
 # ── normalisation ──────────────────────────────────────────────────────────────
 def _vessel_name(v: Any) -> str:
-    s = v.get("vesselName") if isinstance(v, dict) else v
+    # Crewing echoes {vesselName}; the SAILERP resolver echoes {name} (2-Nov-2026) — `name` is read only when vesselName is absent
+    s = (v.get("vesselName") if "vesselName" in v else v.get("name")) if isinstance(v, dict) else v
     s = re.sub(r"^\s*(mv|m/v|mt|m/t|ms)\s+", "", str(s or "").strip(), flags=re.I)
     return re.sub(r"\s+", " ", s).lower()
 
@@ -420,7 +468,7 @@ def state_from_result(tool: str, result: dict[str, Any]) -> dict[str, Any] | Non
             continue
         v = q[k]
         if k == "vessels" and isinstance(v, list):
-            v = [str(x.get("vesselName") if isinstance(x, dict) else x) for x in v]
+            v = [str((x.get("vesselName") if "vesselName" in x else x.get("name")) if isinstance(x, dict) else x) for x in v]
         filters[k] = v
     return {"tool": tool, "filters": filters}
 

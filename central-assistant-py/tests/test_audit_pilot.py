@@ -149,7 +149,7 @@ async def test_server_lines_are_read_from_tagged_tools_and_crewing_tools_only(mo
     agent, s = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=REGISTRY, **BASE_ENV)
     envelope = {"ok": True, "mode": "list", "total": 12, "returned": 10, "offset": 0, "unit": "observations", "nextOffset": 10, "rows": []}
 
-    async def fake_execute(instance, tool, args, token, rid, module=None):
+    async def fake_execute(instance, tool, args, token, rid, module=None, conversation_id=None):
         return {"ok": True, "data": dict(envelope)}
 
     monkeypatch.setattr(agent, "execute_module_tool", fake_execute)
@@ -169,7 +169,8 @@ async def test_server_lines_are_read_from_tagged_tools_and_crewing_tools_only(mo
 
 def test_guard_needs_the_capability_and_a_tool_the_guard_knows(monkeypatch):
     agent, _ = _reload(monkeypatch, ASSISTANT_MODULE_INSTANCES=REGISTRY, **BASE_ENV)
-    assert agent.has_guarded_tools([{"name": "crewing_query_documents"}]) and not agent.has_guarded_tools(TOOLS)
+    assert agent.has_guarded_tools([{"name": "crewing_query_documents"}]) and agent.has_guarded_tools(TOOLS)   # area tools registered (follow-up)
+    assert not agent.has_guarded_tools([{"name": "sail_resolve_vessel", "module": "shared"}, {"name": "legacy_untagged"}])
 
 
 # ── 3. conversation key includes the module: no history / state across a module switch ──
@@ -225,8 +226,10 @@ async def test_chat_path_module_switch_discards_history_and_wires_capabilities(m
 
     calls: list[dict] = []
 
-    async def loop(message, ui_module, identity_token, masker, manifest_tools, history=None, instance=None, conv_key=None, user_message=""):
-        calls.append({"module": ui_module, "name_parts": masker._name_parts, "history": history, "key": conv_key, "tools": manifest_tools})
+    async def loop(message, ui_module, identity_token, masker, manifest_tools, history=None, instance=None, conv_key=None, user_message="",
+                   conversation_id=None):
+        calls.append({"module": ui_module, "name_parts": masker._name_parts, "history": history, "key": conv_key, "tools": manifest_tools,
+                      "cid": conversation_id})
         if ui_module == "audit":
             masker.learn_from_json({"rows": [{"witnessName": "John Smith"}]})
             mask_memory.set_query_state_for(conv_key, {"tool": "audit_query_observations", "filters": {"vessels": ["Gas Mia"]}})
@@ -247,7 +250,7 @@ async def test_chat_path_module_switch_discards_history_and_wires_capabilities(m
     st, out = await chat.handle_chat({"message": "overdue observations?", "conversationId": "c1", "context": {"module": "audit"}}, ident, "TOK", pilot)
     assert st == 200 and out["gate"] == "answer" and out["module"] == "Audit"
     assert out["response"].endswith("Showing 10 of 12 matching observations (records 1–10; 2 more available).")   # generalised line
-    assert calls[-1]["key"] == ("audit-pilot", "acme", "u1", "c1", "audit") and calls[-1]["name_parts"] is True
+    assert calls[-1]["key"] == ("audit-pilot", "acme", "u1", "c1", "audit") and calls[-1]["name_parts"] is True and calls[-1]["cid"] == "c1"
 
     # the same conversation id from the Safety widget: history discarded, no query state, fresh key
     st, out = await chat.handle_chat({"message": "and the MOCs?", "conversationId": "c1", "conversationHistory": hist, "context": {"module": "safety"}}, ident, "TOK", pilot)

@@ -140,7 +140,7 @@ async def _handle_chat(body: dict[str, Any], identity: dict[str, Any], identity_
             # follow-ups ('readable format', 'more') refer to the previous answer instead of restarting.
             r = await agent.run_tool_loop(model_note + agent.vessel_context_prefix(ctx) + message, ui_module, identity_token, masker,
                                           manifest["tools"], history=agent.build_history(raw_history), instance=live,
-                                          conv_key=state_key, user_message=message)
+                                          conv_key=state_key, user_message=message, conversation_id=body.get("conversationId"))
             if masker and masker.warnings:
                 print("[assistant] unmask warnings:", masker.warnings)
             if state_key:
