@@ -37,6 +37,15 @@ const ext = (n: number, status: string) => ({
 });
 
 describe('defect report PDF', () => {
+  it('retains pending/failed file notes and embeds available image evidence', () => {
+    const pdf = render({
+      fileNotes: ['evidence.pdf - Awaiting synchronization', 'photo.jpg - Transfer failed - contact support'],
+      fileImages: [{ label: 'Available photo', data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ioAAAAASUVORK5CYII=' }],
+    });
+    expect(pdf).toContain('Awaiting synchronization');
+    expect(pdf).toContain('Transfer failed');
+    expect(pdf).toContain('Available photo');
+  });
   it('prints current and rejected legacy evidence without changing the portrait form', () => {
     const pdf = render({
       closureEvidence: 'old.pdf - Legacy evidence',

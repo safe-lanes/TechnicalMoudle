@@ -746,6 +746,9 @@ export async function getSetting(key: string): Promise<string | null> {
 }
 
 export async function updateSetting(key: string, value: string, userId?: string): Promise<void> {
+  if (key.startsWith('defects_peer_report:')) {
+    throw Object.assign(new Error('Peer capability reports are system-generated and cannot be edited.'), { statusCode: 403 });
+  }
   const db = await getDb();
   await db.update(syncSettings)
     .set({
@@ -763,6 +766,9 @@ export async function updateSetting(key: string, value: string, userId?: string)
  * this is UPDATE-only and no-ops if the key is absent. Used by provisioning import.
  */
 export async function seedSettingIfEmpty(key: string, value: string): Promise<void> {
+  if (key.startsWith('defects_peer_report:')) {
+    throw Object.assign(new Error('Peer reports cannot be seeded or copied by provisioning.'), { statusCode: 403 });
+  }
   if (value === undefined || value === null || value === '') return;
   const db = await getDb();
   // UPDATE-then-INSERT (was UPDATE-only). The old UPDATE-only form silently no-oped when the
@@ -781,6 +787,9 @@ export async function seedSettingIfEmpty(key: string, value: string): Promise<vo
 }
 
 export async function updateSettings(settings: Record<string, string>, userId?: string): Promise<void> {
+  if (Object.keys(settings).some(key => key.startsWith('defects_peer_report:'))) {
+    throw Object.assign(new Error('Peer capability reports are system-generated and cannot be edited.'), { statusCode: 403 });
+  }
   for (const [key, value] of Object.entries(settings)) {
     await updateSetting(key, value, userId);
   }

@@ -16,6 +16,9 @@ import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { defects } from '@shared/schema';
 import { defectAttachmentAvailability, STALE_CLOSURE_MESSAGE } from '@shared/defectEvidence';
 import { isDeepStrictEqual } from 'node:util';
+import { withDefectFileSave } from './defectFileCommit';
+import { getDefectFileReadiness } from './defectFileReadiness';
+import type { DefectFileActor } from './defectFileAccess';
 import {
   apprvWorkflows, apprvWorkflowNodes, apprvNodeSlots,
   apprvRequests, apprvRequestSlots,
@@ -624,7 +627,7 @@ export async function hasActiveUserVesselAssignment(userUuid: string, vesselId: 
   return defectsRepo.hasActiveUserVesselAssignment(userUuid, vesselId);
 }
 
-export async function createDefect(body: any, _actor?: import('./defectsApprovalHooks').DefectActor) {
+export async function createDefect(body: any, _actor?: import('./defectsApprovalHooks').DefectActor, fileActor?: DefectFileActor) {
   const validatedData = insertDefectSchema.parse(body);
   await assertDefectEvidenceRules({ duuid: null, attachments: [], partCAttachments: [], closureFiles: [] }, validatedData);
   const { assertDefectCreationApprovalStateAllowed } = await import('./defectsApprovalHooks');
@@ -642,7 +645,9 @@ export async function createDefect(body: any, _actor?: import('./defectsApproval
 
   console.log(`[DefectRoutes] Creating defect with generated ID: ${generatedId} for vessel: ${vesselId}`);
 
-  return defectsRepo.createDefect(defectWithId);
+  return withDefectFileSave({ ...defectWithId, attachmentCommit: body.attachmentCommit }, null, fileActor,
+    normalized => defectsRepo.createDefect(normalized),
+    (_current, normalized) => assertDefectEvidenceRules({ closureFiles: [], partCAttachments: [], vesselId }, normalized));
 }
 
 /**
@@ -706,7 +711,8 @@ export async function assertDefectEvidenceRules(current: any, body: any): Promis
   if (body?.partCAttachments !== undefined && !Array.isArray(body.partCAttachments)) {
     throw Object.assign(new Error('Part C1 attachments must be a list.'), { statusCode: 400 });
   }
-  if (!defectAttachmentAvailability().c1Upload && Array.isArray(body?.partCAttachments)) {
+  const readiness = await getDefectFileReadiness(current.vesselId ?? body.vesselId);
+  if (!readiness.c1Upload && Array.isArray(body?.partCAttachments)) {
     // Unchanged saved/sync-received C1 content remains readable and saveable.
     // Do not allow replacement bytes under an existing ID to bypass readiness.
     const saved = current.partCAttachments ?? [];
@@ -767,7 +773,7 @@ export async function extensionEntrySender(defectRef: string, entryId: string): 
   return { duuid: defect.duuid, sender: entry.requestedByUserId ?? null, status: entry.status ?? null, vesselId: defect.vesselId ?? null };
 }
 
-export async function updateDefect(id: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor) {
+export async function updateDefect(id: string, body: any, actor?: import('./defectsApprovalHooks').DefectActor, fileActor?: DefectFileActor) {
   body = dropRetiredClosureFields(trimDefectIdentityFields(body));
   // Approval gate (B2a, 03-Sep-2026): the generic PATCH is Defects' ONLY live write path,
   // so extension/verification approval writes are detected and routed engine-first HERE,
@@ -788,7 +794,12 @@ export async function updateDefect(id: string, body: any, actor?: import('./defe
   const gated = await gateDefectUpdate(current, body, actor ?? {});
   const partialDefectSchema = insertDefectSchema.partial();
   const validatedData = partialDefectSchema.parse(gated.body);
-  const updated = await defectsRepo.updateDefect(id, validatedData);
+  const updated = await withDefectFileSave({ ...validatedData, attachmentCommit: body.attachmentCommit }, current, fileActor,
+    normalized => defectsRepo.updateDefect(id, normalized),
+    async (locked, normalized) => {
+      await assertDefectEvidenceRules(locked, normalized);
+      applyPartALock(locked, normalized, { userUuid: fileActor!.userUuid, name: fileActor!.name });
+    });
   await recordDefectSubmissions(current, updated);
   const approvalSubmissions: Array<import('./defectsApprovalHooks').ExtensionSubmissionOutcome> = [];
   const recordSubmissionFailure = async (payload: any) => {

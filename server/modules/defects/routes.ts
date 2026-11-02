@@ -4,8 +4,16 @@ import { requirePermission } from '../../middleware/permissions';
 import { requireRole, requireVesselAccess } from '../../middleware/auth';
 import * as defectsCtrl from './controllers/defectsController';
 import * as adminCtrl from './controllers/defectAdminController';
+import * as filesCtrl from './controllers/defectFileController';
 
 const router = Router();
+router.get('/defects/file-readiness', filesCtrl.readiness);
+router.get('/defects/file-peer-reports', filesCtrl.peerReports);
+router.get('/defects/file-staging/:token', filesCtrl.stagedDownload);
+router.post('/defects/file-staging/:section', filesCtrl.authorizeMutation, filesCtrl.uploadBody, filesCtrl.stage);
+router.post('/defects/:defectId/file-staging/:section', filesCtrl.authorizeMutation, filesCtrl.uploadBody, filesCtrl.stage);
+router.get('/defects/:defectId/files/:section/:attachmentId', filesCtrl.download);
+router.get('/defects/:defectId/files/:section/:attachmentId/status', filesCtrl.status);
 
 // ── Permission policy (requirePermission, per-endpoint) ──
 // Vessel daily-operation defect writes STAY OPEN (create/update/close/link/notes,
@@ -51,7 +59,7 @@ router.get('/defects/approval-diagnostics', defectsApprovalView, asyncHandler(de
 router.get('/defects/report-settings', asyncHandler(defectsCtrl.getDefectReportSettings));
 
 // POST /defects — create new defect
-router.post('/defects', asyncHandler(defectsCtrl.createDefect));
+router.post('/defects', filesCtrl.authorizeCommit, asyncHandler(defectsCtrl.createDefect));
 
 // POST /defects/reports/:reportKey — generate defect report
 router.post('/defects/reports/:reportKey', asyncHandler(defectsCtrl.generateReport));
@@ -103,7 +111,7 @@ router.get('/defects/:id/approval-process',
 router.get('/defects/:id', asyncHandler(defectsCtrl.getDefect));
 
 // PATCH  /defects/:id — update defect
-router.patch('/defects/:id', asyncHandler(defectsCtrl.updateDefect));
+router.patch('/defects/:id', filesCtrl.authorizeCommit, asyncHandler(defectsCtrl.updateDefect));
 
 // DELETE /defects/:id — delete defect
 router.delete('/defects/:id', asyncHandler(defectsCtrl.deleteDefect));

@@ -2,6 +2,7 @@ import { officeReviewerRoleRuidsSchema } from "./officeReviewer";
 
 import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { DefectAttachment as DefectFormAttachment } from "./defectAttachments";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { updatedAtColumn, updatedAtColumnTz } from "./schemaHelpers";
@@ -1735,33 +1736,12 @@ export const defects = pgTable("defects", {
     electronicConfirmation?: string;
     requestedAt: string;
   }>>().default([]),
-  // Part A Attachments (stored inline for form wizard)
-  partAAttachments: json("part_a_attachments").$type<Array<{
-    id: string;
-    name: string;
-    size: number;
-    type: string;
-    data: string;
-    uploadedAt: string;
-  }>>().default([]),
+  // Part A compatibility metadata: existing inline files and new private references.
+  partAAttachments: json("part_a_attachments").$type<DefectFormAttachment[]>().default([]),
   // Part C1 documents are independent of Part B. No legacy backfill.
-  partCAttachments: json("part_c_attachments").$type<Array<{
-    id: string;
-    name: string;
-    size: number;
-    type: string;
-    data: string;
-    uploadedAt: string;
-  }>>().default([]),
+  partCAttachments: json("part_c_attachments").$type<DefectFormAttachment[]>().default([]),
   // Part B rectification documentation (existing inline content remains readable)
-  attachments: json("attachments").$type<Array<{
-    id: string;
-    name: string;
-    size: number;
-    type: string;
-    data: string;
-    uploadedAt: string;
-  }>>().default([]),
+  attachments: json("attachments").$type<DefectFormAttachment[]>().default([]),
   // Audit trail
   auditTrail: json("audit_trail").$type<Array<{
     action: string;

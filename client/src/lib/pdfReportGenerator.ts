@@ -60,6 +60,8 @@ export interface TableColumn {
 }
 
 export interface DefectReportPdfData {
+  fileImages?: Array<{ label: string; data: string }>;
+  fileNotes?: string[];
   reportId: string;
   vessel: string;
   category: string;
@@ -1400,6 +1402,22 @@ class PDFReportGenerator {
       }
     }
 
+    if (defectData.fileNotes?.length) {
+      y = this.addFormField(margin, this.checkPageBreak(y + 4, 30), 'Attachments', defectData.fileNotes.join('\n'), contentWidth);
+    }
+    for (const image of defectData.fileImages ?? []) {
+      y = this.checkPageBreak(y + 6, 145);
+      y = this.addFormField(margin, y, 'Attachment image', image.label, contentWidth);
+      try {
+        const dimensions = this.doc.getImageProperties(image.data);
+        const scale = Math.min(contentWidth / dimensions.width, 120 / dimensions.height);
+        const width = dimensions.width * scale, height = dimensions.height * scale;
+        this.doc.addImage(image.data, image.data.startsWith('data:image/png') ? 'PNG' : 'JPEG', margin, y, width, height);
+        y += height + 6;
+      } catch {
+        y = this.addFormField(margin, y, 'Image unavailable', image.label, contentWidth);
+      }
+    }
     this.addFooter(pageWidth, pageHeight, margin);
 
     const timestamp = format(new Date(), 'yyyyMMdd_HHmm');

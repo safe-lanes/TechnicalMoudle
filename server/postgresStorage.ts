@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { defectFileCommitContext } from './modules/defects/services/defectFileContext';
 import { persistMaintenanceHistory, visibleMaintenanceHistory } from './modules/work-orders/utils/maintenanceHistoryPersistence';
 import {
   type ApprovalFieldOverride,
@@ -5351,7 +5352,8 @@ export class PostgresStorage {
   }
 
   async createDefect(defect: InsertDefect): Promise<Defect> {
-    const db = await getDb();
+    const fileCommit = defectFileCommitContext.getStore();
+    const db = fileCommit?.tx ?? await getDb();
     
     // Generate semantic defect ID: D{VesselCode}-{YY}-{Seq}
     // Example: D019-26-0023 (19th vessel, 2026, 23rd defect)
@@ -5425,7 +5427,7 @@ export class PostgresStorage {
         result = await db.insert(defects).values({
           ...defect,
           id: formatDefectNumber(prefix, nextSeq),
-          duuid: randomUUID(),
+          duuid: fileCommit?.duuid ?? randomUUID(),
         }).returning();
         break;
       } catch (e: any) {
@@ -5445,13 +5447,15 @@ export class PostgresStorage {
     }
 
     // Sync field logging — INSERT
-    try { await logFieldChanges('defects', result[0].duuid, defect.vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect create:', e); }
+    if (fileCommit) await logFieldChanges('defects', result[0].duuid, defect.vesselId || null, null, result[0], fileCommit.actorUuid, db);
+    else try { await logFieldChanges('defects', result[0].duuid, defect.vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect create:', e); }
 
     return result[0];
   }
 
   async updateDefect(id: string, data: Partial<InsertDefect>): Promise<Defect> {
-    const db = await getDb();
+    const fileCommit = defectFileCommitContext.getStore();
+    const db = fileCommit?.tx ?? await getDb();
     // Fetch existing row for old values (needed for future sync field logging)
     const existingDefect = await this.getDefect(id);
     if (!existingDefect) {
@@ -5467,7 +5471,8 @@ export class PostgresStorage {
     }
 
     // Sync field logging — UPDATE
-    try { await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, existingDefect, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect update:', e); }
+    if (fileCommit) await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, existingDefect, result[0], fileCommit.actorUuid, db);
+    else try { await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, existingDefect, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect update:', e); }
 
     return result[0];
   }

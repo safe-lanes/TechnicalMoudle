@@ -18,6 +18,7 @@ import { pmsAlertEngine } from "../modules/alerts/services/pmsAlertEngine";
 import { runPruning } from "../modules/sync/pruningService";
 import { runHealthCheck } from "../modules/sync/healthMonitor";
 import { runDriftScan } from "../modules/sync/driftDetector";
+import { cleanupExpiredDefectStages } from "../modules/defects/services/defectFileCleanup";
 
 // Parse an int env var honoring an explicit 0 (a plain `|| default` treats "0" as
 // unset — wrong for jitter, where 0 = "no jitter").
@@ -52,6 +53,7 @@ export class MaintenanceOrchestrator {
     { name: "alerts", intervalMs: Math.max(60_000, envInt("MAINT_ALERTS_INTERVAL_MS", 5 * 60_000)), timeoutMs: TIMEOUT_ALERTS_MS, run: () => pmsAlertEngine.runScan() },
     { name: "health", intervalMs: 6 * 60 * 60_000, timeoutMs: TIMEOUT_HEALTH_MS, run: () => runHealthCheck() },
     { name: "pruning", intervalMs: 24 * 60 * 60_000, timeoutMs: TIMEOUT_PRUNING_MS, run: () => runPruning() },
+    { name: "defect-staging-cleanup", intervalMs: 24 * 60 * 60_000, timeoutMs: 10 * 60_000, run: () => cleanupExpiredDefectStages() },
     // Drift = row value vs its OWN newest field log (local only; ship and shore both).
     // Read-only w.r.t. business data — reports into sync_field_log_failures kind='drift'.
     { name: "drift", intervalMs: 24 * 60 * 60_000, timeoutMs: TIMEOUT_DRIFT_MS, run: () => runDriftScan() },

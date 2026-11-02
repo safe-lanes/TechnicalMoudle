@@ -1,4 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
+import { hasExternalDefectFiles } from '../services/defectFileCommit';
+import { defectFileActor } from '../services/defectFileAccess';
 import { z } from 'zod';
 import { getRbacIdentity, type AuthenticatedRequest } from '../../../middleware/auth';
 import { isShipInstance } from '../../sync/syncRole';
@@ -307,7 +309,8 @@ export async function getDefectApprovalDiagnostics(_req: Request, res: Response)
 
 export async function createDefect(req: Request, res: Response) {
   try {
-    const defect = await defectsService.createDefect(req.body, defectActor(req));
+    const defect = await defectsService.createDefect(req.body, defectActor(req),
+      hasExternalDefectFiles(req.body) ? await defectFileActor(req) : undefined);
     res.status(201).json(defect);
   } catch (error: any) {
     console.error('[DefectRoutes] Error creating defect:', error);
@@ -325,7 +328,8 @@ export async function createDefect(req: Request, res: Response) {
 
 export async function updateDefect(req: Request, res: Response) {
   try {
-    const result = await defectsService.updateDefect(req.params.id, req.body, defectActor(req));
+    const result = await defectsService.updateDefect(req.params.id, req.body, defectActor(req),
+      (hasExternalDefectFiles(req.body) || req.body.attachmentCommit) ? await defectFileActor(req) : undefined);
     // Preserve the historical PATCH response shape (the saved defect remains the
     // top-level object) while exposing the post-save engine outcome explicitly.
     const raw = result.approvalSubmissions[0];

@@ -1,10 +1,12 @@
+import { validateDefectFileKey } from './defectAttachments';
 /** Read-only compatibility resolution. Never copy/reclassify legacy evidence on save. */
 export type EvidenceFile = {
   id: string; name: string; data?: string; url?: string;
+  storageVersion?: number; fileKey?: string; stagedRef?: string; backend?: string;
 };
 export type LegacyEvidenceFile = { datuuid: string; filename: string; url?: string };
 export type ResolvedDefectEvidence = {
-  id: string; name: string; source: 'c1' | 'legacy' | 'unavailable'; href?: string;
+  id: string; name: string; source: 'c1' | 'legacy' | 'unavailable'; href?: string; external?: boolean; staged?: boolean;
 };
 
 function safeEvidenceHref(value?: string): string | undefined {
@@ -18,6 +20,7 @@ export function resolveDefectEvidence(
   c1: readonly EvidenceFile[] = [],
   partB: readonly EvidenceFile[] = [],
   separate: readonly LegacyEvidenceFile[] = [],
+  sessionId?: string,
 ): ResolvedDefectEvidence[] {
   return ids.map((id) => {
     // Prefer C1, then inline Part B, then the same defect's separate legacy rows.
@@ -26,6 +29,15 @@ export function resolveDefectEvidence(
       if (matches.length > 1) return { id, name: id, source: 'unavailable' as const };
       if (matches.length === 1) {
         const file = matches[0];
+        if (file.storageVersion === 1 && file.fileKey) {
+          try {
+            const owner = validateDefectFileKey(file.fileKey);
+            const href = file.stagedRef && sessionId
+              ? `/technical/api/defects/file-staging/${encodeURIComponent(file.stagedRef)}?sessionId=${encodeURIComponent(sessionId)}&backend=${encodeURIComponent(file.backend ?? '')}`
+              : `/technical/api/defects/${owner.defect}/files/${owner.section}/${owner.id}`;
+            return { id, name: file.name, source, href, external: true, staged: Boolean(file.stagedRef) };
+          } catch { return { id, name: file.name, source: 'unavailable' as const }; }
+        }
         return { id, name: file.name, source, href: safeEvidenceHref(file.data ?? file.url) };
       }
     }

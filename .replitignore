@@ -1,1 +1,5 @@
 /generated-artifacts/
+/.private/defect-docs/
+/.private/defect-docs-staging/
+/.private/tenants/*/defect-docs/
+/.private/tenants/*/defect-docs-staging/

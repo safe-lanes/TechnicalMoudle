@@ -21,7 +21,9 @@ import { useQuery } from "@tanstack/react-query";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
-import { FileAttachmentDialog, FileAttachment } from "@/components/FileAttachmentDialog";
+import { DefectAttachmentDialog, defectFileHeaders } from "./DefectAttachmentDialog";
+import { type DefectAttachment, isExternalDefectAttachment } from "@shared/defectAttachments";
+import { prepareDefectPdfAttachments } from "./defectPdfAttachments";
 import { defectAttachmentAvailability, resolveDefectEvidence, defectEvidenceLabel, type LegacyEvidenceFile } from "@shared/defectEvidence";
 import { DefectEvidenceList } from "./DefectEvidenceList";
 import { useVessels } from "@/hooks/useVessels";
@@ -564,14 +566,14 @@ export default function DefectFormWizard({
   const [isViewMode, setIsViewMode] = useState(mode === 'view');
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
-  const [partCAttachments, setPartCAttachments] = useState<FileAttachment[]>([]);
+  const [fileAttachments, setFileAttachments] = useState<DefectAttachment[]>([]);
+  const [partCAttachments, setPartCAttachments] = useState<DefectAttachment[]>([]);
   const [isPartCAttachmentDialogOpen, setIsPartCAttachmentDialogOpen] = useState(false);
-  const attachmentAvailability = defectAttachmentAvailability();
+  const [attachmentSessionId] = useState(() => crypto.randomUUID());
   // QA round 2 (DF-09): ids of uploaded defect files chosen as C1 closure evidence.
   const [closureFiles, setClosureFiles] = useState<string[]>([]);
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
-  const [partAAttachments, setPartAAttachments] = useState<FileAttachment[]>([]);
+  const [partAAttachments, setPartAAttachments] = useState<DefectAttachment[]>([]);
   const [isPartAAttachmentDialogOpen, setIsPartAAttachmentDialogOpen] = useState(false);
   
   // Track created defect ID to prevent duplicate creation
@@ -627,7 +629,11 @@ export default function DefectFormWizard({
     }
   });
   
-  const currentDefect = defect || fetchedDefect;
+  const [savedFileDefect, setSavedFileDefect] = useState<any>(null);
+  const incomingDefect = defect || fetchedDefect;
+  const currentDefect = savedFileDefect && (!incomingDefect ||
+    (incomingDefect.id === savedFileDefect.id && new Date(savedFileDefect.updatedAt).getTime() >= new Date(incomingDefect.updatedAt).getTime()))
+    ? savedFileDefect : incomingDefect;
   const separateEvidence = useQuery<LegacyEvidenceFile[]>({
     queryKey: ["/technical/api/defects", currentDefect?.duuid, "attachments"],
     enabled: Boolean(currentDefect?.duuid),
@@ -637,7 +643,7 @@ export default function DefectFormWizard({
     },
   });
   const resolveEvidence = (ids: string[]) =>
-    resolveDefectEvidence(ids, partCAttachments, fileAttachments, separateEvidence.data ?? []);
+    resolveDefectEvidence(ids, partCAttachments, fileAttachments, separateEvidence.data ?? [], attachmentSessionId);
   const selectedEvidence = resolveEvidence(closureFiles);
   const approvalDefectId = currentDefect?.id ?? params.id ?? createdDefectId ?? null;
   const closureHistory = useQuery<RejectedClosureAttempt[]>({
@@ -803,6 +809,19 @@ export default function DefectFormWizard({
     return () => window.clearTimeout(timer);
   }, [currentExtension.newTargetDate, validDraftExtensionDate]);
 
+  const attachmentVesselUuid = currentDefect?.vesselId ?? form.watch("vesselId");
+  const fileReadiness = useQuery<ReturnType<typeof defectAttachmentAvailability>>({
+    queryKey: ["defect-file-readiness", attachmentVesselUuid],
+    enabled: Boolean(attachmentVesselUuid),
+    queryFn: async () => {
+      const response = await fetch(`/technical/api/defects/file-readiness?vesselUuid=${encodeURIComponent(attachmentVesselUuid)}`, {
+        headers: defectFileHeaders(currentUser ?? undefined), credentials: "include",
+      });
+      if (!response.ok) throw new Error("File compatibility could not be verified.");
+      return response.json();
+    },
+  });
+  const attachmentAvailability = fileReadiness.data ?? defectAttachmentAvailability();
   const extensionPreview = useQuery<ApprovalWorkflowPreviewData>({
     queryKey: ["defect-approval-preview", approvalDefectId, debouncedExtensionDate],
     enabled: isDraftingExtension && Boolean(approvalDefectId) && Boolean(debouncedExtensionDate) && isExtensionDateSettled,
@@ -1049,6 +1068,8 @@ export default function DefectFormWizard({
         partAAttachments: partAAttachments,
         attachments: fileAttachments,
         partCAttachments,
+        ...(attachmentAvailability.externalStorage || [partAAttachments, fileAttachments, partCAttachments].some(files => files.some(isExternalDefectAttachment))
+          ? { attachmentCommit: { sessionId: attachmentSessionId, expectedUpdatedAt: currentDefect?.updatedAt ? new Date(currentDefect.updatedAt).toISOString() : null } } : {}),
         // Preserve saved legacy/unavailable IDs; the API validates new selections.
         closureFiles,
         targetDateExtensions: extensionsOverride ?? targetDateExtensions,
@@ -1057,13 +1078,22 @@ export default function DefectFormWizard({
       // Use createdDefectId if we already created this defect in this session
       const existingId = currentDefect?.id || createdDefectId;
       let approvalSubmission: "submitted" | "not-required" = "not-required";
+      const saveRequest = async (method: string, url: string) => {
+        if (!submitData.attachmentCommit) return apiRequest(method, url, submitData);
+        const response = await fetch(url, { method, credentials: "include",
+          headers: { ...defectFileHeaders(currentUser ?? undefined), "Content-Type": "application/json" },
+          body: JSON.stringify(submitData) });
+        if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+        return response;
+      };
       
         if (existingId) {
-          const response = await apiRequest('PATCH', `/technical/api/defects/${existingId}`, submitData);
+          const response = await saveRequest('PATCH', `/technical/api/defects/${existingId}`);
           // Newer servers return a structured outcome. A persisted defect must remain
           // usable when the post-save engine submission failed.
           let outcome: any = null;
           try { outcome = await response.clone().json(); } catch { /* legacy empty response */ }
+          if (submitData.attachmentCommit && outcome?.id) setSavedFileDefect(outcome);
           const submission = outcome?.approvalSubmission ?? outcome?.approval ?? null;
           if (submission?.status === "succeeded" || submission?.status === "started") {
             approvalSubmission = "submitted";
@@ -1086,7 +1116,7 @@ export default function DefectFormWizard({
           toast({ title: "Defect updated successfully" });
         }
       } else {
-        const response = await apiRequest('POST', '/technical/api/defects', submitData);
+        const response = await saveRequest('POST', '/technical/api/defects');
         try {
           const createdDefect = await response.clone().json();
           const submission = createdDefect?.approvalSubmission ?? createdDefect?.approval ?? null;
@@ -1099,6 +1129,7 @@ export default function DefectFormWizard({
           }
           if (createdDefect && createdDefect.id) {
             setCreatedDefectId(createdDefect.id);
+            if (submitData.attachmentCommit) setSavedFileDefect(createdDefect);
           }
         } catch (e) {
         }
@@ -1325,7 +1356,12 @@ export default function DefectFormWizard({
       : String(rootCauseVal || '');
 
 
+    const pdfAttachments = await prepareDefectPdfAttachments([
+      { section: "part-a", files: partAAttachments }, { section: "part-b", files: fileAttachments },
+      { section: "part-c1", files: partCAttachments },
+    ], currentDefect?.id ?? createdDefectId ?? undefined, attachmentSessionId, defectFileHeaders(currentUser ?? undefined));
     const pdfData: DefectReportPdfData = {
+      ...pdfAttachments,
       reportId: currentDefect?.id || defectId, // QA PDF: the record's id is `id` (e.g. D001-26-0100)
       vessel: vesselName,
       category: data.equipmentCategory || '',
@@ -2893,7 +2929,7 @@ export default function DefectFormWizard({
         initialData={editingAction}
       />
 
-      <FileAttachmentDialog
+      <DefectAttachmentDialog
         open={isAttachmentDialogOpen}
         onOpenChange={setIsAttachmentDialogOpen}
         attachments={fileAttachments}
@@ -2901,9 +2937,11 @@ export default function DefectFormWizard({
         readOnly={isViewMode}
         title="Part B - Rectification Documentation"
         itemName="Rectification"
+        externalStorage={attachmentAvailability.externalStorage} section="part-b" vesselUuid={attachmentVesselUuid}
+        defectId={currentDefect?.id ?? createdDefectId ?? undefined} sessionId={attachmentSessionId} user={currentUser ?? undefined}
       />
 
-      <FileAttachmentDialog
+      <DefectAttachmentDialog
         open={isPartCAttachmentDialogOpen}
         onOpenChange={setIsPartCAttachmentDialogOpen}
         attachments={partCAttachments}
@@ -2911,9 +2949,11 @@ export default function DefectFormWizard({
         readOnly={isViewMode || !isMasterRank || hasPendingExtensionRequest || !attachmentAvailability.c1Upload}
         title="Part C1 - Closure documents"
         itemName="Closure document"
+        externalStorage={attachmentAvailability.externalStorage} section="part-c1" vesselUuid={attachmentVesselUuid}
+        defectId={currentDefect?.id ?? createdDefectId ?? undefined} sessionId={attachmentSessionId} user={currentUser ?? undefined}
       />
 
-      <FileAttachmentDialog
+      <DefectAttachmentDialog
         open={isPartAAttachmentDialogOpen}
         onOpenChange={setIsPartAAttachmentDialogOpen}
         attachments={partAAttachments}
@@ -2921,6 +2961,8 @@ export default function DefectFormWizard({
         readOnly={partALocked}
         title="Part A Attachments - Defect Photos"
         itemName="Defect Photo"
+        externalStorage={attachmentAvailability.externalStorage} section="part-a" vesselUuid={attachmentVesselUuid}
+        defectId={currentDefect?.id ?? createdDefectId ?? undefined} sessionId={attachmentSessionId} user={currentUser ?? undefined}
       />
     </div>
   );
