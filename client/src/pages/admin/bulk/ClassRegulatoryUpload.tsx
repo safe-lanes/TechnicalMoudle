@@ -37,7 +37,7 @@ export default function ClassRegulatoryUpload({ vesselId }: ClassRegulatoryUploa
       templateFileName="class_regulatory_template.xlsx"
       fieldMappings={getClassRegulatoryFieldMappings()}
       vesselId={vesselId}
-      previewColumns={["Component Code", "Certificate Number", "Classification Society", "Survey Type", "Vessel Code", "Action"]}
+      previewColumns={["Component Code", "Certificate Number", "Classification Society", "Survey Type/Category", "Vessel Code", "Action"]}
       onRefreshData={refreshSectionH}
       classRegulatoryReferences={masters.data}
       referenceLoading={masters.isLoading}

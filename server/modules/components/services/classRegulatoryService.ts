@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { auditLog, componentClassRegulatory as entries, components, masterLists, vessels } from "@shared/schema";
 import { classRegulatoryInput, validateClassRegulatoryDates } from "@shared/classRegulatory";
 import { getDb } from "../../../db";
@@ -32,8 +32,17 @@ export async function listClassEntries(componentId: string, actor: SectionHActor
   const db = await getDb();
   await parent(db, componentId, actor);
   if (includeDeleted && !sectionHOfficeCanManage(actor)) throw new ForbiddenError("A verified Office session is required to view removed entries.");
-  return db.select().from(entries).where(and(eq(entries.componentId, componentId), includeDeleted ? undefined : active))
+  const rows = await db.select().from(entries).where(and(eq(entries.componentId, componentId), includeDeleted ? undefined : active))
     .orderBy(asc(entries.sortOrder), asc(entries.ccruuid), asc(entries.id));
+  const keys = Array.from(new Set(rows.map(row => row.surveyTypeKey).filter((key): key is string => !!key)));
+  // Only enrich references on records this actor may already read, including retired
+  // masters. No broader master-list permission or write entitlement is granted.
+  const masters = keys.length ? await db.select({ key: masterLists.listKey, category: masterLists.category })
+    .from(masterLists).where(and(eq(masterLists.listType, "surveyType"), inArray(masterLists.listKey, keys))) : [];
+  return rows.map(row => {
+    const matches = masters.filter(master => master.key === row.surveyTypeKey);
+    return { ...row, surveyTypeCategory: matches.length === 1 ? matches[0].category : null };
+  });
 }
 
 /** Historical UUID migration must be explicitly reconciled, not guessed at first edit. */

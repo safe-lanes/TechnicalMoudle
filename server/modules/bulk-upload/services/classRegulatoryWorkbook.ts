@@ -33,7 +33,8 @@ export function readSectionHWorkbook(buffer: Buffer, name: string, sheetName?: s
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
   if (range.s.r !== 0 || range.e.c !== 9) throw new ValidationError("Use the downloaded ten-column template, with headers in row 1.");
   headers().forEach((header, column) => {
-    if (String(ws[XLSX.utils.encode_cell({ r: 0, c: column })]?.v ?? "").trim() !== header)
+    const submitted = String(ws[XLSX.utils.encode_cell({ r: 0, c: column })]?.v ?? "").trim();
+    if (submitted !== header && !(column === 5 && submitted === "Survey Type"))
       throw new ValidationError(`Column ${column + 1} must be "${header}".`);
   });
   // Bound scans as well as nonempty data rows; reject pathological worksheet ranges early.

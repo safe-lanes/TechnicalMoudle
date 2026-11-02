@@ -13,7 +13,7 @@ import {
 import { ComponentDateInput } from "@/components/pms/ComponentDateInput";
 import ClassRegulatoryAttachments from "@/components/pms/ClassRegulatoryAttachments";
 import { formatComponentDate } from "@/lib/componentDatePresentation";
-import { classSurveyDay, validateClassRegulatoryDates } from "@shared/classRegulatory";
+import { classSurveyDay, surveyTypeCategoryLabel, validateClassRegulatoryDates } from "@shared/classRegulatory";
 import type { ClassRegulatoryEntry } from "@shared/classRegulatory";
 import { Plus, Pencil, Trash2, RotateCcw, X, Save, RefreshCw, ShieldCheck, ShieldAlert } from "lucide-react";
 
@@ -107,7 +107,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   const previousConfirmationContext = useRef({ id, securityScope, principalScope });
   const inFlight = useRef(false);
   const originalDates = useRef({ lastClassSurvey: "", nextSurveyDue: "" });
-  const originalReferences = useRef({ classificationSocietyKey: "", surveyTypeKey: "", classificationSociety: "", surveyType: "" });
+  const originalReferences = useRef({ classificationSocietyKey: "", surveyTypeKey: "", classificationSociety: "", surveyType: "", surveyTypeCategory: null as string | null });
   const previousComponentId = useRef(id);
   const previousPrincipal = useRef(principalScope);
   useEffect(() => {
@@ -288,6 +288,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
       surveyTypeKey: entry?.surveyTypeKey || "",
       classificationSociety: entry?.classificationSociety || "",
       surveyType: entry?.surveyType || "",
+      surveyTypeCategory: entry?.surveyTypeCategory ?? null,
     };
     setFieldErrors({});
     setSaveError("");
@@ -393,7 +394,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
   const societyLabel = (entry: RegulatoryEntry) => entry.classificationSociety || societies.find((x) => x.listKey === entry.classificationSocietyKey)?.listValue || entry.classificationSocietyKey || "—";
   const surveyLabel = (entry: RegulatoryEntry) => {
     const master = surveys.find((x) => x.listKey === entry.surveyTypeKey);
-    return entry.surveyType || master?.listValue || "Unavailable survey type";
+    return surveyTypeCategoryLabel(entry.surveyType || master?.listValue, entry.surveyTypeCategory ?? master?.category);
   };
   const saveEntry = () => {
     const errors = validateClassRegulatoryDates(draft, originalDates.current);
@@ -423,11 +424,11 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
         )}
         {name === "surveyTypeKey" && originalReferences.current.surveyTypeKey && !surveys.some((item) => item.listKey === originalReferences.current.surveyTypeKey) && (
           <option value={originalReferences.current.surveyTypeKey}>
-            {originalReferences.current.surveyType || "Unavailable survey type"}
+            {surveyTypeCategoryLabel(originalReferences.current.surveyType, originalReferences.current.surveyTypeCategory)}
           </option>
         )}
         {(name === "classificationSocietyKey" ? societies : surveys).map((item) => (
-          <option key={item.listKey} value={item.listKey}>{item.listValue}{name === "classificationSocietyKey" && item.country ? ` · ${item.country}` : ""}</option>
+          <option key={item.listKey} value={item.listKey}>{name === "surveyTypeKey" ? surveyTypeCategoryLabel(item.listValue, item.category) : `${item.listValue}${item.country ? ` · ${item.country}` : ""}`}</option>
         ))}
       </select>
       {name === "surveyTypeKey" && originalReferences.current.surveyTypeKey && !surveys.some((item) => item.listKey === originalReferences.current.surveyTypeKey) && (
@@ -505,7 +506,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
           {textField("certificateNumber", "Certificate Number", 100)}
           <div><label className="mb-1 block text-xs font-medium text-gray-600">Last Class Survey</label><ComponentDateInput value={draft.lastClassSurvey} onChange={(v) => setValue("lastClassSurvey", v)} className={inputClass} data-testid="input-last-class-survey" />{fieldErrors.lastClassSurvey && <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.lastClassSurvey}</p>}</div>
           <div><label className="mb-1 block text-xs font-medium text-gray-600">Next Class Survey</label><ComponentDateInput value={draft.nextSurveyDue} onChange={(v) => setValue("nextSurveyDue", v)} className={inputClass} data-testid="input-next-survey-due" />{fieldErrors.nextSurveyDue && <p role="alert" className="mt-1 text-xs text-red-700">{fieldErrors.nextSurveyDue}</p>}</div>
-          {control("surveyTypeKey", "Survey Type", editingId === "new" || !!originalReferences.current.surveyTypeKey)}
+          {control("surveyTypeKey", "Survey Type/Category", editingId === "new" || !!originalReferences.current.surveyTypeKey)}
           {textField("classRequirements", "Class Requirements", 2000, true)}
           <div className="rounded-sm border border-slate-200 bg-slate-50 px-2.5 py-2"><span className="block text-xs font-medium text-gray-600">Class Code</span><span className="text-sm text-slate-700">Assigned from classification society</span></div>
           {textField("information", "Information", 2000, true)}
@@ -542,7 +543,7 @@ export default function ClassRegulatorySection({ componentId, readOnly = false, 
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Certificate Number</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{entry.certificateNumber || "—"}</span></div>
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Last Class Survey</span><span className="block break-words text-sm text-slate-900">{formatComponentDate(entry.lastClassSurvey)}</span>{dateWarning(entry.lastClassSurvey) && <span className="block break-words text-[10px] text-amber-800">{dateWarning(entry.lastClassSurvey)}</span>}</div>
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Next Class Survey</span><span className="block break-words text-sm text-slate-900">{formatComponentDate(entry.nextSurveyDue)}</span>{dateWarning(entry.nextSurveyDue) && <span className="block break-words text-[10px] text-amber-800">{dateWarning(entry.nextSurveyDue)}</span>}</div>
-              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Survey Type</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{surveyLabel(entry)}</span></div>
+              <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Survey Type/Category</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{surveyLabel(entry)}</span></div>
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Class Requirements</span><span className="block whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm text-slate-700">{entry.classRequirements || "—"}</span></div>
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Class Code</span><span className="block break-words [overflow-wrap:anywhere] text-sm text-slate-900">{entry.classCode || "—"}</span></div>
               <div className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Information</span><span className="block whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm text-slate-700">{entry.information || "—"}</span></div>

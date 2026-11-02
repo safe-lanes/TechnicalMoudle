@@ -22,7 +22,7 @@ const values = ["001.010", "DNV", "ABS-123", "01-10-2026", "02-10-2026", "ANN", 
 function workbook(rows = [values], options: any = {}) {
   const book = XLSX.utils.book_new();
   if (options.date1904) book.Workbook = { WBProps: { date1904: true } };
-  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([CLASS_REGULATORY_TEMPLATE_FIELDS.map(f => f.header), ...rows]), "Import");
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([options.headers || CLASS_REGULATORY_TEMPLATE_FIELDS.map(f => f.header), ...rows]), "Import");
   return XLSX.write(book, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 function changed(changes: Record<number, any>) {
@@ -67,6 +67,7 @@ describe("Section H bulk import — isolated PostgreSQL TEMP tables", () => {
     await conn.query(`INSERT INTO pg_temp.master_lists(list_type,list_key,list_value) VALUES
       ('classificationSociety','DNV','Det Norske Veritas'),('classificationSociety','ABS','American Bureau'),
       ('surveyType','ANN','Annual Survey')`);
+    await conn.query("UPDATE pg_temp.master_lists SET category='Class' WHERE list_type='surveyType'");
   });
 
   it("dry-run is read-only; commit uses selected vessel cuuid, not legacy id or the other vessel's code match", async () => {
@@ -225,7 +226,7 @@ describe("Section H bulk import — isolated PostgreSQL TEMP tables", () => {
   });
   it("resolves a unique Survey Type value, previews its value and saves the canonical key and snapshot", async () => {
     const p = await preview([changed({ 5: "Annual Survey" })]);
-    expect(p.rows[0]).toMatchObject({ status: "ok", normalized: { "Survey Type": "Annual Survey" } });
+    expect(p.rows[0]).toMatchObject({ status: "ok", normalized: { "Survey Type/Category": "Annual Survey/Class" } });
     expect(await commit(p.fileToken)).toMatchObject({ created: 1, failed: 0 });
     expect((await conn.query("SELECT survey_type_key,survey_type FROM pg_temp.component_class_regulatory")).rows)
       .toEqual([{ survey_type_key: "ANN", survey_type: "Annual Survey" }]);
@@ -238,7 +239,7 @@ describe("Section H bulk import — isolated PostgreSQL TEMP tables", () => {
     const p = await preview([changed({ 5: "Annual Survey" })]);
     expect(p.summary).toMatchObject({ ok: 0, errors: 1 });
     expect(p.rows[0].errors.join()).toContain('"Annual Survey" matches multiple active Survey Types');
-    expect(p.rows[0].normalized["Survey Type"]).toBe("Annual Survey");
+    expect(p.rows[0].normalized["Survey Type/Category"]).toBe("Annual Survey");
     await expect(commit(p.fileToken)).rejects.toThrow(/errors/);
     expect((await conn.query("SELECT survey_type_key FROM pg_temp.component_class_regulatory")).rows)
       .toEqual([{ survey_type_key: "ANN" }]);
@@ -248,7 +249,7 @@ describe("Section H bulk import — isolated PostgreSQL TEMP tables", () => {
     await conn.query(`INSERT INTO pg_temp.master_lists(list_type,list_key,list_value,category)
       VALUES('surveyType','STT-ANN','Annual Survey','Statutory')`);
     const p = await preview([changed({ 5: "STT-ANN" })]);
-    expect(p.rows[0].normalized["Survey Type"]).toBe("Annual Survey");
+    expect(p.rows[0].normalized["Survey Type/Category"]).toBe("Annual Survey/Statutory");
     expect(await commit(p.fileToken)).toMatchObject({ created: 1, failed: 0 });
     expect((await conn.query("SELECT survey_type_key,survey_type FROM pg_temp.component_class_regulatory")).rows)
       .toEqual([{ survey_type_key: "STT-ANN", survey_type: "Annual Survey" }]);
@@ -279,23 +280,88 @@ describe("Section H bulk import — isolated PostgreSQL TEMP tables", () => {
     await commit((await preview()).fileToken);
     await conn.query("UPDATE pg_temp.master_lists SET is_active=false WHERE list_key='ANN'");
     const p = await preview([changed({ 5: "", 8: "Updated information" })]);
-    expect(p.rows[0].normalized["Survey Type"]).toBe("Annual Survey");
+    expect(p.rows[0].normalized["Survey Type/Category"]).toBe("Annual Survey/Class");
     expect(await commit(p.fileToken)).toMatchObject({ updated: 1, failed: 0 });
     expect((await conn.query("SELECT survey_type_key,survey_type,information FROM pg_temp.component_class_regulatory")).rows)
       .toEqual([{ survey_type_key: "ANN", survey_type: "Annual Survey", information: "Updated information" }]);
   });
-  it("keeps ten import columns with value-only survey references and explicit ambiguity guidance", async () => {
+  it("keeps ten import columns with paired survey references and explicit ambiguity guidance", async () => {
     const template = await classRegulatoryTemplate(vessel);
     const book = XLSX.read(template, { type: "buffer" });
     const reference = XLSX.utils.sheet_to_json(book.Sheets["Master References"], { header: 1 }) as string[][];
-    expect(reference[0]).toEqual(["Classification Society", "Class Code", "Survey Type"]);
-    expect(reference.some(row => row[2] === "Annual Survey")).toBe(true);
+    expect(reference[0]).toEqual(["Classification Society", "Class Code", "Survey Type/Category"]);
+    expect(reference.some(row => row[2] === "Annual Survey/Class")).toBe(true);
     expect(reference.flat()).not.toContain("ANN");
     expect(reference.flat()).toContain("DNV"); // Classification Society codes remain unchanged.
     const guide = XLSX.utils.sheet_to_json(book.Sheets["Field Mapping Guide"], { header: 1 }) as string[][];
-    expect(guide.find(row => row[0] === "Survey Type")?.[1]).toContain("duplicate values are rejected");
+    expect(guide.find(row => row[0] === "Survey Type/Category")?.[1]).toContain("duplicate pairs are rejected");
     expect(XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1 })[0])
       .toEqual(CLASS_REGULATORY_TEMPLATE_FIELDS.map(f => f.header));
+  });
+  it("imports distinct categories using slash labels while persisting only the original keys and value snapshots", async () => {
+    await conn.query(`INSERT INTO pg_temp.master_lists(list_type,list_key,list_value,category)
+      VALUES('surveyType','STT-ANN','Annual Survey','Statutory')`);
+    const p = await preview([
+      changed({ 2: "CLASS", 5: "Annual Survey/Class" }),
+      changed({ 2: "STATUTORY", 5: "Annual Survey/Statutory" }),
+    ]);
+    expect(p.summary).toMatchObject({ ok: 2, errors: 0 });
+    expect(p.rows.map(r => r.normalized["Survey Type/Category"]))
+      .toEqual(["Annual Survey/Class", "Annual Survey/Statutory"]);
+    expect(await commit(p.fileToken)).toMatchObject({ created: 2, failed: 0 });
+    expect((await conn.query("SELECT survey_type_key,survey_type FROM pg_temp.component_class_regulatory ORDER BY certificate_number")).rows)
+      .toEqual([{ survey_type_key: "ANN", survey_type: "Annual Survey" }, { survey_type_key: "STT-ANN", survey_type: "Annual Survey" }]);
+  });
+  it("accepts the old Survey Type header but continues rejecting any other changed or reordered header", async () => {
+    const old = CLASS_REGULATORY_TEMPLATE_FIELDS.map(f => f.header);
+    old[5] = "Survey Type";
+    for (const input of ["ANN", "Annual Survey", "Annual Survey/Class"]) {
+      const p = await previewSectionHImport(actor, vessel, "upsert",
+        workbook([changed({ 5: input })], { headers: old }), "old.xlsx");
+      expect(p.summary.errors).toBe(0);
+      expect(p.columns[5]).toBe("Survey Type/Category");
+      expect(p.rows[0].normalized["Survey Type/Category"]).toBe("Annual Survey/Class");
+    }
+    const invalid = [...old]; [invalid[4], invalid[5]] = [invalid[5], invalid[4]];
+    expect(() => readSectionHWorkbook(workbook([values], { headers: invalid }), "bad.xlsx")).toThrow(/Column 5/);
+    invalid[4] = old[4]; invalid[5] = "Survey";
+    expect(() => readSectionHWorkbook(workbook([values], { headers: invalid }), "bad.xlsx")).toThrow(/Column 6/);
+  });
+  it("rejects duplicate complete pairs and inactive-only composite inputs without modifying masters", async () => {
+    await conn.query(`INSERT INTO pg_temp.master_lists(list_type,list_key,list_value,category)
+      VALUES('surveyType','DUP-ANN','Annual Survey','Class')`);
+    const p = await preview([changed({ 5: "Annual Survey/Class" })]);
+    expect(p.rows[0]).toMatchObject({ status: "error", normalized: { "Survey Type/Category": "Annual Survey/Class" } });
+    expect(p.rows[0].errors.join()).toContain("unique Survey Type/Category pair");
+    await conn.query("UPDATE pg_temp.master_lists SET is_active=false WHERE list_key='DUP-ANN'");
+    expect((await preview([changed({ 5: "Annual Survey/Class" })])).summary.errors).toBe(0);
+    await conn.query("UPDATE pg_temp.master_lists SET is_deleted=true WHERE list_key='ANN'");
+    expect((await preview([changed({ 5: "Annual Survey/Class" })])).summary.errors).toBe(1);
+  });
+  it.each(["ANN", "Annual Survey/Class", ""])("detects category changes after preview for %s, including preserved references", async input => {
+    await commit((await preview()).fileToken);
+    const p = await preview([changed({ 5: input, 8: "Should not save" })]);
+    await conn.query("UPDATE pg_temp.master_lists SET category='Statutory' WHERE list_key='ANN'");
+    expect(await commit(p.fileToken)).toMatchObject({ updated: 0, created: 0, failed: 1 });
+    expect((await conn.query("SELECT information,survey_type_key FROM pg_temp.component_class_regulatory")).rows)
+      .toEqual([{ information: "Information", survey_type_key: "ANN" }]);
+  });
+  it("does not invent categories for incomplete masters or offer them as composite template choices", async () => {
+    await conn.query("UPDATE pg_temp.master_lists SET category=null WHERE list_key='ANN'");
+    expect((await preview([changed({ 5: "Annual Survey/Category unavailable" })])).summary.errors).toBe(1);
+    const legacy = await preview();
+    expect(legacy.summary.errors).toBe(0);
+    expect(legacy.rows[0].normalized["Survey Type/Category"]).toBe("Annual Survey/Category unavailable");
+    const book = XLSX.read(await classRegulatoryTemplate(vessel), { type: "buffer" });
+    expect(XLSX.utils.sheet_to_json(book.Sheets["Master References"], { header: 1 }).flat())
+      .not.toContain("Annual Survey/Category unavailable");
+  });
+  it("compares complete pairs without splitting slash-containing values and detects formatted collisions", async () => {
+    await conn.query("UPDATE pg_temp.master_lists SET list_value='Annual/Occasional Survey' WHERE list_key='ANN'");
+    expect((await preview([changed({ 5: "Annual/Occasional Survey/Class" })])).summary.errors).toBe(0);
+    await conn.query(`INSERT INTO pg_temp.master_lists(list_type,list_key,list_value,category)
+      VALUES('surveyType','SLASH','Annual','Occasional Survey/Class')`);
+    expect((await preview([changed({ 5: "Annual/Occasional Survey/Class" })])).summary.errors).toBe(1);
   });
   it("generates exact template headers and parses strict dates/1904 serial dates/text codes", async () => {
     const template = await classRegulatoryTemplate(vessel);

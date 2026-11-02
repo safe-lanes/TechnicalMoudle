@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { ComponentClassRegulatory } from "./schema";
 
-export type ClassRegulatoryEntry = ComponentClassRegulatory;
+// Read-only display metadata resolved from the saved master key; never persisted.
+export type ClassRegulatoryEntry = ComponentClassRegulatory & { surveyTypeCategory?: string | null };
+
+export function surveyTypeCategoryLabel(value?: string | null, category?: string | null): string {
+  return `${value?.trim() || "Unavailable survey type"}/${category?.trim() || "Category unavailable"}`;
+}
 
 /** Strict calendar day parsing without Date's rollover or timezone conversion. */
 export function classSurveyDay(value: string | null | undefined): string | null {

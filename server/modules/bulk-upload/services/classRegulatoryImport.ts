@@ -3,6 +3,7 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { components, vessels, masterLists, componentClassRegulatory as entries,
   importHistory, importChangeLog, bulkImportHistory, bulkImportErrors } from "@shared/schema";
 import { CLASS_REGULATORY_TEMPLATE_FIELDS } from "@shared/bulkImportTemplateFields";
+import { surveyTypeCategoryLabel } from "@shared/classRegulatory";
 import { getDb } from "../../../db";
 import { getCurrentTenantContext } from "../../../utils/asyncLocalStorage";
 import { ConflictError, ForbiddenError, ValidationError } from "../../shared/errors";
@@ -66,15 +67,20 @@ function entryFingerprint(entry: Entry) {
   return fingerprint(business);
 }
 async function master(db: Connection, type: string, value: string, lock = false) {
-  const query = db.select().from(masterLists).where(and(eq(masterLists.listType, type),
-    or(eq(masterLists.listKey, value), eq(masterLists.listValue, value))));
+  // Compare complete formatted pairs, rather than splitting on "/" (which may
+  // legitimately occur in a value or category). Exact legacy keys retain priority.
+  const query = db.select().from(masterLists).where(type === "surveyType" ? eq(masterLists.listType, type) :
+    and(eq(masterLists.listType, type), or(eq(masterLists.listKey, value), eq(masterLists.listValue, value))));
   const matches = await (lock ? query.for("share") : query);
   const codes = matches.filter(row => row.listKey === value);
-  const candidates = codes.length ? codes : matches.filter(row => row.listValue === value && row.isActive && !row.isDeleted);
+  const eligible = matches.filter(row => row.isActive && !row.isDeleted);
+  const pairs = type === "surveyType" ? eligible.filter(row => row.category?.trim() &&
+    surveyTypeCategoryLabel(row.listValue, row.category) === value) : [];
+  const candidates = codes.length ? codes : pairs.length ? pairs : eligible.filter(row => row.listValue === value);
   if (type === "surveyType" && !codes.length && candidates.length > 1)
-    throw new ValidationError(`Survey Type: "${value}" matches multiple active Survey Types. Use an unambiguous Survey Type value; this row cannot be imported.`);
+    throw new ValidationError(`Survey Type/Category: "${value}" matches multiple active Survey Types. Enter a unique Survey Type/Category pair; this row cannot be imported.`);
   if (candidates.length !== 1 || !candidates[0].isActive || candidates[0].isDeleted) throw new ValidationError(
-    `${type === "classificationSociety" ? "Classification Society" : "Survey Type"}: ${candidates.length > 1 ? "ambiguous master value" : "unknown, inactive or removed master value"}.`);
+    `${type === "classificationSociety" ? "Classification Society" : "Survey Type/Category"}: ${candidates.length > 1 ? "ambiguous master value" : "unknown, inactive or removed master value"}.`);
   return candidates[0];
 }
 async function evaluate(db: Connection, values: Record<string, string>, vesselId: string, mode: ImportMode, lock = false) {
@@ -100,19 +106,27 @@ async function evaluate(db: Connection, values: Record<string, string>, vesselId
   if (values.lastClassSurveyDate) business.lastClassSurvey = importSurveyDate(values.lastClassSurveyDate);
   if (values.nextClassSurvey) business.nextSurveyDue = importSurveyDate(values.nextClassSurvey);
   const selectedMasters: unknown[] = [];
-  let surveyTypeValue = target?.surveyType;
+  let surveyTypeValue = target?.surveyType ? surveyTypeCategoryLabel(target.surveyType) : undefined;
+  if (!values.surveyType && target?.surveyTypeKey) {
+    const query = db.select().from(masterLists).where(and(eq(masterLists.listType, "surveyType"),
+      eq(masterLists.listKey, target.surveyTypeKey)));
+    const retained = await (lock ? query.for("share") : query);
+    surveyTypeValue = surveyTypeCategoryLabel(target.surveyType, retained.length === 1 ? retained[0].category : null);
+    selectedMasters.push(["retainedSurvey", ...retained.map(m => [m.id, m.listKey, m.listValue, m.category, m.isActive, m.isDeleted])]);
+  }
   for (const [field, type, key] of [
     ["classificationSociety", "classificationSociety", "classificationSocietyKey"],
     ["surveyType", "surveyType", "surveyTypeKey"],
   ]) {
     if (!values[field]) {
-      if (!target && proposed !== "skip") throw new ValidationError(`${field === "surveyType" ? "Survey Type" : "Classification Society"} is required for a new entry.`);
+      if (!target && proposed !== "skip") throw new ValidationError(`${field === "surveyType" ? "Survey Type/Category" : "Classification Society"} is required for a new entry.`);
       continue;
     }
     const selected = await master(db, type, values[field], lock);
     business[key] = selected.listKey;
-    if (type === "surveyType") surveyTypeValue = selected.listValue;
-    selectedMasters.push([type, selected.id, selected.listKey, selected.listValue, selected.isActive, selected.isDeleted]);
+    if (type === "surveyType") surveyTypeValue = surveyTypeCategoryLabel(selected.listValue, selected.category);
+    selectedMasters.push([type, selected.id, selected.listKey, selected.listValue, selected.isActive, selected.isDeleted,
+      ...(type === "surveyType" ? [selected.category] : [])]);
   }
   const societyCode = business.classificationSocietyKey || target?.classificationSocietyKey || target?.classCode;
   if (values.classCode) {
@@ -154,7 +168,7 @@ export async function previewSectionHImport(
       result.normalized.action = resolved.proposed;
       result.normalized.Action = resolved.proposed;
       if (!result.errors.length && resolved.surveyTypeValue)
-        result.normalized["Survey Type"] = resolved.surveyTypeValue;
+        result.normalized["Survey Type/Category"] = resolved.surveyTypeValue;
     } catch (error: any) {
       result.errors.push(...(error.fieldErrors ? Object.entries(error.fieldErrors).map(([k, v]) => `${k}: ${v}`) : [error.message]));
     }
@@ -251,7 +265,7 @@ export async function commitSectionHImport(
               live.proposed !== row.proposed || live.target?.id !== row.target?.id ||
               (live.target && entryFingerprint(live.target) !== row.targetFingerprint) ||
               live.masterFingerprint !== row.masterFingerprint)
-            throw new ConflictError("Component or matching record changed after validation; run dry-run again.");
+            throw new ConflictError("Component, matching record or reference master changed after validation; run dry-run again.");
           if (live.proposed === "skip") return "skipped" as const;
           const saved = await writeClassEntryInTransaction(tx, live.component.cuuid, live.business, actor, live.target, "bulk_import");
           await tx.insert(importChangeLog).values({ id: randomUUID(), importHistoryId: id,

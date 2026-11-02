@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { masterLists } from "@shared/schema";
 import { CLASS_REGULATORY_TEMPLATE_FIELDS } from "@shared/bulkImportTemplateFields";
+import { surveyTypeCategoryLabel } from "@shared/classRegulatory";
 import { getDb } from "../../../db";
 import { importVessel } from "./classRegulatoryImport";
 
@@ -23,17 +24,18 @@ export async function classRegulatoryTemplate(vesselId: string) {
   const reference = workbook.addWorksheet("Master References");
   reference.columns = [
     { header: "Classification Society", width: 60 }, { header: "Class Code", width: 25 },
-    { header: "Survey Type", width: 60 },
+    { header: "Survey Type/Category", width: 60 },
   ];
   const societies = masters.filter(m => m.listType === "classificationSociety");
-  const surveys = masters.filter(m => m.listType === "surveyType");
+  const surveys = masters.filter(m => m.listType === "surveyType" && m.category?.trim());
   for (let i = 0; i < Math.max(societies.length, surveys.length); i++)
-    reference.addRow([societies[i]?.listValue, societies[i]?.listKey, surveys[i]?.listValue]);
+    reference.addRow([societies[i]?.listValue, societies[i]?.listKey,
+      surveys[i] ? surveyTypeCategoryLabel(surveys[i].listValue, surveys[i].category) : undefined]);
   for (let row = 2; row <= 1001; row++) {
     if (societies.length) sheet.getCell(row, 2).dataValidation = { type: "list", allowBlank: true,
       formulae: [`'Master References'!$A$2:$A$${societies.length + 1}`], showErrorMessage: true, error: "Select an active Classification Society." };
     if (surveys.length) sheet.getCell(row, 6).dataValidation = { type: "list", allowBlank: true,
-      formulae: [`'Master References'!$C$2:$C$${surveys.length + 1}`], showErrorMessage: true, error: "Select an active Survey Type." };
+      formulae: [`'Master References'!$C$2:$C$${surveys.length + 1}`], showErrorMessage: true, error: "Select an active Survey Type/Category." };
   }
   const guide = workbook.addWorksheet("Field Mapping Guide");
   guide.columns = [{ header: "Field", width: 28 }, { header: "Rule", width: 110 }];

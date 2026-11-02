@@ -937,7 +937,7 @@ export default function UniformBulkUpload({
                   <p className="text-sm text-sky-800">Use the selected vessel’s actual Vessel Code. Blank optional update cells preserve existing values. No attachment files are accepted.</p>
                   <p className="text-xs text-sky-700 mt-1">
                     {referenceLoading
-                      ? "Loading Classification Society and Survey Type reference lists…"
+                      ? "Loading Classification Society and Survey Type/Category reference lists…"
                       : referenceError
                         ? "Reference list preview is unavailable; validation still checks active master values."
                         : classRegulatoryReferences
@@ -1439,7 +1439,7 @@ export default function UniformBulkUpload({
                       <li>Dates accept DD-MM-YYYY text or actual Excel date cells; alternate date strings are not accepted.</li>
                       <li>Certificate Number is trimmed at the ends only; case and internal characters are preserved.</li>
                       <li>Blank optional cells on updates preserve existing values, including master references and the derived Class Code.</li>
-                      <li>Classification Society and Survey Type must match active master entries; missing master data is never created by this import.</li>
+                      <li>Classification Society and Survey Type/Category must match active master entries; missing master data is never created by this import.</li>
                       <li>The workbook contains data only. Supporting document attachments are neither uploaded nor changed.</li>
                     </ul>
                   </div>

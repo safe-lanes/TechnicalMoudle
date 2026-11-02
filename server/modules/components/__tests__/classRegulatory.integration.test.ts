@@ -83,6 +83,23 @@ describe("Section H real PostgreSQL persistence (TEMP tables only)", () => {
     expect((await conn.query("SELECT action_type FROM pg_temp.audit_log ORDER BY id")).rows.map((row: any) => row.action_type))
       .toEqual(["create", "delete", "restore"]);
   });
+  it("enriches scoped read-only entries from their exact master key without rewriting snapshots or granting writes", async () => {
+    const row = await createClassEntry(component, business, actor);
+    await conn.query("INSERT INTO pg_temp.master_user_vessels (user_uuid,vessel_id) VALUES ($1,$2)", [actor.userId, vessel]);
+    const ship = { ...actor, userType: "Ship" as const, canEdit: false };
+    await conn.query("UPDATE pg_temp.master_lists SET category='Class' WHERE list_type='surveyType' AND list_key='CLS-ANN'");
+    expect((await listClassEntries(component, ship))[0]).toMatchObject({
+      id: row.id, surveyType: row.surveyType, surveyTypeKey: "CLS-ANN", surveyTypeCategory: "Class",
+    });
+    await conn.query("UPDATE pg_temp.master_lists SET is_active=false,is_deleted=true,category='Retired Class' WHERE list_type='surveyType' AND list_key='CLS-ANN'");
+    expect((await listClassEntries(component, ship))[0].surveyTypeCategory).toBe("Retired Class");
+    await expect(mutateClassEntry(row.id, { information: "blocked" }, "update", ship)).rejects.toMatchObject({ statusCode: 403 });
+    expect(await mutateClassEntry(row.id, { information: "unrelated edit", surveyTypeKey: "CLS-ANN" }, "update", actor))
+      .toMatchObject({ surveyTypeKey: "CLS-ANN", surveyType: row.surveyType });
+    await conn.query("DELETE FROM pg_temp.master_lists WHERE list_type='surveyType' AND list_key='CLS-ANN'");
+    expect((await listClassEntries(component, ship))[0]).toMatchObject({ surveyType: row.surveyType, surveyTypeCategory: null });
+    await expect(mutateClassEntry(row.id, { surveyTypeCategory: "Forged" }, "update", actor)).rejects.toMatchObject({ statusCode: 400 });
+  });
   it("rolls back the business insert if required audit fails", async () => {
     await conn.query("ALTER TABLE pg_temp.audit_log ADD CONSTRAINT test_audit_refusal CHECK (action_type <> 'create')");
     try {
