@@ -66,7 +66,7 @@ for iss, kind, q, ctx, claims in CASES:
     elif kind == "live":
         ok = r["http"] == 200 and r["gate"] == "answer" and any(t != "search_module_docs" for t in r["tools"]) and bool(nums(r["answer"]))
     else:
-        figure = re.search(r"\*\*\d", r["answer"])
+        figure = re.search(r"\*\*[\d,]+\b(?!\.\d)", r["answer"])  # a bold count, not a bold manual section such as 4.0
         ok = r["http"] == 200 and not figure and r["ms"] < 60000
     print(("PASS " if ok else "FAIL ") + f"{iss:15} {kind:10} {r['ms']:6}ms http {r['http']} gate {r['gate']} tools {r['tools']} nums {nums(r['answer'])[:4]} | {r['answer'][:100]!r}", flush=True)
     out.append({"iss": iss, "kind": kind, "q": q, "ok": ok, **{k: r[k] for k in ("gate", "tools", "ms", "citations")}, "nums": nums(r["answer"]), "head": r["answer"][:300]})
