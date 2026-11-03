@@ -144,7 +144,7 @@ def technical():
     # Technical tools have only rolling ranges: 'last month' must be declined, never answered with the rolling count
     V9 = {"module": "technical", "vesselId": "744cf286-841a-11ed-aa7c-7003bca91a86", "vesselName": "Vessel 9"}
     rolling = (source("technical-dev", "get_work_orders", {"vesselId": V9["vesselId"], "status": "Completed", "dateRange": "month", "limit": 50}, **D) or {}).get("count")
-    decline = r"(can(?:not|['’]t)|unable|not able|does not (?:support|provide|filter)|doesn['’]t|no (?:tool|filter)|only)"
+    decline = r"(can(?:not|['’]t)|couldn['’]t|unable|not able|does not (?:support|provide|filter)|doesn['’]t|no (?:tool|filter)|only)"
     for q in ("How many work orders were completed last month?", "Which work orders were completed last month?", "How many defects were raised in October?"):
         r = chat(CAND, "technical-dev", q, V9, cid("t3"), **D); rl = chat(LIVE, "technical-dev", q, V9, cid("t3l"), **D)
         claims_count = rolling in nums(r["answer"]) and re.search(r"last month|October", r["answer"][:200]) and not re.search(decline, r["answer"], re.I)
