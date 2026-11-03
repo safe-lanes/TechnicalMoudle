@@ -245,6 +245,11 @@ const norm = (v: unknown): unknown => (v === undefined || v === null || v === ''
 const changedValue = (incoming: unknown, current: unknown): boolean =>
   incoming !== undefined && JSON.stringify(norm(incoming)) !== JSON.stringify(norm(current));
 
+// Rejection clears closureFiles to null; the wizard echoes that empty selection as [].
+// Normalize only this field for change detection, never non-empty evidence or other arrays.
+const emptyClosureSelection = (value: unknown): unknown =>
+  Array.isArray(value) && value.length === 0 ? null : value;
+
 const isShip = async (): Promise<boolean> => (await import('../../sync/syncRole')).isShipInstance();
 
 /** Shared C1 guard for the legacy /close route as well as generic PATCH. */
@@ -275,7 +280,9 @@ export async function gateDefectUpdate(
   const onShip = await isShip();
 
   // ── Closure (Part C1) — Master-only permission rule (NOT the engine) ────────────
-  const c1Changed = C1_FIELDS.some((f) => changedValue(out[f], current[f]))
+  const c1Changed = C1_FIELDS.some((f) => f === 'closureFiles'
+    ? changedValue(emptyClosureSelection(out[f]), emptyClosureSelection(current[f]))
+    : changedValue(out[f], current[f]))
     || isClosingStatusTransition(current.status, out.status);
   if (c1Changed && (actor.rankName || '').trim() !== 'Master') {
     throw new AppError(403, 'Only the Master may perform defect closure (Part C1 Closeout).', { code: 'CLOSURE_MASTER_ONLY' });

@@ -613,6 +613,9 @@ export default function DefectFormWizard({
   });
   const [debouncedExtensionDate, setDebouncedExtensionDate] = useState('');
   const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
+  const extensionSubmissionRef = useRef(false);
+  // Preserve request identity across a failed/ambiguous save, including a lost response.
+  const extensionDraftRef = useRef<{ owner: string; entry: ExtensionHistoryRecord } | null>(null);
   
   // Section refs for scroll tracking
   const partARef = useRef<HTMLDivElement>(null);
@@ -2646,7 +2649,7 @@ export default function DefectFormWizard({
                               type="button"
                               onClick={async () => {
                                 // Prevent duplicate submissions
-                                if (isSubmittingExtension) return;
+                                if (extensionSubmissionRef.current) return;
 
                                 // Validate B5 mandatory fields up front and show
                                 // a clear message rather than relying on a silently
@@ -2663,6 +2666,7 @@ export default function DefectFormWizard({
                                   return;
                                 }
 
+                                extensionSubmissionRef.current = true;
                                 setIsSubmittingExtension(true);
 
                                 try {
@@ -2681,7 +2685,13 @@ export default function DefectFormWizard({
                                     return;
                                   }
                                   
-                                  const newExtension = {
+                                  const owner = String(currentDefect?.id || createdDefectId || "new");
+                                  const cached = extensionDraftRef.current;
+                                  const sameDraft = cached?.owner === owner
+                                    && cached.entry.existingTargetDate === existingTargetDate
+                                    && cached.entry.newTargetDate === currentExtension.newTargetDate
+                                    && cached.entry.reasonForExtension === currentExtension.reasonForExtension;
+                                  const newExtension = sameDraft ? cached.entry : {
                                     id: `EXT-${Date.now()}`,
                                     existingTargetDate,
                                     newTargetDate: currentExtension.newTargetDate,
@@ -2689,6 +2699,7 @@ export default function DefectFormWizard({
                                     status: 'Requested' as const,
                                     requestedAt: new Date().toISOString(),
                                   };
+                                  extensionDraftRef.current = { owner, entry: newExtension };
                                   
                                   const updatedExtensions = [...targetDateExtensions, newExtension];
                                   
@@ -2697,6 +2708,7 @@ export default function DefectFormWizard({
                                    const result = await saveDefect(formData, false, false, updatedExtensions);
                                   
                                    if (result.saved) {
+                                    extensionDraftRef.current = null;
                                     setTargetDateExtensions(updatedExtensions);
                                     setShowExtensionForm(false);
                                     if (approvalDefectId !== null) {
@@ -2711,16 +2723,19 @@ export default function DefectFormWizard({
                                      } else {
                                        toast({ title: "Extension request submitted and saved" });
                                      }
-                                  } else {
-                                    toast({ title: "Extension added but save failed. Please click SAVE.", variant: "destructive" });
+                                  } else if (result.kind === "save-in-progress") {
+                                    toast({ title: "Extension not saved", description: "A save is already in progress. Wait for it to finish before submitting the extension.", variant: "destructive" });
                                   }
+                                  // Other failures already have an actionable toast from saveDefect.
+                                  // Keep the draft open and do not claim that an unsaved entry was added.
                                 } finally {
+                                  extensionSubmissionRef.current = false;
                                   setIsSubmittingExtension(false);
                                 }
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                               data-testid="button-submit-extension"
-                              disabled={isSubmittingExtension}
+                              disabled={isSubmittingExtension || isSaving}
                             >
                               {isSubmittingExtension ? 'Saving...' : 'Submit'}
                             </Button>

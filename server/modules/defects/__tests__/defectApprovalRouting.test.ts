@@ -95,6 +95,64 @@ describe('Defects approval routing', () => {
     expect(result.factors.approvedExtensionCount).toBe(0);
   });
 
+  it.each(['Master', 'Chief Engineer'])('allows reopened empty evidence during a new extension for %s', async rankName => {
+    const reopened = { ...baseDefect, status: 'Open', confirmCompleted: false, closureFiles: null,
+      dateCompleted: null, closedByName: null, closedByRank: null };
+    mocks.getDefect.mockResolvedValue(reopened);
+    const newEntry = { id: 'new-request', status: 'Requested', existingTargetDate: '2026-01-01',
+      newTargetDate: '2026-01-31', reasonForExtension: 'More rectification required', requestedAt: '2026-01-02' };
+    const result = await gateDefectUpdate(reopened, {
+      confirmCompleted: false, closureFiles: [], dateCompleted: '', closedByName: '', closedByRank: '',
+      verified: false, targetDateExtensions: [newEntry],
+    }, { userUuid: 'requester-1', rankName });
+    expect(result.body.targetDateExtensions).toHaveLength(1);
+    expect(result.body.targetDateExtensions[0]).toMatchObject({ id: 'new-request', status: 'Requested' });
+    expect(result.postSave).toHaveLength(1);
+    expect(reopened.closureFiles).toBeNull();
+    mocks.engineSubmitOutcome.mockResolvedValue('STARTED');
+    expect(await result.postSave[0]()).toEqual({ status: 'started' });
+    expect(mocks.engineSubmitOutcome).toHaveBeenCalledWith(
+      { moduleId: 'defects', screenId: 'defects-extension', actionId: '' }, reopened.duuid,
+      expect.objectContaining({ extensionId: 'new-request' }), 'vessel-1', 'requester-1',
+    );
+    expect(result.body.targetCloseDate).toBeUndefined();
+  });
+
+  it.each([
+    ['null-to-empty', null, []], ['empty-to-null', [], null],
+    ['unset-to-empty', undefined, []], ['empty-to-empty', [], []],
+  ])('does not mistake empty closure selection %s for a Master-only action', async (_name, stored, echo) => {
+    await expect(gateDefectUpdate({ ...baseDefect, closureFiles: stored },
+      { closureFiles: echo }, { userUuid: 'requester', rankName: 'Chief Engineer' })).resolves.toBeDefined();
+  });
+
+  it.each(['add-evidence', 'remove-evidence', 'change-evidence', 'stale-closeout'])(
+    'still guards meaningful C1 edits during extension submission: %s', async scenario => {
+      const current = { ...baseDefect, confirmCompleted: false,
+        closureFiles: scenario === 'remove-evidence' || scenario === 'change-evidence' ? ['old-file'] : null };
+      const incoming = {
+        closureFiles: scenario === 'add-evidence' || scenario === 'change-evidence' ? ['new-file'] : [],
+        ...(scenario === 'stale-closeout' ? { confirmCompleted: true, closedByName: 'Previous Master' } : {}),
+        targetDateExtensions: [{ id: 'new', status: 'Requested', newTargetDate: '2026-01-31' }],
+      };
+      await expect(gateDefectUpdate(current, incoming, { rankName: 'Chief Engineer' }))
+        .rejects.toMatchObject({ statusCode: 403, details: { code: 'CLOSURE_MASTER_ONLY' } });
+      await expect(gateDefectUpdate(current, incoming, { rankName: 'Master' }))
+        .rejects.toMatchObject({ statusCode: 409, details: { code: 'EXTENSION_PENDING_CLOSEOUT' } });
+    },
+  );
+
+  it('allows unchanged empty evidence with a pending request without changing its governed entry', async () => {
+    const pendingEntry = { id: 'existing-request', status: 'Requested', newTargetDate: '2026-01-31' };
+    const current = { ...baseDefect, closureFiles: null, targetDateExtensions: [pendingEntry] };
+    mocks.pendingEngineRequestInScopes.mockResolvedValue({ request: { requuid: 'request-1' } });
+    const result = await gateDefectUpdate(current, { closureFiles: [], targetDateExtensions: [pendingEntry] },
+      { rankName: 'Chief Engineer' });
+    expect(result.postSave).toHaveLength(0);
+    expect(result.body.targetDateExtensions[0].id).toBe('existing-request');
+    expect(mocks.maybeEngineDecideScoped).not.toHaveBeenCalled();
+  });
+
   it('uses the repeat scope after one approved extension', async () => {
     mocks.getDefect.mockResolvedValue({
       ...baseDefect,
