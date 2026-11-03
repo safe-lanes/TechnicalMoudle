@@ -187,7 +187,7 @@ describe('Consolidated B5 approval display', () => {
     expect(rendered).toContain(`approval-status-${state}-extension`);
     expect(rendered).not.toContain('data-decision="true"');
   });
-  it('keeps Verification and shared default progress headings unchanged', () => {
+  it('keeps shared default progress headings unchanged while C2 explicitly opts out', () => {
     const rendered = html(cardModule.DefectApprovalStatus, { action: 'verification', defectId: 'fixture',
       approval: { data: chain, isLoading: false, error: null }, canEdit: true });
     expect(rendered).toContain('Approval progress');
@@ -195,6 +195,194 @@ describe('Consolidated B5 approval display', () => {
     const shared = html(processModule.ApprovalProcessSection, { blocks: [{ title: 'Verification', process }] });
     expect(shared).toContain('approval-process-section');
     expect(shared).toContain('Verification');
-    expect(wizardSource).toContain('title: "Verification", process: defectApprovalProcess.data?.verification');
+    expect(wizardSource).toContain('scope="verification"');
+    expect(wizardSource).not.toContain('title: "Verification", process: defectApprovalProcess.data?.verification');
+  });
+});
+
+// Render the real C2 JSX, not a reimplementation of its conditions. UI primitives
+// and evidence links are lightweight stand-ins; all display/eligibility rules are real.
+let verificationJsx = '';
+function findVerification(node: ts.Node) {
+  if (ts.isJsxElement(node) && node.children.some(child =>
+    ts.isJsxElement(child) && child.openingElement.tagName.getText(wizardAst) === 'h3' &&
+    child.getText(wizardAst).includes('C2. Verification'))) verificationJsx = node.getText(wizardAst);
+  ts.forEachChild(node, findVerification);
+}
+findVerification(wizardAst);
+const verificationProcess = {
+  subjectType: 'defect-verification', attempts: [
+    { number: 1, events: [event('submitted', 'Closed out — sent for verification'),
+      event('rejected', 'Rejected — Step 1', { remarks: 'Previous closure rejected\nMore evidence required' })] },
+    { number: 2, events: [event('submitted', 'Closed out again — sent for verification'),
+      event('approved', 'Approved — Step 2', { remarks: 'ADMIN OVERRIDE\nVerified evidence' })] },
+  ],
+};
+function renderVerification(overrides: Record<string, any> = {}) {
+  expect(verificationJsx).toContain('scope="verification"');
+  const bindings = {
+    ...wizardBindings, ...cardModule,
+    Input: (props: any) => React.createElement('input', props),
+    DefectEvidenceList: () => React.createElement('a', { href: '/evidence/fixture' }, 'Closure evidence.pdf'),
+    selectedEvidence: [],
+    currentDefect: { id: 'verification-defect', verified: false },
+    verificationDisplay: { date: '2026-11-03', name: 'Recorded Verifier', position: 'Marine Manager' },
+    verificationApproval: { data: chain, isLoading: false, error: null, refetch: vi.fn() },
+    defectApprovalProcess: { data: { verification: verificationProcess, extension: process }, isLoading: false },
+    hasPendingExtensionRequest: false, renderVerificationApproval: true,
+    approvalDefectId: 'verification-defect', canEditDefect: true, isViewMode: false,
+    ...overrides,
+  };
+  const Component = compile(`export default function C2() { return (${verificationJsx}); }`, {}, bindings).default;
+  return html(Component, {});
+}
+
+describe('Consolidated C2 verification display', () => {
+  it('places exactly one compact process below all verification fields, retaining evidence and controls', () => {
+    const rendered = renderVerification();
+    expect(rendered.match(/data-testid="defect-verification-approval-process"/g)).toHaveLength(1);
+    expect(rendered.match(/>Approval process</g)).toHaveLength(1);
+    expect(rendered.indexOf('input-verified-by-office-position')).toBeLessThan(rendered.indexOf('defect-verification-approval-process'));
+    for (const text of ['input-date-verified', 'input-verified-by-name', 'Recorded Verifier', 'Marine Manager',
+      'Closure evidence.pdf', 'data-decision="true"']) expect(rendered).toContain(text);
+    expect(rendered).not.toContain('Approval progress');
+    expect(rendered).not.toContain('approval-process-section');
+    expect(rendered).not.toContain('Requested again');
+    expect(rendered).toContain('readonly=""');
+  });
+  it('retains rejection/recloseout order, maritime timestamps and override remarks', () => {
+    const rendered = renderVerification();
+    for (const text of ['Attempt 1', 'Attempt 2', 'Closed out — sent for verification',
+      'Closed out again — sent for verification', 'Previous closure rejected\nMore evidence required',
+      'Approved — Step 2', 'ADMIN OVERRIDE\nVerified evidence', '03 Nov 2026, 0836 Z']) expect(rendered).toContain(text);
+    expect(rendered.indexOf('Rejected — Step 1')).toBeLessThan(rendered.indexOf('Closed out again'));
+    expect(rendered).toContain('verification-current-pending-step');
+    expect(rendered).toContain('Earlier Approver');
+  });
+  it('keeps history and pending-extension warning while blocking decisions', () => {
+    const rendered = renderVerification({ hasPendingExtensionRequest: true });
+    expect(rendered).toContain('c2-extension-pending-warning');
+    expect(rendered).toContain('Closed out again');
+    expect(rendered).not.toContain('data-decision="true"');
+  });
+  it.each([{ isViewMode: true }, { canEditDefect: false }])('keeps history read-only under %j', restriction => {
+    const rendered = renderVerification(restriction);
+    expect(rendered).toContain('Closed out again');
+    expect(rendered).not.toContain('data-decision="true"');
+  });
+  it.each(['approved', 'returned', 'rejected'])('keeps recorded %s history when decision eligibility hides the controller', requestStatus => {
+    const data = { ...chain, requestStatus };
+    const rendered = renderVerification({
+      verificationApproval: { data, isLoading: false, error: null },
+      renderVerificationApproval: presentation.shouldRenderVerificationApproval({ c1CloseoutComplete: true, chain: data }),
+    });
+    expect(rendered).toContain('Closed out again');
+    expect(rendered).not.toContain('data-decision="true"');
+    expect(rendered).not.toContain('verification-current-pending-step');
+  });
+  it('preserves workflow preview without inventing a pending process from configured steps', () => {
+    const rendered = renderVerification({
+      verificationApproval: { data: { ...chain, requestUuid: null, requestStatus: null }, isLoading: false, error: null },
+      defectApprovalProcess: { data: { verification: { subjectType: 'defect-verification', attempts: [] } }, isLoading: false },
+    });
+    expect(rendered).toContain('Workflow preview');
+    expect(rendered).not.toContain('verification-current-pending-step');
+    expect(rendered).not.toContain('Earlier Approver');
+    expect(rendered).not.toContain('data-decision="true"');
+  });
+  it('does not create a recorded process panel for a new unsaved defect', () => {
+    expect(renderVerification({ currentDefect: null })).not.toContain('defect-verification-approval-process');
+  });
+  it('preserves missing-workflow guidance', () => {
+    const rendered = renderVerification({
+      verificationApproval: { data: { ...chain, hasActiveWorkflow: false, requestUuid: null, requestStatus: null, steps: [] }, isLoading: false, error: null },
+    });
+    expect(rendered).toContain('verification-workflow-missing');
+    expect(rendered).not.toContain('data-decision="true"');
+  });
+  it.each(['loading', 'error', 'ship-unavailable'])('preserves %s guidance without a second progress panel', state => {
+    const error = state === 'error' ? new Error('offline') :
+      state === 'ship-unavailable' ? { code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE', status: 503 } : null;
+    const rendered = renderVerification({
+      verificationApproval: { data: undefined, isLoading: state === 'loading', error, refetch: vi.fn() },
+      defectApprovalProcess: { data: null, isLoading: state === 'loading' },
+    });
+    expect(rendered).toContain(`approval-status-${state}-verification`);
+    expect(rendered).not.toContain('Approval progress');
+    expect(rendered).not.toContain('data-decision="true"');
+    if (state === 'error') expect(rendered).toContain('button-retry-approval-verification');
+  });
+  it('keeps legacy fields and history quiet for verified vessel records even with a stale pending chain', () => {
+    const rendered = renderVerification({
+      currentDefect: { id: 'legacy', verified: true },
+      verificationDisplay: { date: '2026-11-03', name: 'Synced Verifier', position: 'Master', isLegacyVerification: true },
+      verificationApproval: { data: chain, isLoading: false, error: { code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE', status: 503 } },
+    });
+    expect(rendered).toContain('Synced Verifier');
+    expect(rendered).toContain('legacy-verification-note');
+    expect(rendered).toContain('Closed out again');
+    for (const text of ['could not be confirmed', 'reviewed after the next sync', 'verification-current-pending-step',
+      'data-decision="true"']) expect(rendered).not.toContain(text);
+  });
+  it('omits a noisy unavailable panel for a verified vessel without history', () => {
+    const rendered = renderVerification({
+      currentDefect: { id: 'legacy', verified: true },
+      defectApprovalProcess: { data: null, isLoading: false },
+      verificationApproval: { data: undefined, isLoading: false, error: { code: 'APPROVAL_ENGINE_UNAVAILABLE_ON_INSTANCE', status: 503 } },
+    });
+    expect(rendered).not.toContain('defect-verification-approval-process');
+    expect(rendered).not.toContain('could not be confirmed');
+  });
+  it('retains explicit missing actor/time markers for legacy verification history', () => {
+    const rendered = renderVerification({
+      defectApprovalProcess: { data: { verification: { subjectType: 'defect-verification', attempts: [
+        { number: 1, events: [event('approved', 'Approved', { byName: null, byPosition: null, at: null })] },
+      ] } }, isLoading: false },
+    });
+    expect(rendered).toContain('Not Recorded on Not Recorded');
+  });
+});
+
+describe('Recorded decisions refresh the exact process history query', () => {
+  const decisionNode = wizardAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'ApprovalDecisionPanel')!;
+  const decisionCode = `${decisionNode.getText(wizardAst)}\nexport { ApprovalDecisionPanel };`;
+  function elements(tree: any): any[] {
+    if (!tree || typeof tree !== 'object') return [];
+    return [tree, ...React.Children.toArray(tree.props?.children).flatMap(elements)];
+  }
+  it.each(['approve', 'reject'])('refreshes matching history after %s without changing the decision payload', async decision => {
+    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+    const apiRequest = vi.fn().mockResolvedValue({ json: async () => ({}) });
+    const onDecided = vi.fn();
+    let pending: Promise<unknown> | undefined;
+    const decisionValues = { decision, remarks: 'Recorded remark' };
+    const primitive = (props: any) => React.createElement('div', props);
+    const bindings = {
+      ...wizardBindings, Form: primitive, FormField: primitive,
+      useState: () => [false, vi.fn()], useToast: () => ({ toast: vi.fn() }),
+      zodResolver: () => null, decisionSchema: {},
+      useForm: () => ({ control: {}, setValue: vi.fn(), handleSubmit: (submit: any) => () => (pending = submit(decisionValues)) }),
+      queryClient: { invalidateQueries }, apiRequest,
+    };
+    const Panel = compile(decisionCode, {}, bindings).ApprovalDecisionPanel;
+    const tree = Panel({ chain, defectId: 'verification-defect', action: 'verification', canEdit: true, onDecided });
+    elements(tree).find(el => el.props?.['data-testid'] === `button-${decision}-verification`).props.onClick();
+    await pending;
+    expect(apiRequest).toHaveBeenCalledWith('POST', expect.stringContaining('/request-current/decide'), {
+      decision, remarks: 'Recorded remark',
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['/technical/api/defects/', 'verification-defect', 'approval-process'],
+    });
+    expect(onDecided).toHaveBeenCalledOnce();
+  });
+  it('also invalidates process history after a successful form save/closeout', () => {
+    let saveBody = '';
+    function findSave(node: ts.Node) {
+      if (ts.isVariableDeclaration(node) && node.name.getText(wizardAst) === 'saveDefect') saveBody = node.getText(wizardAst);
+      ts.forEachChild(node, findSave);
+    }
+    findSave(wizardAst);
+    expect(saveBody).toContain("['/technical/api/defects/', approvalDefectId, 'approval-process']");
   });
 });

@@ -23,31 +23,45 @@ const EVENT_COLOR: Record<string, string> = {
 };
 
 export interface DefectExtensionApprovalProcessProps {
+  /** Identifies which approval history is being rendered; defaults to the B5 extension scope. */
+  scope?: "extension" | "verification";
   process?: ApprovalProcess | null;
   isLoading?: boolean;
   chain?: DefectApprovalChain | null;
   chainStatus?: "loading" | "error" | "resolved";
+  /** Quietly omit engine-unavailable notices for already verified vessel records. */
+  quietWhenUnavailable?: boolean;
 }
 
 /** One compact process history with current pending-step context when available. */
 export function DefectExtensionApprovalProcess({
+  scope = "extension",
   process,
   isLoading = false,
   chain,
   chainStatus = "resolved",
+  quietWhenUnavailable = false,
 }: DefectExtensionApprovalProcessProps) {
+  const scopePrefix = scope === "verification" ? "verification" : "extension";
   const attempts = Array.isArray(process?.attempts) ? process.attempts : [];
   const hasEvents = attempts.some((attempt) => (attempt.events ?? []).length > 0);
-  const pendingStep = hasEvents && chain && String(chain.requestStatus).toLowerCase() === "pending"
-    ? chain.steps.find((step) => chain.currentStepKey && (step.key || step.stepKey || step.nodeKey) === chain.currentStepKey)
-      ?? chain.steps.find((step) => String(step.status).toLowerCase() === "active")
-      ?? chain.steps.find((step) => (step.slots ?? []).some((slot) => String(slot.status).toLowerCase() === "active"))
-      ?? chain.steps.find((step) => String(step.status).toLowerCase() === "pending")
+  // A workflow preview is not an approval request and must not be presented as process history.
+  const hasPersistedRequest = Boolean(chain?.requestUuid);
+  const processChain = quietWhenUnavailable || (scope === "verification" && !hasPersistedRequest) ? null : chain;
+  const pendingStep = hasEvents && processChain && String(processChain.requestStatus).toLowerCase() === "pending"
+    ? processChain.steps.find((step) => processChain.currentStepKey && (step.key || step.stepKey || step.nodeKey) === processChain.currentStepKey)
+      ?? processChain.steps.find((step) => String(step.status).toLowerCase() === "active")
+      ?? processChain.steps.find((step) => (step.slots ?? []).some((slot) => String(slot.status).toLowerCase() === "active"))
+      ?? processChain.steps.find((step) => String(step.status).toLowerCase() === "pending")
     : undefined;
   const pendingSlots = pendingStep?.slots ?? [];
 
+  // On a vessel the approval engine can be absent even though the saved verification is authoritative.
+  // Keep known events, but do not add a second, unconfirmed-state message (or an empty panel).
+  if (quietWhenUnavailable && attempts.length === 0 && !processChain) return null;
+
   return (
-    <section className="min-w-0 rounded border border-slate-200 bg-white p-3 text-sm" data-testid="defect-extension-approval-process">
+    <section className="min-w-0 rounded border border-slate-200 bg-white p-3 text-sm" data-testid={`defect-${scopePrefix}-approval-process`}>
       <h4 className="mb-2 font-semibold text-slate-800">Approval process</h4>
       {attempts.length > 0 ? attempts.map((attempt, attemptIndex) => {
         const events = Array.isArray(attempt.events) ? attempt.events : [];
@@ -88,43 +102,52 @@ export function DefectExtensionApprovalProcess({
         );
       }) : isLoading ? (
         <>
-          <p className="text-xs text-slate-600" data-testid="extension-process-loading">
+          <p className="text-xs text-slate-600" data-testid={`${scopePrefix}-process-loading`}>
             Loading approval process...
           </p>
-          {chain && <DefectChainProgress chain={chain} title="" />}
+          {processChain && <DefectChainProgress chain={processChain} title="" />}
+          {scope === "verification" && !processChain && chainStatus === "error" && !quietWhenUnavailable && (
+            <p className="mt-2 text-xs text-slate-600" data-testid={`${scopePrefix}-current-chain-unresolved`}>
+              Current approval-chain status could not be confirmed.
+            </p>
+          )}
         </>
-      ) : chain ? (
-        <DefectChainProgress chain={chain} title="" />
+      ) : processChain ? (
+        <DefectChainProgress chain={processChain} title="" />
       ) : (
-        <p className="text-xs text-slate-600 [overflow-wrap:anywhere]" data-testid="extension-process-unavailable">
+        <p className="text-xs text-slate-600 [overflow-wrap:anywhere]" data-testid={`${scopePrefix}-process-unavailable`}>
           {chainStatus === "loading"
             ? "Approval process history is unavailable. Current approval-chain status is still loading."
             : chainStatus === "error"
               ? "Approval process history is unavailable. Current approval-chain status could not be confirmed."
               : process
-                ? "No approval process events are recorded, and no current approval chain was returned."
-                : "Approval process history is unavailable. No current approval chain was returned; historical approval data was not inferred."}
+                ? scope === "verification"
+                  ? "No verification process events are recorded, and no persisted approval request is available."
+                  : "No approval process events are recorded, and no current approval chain was returned."
+                : scope === "verification"
+                  ? "Verification process history is unavailable. No persisted approval request was returned; historical approval data was not inferred."
+                  : "Approval process history is unavailable. No current approval chain was returned; historical approval data was not inferred."}
         </p>
       )}
-      {attempts.length > 0 && !hasEvents && chain && (
-        <DefectChainProgress chain={chain} title="" />
+      {attempts.length > 0 && !hasEvents && processChain && (
+        <DefectChainProgress chain={processChain} title="" />
       )}
-      {attempts.length > 0 && !hasEvents && !chain && chainStatus !== "resolved" && (
+      {attempts.length > 0 && !hasEvents && !processChain && chainStatus !== "resolved" && !quietWhenUnavailable && (
         <p className="mt-2 text-xs text-slate-600">
           {chainStatus === "loading"
             ? "Current approval-step status is still loading."
             : "Current approval-step status could not be confirmed."}
         </p>
       )}
-      {hasEvents && chainStatus !== "resolved" && (
-        <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-600" data-testid="extension-current-chain-unresolved">
+      {hasEvents && chainStatus !== "resolved" && !quietWhenUnavailable && (
+        <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-600" data-testid={`${scopePrefix}-current-chain-unresolved`}>
           {chainStatus === "loading"
             ? "Current approval-step status is still loading."
             : "Current approval-step status could not be confirmed."}
         </p>
       )}
       {pendingStep && (
-        <div className="mt-2 border-t border-slate-100 pt-2" data-testid="extension-current-pending-step">
+        <div className="mt-2 border-t border-slate-100 pt-2" data-testid={`${scopePrefix}-current-pending-step`}>
           <div className="text-xs font-medium text-slate-700">
             Current pending step{pendingStep.label || pendingStep.name ? `: ${pendingStep.label || pendingStep.name}` : ""}
           </div>

@@ -43,10 +43,7 @@ import {
   type DefectApprovalChain,
 } from "@/components/approvals/ApprovalChainProgress";
 import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
-import {
-  ApprovalProcessSection,
-  type ApprovalProcess,
-} from "@/components/approvals/ApprovalProcessSection";
+import type { ApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
 import { DefectExtensionApprovalProcess } from "./DefectExtensionApprovalProcess";
 import {
   Form,
@@ -381,6 +378,7 @@ function ApprovalDecisionPanel({
         queryClient.invalidateQueries({ queryKey: defectApprovalChainQueryKey(defectId, action) }),
         queryClient.invalidateQueries({ queryKey: ["defects"] }),
         queryClient.invalidateQueries({ queryKey: ["/technical/api/defects"] }),
+        queryClient.invalidateQueries({ queryKey: ["/technical/api/defects/", defectId, "approval-process"] }),
       ]);
       onDecided();
       const applyError = approvalDecisionApplyError(result);
@@ -1122,6 +1120,9 @@ export default function DefectFormWizard({
           }
         queryClient.invalidateQueries({ queryKey: ['defects'] });
         queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+        if (approvalDefectId !== null) {
+          void queryClient.invalidateQueries({ queryKey: ['/technical/api/defects/', approvalDefectId, 'approval-process'] });
+        }
         if (showToast) {
           toast({ title: "Defect updated successfully" });
         }
@@ -2888,7 +2889,6 @@ export default function DefectFormWizard({
                       <p className="text-sm font-medium text-gray-600 mb-1">Closure evidence</p>
                       <DefectEvidenceList files={selectedEvidence} />
                     </div>
-                    <ApprovalProcessSection blocks={[{ title: "Verification", process: defectApprovalProcess.data?.verification }]} />
                     {hasPendingExtensionRequest && (
                       <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="c2-extension-pending-warning">
                         Verification is blocked while the extension approval is pending.
@@ -2913,6 +2913,19 @@ export default function DefectFormWizard({
                       <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
                       <Input value={verificationDisplay.position} readOnly data-testid="input-verified-by-office-position" className="h-10 text-sm border-gray-300 bg-gray-100" />
                     </div>
+                    {currentDefect?.id && (
+                      <DefectExtensionApprovalProcess
+                        scope="verification"
+                        process={defectApprovalProcess.data?.verification}
+                        isLoading={defectApprovalProcess.isLoading}
+                        chain={hasPersistedApprovalRequest(verificationApproval.data) ? verificationApproval.data : null}
+                        chainStatus={verificationApproval.isLoading ? "loading" : verificationApproval.error ? "error" : "resolved"}
+                        quietWhenUnavailable={Boolean(
+                          currentDefect.verified === true &&
+                          isApprovalUnavailableOnInstance(verificationApproval.error),
+                        )}
+                      />
+                    )}
                     {!hasPendingExtensionRequest && renderVerificationApproval
                       // Jeevan #8: on the vessel a verified defect needs no "will be reviewed ashore" note
                       && !(currentDefect?.verified && isApprovalUnavailableOnInstance(verificationApproval.error)) && (
@@ -2930,6 +2943,7 @@ export default function DefectFormWizard({
                           approval={verificationApproval}
                           canEdit={canEditDefect && !isViewMode}
                           previewWhenNoRequest
+                          showProgress={false}
                         />
                       )
                     )}
