@@ -22,3 +22,4 @@
 - [Defect matching runtime](defect-matching-runtime.md) — SQL timezone settings do not control PL/V8 Date parsing; verify actual browser and database runtimes independently.
 - [Legacy micro-frontend boundary](micro-frontend-retirement.md) — four missing appraisal exports may retire; preserve the global and remaining integration scaffolding.
 - [SAILERP user-type contract](sailerp-user-type-contract.md) — owner confirms x-user-type is exactly Office or Ship; permissive string transport does not define more values.
+- [Type-diagnostic safety gates](type-diagnostic-safety-gates.md) — scoped type fixes require stopped-workflow verification and separate, task-specific restart/completion approval.
