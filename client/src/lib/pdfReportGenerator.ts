@@ -1,6 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import {
+  formatPdfApprovalActor, formatPdfApprovalTime,
+  type DefectPdfApprovalHistory,
+} from '../pages/defects/defectPdfApprovalHistory';
 
 export function formatReportDateRange(dateFrom?: Date | null, dateTo?: Date | null): string {
   if (!dateFrom && !dateTo) return 'All Time';
@@ -106,7 +110,11 @@ export interface DefectReportPdfData {
     approved: string;
     approvalDate: string;
     approverComments: string;
+    submittedBy?: string;
+    submittedAt?: string;
   }>;
+  /** Saved audit history, independent of the rejected-closure appendix setting. */
+  approvalHistory?: DefectPdfApprovalHistory;
   /** Rejected closure attempts — printed only when the Defects approval setting
    *  'show rejected closures on the printed report' is on (Sahil F1). */
   rejectedClosures?: Array<{
@@ -1153,6 +1161,60 @@ class PDFReportGenerator {
     return y;
   }
 
+  /** Paginate long defect narratives without altering other reports' field layout. */
+  private addDefectNarrative(y: number, label: string, value: string, margin: number, width: number): number {
+    if (!this.doc) return y;
+    y = this.checkPageBreak(y, 14);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setFontSize(8);
+    this.doc.setTextColor(...PDF_COLORS.textLight);
+    this.doc.text(label, margin, y);
+    y += 4;
+    this.doc.setFontSize(9.5);
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    for (const line of this.doc.splitTextToSize(value || '-', width - 2)) {
+      y = this.checkPageBreak(y, 4);
+      this.doc.text(line, margin, y);
+      y += 4;
+    }
+    return y;
+  }
+
+  private addDefectApprovalHistory(
+    y: number, title: string, process: DefectPdfApprovalHistory['extension'], margin: number,
+  ): number {
+    if (!this.doc) return y;
+    y = this.checkPageBreak(y + 4, 30);
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...PDF_COLORS.textDark);
+    this.doc.text(title, margin, y);
+    const body: any[] = [];
+    for (const attempt of process.attempts) {
+      body.push([{ content: `Attempt ${attempt.number}`, colSpan: 4, styles: { fontStyle: 'bold', fillColor: PDF_COLORS.bgLight } }]);
+      if (attempt.events.length === 0) body.push([{ content: 'No approval events recorded for this attempt.', colSpan: 4 }]);
+      for (const event of attempt.events) {
+        body.push([
+          event.label || event.type,
+          formatPdfApprovalActor(event.byName, event.byPosition),
+          formatPdfApprovalTime(event.at),
+          event.remarks || '-',
+        ]);
+      }
+    }
+    if (body.length === 0) body.push([{ content: 'No approval process events recorded. Historical users and decisions were not inferred.', colSpan: 4 }]);
+    autoTable(this.doc, {
+      startY: y + 3, margin: { left: margin, right: margin, top: 15, bottom: 22 },
+      head: [['Step / Action', 'User / Position', 'Date / Time', 'Remarks']], body,
+      showHead: 'everyPage', rowPageBreak: 'avoid',
+      styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2, overflow: 'linebreak', textColor: PDF_COLORS.textDark,
+        lineColor: PDF_COLORS.border, lineWidth: 0.1 },
+      headStyles: { fillColor: PDF_COLORS.bgLight, textColor: PDF_COLORS.textDark, fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 42 }, 1: { cellWidth: 43 }, 2: { cellWidth: 37 }, 3: { cellWidth: 58 } },
+    });
+    return (this.doc as any).lastAutoTable.finalY + 6;
+  }
+
   generateDefectReportPdf(defectData: DefectReportPdfData): void {
     this.doc = new jsPDF({
       orientation: 'portrait',
@@ -1327,15 +1389,24 @@ class PDFReportGenerator {
       y2 = this.addFormField(margin + col2Width, y, 'New Target Date', ext.newTargetDate, col2Width);
       y = Math.max(y1, y2) + 2;
 
-      y = this.addFormField(margin, y, 'Reason for Extension', ext.reasonForExtension, contentWidth);
+      y = this.addDefectNarrative(y, 'Reason for Extension', ext.reasonForExtension, margin, contentWidth);
       y += 4;
 
+      if (ext.submittedBy !== undefined) {
+        y = this.addDefectNarrative(y, 'Submitted By', ext.submittedBy, margin, contentWidth);
+        y = this.addDefectNarrative(y, 'Submitted On', ext.submittedAt || 'Not Recorded', margin, contentWidth);
+        y += 2;
+      }
+      y = this.checkPageBreak(y, 18);
       y1 = this.addFormField(margin, y, 'Approved', ext.approved, col2Width);
       y2 = this.addFormField(margin + col2Width, y, 'Approval Date', ext.approvalDate, col2Width);
       y = Math.max(y1, y2) + 2;
 
-      y = this.addFormField(margin, y, 'Approver Comments', ext.approverComments, contentWidth);
+      y = this.addDefectNarrative(y, 'Approver Comments', ext.approverComments, margin, contentWidth);
       y += 6;
+    }
+    if (defectData.approvalHistory) {
+      y = this.addDefectApprovalHistory(y, 'Extension Approval Process', defectData.approvalHistory.extension, margin);
     }
 
     y = this.checkPageBreak(y, 60);
@@ -1361,7 +1432,7 @@ class PDFReportGenerator {
       y += 2;
     }
 
-    y = this.checkPageBreak(y, 30);
+    y = this.checkPageBreak(y, 40);
     this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(...PDF_COLORS.textDark);
@@ -1376,6 +1447,9 @@ class PDFReportGenerator {
     y2 = this.addFormField(margin + col2Width, y, 'Verified By (Office Position)', defectData.verifiedByOfficePosition, col2Width);
     y = Math.max(y1, y2) + 2;
 
+    if (defectData.approvalHistory) {
+      y = this.addDefectApprovalHistory(y, 'Verification Approval Process', defectData.approvalHistory.verification, margin);
+    }
     const rejected = defectData.rejectedClosures ?? [];
     if (rejected.length > 0) {
       y = this.checkPageBreak(y + 4, 40);
@@ -1403,7 +1477,7 @@ class PDFReportGenerator {
     }
 
     if (defectData.fileNotes?.length) {
-      y = this.addFormField(margin, this.checkPageBreak(y + 4, 30), 'Attachments', defectData.fileNotes.join('\n'), contentWidth);
+      y = this.addDefectNarrative(y + 4, 'Attachments', defectData.fileNotes.join('\n'), margin, contentWidth);
     }
     for (const image of defectData.fileImages ?? []) {
       y = this.checkPageBreak(y + 6, 145);

@@ -24,6 +24,7 @@ import AddActionModal from "@/components/AddActionModal";
 import { DefectAttachmentDialog, defectFileHeaders } from "./DefectAttachmentDialog";
 import { type DefectAttachment, isExternalDefectAttachment } from "@shared/defectAttachments";
 import { prepareDefectPdfAttachments } from "./defectPdfAttachments";
+import { loadDefectPdfApprovalHistory, extensionSubmissionForPdf } from "./defectPdfApprovalHistory";
 import { defectAttachmentAvailability, resolveDefectEvidence, defectEvidenceLabel, type LegacyEvidenceFile } from "@shared/defectEvidence";
 import { DefectEvidenceList } from "./DefectEvidenceList";
 import { useVessels } from "@/hooks/useVessels";
@@ -72,6 +73,7 @@ import {
   hasAuditDisplayValue,
   projectExtensionCardPresentation,
   projectExtensionHistory,
+  orderExtensionHistory,
   projectRejectedClosureAuditFields,
   projectRejectedClosureHistory,
   type ApprovalPreviewStep,
@@ -1344,7 +1346,21 @@ export default function DefectFormWizard({
   };
 
   const handleExportPdf = async () => {
-    const data = form.getValues();
+    const data = structuredClone(form.getValues());
+    let approvalHistory;
+    try {
+      approvalHistory = await loadDefectPdfApprovalHistory(
+        approvalDefectId,
+        defectFileHeaders(currentUser ?? undefined),
+      );
+    } catch (error) {
+      toast({
+        title: "PDF export could not load approval history",
+        description: error instanceof Error ? error.message : "Check your connection and retry Export.",
+        variant: "destructive",
+      });
+      return;
+    }
     // Sahil F1: rejected closure attempts print only when the Defects approval setting is on.
     let showRejectedClosures = false;
     try {
@@ -1373,6 +1389,7 @@ export default function DefectFormWizard({
     ], currentDefect?.id ?? createdDefectId ?? undefined, attachmentSessionId, defectFileHeaders(currentUser ?? undefined));
     const pdfData: DefectReportPdfData = {
       ...pdfAttachments,
+      approvalHistory,
       reportId: currentDefect?.id || defectId, // QA PDF: the record's id is `id` (e.g. D001-26-0100)
       vessel: vesselName,
       category: data.equipmentCategory || '',
@@ -1410,7 +1427,8 @@ export default function DefectFormWizard({
         status: a.status || '',
       })),
       // Sahil E12: every extension, oldest first (was: the latest one only).
-      targetDateExtensions: targetDateExtensions.map((ext) => ({
+      targetDateExtensions: orderExtensionHistory(targetDateExtensions).map((ext) => ({
+        ...extensionSubmissionForPdf(ext.id, currentDefect?.targetDateExtensions ?? []),
         existingTargetDate: formatDate(ext.existingTargetDate),
         newTargetDate: formatDate(ext.newTargetDate),
         reasonForExtension: ext.reasonForExtension || '',
