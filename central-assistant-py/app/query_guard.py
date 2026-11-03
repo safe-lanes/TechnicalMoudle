@@ -350,6 +350,14 @@ def other_module_tab(tool: str, text: str) -> str | None:
     return None
 
 
+def without_unasked_near_miss_type(tool: str, args: dict[str, Any], text: str) -> dict[str, Any]:
+    """'Near misses' means the whole Near Miss screen. The model sometimes added reportTypes ['Near Miss'] on its own (559 vs 1,431
+    for 2024 on the trial copy), so the same question gave two answers. The filter stays only if the user mentions a report type."""
+    if tool != "incident_query_near_misses" or args.get("reportTypes") != ["Near Miss"] or re.search(r"\b(?:report\s+)?types?\b", text or "", re.I):
+        return args
+    return {k: v for k, v in args.items() if k != "reportTypes"}
+
+
 def looks_follow_up(text: str) -> bool:
     return bool(re.search(FOLLOWUP, text or "", re.I))
 

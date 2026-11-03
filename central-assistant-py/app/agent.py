@@ -245,6 +245,7 @@ class ManifestToolset(AbstractToolset[Deps]):
                 out = {"ok": True, "data": decision.refusal()}
             else:
                 args = {k: v for k, v in args.items() if k != "conversation"}
+                args = query_guard.without_unasked_near_miss_type(name, args, deps.user_message)
                 if decision is not None and name in query_guard.AREA_QUERY_TOOLS:
                     # 2-Nov-2026 DECISION: the assistant's guard is the authority. The SAILERP backend receives the COMPLETE
                     # validated filter set as a fresh query (basis 'new'), so it never has to inherit from its own copy of

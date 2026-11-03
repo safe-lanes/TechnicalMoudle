@@ -235,3 +235,12 @@ def test_other_module_tab_refuses_only_foreign_records():
     assert o("crewing_query_assignments", "How many near misses?") is None
     assert o("audit_query_actions", "") is None
 
+
+def test_near_miss_report_type_only_when_the_user_mentions_a_type():
+    from app.query_guard import without_unasked_near_miss_type as w
+    T = "incident_query_near_misses"; A = {"mode": "count", "reportTypes": ["Near Miss"]}
+    assert w(T, A, "How many near misses in 2024?") == {"mode": "count"}
+    assert w(T, A, "How many near misses of report type Near Miss?") == A
+    assert w(T, {"reportTypes": ["Unsafe Act"]}, "unsafe acts") == {"reportTypes": ["Unsafe Act"]}
+    assert w("incident_query_actions", A, "near misses") == A
+
