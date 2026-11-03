@@ -235,7 +235,13 @@ class ManifestToolset(AbstractToolset[Deps]):
                 args = {k: v for k, v in decision.effective.items() if k != "conversation"}
                 print(f"[assistant] query guard {name}: basis={decision.basis} inherited={decision.inherited} "
                       f"violations={[v['kind'] + ':' + str(v.get('filter', '')) for v in decision.violations]}")
-            if decision is not None and decision.violations:
+            other_tab = query_guard.other_module_tab(name, deps.user_message)
+            if other_tab:
+                # 3-Nov-2026: the prompt rule alone still let 2 of 30 repeats answer near misses from observations (a wrong figure).
+                print(f"[assistant] other-module refusal {name} -> {other_tab}")
+                out = {"ok": True, "data": {"ok": False, "code": "other_module", "error": (
+                    f"These records are not held in this module. Tell the user to ask in the {other_tab} assistant tab. Give no figure, not even 0.")}}
+            elif decision is not None and decision.violations:
                 out = {"ok": True, "data": decision.refusal()}
             else:
                 args = {k: v for k, v in args.items() if k != "conversation"}

@@ -215,3 +215,23 @@ def test_round2_keys_have_evidence_rules():
     assert not qg.evidence("extensionStatus", ["pending"], "only vessel Alpha")
     assert qg.evidence("multiCategory", True, "which belong to more than one category?")
     assert not qg.evidence("multiCategory", True, "only vessel Alpha")
+
+
+def test_other_module_tab_refuses_only_foreign_records():
+    from app.query_guard import other_module_tab as o
+    assert o("audit_query_observations", "How many near misses are overdue?") == "Incident"
+    assert o("audit_query_actions", "How many near-miss reports on Desert Rose?") == "Incident"
+    assert o("audit_query_inspections", "How many open MOCs are there?") == "Safety"
+    assert o("safety_query_moc", "How many incidents last year?") == "Incident"
+    assert o("safety_query_risk_assessments", "How many inspections have we completed?") == "Audit"
+    assert o("incident_query_near_misses", "How many safety meetings are recorded?") == "Safety"
+    # its own records, follow-ups, both named, a word inside another word, tools outside the areas: no objection
+    assert o("audit_query_observations", "How many observations are overdue?") is None
+    assert o("incident_query_near_misses", "How many near misses are overdue?") is None
+    assert o("incident_query_actions", "pending incident actions on Gas Mia") is None
+    assert o("audit_query_actions", "list them") is None
+    assert o("audit_query_inspections", "inspections on vessels that also had an incident") is None
+    assert o("audit_query_inspections", "How many inspections at Smsport?") is None
+    assert o("crewing_query_assignments", "How many near misses?") is None
+    assert o("audit_query_actions", "") is None
+

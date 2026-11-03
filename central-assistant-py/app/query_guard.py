@@ -326,6 +326,30 @@ def same(key: str, a: Any, b: Any) -> bool:
     return _norm(key, a) == _norm(key, b)
 
 
+# 3-Nov-2026: record types per SAILERP module. A data tool of one module is refused when the message names another module's
+# records and none of its own (Audit answered "near misses" from observations). Applies to the area tools only.
+_RECORDS = {
+    "audit": r"inspections?|observations?|findings?|preparations?|audit actions?|sire|cdi|risq|vetting",
+    "safety": r"moc|mocs|management of change|risk assessments?|safety meetings?|sms|master reviews?",
+    "incident": r"near[\s-]?miss(?:es)?|snm|incidents?|lessons? learnt|lessons? learned|fleet notifications?",
+}
+_RECORD_RE = {m: re.compile(rf"\b(?:{p})\b", re.I) for m, p in _RECORDS.items()}
+_TAB = {"audit": "Audit", "safety": "Safety", "incident": "Incident"}
+
+
+def other_module_tab(tool: str, text: str) -> str | None:
+    """The tab that holds the records the message asks about, when the tool's own module does not; None = no objection."""
+    module = tool.split("_", 1)[0]
+    if tool not in AREA_QUERY_TOOLS or module not in _RECORD_RE or not text:
+        return None
+    if _RECORD_RE[module].search(text):
+        return None
+    for other, rx in _RECORD_RE.items():
+        if other != module and rx.search(text):
+            return _TAB[other]
+    return None
+
+
 def looks_follow_up(text: str) -> bool:
     return bool(re.search(FOLLOWUP, text or "", re.I))
 

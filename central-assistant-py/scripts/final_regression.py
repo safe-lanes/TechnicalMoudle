@@ -331,8 +331,7 @@ def areas():
     rec("areas", "module switch: same conversation id, Safety does not inherit the Audit query", "LOCAL-PILOT", not any(t.startswith("audit_") for t in (r["tools"] or [])), tools=r["tools"], head=r["answer"][:150])
     for mod, q, tab, bad in (("audit", "How many near misses are overdue?", "incident", "incident_"), ("audit", "How many open MOCs are there?", "safety", "safety_"), ("safety", "How many inspections have we completed?", "audit", "audit_"), ("incident", "How many safety meetings are recorded?", "safety", "safety_")):
         r = chat(CAND, P, q, {"module": mod}, cid("mx"), **AR)
-        data = [t for t in (r["tools"] or []) if t != "search_module_docs"]
-        rec("areas", f"another module's records asked in {mod}: names the {tab} tab, no figure", "LOCAL-PILOT", not data and tab in r["answer"].lower() and not re.search(r"\*\*\d", r["answer"]), tools=r["tools"], head=r["answer"][:170])
+        rec("areas", f"another module's records asked in {mod}: names the {tab} tab, no figure", "LOCAL-PILOT", tab in r["answer"].lower() and not nums(r["answer"]), tools=r["tools"], head=r["answer"][:170])
     # company B: role right refuses, relayed, and its own data elsewhere
     B = dict(userId="369", tenantDomain="kotc", tuid="sail_trial_b")
     r = chat(CAND, P, "How many near misses are overdue?", {"module": "incident"}, cid("b"), **B)
