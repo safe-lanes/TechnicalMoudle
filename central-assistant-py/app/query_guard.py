@@ -42,7 +42,7 @@ FILTER_KEYS: dict[str, set[str]] = {
     "audit_query_observations": {"status", "riskLevels", "inspectionTypes", "categories", "viqChapter", "includeRecommended", "includeLae",
                                  "excludeDryDock", "vessels", "dueWithin", "closedWithin", "inspectionDateWithin", "inspectionDateFrom",
                                  "inspectionDateTo"},
-    "safety_query_moc": {"statuses", "typeOfChange", "initialRisk", "stages", "effectivenessReviewDue", "vessels", "initiatedWithin",
+    "safety_query_moc": {"statuses", "extensionStatus", "typeOfChange", "initialRisk", "stages", "effectivenessReviewDue", "vessels", "initiatedWithin",
                          "initiatedFrom", "initiatedTo", "targetWithin", "targetFrom", "targetTo"},
     "incident_query_incidents": {"categories", "statuses", "severityMin", "severityIn", "vessels", "incidentDateWithin", "incidentDateFrom",
                                  "incidentDateTo", "reportDateWithin"},
