@@ -274,6 +274,87 @@ def auth():
     rec("auth", "conversation separation: same id across instances/modules carries nothing", "LOCAL-PILOT", "crewing_query_assignments" not in (r["tools"] or []), tools=r["tools"], head=r["answer"][:150])
 
 
+
+# ------------------------------------------------------------------------------------------------------------- ALL AREAS
+def areas():
+    AR = dict(userId="301", tenantDomain="rsms", tuid="sail_trial_a"); P = "audit-pilot"
+    def src(tool, args):
+        d = source(P, tool, args, **AR) or {}
+        return d.get("total"), d
+    def ask(label, module, q, tool, args, cid_=None, hist=None, words=None):
+        total, d = src(tool, args)
+        r = chat(CAND, P, q, {"module": module}, cid_ or cid("a"), hist, **AR)
+        hit = total is not None and (total in nums(r["answer"]) or (total == 0 and re.search(r"\b(no|none|zero|0)\b", r["answer"], re.I) is not None))
+        ok = r["gate"] == "answer" and tool in (r["tools"] or []) and hit and (not words or all(w.lower() in r["answer"].lower() for w in words))
+        rec("areas", label, "LOCAL-PILOT", ok, source=total, tools=r["tools"], args=r["args"], head=r["answer"][:210])
+        return r
+    # AUDIT
+    ask("inspections: count", "audit", "How many inspections have we completed in total?", "audit_query_inspections", {"mode": "count"})
+    ask("inspections: type filter", "audit", "How many SIRE inspections are on record?", "audit_query_inspections", {"mode": "count", "inspectionTypes": ["SIRE"]})
+    ask("inspections: vessel filter, other wording", "audit", "What is the inspection count for Desert Rose?", "audit_query_inspections", {"mode": "count", "vessels": ["Desert Rose"]})
+    ask("planned: overdue", "audit", "How many planned inspections are overdue?", "audit_query_planned_inspections", {"mode": "count", "dueStatus": "overdue"})
+    ask("planned: next due view", "audit", "How many vessels are due for a SIRE inspection?", "audit_query_planned_inspections", {"mode": "count", "view": "next_due", "inspectionTypes": ["SIRE"]})
+    ask("preparations: active", "audit", "How many inspection preparations are active right now?", "audit_query_preparations", {"mode": "count"})
+    ask("preparations: archived", "audit", "How many preparations have been archived?", "audit_query_preparations", {"mode": "count", "archived": "archived"})
+    ask("actions: pending", "audit", "How many audit actions are pending?", "audit_query_actions", {"mode": "count"})
+    ask("actions: overdue", "audit", "How many audit actions are past their due date?", "audit_query_actions", {"mode": "count", "status": "overdue"})
+    # follow-ups + paging in Audit
+    c = cid("af"); q1 = "How many audit actions are pending?"
+    r1 = chat(CAND, P, q1, {"module": "audit"}, c, **AR); h = [{"role": "user", "content": q1}, {"role": "assistant", "content": r1["answer"]}]
+    t2, _ = src("audit_query_actions", {"mode": "count", "status": "overdue"})
+    r2 = chat(CAND, P, "how many of those are overdue?", {"module": "audit"}, c, h, **AR); h += [{"role": "user", "content": "how many of those are overdue?"}, {"role": "assistant", "content": r2["answer"]}]
+    rec("areas", "audit actions follow-up keeps the question", "LOCAL-PILOT", t2 in nums(r2["answer"]) and "audit_query_actions" in (r2["tools"] or []), source=t2, args=r2["args"], head=r2["answer"][:170])
+    r3 = chat(CAND, P, "list them", {"module": "audit"}, c, h, **AR); h += [{"role": "user", "content": "list them"}, {"role": "assistant", "content": r3["answer"]}]
+    r4 = chat(CAND, P, "show more", {"module": "audit"}, c, h, **AR)
+    rec("areas", "audit actions list then next page", "LOCAL-PILOT", any('"offset":10' in str(a).replace(" ", "").replace("'", '"') for a in r4["args"]) and r4["gate"] == "answer", args=r4["args"], head=r4["answer"][:170])
+    # SAFETY
+    ask("MOC actions: pending", "safety", "How many MOC actions are still pending?", "safety_query_moc_actions", {"mode": "count"})
+    ask("risk assessments: all", "safety", "How many risk assessments do we have across vessel, office and generic?", "safety_query_risk_assessments", {"mode": "count"})
+    ask("risk assessments: review overdue", "safety", "How many risk assessments are overdue for review?", "safety_query_risk_assessments", {"mode": "count", "reviewOverdue": True})
+    ask("safety meetings: total", "safety", "How many safety meetings are recorded?", "safety_query_safety_meetings", {"mode": "count"})
+    ask("safety meetings: response overdue", "safety", "How many safety meetings have an overdue office response?", "safety_query_safety_meetings", {"mode": "count", "officeResponses": ["overdue"]})
+    ask("SMS: dashboard total", "safety", "How many SMS document changes are on the dashboard?", "safety_query_sms_documents", {"mode": "count"})
+    ask("SMS: revisions in draft", "safety", "How many SMS revisions are in draft?", "safety_query_sms_documents", {"mode": "count", "kinds": ["revision"], "buckets": ["draft"]})
+    ask("master review: total", "safety", "How many master reviews are there?", "safety_query_master_reviews", {"mode": "count"})
+    # INCIDENT
+    ask("near misses: overdue", "incident", "How many near miss reports are overdue?", "incident_query_near_misses", {"mode": "count", "statuses": ["OverDue"]})
+    ask("near misses: dated, year", "incident", "How many near misses were reported in 2024?", "incident_query_near_misses", {"mode": "count", "dateFrom": "2024-01-01", "dateTo": "2024-12-31"})
+    ask("incident actions: pending", "incident", "How many incident and near miss actions are pending?", "incident_query_actions", {"mode": "count"})
+    ask("lessons + fleet: total", "incident", "How many lessons learnt and fleet notifications are there?", "incident_query_lessons_fleet", {"mode": "count"})
+    # missing records never a false zero
+    for mod, q in (("audit", "How many preparations does vessel Zyzzyva Nonexistent have?"), ("safety", "How many safety meetings has vessel Zyzzyva Nonexistent held?"), ("incident", "How many near misses does vessel Zyzzyva Nonexistent have?")):
+        r = chat(CAND, P, q, {"module": mod}, cid("nf"), **AR)
+        rec("areas", f"unknown vessel, {mod}: not found, not 0", "LOCAL-PILOT", bool(re.search(r"couldn|could not|not found|no vessel|unable|can't find|cannot find", r["answer"], re.I)) and not re.search(r"\*\*0\b|\b0 (near|meeting|prep)", r["answer"]), tools=r["tools"], head=r["answer"][:150])
+    # module switching with one conversation id, and tools offered per module
+    same = cid("sw"); chat(CAND, P, "How many planned inspections are overdue?", {"module": "audit"}, same, **AR)
+    r = chat(CAND, P, "how many of those are there?", {"module": "safety"}, same, **AR)
+    rec("areas", "module switch: same conversation id, Safety does not inherit the Audit query", "LOCAL-PILOT", not any(t.startswith("audit_") for t in (r["tools"] or [])), tools=r["tools"], head=r["answer"][:150])
+    for mod, q, tab, bad in (("audit", "How many near misses are overdue?", "incident", "incident_"), ("audit", "How many open MOCs are there?", "safety", "safety_"), ("safety", "How many inspections have we completed?", "audit", "audit_"), ("incident", "How many safety meetings are recorded?", "safety", "safety_")):
+        r = chat(CAND, P, q, {"module": mod}, cid("mx"), **AR)
+        data = [t for t in (r["tools"] or []) if t != "search_module_docs"]
+        rec("areas", f"another module's records asked in {mod}: names the {tab} tab, no figure", "LOCAL-PILOT", not data and tab in r["answer"].lower() and not re.search(r"\*\*\d", r["answer"]), tools=r["tools"], head=r["answer"][:170])
+    # company B: role right refuses, relayed, and its own data elsewhere
+    B = dict(userId="369", tenantDomain="kotc", tuid="sail_trial_b")
+    r = chat(CAND, P, "How many near misses are overdue?", {"module": "incident"}, cid("b"), **B)
+    rec("areas", "company B without the menu right: refusal relayed, no number", "LOCAL-PILOT", bool(re.search(r"permission|cannot|can't|can\u2019t|not permitted|not allowed|access", r["answer"], re.I)) and 30 not in nums(r["answer"]), tools=r["tools"], head=r["answer"][:150])
+    ba = (source(P, "audit_query_inspections", {"mode": "count"}, **B) or {}).get("total"); aa = (source(P, "audit_query_inspections", {"mode": "count"}, **AR) or {}).get("total")
+    r = chat(CAND, P, "How many inspections have we completed in total?", {"module": "audit"}, cid("b2"), **B)
+    rec("areas", "company isolation: company B's own inspections", "LOCAL-PILOT", ba is not None and ba != aa and ba in nums(r["answer"]), source=[ba, aa], head=r["answer"][:130])
+    # masking: names from the new tools never reach the model
+    n = caplen(CAND)
+    rs = source(P, "incident_query_actions", {"mode": "list", "limit": 10}, **AR) or {}
+    rm = source(P, "safety_query_master_reviews", {"mode": "list", "limit": 10}, **AR) or {}
+    rows = (rs.get("rows") or []) + (rm.get("rows") or [])
+    vs = sorted({str(x.get("vesselName")) for x in rows if x.get("vesselName")})
+    people = sorted({str(v) for x in rows for k, v in x.items() if isinstance(v, str) and k.endswith("Name") and k != "vesselName" and len(v) >= 3})
+    resp = sorted({str(x.get("responsibility")) for x in rows if x.get("responsibility")})
+    chat(CAND, P, "List the pending incident and near miss actions", {"module": "incident"}, cid("mk"), **AR)
+    chat(CAND, P, "List the master reviews", {"module": "safety"}, cid("mk2"), **AR)
+    blob = chr(10).join(open(CAPS[CAND]).read().splitlines()[n:])
+    leak_v = [v for v in vs if v in blob]; leak_p = [x for x in people if x in blob]; leak_r = [x for x in resp if x in blob]
+    rec("areas", "masking on the new tools: vessel and person names from results never reach the model", "LOCAL-PILOT", bool(vs) and not leak_v and not leak_p, source={"vessels": len(vs), "people": len(people), "vesselTokens": len(re.findall(r"\[VESSEL_\d+\]", blob))}, note=f"leaks {leak_v[:3]} {leak_p[:3]}; responsibility text samples {resp[:3]}; responsibility text in model requests {leak_r[:3]}")
+
+
 # --------------------------------------------------------------------------------------------------------------- MASKING
 def masking():
     S = dict(userId="1", tenantDomain=None, tuid=None); X = {"module": "crewing"}
@@ -297,7 +378,7 @@ def masking():
     rec("masking", "Technical: fleet vessel name masked in model requests", "LOCAL-PILOT", "WK Frontier Pilot" not in blob and "[VESSEL_" in blob, source={"vesselTokens": len(re.findall(r"\[VESSEL_\d+\]", blob))}, head=r["answer"][:120])
 
 
-SECTIONS = {"technical": technical, "crewing": crewing, "date": date, "auth": auth, "masking": masking}
+SECTIONS = {"areas": areas, "technical": technical, "crewing": crewing, "date": date, "auth": auth, "masking": masking}
 for name in sys.argv[1:] or SECTIONS:
     print(f"======== {name}", flush=True)
     try:
