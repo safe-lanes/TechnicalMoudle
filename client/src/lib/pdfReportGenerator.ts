@@ -1375,7 +1375,7 @@ class PDFReportGenerator {
     const extensions = defectData.targetDateExtensions ?? [];
     for (let extIndex = 0; extIndex < extensions.length; extIndex++) {
       const ext = extensions[extIndex];
-      y = this.checkPageBreak(y, 60);
+      y = this.checkPageBreak(y, 34);
 
       this.doc.setFontSize(10);
       this.doc.setFont('helvetica', 'bold');
@@ -1391,19 +1391,6 @@ class PDFReportGenerator {
 
       y = this.addDefectNarrative(y, 'Reason for Extension', ext.reasonForExtension, margin, contentWidth);
       y += 4;
-
-      if (ext.submittedBy !== undefined) {
-        y = this.addDefectNarrative(y, 'Submitted By', ext.submittedBy, margin, contentWidth);
-        y = this.addDefectNarrative(y, 'Submitted On', ext.submittedAt || 'Not Recorded', margin, contentWidth);
-        y += 2;
-      }
-      y = this.checkPageBreak(y, 18);
-      y1 = this.addFormField(margin, y, 'Approved', ext.approved, col2Width);
-      y2 = this.addFormField(margin + col2Width, y, 'Approval Date', ext.approvalDate, col2Width);
-      y = Math.max(y1, y2) + 2;
-
-      y = this.addDefectNarrative(y, 'Approver Comments', ext.approverComments, margin, contentWidth);
-      y += 6;
     }
     if (defectData.approvalHistory) {
       y = this.addDefectApprovalHistory(y, 'Extension Approval Process', defectData.approvalHistory.extension, margin);

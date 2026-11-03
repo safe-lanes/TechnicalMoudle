@@ -74,13 +74,16 @@ describe('defect report PDF', () => {
     expect(pdf).toContain('rejected.pdf - Legacy evidence');
     expect(pdf).toContain('C2. Verification');
   });
-  it('prints every extension with its number and status', () => {
+  it('prints every extension with its number, dates and reason without standalone decision fields', () => {
     const pdf = render({ targetDateExtensions: [ext(1, 'Approved'), ext(2, 'Approved'), ext(3, 'Rejected')] });
     expect(pdf).toContain('B5. Target Date Extension 1 of 3');
     expect(pdf).toContain('B5. Target Date Extension 3 of 3');
     expect(pdf).toContain('reason 1');
     expect(pdf).toContain('reason 3');
-    expect(pdf).toContain('Rejected');
+    expect(pdf).toContain('01-Sep-2026');
+    expect(pdf).toContain('13-Sep-2026');
+    expect(captured.texts.some(item => item.text === 'Approved')).toBe(false);
+    expect(captured.texts.some(item => item.text === 'Approval Date')).toBe(false);
   });
   it('a single extension keeps the old heading', () => {
     const pdf = render({ targetDateExtensions: [ext(1, 'Approved')] });
@@ -100,7 +103,7 @@ describe('defect report PDF', () => {
       approvalHistory: recordedHistory,
     });
     const text = captured.texts.map(item => item.text).join('\n');
-    for (const expected of ['Entry Submitter (Master)', 'Extension Submitter', 'Intermediate Approver', 'Final Approver',
+    for (const expected of ['Extension Submitter', 'Intermediate Approver', 'Final Approver',
       'First Reviewer', 'Withdrawal Actor', 'Closure Submitter', 'Closure Resubmitter', 'Closure Reviewer',
       'Verification Approver', 'ADMIN OVERRIDE', 'Recorded override explanation', 'Reason for first rejection',
       'Additional closure evidence required', '03 Nov 2026, 0915 Z']) expect(text).toContain(expected);
@@ -111,6 +114,60 @@ describe('defect report PDF', () => {
     expect(text.indexOf('Closure Reviewer')).toBeLessThan(text.indexOf('Closure Resubmitter'));
     expect(captured.width).toBeCloseTo(210, 0);
     expect(captured.height).toBeCloseTo(297, 0);
+  });
+  it.each([1, 3])('removes all duplicate summary fields for %s extension(s) while retaining the complete table', count => {
+    const input = {
+      targetDateExtensions: Array.from({ length: count }, (_, i) => ({
+        ...ext(i + 1, i === 0 ? 'Approved' : 'Rejected'),
+        submittedBy: `Summary-only submitter ${i}`,
+        submittedAt: 'SUMMARY-ONLY-TIMESTAMP',
+        approverComments: `Summary-only comments ${i}`,
+      })),
+      approvalHistory: structuredClone(recordedHistory),
+      dateVerified: '03 Nov 2026', verifiedByName: 'Stored Verified User', verifiedByOfficePosition: 'Marine Manager', verified: true,
+      closureEvidence: 'Evidence remains.pdf - Legacy evidence',
+      rejectedClosures: [{ attemptNumber: '1', rejectionReason: 'Appendix remains' }],
+    };
+    const before = structuredClone(input);
+    render(input);
+    const text = captured.texts.map(item => item.text).join('\n');
+    const labels = captured.texts.map(item => item.text);
+    for (const label of ['Submitted By', 'Submitted On', 'Approved', 'Approval Date', 'Approver Comments']) {
+      expect(labels).not.toContain(label);
+    }
+    expect(text).not.toContain('Summary-only');
+    expect(text).not.toContain('SUMMARY-ONLY-TIMESTAMP');
+    expect(labels.filter(label => label === 'Existing Target Date')).toHaveLength(count);
+    expect(labels.filter(label => label === 'New Target Date')).toHaveLength(count);
+    expect(labels.filter(label => label === 'Reason for Extension')).toHaveLength(count);
+    for (let i = 1; i <= count; i++) expect(text).toContain(`reason ${i}`);
+    expect(labels.filter(label => label === 'Extension Approval Process')).toHaveLength(1);
+    for (const actor of ['Extension Submitter', 'Intermediate Approver', 'Final Approver', 'First Reviewer', 'Withdrawal Actor']) {
+      expect(text).toContain(actor);
+      expect(text.indexOf(actor)).toBeGreaterThan(text.indexOf('Extension Approval Process'));
+    }
+    for (const retained of ['Approved - Step 1', 'Rejected - Step 1', 'ADMIN OVERRIDE',
+      'Recorded override explanation', 'Verification Approval Process', 'Stored Verified User',
+      'Evidence remains.pdf - Legacy evidence', 'C3. Rejected Closure Attempts', 'Appendix remains']) {
+      expect(text).toContain(retained);
+    }
+    expect(input).toEqual(before);
+    const table = captured.texts.find(item => item.text === 'Extension Approval Process')!;
+    const lastReason = captured.texts.filter(item => item.text === `reason ${count}`)[0];
+    if (table.page === lastReason.page) expect(table.y - lastReason.y).toBeLessThan(18);
+    if (process.env.DEFECT_PDF_VISUAL_PATH) {
+      writeFileSync(`${process.env.DEFECT_PDF_VISUAL_PATH}.${count}.pdf`, Buffer.from(captured.raw, 'binary'));
+    }
+  });
+  it('does not fabricate process history from legacy summary properties when history is absent', () => {
+    render({ targetDateExtensions: [{
+      ...ext(1, 'Approved'), submittedBy: 'Summary-only legacy actor', approvalDate: 'SUMMARY-ONLY-DATE',
+    }] });
+    const text = captured.texts.map(item => item.text).join('\n');
+    expect(text).toContain('reason 1');
+    expect(text).not.toContain('Summary-only');
+    expect(text).not.toContain('SUMMARY-ONLY-DATE');
+    expect(text).not.toContain('Extension Approval Process');
   });
   it.each([false, true])('prints rejection decisions independently of the detailed rejected-closure setting %s', setting => {
     const pdf = render({
@@ -149,8 +206,9 @@ describe('defect report PDF', () => {
       fileNotes: ['Legacy evidence remains readable', ...Array.from({ length: 15 }, (_, i) => `Very long attachment filename ${i} - existing synchronized evidence and availability notes are preserved.pdf`)],
     });
     const text = captured.texts.map(item => item.text).join('\n');
-    for (const value of ['LONG REMARK START', 'LONG REMARK END', 'SUMMARY END', 'Approval event 18',
+    for (const value of ['LONG REMARK START', 'LONG REMARK END', 'Approval event 18',
       'Verification accepted', 'Legacy evidence remains readable']) expect(text).toContain(value);
+    expect(text).not.toContain('SUMMARY END');
     expect(captured.pages).toBeGreaterThan(4);
     expect(captured.texts.filter(item => !/^SAIL$|^Page \d+ of \d+$/.test(item.text)).every(item => item.y <= 278)).toBe(true);
     for (let page = 1; page <= captured.pages; page++) {
