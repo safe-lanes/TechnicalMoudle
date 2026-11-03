@@ -236,11 +236,19 @@ def test_other_module_tab_refuses_only_foreign_records():
     assert o("audit_query_actions", "") is None
 
 
-def test_near_miss_report_type_only_when_the_user_mentions_a_type():
-    from app.query_guard import without_unasked_near_miss_type as w
-    T = "incident_query_near_misses"; A = {"mode": "count", "reportTypes": ["Near Miss"]}
-    assert w(T, A, "How many near misses in 2024?") == {"mode": "count"}
-    assert w(T, A, "How many near misses of report type Near Miss?") == A
-    assert w(T, {"reportTypes": ["Unsafe Act"]}, "unsafe acts") == {"reportTypes": ["Unsafe Act"]}
-    assert w("incident_query_actions", A, "near misses") == A
-
+def test_agreed_definitions_completed_and_near_miss():
+    from app.query_guard import apply_area_definitions as a, definition_note as n
+    I, N = "audit_query_inspections", "incident_query_near_misses"
+    assert a(I, {"mode": "count"}, "How many inspections have we completed?") == {"mode": "count", "tab": "history", "statuses": ["Done", "Closed"]}
+    assert a(I, {"statuses": ["Processed"]}, "completed or processed") == {"statuses": ["Processed"]}
+    assert a(I, {"mode": "count"}, "How many SIRE inspections are on record?") == {"mode": "count"}
+    assert a(N, {"mode": "count"}, "How many near misses in 2024?") == {"mode": "count", "reportTypes": ["Near Miss"]}
+    assert a(N, {"mode": "count"}, "How many near-miss reports are overdue?") == {"mode": "count", "reportTypes": ["Near Miss"]}
+    assert a(N, {"reportTypes": ["Unsafe Act"]}, "near misses and unsafe acts") == {"reportTypes": ["Unsafe Act"]}
+    assert a(N, {"mode": "count"}, "near misses of all report types") == {"mode": "count"}
+    assert a(N, {"mode": "count"}, "How many reports are on the Near Miss screen?") == {"mode": "count"}
+    assert a(N, {"mode": "group", "groupBy": ["reportType"]}, "near misses by category") == {"mode": "group", "groupBy": ["reportType"]}
+    assert a(N, {"mode": "count"}, "how many of those are overdue?") == {"mode": "count"}
+    assert a("incident_query_actions", {"mode": "count"}, "near misses") == {"mode": "count"}
+    assert "Unsafe" in n(N, {"reportTypes": ["Near Miss"]}) and n(N, {"reportTypes": ["Unsafe Act"]}) is None
+    assert "Done" in n(I, {"statuses": ["Closed", "Done"]}) and n(I, {"mode": "count"}) is None

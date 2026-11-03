@@ -289,7 +289,8 @@ def areas():
         rec("areas", label, "LOCAL-PILOT", ok, source=total, tools=r["tools"], args=r["args"], head=r["answer"][:210])
         return r
     # AUDIT
-    ask("inspections: count", "audit", "How many inspections have we completed in total?", "audit_query_inspections", {"mode": "count"})
+    ask("completed inspections = Done + Closed, with the note", "audit", "How many inspections have we completed in total?", "audit_query_inspections", {"mode": "count", "tab": "history", "statuses": ["Done", "Closed"]}, words=["Done", "Closed"])
+    ask("History tab total is a different question", "audit", "How many inspections are in the History tab?", "audit_query_inspections", {"mode": "count"})
     ask("inspections: type filter", "audit", "How many SIRE inspections are on record?", "audit_query_inspections", {"mode": "count", "inspectionTypes": ["SIRE"]})
     ask("inspections: vessel filter, other wording", "audit", "What is the inspection count for Desert Rose?", "audit_query_inspections", {"mode": "count", "vessels": ["Desert Rose"]})
     ask("planned: overdue", "audit", "How many planned inspections are overdue?", "audit_query_planned_inspections", {"mode": "count", "dueStatus": "overdue"})
@@ -317,8 +318,10 @@ def areas():
     ask("SMS: revisions in draft", "safety", "How many SMS revisions are in draft?", "safety_query_sms_documents", {"mode": "count", "kinds": ["revision"], "buckets": ["draft"]})
     ask("master review: total", "safety", "How many master reviews are there?", "safety_query_master_reviews", {"mode": "count"})
     # INCIDENT
-    ask("near misses: overdue", "incident", "How many near miss reports are overdue?", "incident_query_near_misses", {"mode": "count", "statuses": ["OverDue"]})
-    ask("near misses: dated, year", "incident", "How many near misses were reported in 2024?", "incident_query_near_misses", {"mode": "count", "dateFrom": "2024-01-01", "dateTo": "2024-12-31"})
+    ask("near misses overdue = type Near Miss, unsafe types named", "incident", "How many near miss reports are overdue?", "incident_query_near_misses", {"mode": "count", "statuses": ["OverDue"], "reportTypes": ["Near Miss"]}, words=["Unsafe"])
+    ask("near misses in a year = type Near Miss", "incident", "How many near misses were reported in 2024?", "incident_query_near_misses", {"mode": "count", "dateFrom": "2024-01-01", "dateTo": "2024-12-31", "reportTypes": ["Near Miss"]}, words=["Unsafe"])
+    ask("unsafe acts are their own count", "incident", "How many unsafe acts were reported in 2024?", "incident_query_near_misses", {"mode": "count", "dateFrom": "2024-01-01", "dateTo": "2024-12-31", "reportTypes": ["Unsafe Act"]})
+    ask("whole screen when asked", "incident", "How many reports of all types are on the Near Miss screen?", "incident_query_near_misses", {"mode": "count"})
     ask("incident actions: pending", "incident", "How many incident and near miss actions are pending?", "incident_query_actions", {"mode": "count"})
     ask("lessons + fleet: total", "incident", "How many lessons learnt and fleet notifications are there?", "incident_query_lessons_fleet", {"mode": "count"})
     # missing records never a false zero
@@ -336,7 +339,7 @@ def areas():
     B = dict(userId="369", tenantDomain="kotc", tuid="sail_trial_b")
     r = chat(CAND, P, "How many near misses are overdue?", {"module": "incident"}, cid("b"), **B)
     rec("areas", "company B without the menu right: refusal relayed, no number", "LOCAL-PILOT", bool(re.search(r"permission|cannot|can't|can\u2019t|not permitted|not allowed|access", r["answer"], re.I)) and 30 not in nums(r["answer"]), tools=r["tools"], head=r["answer"][:150])
-    ba = (source(P, "audit_query_inspections", {"mode": "count"}, **B) or {}).get("total"); aa = (source(P, "audit_query_inspections", {"mode": "count"}, **AR) or {}).get("total")
+    ba = (source(P, "audit_query_inspections", {"mode": "count", "tab": "history", "statuses": ["Done", "Closed"]}, **B) or {}).get("total"); aa = (source(P, "audit_query_inspections", {"mode": "count", "tab": "history", "statuses": ["Done", "Closed"]}, **AR) or {}).get("total")
     r = chat(CAND, P, "How many inspections have we completed in total?", {"module": "audit"}, cid("b2"), **B)
     rec("areas", "company isolation: company B's own inspections", "LOCAL-PILOT", ba is not None and ba != aa and ba in nums(r["answer"]), source=[ba, aa], head=r["answer"][:130])
     # masking: names from the new tools never reach the model

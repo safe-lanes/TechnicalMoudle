@@ -350,12 +350,33 @@ def other_module_tab(tool: str, text: str) -> str | None:
     return None
 
 
-def without_unasked_near_miss_type(tool: str, args: dict[str, Any], text: str) -> dict[str, Any]:
-    """'Near misses' means the whole Near Miss screen. The model sometimes added reportTypes ['Near Miss'] on its own (559 vs 1,431
-    for 2024 on the trial copy), so the same question gave two answers. The filter stays only if the user mentions a report type."""
-    if tool != "incident_query_near_misses" or args.get("reportTypes") != ["Near Miss"] or re.search(r"\b(?:report\s+)?types?\b", text or "", re.I):
-        return args
-    return {k: v for k, v in args.items() if k != "reportTypes"}
+_COMPLETED_RE = re.compile(r"\b(?:completed?|finished)\b", re.I)
+_NEAR_MISS_RE = re.compile(r"\bnear[\s-]?miss(?:es)?\b", re.I)
+_ALL_REPORT_TYPES_RE = re.compile(r"\bunsafe\b|\breport\s+types?\b|\btypes?\b|\ball\s+reports\b|\bevery\s+report\b|\bscreen\b", re.I)
+COMPLETED_STATUSES = ["Done", "Closed"]
+COMPLETED_NOTE = "Completed means status Done or Closed. The History tab also lists inspections in other statuses, such as Processed or Uploaded."
+NEAR_MISS_NOTE = "This counts report type Near Miss only. Unsafe Acts and Unsafe Conditions are separate report types and are not included."
+
+
+def apply_area_definitions(tool: str, args: dict[str, Any], text: str) -> dict[str, Any]:
+    """3-Nov-2026 (Astra): 'completed inspections' = Done + Closed; 'near misses' = report type Near Miss. Applied by the server on
+    the words of the user's message, so the same question always gets the same population. A status or type the user names wins."""
+    text = text or ""
+    if tool == "audit_query_inspections" and _COMPLETED_RE.search(text) and not args.get("statuses"):
+        return {**args, "tab": "history", "statuses": list(COMPLETED_STATUSES)}
+    if (tool == "incident_query_near_misses" and _NEAR_MISS_RE.search(text) and not args.get("reportTypes")
+            and "reportType" not in (args.get("groupBy") or []) and not _ALL_REPORT_TYPES_RE.search(text)):
+        return {**args, "reportTypes": ["Near Miss"]}
+    return args
+
+
+def definition_note(tool: str, args: dict[str, Any]) -> str | None:
+    """The sentence the answer must carry when one of the agreed definitions shaped the query."""
+    if tool == "audit_query_inspections" and sorted(args.get("statuses") or []) == sorted(COMPLETED_STATUSES):
+        return COMPLETED_NOTE
+    if tool == "incident_query_near_misses" and (args.get("reportTypes") or []) == ["Near Miss"]:
+        return NEAR_MISS_NOTE
+    return None
 
 
 def looks_follow_up(text: str) -> bool:

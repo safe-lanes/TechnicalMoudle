@@ -245,7 +245,7 @@ class ManifestToolset(AbstractToolset[Deps]):
                 out = {"ok": True, "data": decision.refusal()}
             else:
                 args = {k: v for k, v in args.items() if k != "conversation"}
-                args = query_guard.without_unasked_near_miss_type(name, args, deps.user_message)
+                args = query_guard.apply_area_definitions(name, args, deps.user_message)
                 if decision is not None and name in query_guard.AREA_QUERY_TOOLS:
                     # 2-Nov-2026 DECISION: the assistant's guard is the authority. The SAILERP backend receives the COMPLETE
                     # validated filter set as a fresh query (basis 'new'), so it never has to inherit from its own copy of
@@ -261,6 +261,9 @@ class ManifestToolset(AbstractToolset[Deps]):
             if out.get("ok") is False and "timed out" in str(out.get("error") or ""):
                 deps.partial = True
             result = out.get("data") if out.get("ok") else {"error": out.get("error")}
+            note = query_guard.definition_note(name, args) if not other_tab else None
+            if note and isinstance(result, dict) and result.get("ok") is True:
+                result["answerNote"] = note
             envelope = (deps.ui_module == "crewing" and name in query_guard.QUERY_TOOLS) or name in self._tagged
             if envelope and isinstance(result, dict):
                 p = query_guard.paging_summary(result)
@@ -531,8 +534,8 @@ AREA_DATA_RULES = (
     "RULE — statuses: use the status, stage and type words the tool returns; never rename, merge or re-derive them. "
     "RULE — filters: put every condition the user states into ONE tool call (vessel, fleet or group, type or category, status "
     "or stage, period, severity, responsibility). Add no filter the user did not state: the name of a record type is not a filter. "
-    "'Near misses' means every report on the Near Miss screen, of any report type; 'completed inspections' means the History tab "
-    "with no status filter; 'vessels due for an inspection' means the next-due view with no dueStatus filter, because overdue vessels "
+    "'Near misses' means report type Near Miss, and 'completed inspections' means status Done or Closed in the History tab; the server "
+    "applies both. If the result has `answerNote`, include it in the answer, in its words. 'Vessels due for an inspection' means the next-due view with no dueStatus filter, because overdue vessels "
     "are due too; 'incident and near miss actions' means one call with both sources. Filter by a report type or status "
     "only when the user names that type or status. Never merge two result lists yourself. Pass vessel names exactly as the user "
     "wrote them; the server resolves them. If the message starts with an [App context] line naming a vessel and the user names "
