@@ -327,7 +327,7 @@ def areas():
     # missing records never a false zero
     for mod, q in (("audit", "How many preparations does vessel Zyzzyva Nonexistent have?"), ("safety", "How many safety meetings has vessel Zyzzyva Nonexistent held?"), ("incident", "How many near misses does vessel Zyzzyva Nonexistent have?")):
         r = chat(CAND, P, q, {"module": mod}, cid("nf"), **AR)
-        rec("areas", f"unknown vessel, {mod}: not found, not 0", "LOCAL-PILOT", bool(re.search(r"couldn|could not|not found|no vessel|unable|can't find|cannot find", r["answer"], re.I)) and not re.search(r"\*\*0\b|\b0 (near|meeting|prep)", r["answer"]), tools=r["tools"], head=r["answer"][:150])
+        rec("areas", f"unknown vessel, {mod}: not found, not 0", "LOCAL-PILOT", bool(re.search(r"couldn|could not|not found|no vessel|unable|can.t find|cannot find", r["answer"], re.I)) and not re.search(r"\*\*0\b|\b0 (near|meeting|prep)", r["answer"]), tools=r["tools"], head=r["answer"][:150])
     # module switching with one conversation id, and tools offered per module
     same = cid("sw"); chat(CAND, P, "How many planned inspections are overdue?", {"module": "audit"}, same, **AR)
     r = chat(CAND, P, "how many of those are there?", {"module": "safety"}, same, **AR)
