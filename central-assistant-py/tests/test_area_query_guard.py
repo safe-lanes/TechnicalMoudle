@@ -207,3 +207,11 @@ async def test_execute_module_tool_body_has_conversation_id(monkeypatch):
     assert seen[-1] == {"tool": OBS, "args": {"mode": "count"}, "requestId": "r1", "module": "audit", "conversationId": "c1"}
     await agent.execute_module_tool(s.module_instances["audit-pilot"], OBS, {}, "TOKEN", "r2")
     assert "conversationId" not in seen[-1] and "module" not in seen[-1]
+
+
+def test_round2_keys_have_evidence_rules():
+    # 3-Nov-2026: a follow-up that adds these filters is judged on the user's words, like every other filter
+    assert qg.evidence("extensionStatus", ["pending"], "which of those have an extension pending?")
+    assert not qg.evidence("extensionStatus", ["pending"], "only vessel Alpha")
+    assert qg.evidence("multiCategory", True, "which belong to more than one category?")
+    assert not qg.evidence("multiCategory", True, "only vessel Alpha")

@@ -115,6 +115,8 @@ EVIDENCE: dict[str, str | None] = {
     "inspectionDateFrom": r"\d{4}|\b(from|after|since|between|inspect)\b",
     "inspectionDateTo": r"\d{4}|\b(to|until|before|by|between|inspect)\b",
     "statuses": r"open|closed|close|pending|approv|reject|draft|in progress|complet|verif|implement|status|all (mocs?|incidents?)|every (moc|incident)",
+    "extensionStatus": r"extension|extended|pending|approv|reject|request",
+    "multiCategory": r"multi|more than one|several|multiple|both|two or|categor",
     "typeOfChange": r"temporary|permanent|emergency|type of change|change type",
     "initialRisk": r"risk|high|medium|low|critical",
     "stages": r"stage|proposal|approval|implementation|verification|effectiveness|review|closed",
