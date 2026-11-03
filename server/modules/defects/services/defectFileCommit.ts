@@ -7,7 +7,7 @@ import { defectFileCommitContext } from './defectFileContext';
 import { assertDefectFileAccess, fileError, type DefectFileActor } from './defectFileAccess';
 import { readStagedDefectFile, stagingNamespace, type StagedDefectFile } from './defectFileStaging';
 import { defectFileStore, fileHash } from './defectFileStorage';
-import { getDefectFileReadiness } from './defectFileReadiness';
+import { getDefectFileReadiness, assertLocalC1UploadAvailable } from './defectFileReadiness';
 import { getEffectiveInstanceId, isShipInstance } from '../../sync/syncRole';
 
 export function hasExternalDefectFiles(body: any) {
@@ -22,6 +22,12 @@ export function hasExternalDefectFiles(body: any) {
 export async function withDefectFileSave<T>(body: any, current: any, actor: DefectFileActor | undefined,
   work: (body: any) => Promise<T>, revalidate: (locked: any, body: any) => Promise<void>) {
   const pairs = Object.entries(DEFECT_SECTION_FIELDS);
+  // New C1 bytes always use owned private staging, even with an unready peer.
+  if (Array.isArray(body.partCAttachments) && body.partCAttachments.some((file: any) =>
+    !isExternalDefectAttachment(file) &&
+    !(current?.partCAttachments ?? []).some((old: any) => isDeepStrictEqual(old, file)))) {
+    throw fileError('Please upload new closure documents in Part C1 using private file uploads.', 409, 'EXTERNAL_UPLOAD_REQUIRED');
+  }
   // A ready pair never silently falls back to storing NEW file bytes inline.
   const ready = await getDefectFileReadiness(current?.vesselId ?? body.vesselId);
   if (ready.externalStorage && pairs.some(([, field]) => Array.isArray(body[field]) &&
@@ -81,9 +87,13 @@ export async function withDefectFileSave<T>(body: any, current: any, actor: Defe
           if (alreadySaved) throw fileError('This staged form was already saved. Refresh to load its saved record.', 409, 'DEFECT_ALREADY_SAVED');
         }
         await assertDefectFileAccess(actor, vessel, manifest.section, locked);
-        const ready = await getDefectFileReadiness(vessel);
-        if (!ready.externalStorage || (section === 'part-c1' && !ready.c1Upload)) {
-          throw fileError('File compatibility changed before saving. Please retry after the vessel update; your form values are retained.', 409, 'DEFECT_FILES_UNAVAILABLE');
+        if (section === 'part-c1') {
+          await assertLocalC1UploadAvailable();
+        } else {
+          const ready = await getDefectFileReadiness(vessel);
+          if (!ready.externalStorage) {
+            throw fileError('File compatibility changed before saving. Please retry after the vessel update; your form values are retained.', 409, 'DEFECT_FILES_UNAVAILABLE');
+          }
         }
         const bytes = await defectFileStore.read(`${stagingNamespace(actor)}/${manifest.token}.bin`, manifest.attachment.backend, true);
         if (bytes.length !== manifest.attachment.size || fileHash(bytes) !== manifest.attachment.sha256) throw fileError('Staged file integrity check failed.', 409);
@@ -102,9 +112,12 @@ export async function withDefectFileSave<T>(body: any, current: any, actor: Defe
     await revalidate(locked, output);
     const result = await defectFileCommitContext.run({ tx, duuid, actorUuid: actor.userUuid }, () => work(output));
     if (staged.length) {
-      const finalReady = await getDefectFileReadiness(vessel);
-      if (!finalReady.externalStorage || (staged.some(file => file.section === 'part-c1') && !finalReady.c1Upload)) {
-        throw fileError('File compatibility changed before saving. Please retry; your staged uploads are retained.', 409, 'DEFECT_FILES_UNAVAILABLE');
+      if (staged.some(file => file.section === 'part-c1')) await assertLocalC1UploadAvailable();
+      if (staged.some(file => file.section !== 'part-c1')) {
+        const finalReady = await getDefectFileReadiness(vessel);
+        if (!finalReady.externalStorage) {
+          throw fileError('File compatibility changed before saving. Please retry; your staged uploads are retained.', 409, 'DEFECT_FILES_UNAVAILABLE');
+        }
       }
     }
     const instance = await getEffectiveInstanceId();

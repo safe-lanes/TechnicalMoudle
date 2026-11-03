@@ -14,10 +14,10 @@ import {
 import type { RequestRow, RequestSlotRow, StoredWorkflow } from '../../approval-engine';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { defects } from '@shared/schema';
-import { defectAttachmentAvailability, STALE_CLOSURE_MESSAGE } from '@shared/defectEvidence';
+import { STALE_CLOSURE_MESSAGE } from '@shared/defectEvidence';
 import { isDeepStrictEqual } from 'node:util';
 import { withDefectFileSave } from './defectFileCommit';
-import { getDefectFileReadiness } from './defectFileReadiness';
+import { assertLocalC1UploadAvailable } from './defectFileReadiness';
 import type { DefectFileActor } from './defectFileAccess';
 import {
   apprvWorkflows, apprvWorkflowNodes, apprvNodeSlots,
@@ -711,14 +711,13 @@ export async function assertDefectEvidenceRules(current: any, body: any): Promis
   if (body?.partCAttachments !== undefined && !Array.isArray(body.partCAttachments)) {
     throw Object.assign(new Error('Part C1 attachments must be a list.'), { statusCode: 400 });
   }
-  const readiness = await getDefectFileReadiness(current.vesselId ?? body.vesselId);
-  if (!readiness.c1Upload && Array.isArray(body?.partCAttachments)) {
-    // Unchanged saved/sync-received C1 content remains readable and saveable.
-    // Do not allow replacement bytes under an existing ID to bypass readiness.
+  if (Array.isArray(body?.partCAttachments)) {
+    // Preserve unchanged saved/sync-received data without requiring a peer.
+    // New or changed C1 metadata still requires operational local storage.
     const saved = current.partCAttachments ?? [];
     if (body.partCAttachments.some((file: any) =>
       !saved.some((old: any) => isDeepStrictEqual(old, file)))) {
-      throw Object.assign(new Error(defectAttachmentAvailability().reason), { statusCode: 409, code: 'C1_UNAVAILABLE' });
+      await assertLocalC1UploadAvailable();
     }
   }
   if (Array.isArray(body?.closureFiles) && body.closureFiles.length > 0) {

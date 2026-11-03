@@ -56,14 +56,11 @@ export function defectEvidenceLabel(file: ResolvedDefectEvidence): string {
 export const C1_UNAVAILABLE_MESSAGE = "Part C1 will be available after this vessel's software update.";
 export const STALE_CLOSURE_MESSAGE = 'This form is out of date. Please refresh the page, then attach closure documents in Part C1.';
 
-/**
- * M1 deliberately has no complete binary protocol. This is a code capability,
- * not a setting or administrator override. Do not advertise defect_files_v1.
- * M3 must derive readiness from BOTH authenticated peers, the owning vessel,
- * actual migration 191 availability and the fully implemented file handlers.
- */
+/** Fail-closed UI defaults. Local C1 eligibility is distinct from peer sync readiness. */
 export function defectAttachmentAvailability(): {
   c1Upload: boolean; externalStorage: boolean; reason: string;
+  c1LocalUpload: boolean; c1LocalReason: string;
 } {
-  return { c1Upload: false, externalStorage: false, reason: C1_UNAVAILABLE_MESSAGE };
+  return { c1Upload: false, externalStorage: false, reason: C1_UNAVAILABLE_MESSAGE,
+    c1LocalUpload: false, c1LocalReason: 'Checking local C1 attachment availability…' };
 }

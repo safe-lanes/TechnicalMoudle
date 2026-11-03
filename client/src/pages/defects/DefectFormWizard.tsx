@@ -2798,7 +2798,7 @@ export default function DefectFormWizard({
                       <div className="flex items-center justify-between">
                         <label className="text-sm text-gray-600">Closure evidence</label>
                           <Button type="button" variant="outline" size="sm" className="border-gray-300"
-                            disabled={!attachmentAvailability.c1Upload && partCAttachments.length === 0}
+                            disabled={!attachmentAvailability.c1LocalUpload && partCAttachments.length === 0}
                             onClick={() => setIsPartCAttachmentDialogOpen(true)} data-testid="button-c1-attachments">
                             <Paperclip className="h-4 w-4 mr-2" />
                             Part C1 - Closure documents
@@ -2807,7 +2807,13 @@ export default function DefectFormWizard({
                             )}
                           </Button>
                       </div>
-                      {!attachmentAvailability.c1Upload && <p className="text-sm text-amber-800">{attachmentAvailability.reason}</p>}
+                      {!attachmentAvailability.c1LocalUpload && <p className="text-sm text-amber-800">
+                        {fileReadiness.isError ? "Local C1 attachment availability could not be checked. Please retry." : attachmentAvailability.c1LocalReason}
+                        <button type="button" className="ml-2 underline" onClick={() => void fileReadiness.refetch()}>Retry</button>
+                      </p>}
+                      {attachmentAvailability.c1LocalUpload && !attachmentAvailability.externalStorage && (
+                        <p className="text-sm text-gray-600">C1 documents can be saved locally. Transfer to the counterpart will wait until synchronization compatibility is verified.</p>
+                      )}
                       {separateEvidence.isError && <p className="text-sm text-red-700">Legacy evidence could not be loaded. <button type="button" className="underline" onClick={() => void separateEvidence.refetch()}>Retry</button></p>}
                       {partCAttachments.length === 0 ? (
                         <p className="text-sm text-gray-500">No Part C1 documents uploaded.</p>
@@ -2946,10 +2952,10 @@ export default function DefectFormWizard({
         onOpenChange={setIsPartCAttachmentDialogOpen}
         attachments={partCAttachments}
         onAttachmentsChange={setPartCAttachments}
-        readOnly={isViewMode || !isMasterRank || hasPendingExtensionRequest || !attachmentAvailability.c1Upload}
+        readOnly={isViewMode || !isMasterRank || hasPendingExtensionRequest || !attachmentAvailability.c1LocalUpload}
         title="Part C1 - Closure documents"
         itemName="Closure document"
-        externalStorage={attachmentAvailability.externalStorage} section="part-c1" vesselUuid={attachmentVesselUuid}
+        externalStorage={true} section="part-c1" vesselUuid={attachmentVesselUuid}
         defectId={currentDefect?.id ?? createdDefectId ?? undefined} sessionId={attachmentSessionId} user={currentUser ?? undefined}
       />
 

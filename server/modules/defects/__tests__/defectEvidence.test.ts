@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defectAttachmentAvailability, defectEvidenceLabel, resolveDefectEvidence, STALE_CLOSURE_MESSAGE } from '@shared/defectEvidence';
 
 const repo = vi.hoisted(() => ({ getDefectClosureHistory: vi.fn() }));
+const local = vi.hoisted(() => vi.fn());
 vi.mock('../repositories/defectsRepository', () => repo);
+vi.mock('../services/defectFileReadiness', () => ({ assertLocalC1UploadAvailable: local }));
 import { assertDefectEvidenceRules } from '../services/defectsService';
 
 const file = (id: string) => ({ id, name: `${id}.pdf`, data: 'data:application/pdf;base64,JVBERg==', type: 'application/pdf', size: 4, uploadedAt: '2026-11-02' });
@@ -12,7 +14,10 @@ const current = () => ({
 });
 
 describe('independent C1 evidence and legacy compatibility', () => {
-  beforeEach(() => repo.getDefectClosureHistory.mockResolvedValue([]));
+  beforeEach(() => {
+    repo.getDefectClosureHistory.mockResolvedValue([]);
+    local.mockReset().mockResolvedValue(undefined);
+  });
   it('resolves C1 first, then B, then separate same-defect IDs without changing inputs', () => {
     const ids = ['c', 'b', 'old-row', 'missing'];
     const resolved = resolveDefectEvidence(ids, [file('c')], [file('b')], [{ datuuid: 'old-row', filename: 'legacy.pdf', url: '/private/legacy.pdf' }]);
@@ -38,13 +43,20 @@ describe('independent C1 evidence and legacy compatibility', () => {
     await expect(assertDefectEvidenceRules({ ...current(), closureFiles: [] }, { closureFiles: ['b'] }))
       .rejects.toMatchObject({ statusCode: 400 });
   });
-  it('fails closed for new C1 writes in M1 but permits unchanged sync-received rows', async () => {
+  it('checks local prerequisites for new C1 data but permits unchanged sync-received rows', async () => {
     expect(defectAttachmentAvailability()).toMatchObject({ c1Upload: false, externalStorage: false });
+    local.mockRejectedValue(Object.assign(new Error('Local private storage unavailable'), { statusCode: 409, code: 'C1_LOCAL_UNAVAILABLE' }));
     await expect(assertDefectEvidenceRules(current(), { partCAttachments: [file('new')] }))
-      .rejects.toMatchObject({ statusCode: 409, code: 'C1_UNAVAILABLE' });
+      .rejects.toMatchObject({ statusCode: 409, code: 'C1_LOCAL_UNAVAILABLE' });
     await expect(assertDefectEvidenceRules(current(), { partCAttachments: [file('c')] })).resolves.toBeUndefined();
     await expect(assertDefectEvidenceRules(current(), { partCAttachments: [{ ...file('c'), data: 'replacement' }] }))
-      .rejects.toMatchObject({ code: 'C1_UNAVAILABLE' });
+      .rejects.toMatchObject({ code: 'C1_LOCAL_UNAVAILABLE' });
+  });
+  it('accepts locally available C1 metadata without counterpart readiness', async () => {
+    await expect(assertDefectEvidenceRules(current(), { partCAttachments: [
+      { id: 'new', storageVersion: 1, name: 'new.pdf', fileKey: 'owned-staged-file', size: 4 },
+    ] })).resolves.toBeUndefined();
+    expect(local).toHaveBeenCalledOnce();
   });
   it('protects closed and rejected B/C1 evidence, but allows deliberate unprotected removal', async () => {
     const closed = { ...current(), status: 'Closed' };

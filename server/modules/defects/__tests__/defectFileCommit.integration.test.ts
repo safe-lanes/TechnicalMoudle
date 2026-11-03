@@ -5,9 +5,9 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '@shared/schema';
 import { defectFileCommitContext } from '../services/defectFileContext';
 
-const fixture = vi.hoisted(() => ({ db: null as any, ready: vi.fn(), access: vi.fn(), root: `/tmp/defect-commit-${process.pid}` }));
+const fixture = vi.hoisted(() => ({ db: null as any, ready: vi.fn(), local: vi.fn(), access: vi.fn(), root: `/tmp/defect-commit-${process.pid}` }));
 vi.mock('../../../db', async original => ({ ...await original<any>(), getDb: async () => fixture.db }));
-vi.mock('../services/defectFileReadiness', () => ({ getDefectFileReadiness: fixture.ready }));
+vi.mock('../services/defectFileReadiness', () => ({ getDefectFileReadiness: fixture.ready, assertLocalC1UploadAvailable: fixture.local }));
 vi.mock('../services/defectFileAccess', async original => ({ ...await original<any>(), assertDefectFileAccess: fixture.access }));
 vi.mock('../../sync/syncRole', () => ({ getEffectiveInstanceId: async () => 'SHORE-FIXTURE', isShipInstance: async () => false }));
 vi.mock('../services/defectFileStorage', async original => {
@@ -22,6 +22,7 @@ import { cleanupExpiredDefectStages } from '../services/defectFileCleanup';
 import { defectFileStore } from '../services/defectFileStorage';
 import { recordAuthenticatedDefectPeerReport, listDefectPeerReports } from '../services/defectPeerReports';
 import { updateSettings, seedSettingIfEmpty } from '../../sync/repository';
+import { filterDefectLogs } from '../../sync/defectMetadataCompatibility';
 
 describe('external defect save transaction', () => {
   let client: any, cleanupClient: any, pool: any, testSchema: string;
@@ -41,6 +42,7 @@ describe('external defect save transaction', () => {
     await client.query(`CREATE SCHEMA "${testSchema}"`);
     for (const conn of [client, cleanupClient]) await conn.query(`SET search_path TO "${testSchema}", public`);
     fixture.ready.mockResolvedValue({ externalStorage: true, c1Upload: true });
+    fixture.local.mockReset().mockResolvedValue(undefined);
     for (const table of ['defects', 'audit_log', 'sync_file_queue', 'sync_field_log', 'defect_closure_history', 'defect_attachments', 'defect_actions', 'sync_settings']) {
       await client.query(`CREATE TABLE "${testSchema}"."${table}" (LIKE public."${table}" INCLUDING ALL)`);
     }
@@ -56,11 +58,14 @@ describe('external defect save transaction', () => {
     const [row] = await tx.insert(schema.defects).values({
       id: `FIX-${randomUUID()}`, duuid, vesselId: vessel, vesselName: 'Fixture', issueDate: '2026-11-02',
       category: 'Defect', description: 'Fixture', reportedBy: 'Fixture', attachments: body.attachments,
+      partCAttachments: body.partCAttachments, partAAttachments: body.partAAttachments,
     }).returning();
-    await tx.insert(schema.syncFieldLog).values({
-      tableName: 'defects', rowUuid: duuid, fieldName: 'attachments', oldValue: null,
-      newValue: JSON.stringify(body.attachments), vesselId: vessel, instanceId: 'SHORE-FIXTURE',
-    });
+    for (const field of ['attachments', 'partCAttachments', 'partAAttachments']) {
+      if (body[field] !== undefined) await tx.insert(schema.syncFieldLog).values({
+        tableName: 'defects', rowUuid: duuid, fieldName: field, oldValue: null,
+        newValue: JSON.stringify(body[field]), vesselId: vessel, instanceId: 'SHORE-FIXTURE',
+      });
+    }
     return row;
   }
   it('creates canonical metadata, field-log, audit and queue intent together; expiry never deletes committed bytes', async () => {
@@ -84,6 +89,76 @@ describe('external defect save transaction', () => {
     expect((await client.query('SELECT * FROM sync_file_queue')).rows).toHaveLength(0);
     await cleanupExpiredDefectStages(Date.now() + 8 * 24 * 3600_000);
     await expect(defectFileStore.read(file.fileKey, 'local')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+  it.each(['unknown', 'stale', 'lost', 'expired'])('saves C1 with an %s peer while keeping sync held and A/B inline unchanged', async state => {
+    const { assertDefectEvidenceRules } = await import('../services/defectsService');
+    fixture.ready.mockResolvedValue({ externalStorage: false, c1Upload: false, state, reason: 'Peer is not ready' });
+    const file = await stageDefectFile(actor, { ...input, section: 'part-c1' }, pdf);
+    const inline = { id: randomUUID(), name: 'existing.pdf', size: pdf.buffer.length,
+      type: 'application/pdf', data: `data:application/pdf;base64,${pdf.buffer.toString('base64')}`, uploadedAt: new Date().toISOString() };
+    const original = { vesselId: vessel, closureFiles: [], partCAttachments: [] };
+    await assertDefectEvidenceRules(original, { partCAttachments: [file] });
+    const row = await withDefectFileSave({ vesselId: vessel, partCAttachments: [file],
+      attachments: [inline], partAAttachments: [{ ...inline, id: randomUUID() }], attachmentCommit: { sessionId } },
+    null, actor, work, (_current, normalized) => assertDefectEvidenceRules(original, normalized));
+    const reloaded = (await client.query('SELECT * FROM defects WHERE duuid=$1', [row.duuid])).rows[0];
+    expect(reloaded.part_c_attachments[0]).not.toHaveProperty('stagedRef');
+    expect(reloaded.part_c_attachments[0]).not.toHaveProperty('data');
+    expect(reloaded.attachments).toEqual([inline]);
+    expect(await defectFileStore.read(file.fileKey, 'local')).toEqual(pdf.buffer);
+    expect((await client.query('SELECT * FROM sync_file_queue')).rows[0]).toMatchObject({ status: 'pending', row_uuid: row.duuid });
+    const logs = await fixture.db.select().from(schema.syncFieldLog);
+    expect(logs.find((log: any) => log.fieldName === 'partCAttachments').isSynced).toBe(false);
+    expect(filterDefectLogs(logs, false).some(log => log.fieldName === 'partCAttachments')).toBe(false);
+    expect((await client.query('SELECT * FROM audit_log')).rows).toHaveLength(1);
+    await expect(stageDefectFile(actor, input, pdf)).rejects.toMatchObject({ code: 'DEFECT_FILES_UNAVAILABLE' });
+    await expect(stageDefectFile(actor, { ...input, section: 'part-a' }, pdf)).rejects.toMatchObject({ code: 'DEFECT_FILES_UNAVAILABLE' });
+  });
+  it('saves C1 without peer readiness while retaining unchanged saved A/B metadata', async () => {
+    const partB = await stageDefectFile(actor, input, pdf);
+    const original = await withDefectFileSave({ vesselId: vessel, attachments: [partB], attachmentCommit: { sessionId } }, null, actor, work, async () => {});
+    fixture.ready.mockResolvedValue({ externalStorage: false, c1Upload: false });
+    const c1 = await stageDefectFile(actor, { ...input, section: 'part-c1' }, pdf, original);
+    const result = await withDefectFileSave({ attachments: original.attachments, partCAttachments: [c1],
+      attachmentCommit: { sessionId, expectedUpdatedAt: original.updatedAt.toISOString() } }, original, actor, async body => {
+      const { tx } = defectFileCommitContext.getStore()!;
+      return (await tx.update(schema.defects).set({ partCAttachments: body.partCAttachments }).returning())[0];
+    }, async () => {});
+    expect(result.duuid).toBe(original.duuid);
+    expect(result.attachments).toEqual(original.attachments);
+    expect(result.partCAttachments).toHaveLength(1);
+  });
+  it('does not let C1 bypass a mixed staged A/B readiness failure', async () => {
+    const b = await stageDefectFile(actor, input, pdf);
+    fixture.ready.mockResolvedValue({ externalStorage: false, c1Upload: false });
+    const c1 = await stageDefectFile(actor, { ...input, section: 'part-c1' }, pdf);
+    await expect(withDefectFileSave({ vesselId: vessel, attachments: [b], partCAttachments: [c1],
+      attachmentCommit: { sessionId } }, null, actor, work, async () => {})).rejects.toMatchObject({ code: 'DEFECT_FILES_UNAVAILABLE' });
+    expect((await client.query('SELECT * FROM defects')).rows).toHaveLength(0);
+    expect((await client.query('SELECT * FROM sync_file_queue')).rows).toHaveLength(0);
+  });
+  it('retains staged files when local C1 storage fails during final commit', async () => {
+    fixture.ready.mockResolvedValue({ externalStorage: false, c1Upload: false });
+    const c1 = await stageDefectFile(actor, { ...input, section: 'part-c1' }, pdf);
+    fixture.local.mockResolvedValueOnce(undefined).mockRejectedValueOnce(Object.assign(new Error('Local private storage unavailable'), { code: 'C1_LOCAL_UNAVAILABLE' }));
+    await expect(withDefectFileSave({ vesselId: vessel, partCAttachments: [c1], attachmentCommit: { sessionId } },
+      null, actor, work, async () => {})).rejects.toMatchObject({ code: 'C1_LOCAL_UNAVAILABLE' });
+    expect((await client.query('SELECT * FROM defects')).rows).toHaveLength(0);
+    expect((await client.query('SELECT * FROM sync_field_log')).rows).toHaveLength(0);
+    expect((await client.query('SELECT * FROM sync_file_queue')).rows).toHaveLength(0);
+    expect(await defectFileStore.manifests('local')).toHaveLength(1);
+  });
+  it('rejects new inline C1 bytes but preserves unchanged legacy C1 and unrelated saves', async () => {
+    const { assertDefectEvidenceRules } = await import('../services/defectsService');
+    fixture.ready.mockResolvedValue({ externalStorage: false, c1Upload: false });
+    const legacy = { id: randomUUID(), data: 'data:application/pdf;base64,JVBERi0=', name: 'legacy.pdf' };
+    await expect(withDefectFileSave({ partCAttachments: [legacy] }, null, actor, work, async () => {})).rejects.toMatchObject({ code: 'EXTERNAL_UPLOAD_REQUIRED' });
+    fixture.local.mockRejectedValue(new Error('storage offline'));
+    const unchanged = { partCAttachments: [legacy] };
+    await expect(assertDefectEvidenceRules(unchanged, unchanged)).resolves.toBeUndefined();
+    const callback = vi.fn(async body => body);
+    expect(await withDefectFileSave(unchanged, unchanged, undefined, callback, async () => {})).toEqual(unchanged);
+    expect(fixture.local).not.toHaveBeenCalled();
   });
   it('rejects another form session and readiness loss before commit without losing the staged file', async () => {
     const file = await stageDefectFile(actor, input, pdf);

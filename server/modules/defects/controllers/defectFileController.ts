@@ -3,7 +3,7 @@ import type { RequestHandler, Request, Response } from 'express';
 import { DEFECT_FILE_BYTES, DEFECT_SECTIONS, type DefectFileSection } from '@shared/defectAttachments';
 import { tenantStorage, getCurrentTenantContext } from '../../../utils/asyncLocalStorage';
 import { defectFileActor, assertDefectFileAccess, fileError } from '../services/defectFileAccess';
-import { getDefectFileReadiness } from '../services/defectFileReadiness';
+import { getDefectFileReadiness, getLocalC1Availability, assertLocalC1UploadAvailable } from '../services/defectFileReadiness';
 import { stageDefectFile, readStagedDefectFile, stagingNamespace } from '../services/defectFileStaging';
 import { defectFileStore, fileHash } from '../services/defectFileStorage';
 import { defectFileContent } from '../services/defectFileDownload';
@@ -45,9 +45,11 @@ export const uploadBody: RequestHandler = (req, res, next) => {
 };
 export const stage = fileHandler(async (req, res) => {
   const actor = await defectFileActor(req);
+  if (!DEFECT_SECTIONS.includes(req.params.section as DefectFileSection)) throw fileError('Invalid attachment section.');
+  // Detect a missing C1 column before a full existing-defect SELECT can fail.
+  if (req.params.section === 'part-c1') await assertLocalC1UploadAvailable();
   const current = req.params.defectId ? await repo.getDefect(req.params.defectId) : undefined;
   if (req.params.defectId && !current) throw fileError('Defect not found.', 404);
-  if (!DEFECT_SECTIONS.includes(req.params.section as DefectFileSection)) throw fileError('Invalid attachment section.');
   res.status(201).json(await stageDefectFile(actor, {
     vesselUuid: req.body.vesselUuid, sessionId: req.body.sessionId, section: req.params.section as DefectFileSection,
   }, req.file!, current));
@@ -56,7 +58,7 @@ export const readiness = fileHandler(async (req, res) => {
   const actor = await defectFileActor(req);
   const vessel = String(req.query.vesselUuid ?? '');
   await assertDefectFileAccess(actor, vessel);
-  res.json({ ...await getDefectFileReadiness(vessel), backend: defectFileStore.backend() });
+  res.json({ ...await getDefectFileReadiness(vessel), ...await getLocalC1Availability(), backend: defectFileStore.backend() });
 });
 export const peerReports = fileHandler(async (req, res) => {
   const actor = await defectFileActor(req);
