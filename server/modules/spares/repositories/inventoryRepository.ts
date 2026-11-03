@@ -83,7 +83,7 @@ export async function getLocationsWithStock(vesselId: string): Promise<Array<{ i
   return storage.getLocationsWithStock(vesselId);
 }
 
-export async function upsertSpareLocationStock(data: InsertSpareLocationStock): Promise<SpareLocationStock> {
+export async function upsertSpareLocationStock(data: Omit<InsertSpareLocationStock, 'spareUuid'> & { spareUuid?: string }): Promise<SpareLocationStock> {
   return storage.upsertSpareLocationStock(data);
 }
 

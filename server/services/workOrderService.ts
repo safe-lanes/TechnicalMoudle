@@ -370,9 +370,13 @@ export class WorkOrderService {
 
               // Create read-only audit entry (ISOLATION: no setComponentRunningHours call)
               const previousRH = parseInt(component.currentCumulativeRH || '0');
+              const auditVesselId = wo.vesselId || component.vesselId;
+              if (!auditVesselId) {
+                throw new ValidationError('Vessel ID is required for the running hours audit');
+              }
               await storage.createRunningHoursAudit({
                 componentId: component.cuuid,
-                vesselId: wo.vesselId || component.vesselId,
+                vesselId: auditVesselId,
                 previousRH: String(previousRH),
                 newRH: String(runningHours),
                 cumulativeRH: String(runningHours),

@@ -250,7 +250,7 @@ export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, nex
     // Approvals QA (Jeevan #3): true when no rank was sent and the mock default was used — an office user then
     // has NO rank, and must never be labelled "Chief Engineer" in audit/approval history.
     rankIsDefault: !((typeof headerRank === "string" && headerRank.trim()) || (bodyRank && bodyRank.trim())),
-    userType: fwdType || "Office",
+    userType: fwdType === "Office" || fwdType === "Ship" ? fwdType : "Office",
     createdAt: new Date(),
     updatedAt: new Date(),
   };

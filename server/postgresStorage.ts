@@ -1359,7 +1359,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined> {
+  async getComponentByCode(componentCode: string, vesselId: string | null): Promise<Component | undefined> {
     const db = await getDb();
     const result = await db.select().from(components)
       .where(and(
@@ -1370,7 +1370,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createComponent(component: InsertComponent & { id?: Component["id"] }): Promise<Component> {
+  async createComponent(component: Omit<InsertComponent, "cuuid"> & { cuuid?: string; id?: Component["id"] }): Promise<Component> {
     const db = await getDb();
     const id = component.id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(components).values({

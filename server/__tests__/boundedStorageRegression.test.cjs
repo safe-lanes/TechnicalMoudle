@@ -16,7 +16,9 @@ const declaration = 'InsertComponent & { id?: Component["id"] }';
 
 test('current source retains the declarations and equivalent generated recurrence SQL', () => {
   for (const name of ['createComponent', 'createFleetScopedComponent']) {
-    assert.ok(p.methodText(name).includes(`component: ${declaration}`));
+    assert.ok(p.methodText(name).includes(name === 'createComponent'
+      ? 'component: Omit<InsertComponent, "cuuid"> & { cuuid?: string; id?: Component["id"] }'
+      : `component: ${declaration}`));
   }
   const recurring = p.methodText('calculateAndUpdateRecurringDefects');
   assert.ok(recurring.includes('of Array.from(defectGroups))'));

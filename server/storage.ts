@@ -268,8 +268,8 @@ export interface IStorage {
   // Running Hours methods
   getComponents(vesselId: string, vesselIds?: string[]): Promise<Component[]>;
   getComponent(id: string): Promise<Component | undefined>;
-  getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>;
-  createComponent(component: InsertComponent): Promise<Component>;
+  getComponentByCode(componentCode: string, vesselId: string | null): Promise<Component | undefined>;
+  createComponent(component: Omit<InsertComponent, "cuuid"> & { cuuid?: string }): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
   deleteComponent(id: string, userId?: string): Promise<void>;
   inactivateComponent(id: string, vesselId: string, userId?: string, apply?: boolean): Promise<{
@@ -1025,7 +1025,7 @@ export interface IStorage {
   getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]>;
   getSpareLocationStockByLocation(locationId: number): Promise<SpareLocationStock[]>;
   getSpareLocationStockItem(spareId: number, locationId: number): Promise<SpareLocationStock | undefined>;
-  upsertSpareLocationStock(data: InsertSpareLocationStock): Promise<SpareLocationStock>;
+  upsertSpareLocationStock(data: Omit<InsertSpareLocationStock, 'spareUuid'> & { spareUuid?: string }): Promise<SpareLocationStock>;
   updateSpareLocationStockQty(spareId: number, locationId: number, qtyChange: number): Promise<SpareLocationStock>;
   getSpareRobTotal(spareId: number): Promise<number>;
   getSpareLocationsWithQty(spareId: number, activeLocationNames?: string[]): Promise<Array<{ locationId: number; locationName: string; qty: number }>>;
