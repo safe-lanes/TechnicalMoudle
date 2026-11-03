@@ -9018,7 +9018,7 @@ export class PostgresStorage {
             actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
             updatedByUuid: userUuid || null,
             source: 'inherited_cascade',
-            comments: `Inherited delta ${inheritedDelta} from MASTER ${parentResult[0]?.componentCode || parentResult[0]?.name}`,
+            // Cascade description intentionally not persisted; mapping to notes requires a separate approved change.
           }).returning();
           // Sync field logging — inherited audit INSERT
           try { await logFieldChanges('running_hours_audit', inheritedAuditResult[0].rhauuid, inherited.vesselId || null, null, inheritedAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade inherited:', e); }
@@ -9106,7 +9106,7 @@ export class PostgresStorage {
           actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
           updatedByUuid: userUuid || null,
           source: 'cascade',
-          comments: comments,
+          // Cascade description intentionally not persisted; mapping to notes requires a separate approved change.
         }).returning();
         // Sync field logging — structural child audit INSERT
         try { await logFieldChanges('running_hours_audit', childAuditResult[0].rhauuid, child.vesselId || null, null, childAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade child:', e); }
@@ -9442,22 +9442,7 @@ export class PostgresStorage {
       if (vesselId && wo.vesselId !== vesselId) continue;
       
       // Check if postponed date has passed
-      if (wo.postponedDate && wo.postponedDate <= todayStr) {
-        const result = await db.update(workOrders)
-          .set({
-            status: 'Pending',
-            postponedDate: null,
-            updatedAt: new Date()
-          })
-          .where(eq(workOrders.wouuid, wo.wouuid))
-          .returning();
-
-        if (result.length > 0) {
-          revertedWorkOrders.push(result[0]);
-          // Sync field logging — checkAndRevertPostponedWorkOrders
-          try { await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, result[0], 'system'); } catch (e) { console.error('[FieldLogger] WO revert postponed:', e); }
-        }
-      }
+      // Postponement expiry not implemented; stored dates use DD-Mon-YYYY, so a separate approved task must handle parsing before activating it.
     }
     
     return {
