@@ -44,9 +44,9 @@ def test_area_tools_are_query_tools_with_their_filter_keys_and_crewing_is_unchan
     assert qg.QUERY_TOOLS[:8] == qg.CREWING_QUERY_TOOLS                        # Crewing tools first, same order as before
     assert qg.FILTER_KEYS[OBS] == {"status", "riskLevels", "inspectionTypes", "categories", "viqChapter", "includeRecommended", "includeLae",
                                    "excludeDryDock", "vessels", "dueWithin", "closedWithin", "inspectionDateWithin", "inspectionDateFrom", "inspectionDateTo"}
-    assert qg.FILTER_KEYS[MOC] == {"statuses", "typeOfChange", "initialRisk", "stages", "effectivenessReviewDue", "vessels", "initiatedWithin",
+    assert qg.FILTER_KEYS[MOC] == {"statuses", "extensionStatus", "typeOfChange", "initialRisk", "stages", "effectivenessReviewDue", "vessels", "initiatedWithin",
                                    "initiatedFrom", "initiatedTo", "targetWithin", "targetFrom", "targetTo"}
-    assert qg.FILTER_KEYS[INC] == {"categories", "statuses", "severityMin", "severityIn", "vessels", "incidentDateWithin", "incidentDateFrom",
+    assert qg.FILTER_KEYS[INC] == {"categories", "statuses", "severityMin", "severityIn", "multiCategory", "vessels", "incidentDateWithin", "incidentDateFrom",
                                    "incidentDateTo", "reportDateWithin"}
     for tool in qg.AREA_QUERY_TOOLS:                                             # every filter key has an evidence rule (or None = value words)
         assert qg.FILTER_KEYS[tool] <= set(qg.EVIDENCE), tool
