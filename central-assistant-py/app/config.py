@@ -106,6 +106,8 @@ class Settings(BaseSettings):
     #                    "signingKey":"…","capabilities":{"queryState":true,"maskNameParts":true}}}
     assistant_module_instances: str = "{}"
     assistant_capture_outbound: str = ""              # test seam: file path; captures ACTUAL wire bodies
+    assistant_timezone: str = "UTC"                   # 3-Nov-2026: zone of the trusted date given to the model; a registration "timezone" wins
+    assistant_as_of: str = ""                         # test seam: YYYY-MM-DD pins the trusted date (pilot only, never on a release)
     # 21-Oct-2026 (Crewing live-data PILOT TRIAL): remember, per conversation, the names the masker learned from tool
     # results, so a follow-up turn masks them in the replayed history BEFORE its first model call. Off by default.
     assistant_mask_conversation_memory: bool = False

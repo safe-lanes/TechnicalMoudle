@@ -18,12 +18,15 @@ known-good on failure). The caller's SIGNED identity token is FORWARDED UNMODIFI
 from __future__ import annotations
 
 import asyncio
+import calendar
 import contextvars
 import dataclasses
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import (
@@ -436,6 +439,37 @@ def tool_loop_instructions(module: str, guard: bool | None = None) -> str:
     return text + " " + KB_ANSWER_RULES if settings().kb_rules_on else text
 
 
+def trusted_date_block(instance: dict[str, Any] | None = None, now: datetime | None = None) -> str:
+    """3-Nov-2026: the model has no clock, so 'last month' was a guess ('last 1 month' on a Crewing tool = the CURRENT month).
+    The server states today's date and the calendar periods, in the company's time zone (registration "timezone", else
+    ASSISTANT_TIMEZONE, default UTC). Built per run and appended to the instructions, so the static prompt and its hash do not change.
+    ASSISTANT_AS_OF (YYYY-MM-DD) pins the date for tests; it is a pilot seam like ASSISTANT_CAPTURE_OUTBOUND and is never set on a release."""
+    s = settings()
+    tz_name = str((instance or {}).get("timezone") or s.assistant_timezone or "UTC")
+    try:
+        tz: tzinfo = timezone.utc if tz_name.upper() == "UTC" else ZoneInfo(tz_name)
+    except Exception:  # an unknown zone (or no zone database on the host) must not break answers
+        tz, tz_name = timezone.utc, "UTC"
+    today = date.fromisoformat(s.assistant_as_of) if s.assistant_as_of else (now or datetime.now(tz)).astimezone(tz).date()
+    this_first = today.replace(day=1)
+    last_last = this_first - timedelta(days=1)
+    last_first = last_last.replace(day=1)
+    this_last = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+    return (
+        f"RULE — dates (trusted, from the server): today is {today.isoformat()} ({tz_name}). Current month = {this_first:%Y-%m} "
+        f"({this_first.isoformat()} to {this_last.isoformat()}). Last month / previous month = {last_first:%Y-%m} "
+        f"({last_first.isoformat()} to {last_last.isoformat()}). Current year = {today.year}; last year = {today.year - 1}. "
+        "A calendar period ('this month', 'last month', 'in March', 'last year') is that exact period: pass the explicit month value or the "
+        "from/to dates of that period when the tool has them. A month named without a year is its most recent occurrence not after today. "
+        "Rolling parameters count back from today and include the current month (lastMonths: 1 is the CURRENT month, a 'last 1 months' window "
+        "ends today), so use them only when the user asks for a rolling period ('last 3 months', 'past 30 days'). An option such as dateRange "
+        "week/month/quarter/year is a range counted from today, NOT a calendar period: it can serve 'due this month' or 'upcoming', but it "
+        "cannot answer 'last month' or a named past month, and its result must never be labelled with calendar dates it was not filtered by. "
+        "If no tool can filter by the period asked, say that plainly and give no count for that period (you may add what the tool can report, "
+        "named for what it is). State the period you actually used in the answer."
+    )
+
+
 def _between(text: str, start: str, end: str | None) -> str:
     i = text.index(start)
     j = text.index(end, i) if end else len(text)
@@ -748,7 +782,8 @@ async def run_tool_loop(message: str, ui_module: str, identity_token: str, maske
                 conversation_id=str(conversation_id) if conversation_id else None)
     token = current_masker.set(masker)
     try:
-        agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=tool_loop_instructions(ui_module, guard=guard),
+        instructions = tool_loop_instructions(ui_module, guard=guard) + "\n\n" + trusted_date_block(instance)
+        agent: Agent[Deps, str] = Agent(_model(), deps_type=Deps, instructions=instructions,
                                         toolsets=[ManifestToolset(manifest_tools, conversation_param=guard, ui_module=ui_module)],
                                         model_settings=_tool_loop_settings(), retries=0)
         result = await agent.run(message, deps=deps, message_history=history or None)
