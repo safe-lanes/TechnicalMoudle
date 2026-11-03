@@ -30,6 +30,7 @@ const chainModule = compile(readFileSync('client/src/components/approvals/Approv
   '@tanstack/react-query': { useQuery: () => ({ data: [] }) },
 });
 const extensionModule = compile(readFileSync('client/src/pages/defects/DefectExtensionApprovalProcess.tsx', 'utf8'), {
+  './defectApprovalPresentation': presentation,
   '@/components/approvals/ApprovalProcessSection': processModule,
   '@/components/approvals/ApprovalChainProgress': chainModule,
 });
@@ -58,7 +59,7 @@ function visit(node: ts.Node) {
 visit(wizardAst);
 const html = (Component: any, props: any) => renderToStaticMarkup(React.createElement(Component, props));
 const event = (type = 'submitted', label = 'Requested', extras = {}) => ({
-  type, label, byName: 'Example Master', byPosition: 'Master',
+  type, label, byName: 'Example Master', byPosition: 'Master', byRole: 'Sail Admin',
   at: '2026-11-03T08:36:00Z', remarks: null, ...extras,
 });
 const process = { subjectType: 'defect-extension', attempts: [
@@ -102,7 +103,7 @@ describe('Consolidated B5 approval display', () => {
   it('preserves every event, attempt, actor, UTC time and multiline override remark in compact rows', () => {
     const rendered = html(extensionModule.DefectExtensionApprovalProcess, { process });
     for (const text of ['Attempt 1', 'Attempt 2', 'Requested again', 'Approved — Step 1', 'Rejected — Step 2',
-      'Example Master (Master)', '03 Nov 2026, 0836 Z', 'ADMIN OVERRIDE\nOriginal reason', 'Please revise the date']) {
+      'Example Master (Sail Admin)', '03 Nov 2026, 0836 Z', 'ADMIN OVERRIDE\nOriginal reason', 'Please revise the date']) {
       expect(rendered).toContain(text);
     }
     expect(rendered.indexOf('Requested again')).toBeGreaterThan(rendered.indexOf('Approved — Step 1'));
@@ -120,9 +121,9 @@ describe('Consolidated B5 approval display', () => {
   });
   it('does not invent identity or time for legacy events', () => {
     const rendered = html(extensionModule.DefectExtensionApprovalProcess, {
-      process: { ...process, attempts: [{ number: 1, events: [event('approved', 'Approved', { byName: null, byPosition: null, at: null })] }] },
+      process: { ...process, attempts: [{ number: 1, events: [event('approved', 'Approved', { byName: null, byPosition: null, byRole: null, at: null })] }] },
     });
-    expect(rendered).toContain('Not Recorded on Not Recorded');
+    expect(rendered).toContain('Not Recorded (Role unavailable) on Not Recorded');
     expect(rendered).not.toContain('Example Master');
   });
   it('uses active slot context when older chain data omits the step status and current key', () => {
@@ -336,10 +337,49 @@ describe('Consolidated C2 verification display', () => {
   it('retains explicit missing actor/time markers for legacy verification history', () => {
     const rendered = renderVerification({
       defectApprovalProcess: { data: { verification: { subjectType: 'defect-verification', attempts: [
-        { number: 1, events: [event('approved', 'Approved', { byName: null, byPosition: null, at: null })] },
+        { number: 1, events: [event('approved', 'Approved', { byName: null, byPosition: null, byRole: null, at: null })] },
       ] } }, isLoading: false },
     });
-    expect(rendered).toContain('Not Recorded on Not Recorded');
+    expect(rendered).toContain('Not Recorded (Role unavailable) on Not Recorded');
+  });
+});
+
+describe('Defect-only actual actor role display', () => {
+  it.each(['extension', 'verification'])('uses each actor account role, never designation, in %s history', scope => {
+    const history = { subjectType: `defect-${scope}`, attempts: [{ number: 1, events: [
+      event('submitted', 'Requested', { byName: 'Same Display Name', byRole: 'Ship User' }),
+      event('approved', 'Approved', { byName: 'Same Display Name', byRole: 'Sail Admin', remarks: 'ADMIN OVERRIDE' }),
+      event('rejected', 'Rejected', { byName: 'Different Actor', byRole: 'Technical Superintendent', byPosition: 'Marine Manager' }),
+      event('withdrawn', 'Withdrawn', { byName: 'Unavailable Actor', byRole: null, byPosition: 'Master' }),
+    ] }] };
+    const rendered = html(extensionModule.DefectExtensionApprovalProcess, { scope, process: history });
+    for (const label of ['Same Display Name (Ship User)', 'Same Display Name (Sail Admin)',
+      'Different Actor (Technical Superintendent)', 'Unavailable Actor (Role unavailable)', 'ADMIN OVERRIDE']) {
+      expect(rendered).toContain(label);
+    }
+    expect(rendered).not.toContain('(Master)');
+    expect(rendered).not.toContain('(Marine Manager)');
+    // Shared Work Order / Modify PMS presentation continues using its original position.
+    const shared = html(processModule.ApprovalProcessSection, { blocks: [{ title: 'Other module', process: history }] });
+    expect(shared).toContain('Same Display Name (Master)');
+    expect(shared).not.toContain('Same Display Name (Sail Admin)');
+  });
+  it.each(['extension', 'verification'])('uses account roles in %s chain fallback and pending slots', scope => {
+    const actualChain = { ...chain, steps: [{ ...chain.steps[1], slots: [
+      { status: 'approved', roleLabel: 'Configured Reviewer', decidedByName: 'Acting Admin',
+        decidedByRole: 'Sail Admin', decidedByPosition: 'Master' },
+      { status: 'rejected', roleLabel: 'Configured Verifier', decidedByName: 'Unknown Role',
+        decidedByPosition: 'Marine Manager' },
+    ] }] };
+    for (const process of [null, { subjectType: `defect-${scope}`, attempts: [{ number: 1, events: [event()] }] }]) {
+      const rendered = html(extensionModule.DefectExtensionApprovalProcess, { scope, process, chain: actualChain });
+      expect(rendered).toContain('Acting Admin (Sail Admin)');
+      expect(rendered).toContain('Unknown Role (Role unavailable)');
+      expect(rendered).not.toContain('(Master)');
+      expect(rendered).not.toContain('(Marine Manager)');
+    }
+    const unchanged = html(chainModule.DefectChainProgress, { chain: actualChain });
+    expect(unchanged).toContain('(Master)');
   });
 });
 

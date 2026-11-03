@@ -75,6 +75,8 @@ export async function latestSubmitterUuid(subjectType: HistorySubjectType, subje
 export interface ProcessEvent {
   type: string; label: string;
   byName: string | null; byPosition: string | null; at: string | null; remarks: string | null;
+  /** Optional Defect-only read-time account role; not a historical role snapshot. */
+  byRole?: string | null;
 }
 export interface ProcessAttempt { number: number; events: ProcessEvent[] }
 export interface ApprovalProcess { subjectType: string; attempts: ProcessAttempt[] }
@@ -85,7 +87,7 @@ export interface LegacyEvent {
   remarks?: string | null; stepLabel?: string | null;
 }
 
-interface RawEvent { type: string; at: string | null; byName: string | null; byPosition: string | null; remarks: string | null; stepLabel: string | null }
+interface RawEvent { type: string; at: string | null; byName: string | null; byPosition: string | null; remarks: string | null; stepLabel: string | null; byRole?: string | null }
 
 const isPostponement = (t: string) => t === 'wo-postponement' || t === 'wo-re-postponement' || t === 'defect-extension';
 
@@ -112,10 +114,12 @@ function labelFor(subjectType: string, e: RawEvent, attempt: number): string {
 const toMs = (at: string | null) => (at ? Date.parse(at) : NaN);
 
 /** Pure: recorded rows + older-record events → attempts (a new attempt starts at every submission). */
-export function buildApprovalProcess(subjectType: string, rows: Array<Pick<ApprovalHistoryRow, 'eventType' | 'occurredAt' | 'actorName' | 'actorPosition' | 'remarks' | 'stepLabel'>>, legacy: LegacyEvent[] = []): ApprovalProcess {
+export function buildApprovalProcess(subjectType: string, rows: Array<Pick<ApprovalHistoryRow, 'eventType' | 'occurredAt' | 'actorName' | 'actorPosition' | 'remarks' | 'stepLabel'> & Partial<Pick<ApprovalHistoryRow, 'actorUuid'>>>, legacy: LegacyEvent[] = [], actorRoles?: ReadonlyMap<string, string | null>): ApprovalProcess {
+  const includeRoles = actorRoles !== undefined && ['defect-extension', 'defect-verification'].includes(subjectType);
   const recorded: RawEvent[] = rows.map((r) => ({
     type: r.eventType, at: r.occurredAt ? new Date(r.occurredAt).toISOString() : null,
     byName: r.actorName ?? null, byPosition: r.actorPosition ?? null, remarks: r.remarks ?? null, stepLabel: r.stepLabel ?? null,
+    ...(includeRoles ? { byRole: r.actorUuid ? actorRoles!.get(r.actorUuid)?.trim() || null : null } : {}),
   }));
   // Older-record events only for the time before the first recorded event (never duplicated).
   const firstRecorded = recorded.length ? toMs(recorded[0].at) : NaN;
@@ -130,7 +134,8 @@ export function buildApprovalProcess(subjectType: string, rows: Array<Pick<Appro
   for (const e of all) {
     if (e.type === 'submitted' || attempts.length === 0) attempts.push({ number: attempts.length + 1, events: [] });
     const current = attempts[attempts.length - 1];
-    current.events.push({ type: e.type, label: labelFor(subjectType, e, current.number), byName: e.byName, byPosition: e.byPosition, at: e.at, remarks: e.remarks });
+    current.events.push({ type: e.type, label: labelFor(subjectType, e, current.number), byName: e.byName, byPosition: e.byPosition, at: e.at, remarks: e.remarks,
+      ...(includeRoles ? { byRole: e.byRole ?? null } : {}) });
   }
   return { subjectType, attempts };
 }

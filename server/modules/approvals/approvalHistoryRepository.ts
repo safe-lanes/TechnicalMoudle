@@ -2,7 +2,7 @@
  * approval_history (migration 179) — insert-only event rows, field-logged so they travel
  * vessel ↔ office. Plus a read-only user lookup for older records (master data).
  */
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { masterUsers } from '@shared/schema';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
@@ -40,4 +40,14 @@ export async function lookupUser(userUuid: string): Promise<{ name: string | nul
   const [u] = await db().select({ name: masterUsers.fullName, role: masterUsers.role, designation: masterUsers.designation })
     .from(masterUsers).where(eq(masterUsers.id, userUuid)).limit(1);
   return u ? { name: u.name?.trim() || null, role: u.role?.trim() || null, designation: u.designation?.trim() || null } : null;
+}
+
+/** Read-only account roles, not ranks/designations or workflow-slot roles. */
+export async function lookupAccountRoles(userUuids: string[]): Promise<Map<string, string | null>> {
+  const ids = Array.from(new Set(userUuids.filter(id => id && id !== 'system')));
+  if (!ids.length) return new Map();
+  const users = await db().select({ id: masterUsers.id, role: masterUsers.role })
+    .from(masterUsers).where(and(inArray(masterUsers.id, ids),
+      or(eq(masterUsers.isDeleted, false), isNull(masterUsers.isDeleted))));
+  return new Map(users.map(user => [user.id, user.role?.trim() || null]));
 }

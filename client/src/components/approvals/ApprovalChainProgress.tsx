@@ -9,6 +9,7 @@
  * slot's resolved approvers — the screens gate their approve/reject buttons on it.
  */
 import React from "react";
+import { formatDefectProcessActor } from "@/pages/defects/defectApprovalPresentation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -48,6 +49,7 @@ export interface DefectApprovalStep {
   decidedBy?: string | null;
   decidedByName?: string | null;
   decidedByPosition?: string | null;
+  decidedByRole?: string | null;
   decidedAt?: string | null;
   remarks?: string | null;
   slots?: Array<{
@@ -57,6 +59,7 @@ export interface DefectApprovalStep {
     decidedBy?: string | null;
     decidedByName?: string | null;
     decidedByPosition?: string | null;
+    decidedByRole?: string | null;
     decidedAt?: string | null;
     remarks?: string | null;
   }>;
@@ -250,7 +253,7 @@ export function ApprovalChainProgress({
   );
 }
 
-export function DefectChainProgress({ chain, title = "Approval progress" }: { chain: DefectApprovalChain; title?: string }) {
+export function DefectChainProgress({ chain, title = "Approval progress", actorDetail = "position" }: { chain: DefectApprovalChain; title?: string; actorDetail?: "position" | "role" }) {
   const steps = Array.isArray(chain.steps) ? chain.steps : [];
   const rejectedStepIndex = steps.findIndex((step) =>
     String(step.status).toLowerCase() === "rejected"
@@ -283,15 +286,21 @@ export function DefectChainProgress({ chain, title = "Approval progress" }: { ch
                 <span style={{ width: 8, height: 8, borderRadius: 4, background: color, display: "inline-block" }} />
                 {status}
               </span>
-              {step.decidedBy && <span className="text-gray-600">by {step.decidedBy}</span>}
+              {actorDetail === "role"
+                ? (step.decidedByName || step.decidedBy) && <span className="text-gray-600">
+                    by {formatDefectProcessActor({ byName: step.decidedByName || step.decidedBy, byRole: step.decidedByRole })}
+                  </span>
+                : step.decidedBy && <span className="text-gray-600">by {step.decidedBy}</span>}
               {step.slots?.map((slot, slotIndex) => {
                 const remark = formatInlineApprovalSlotRemark(slot.status, slot.remarks);
                 return (
                   <div key={slot.slotId || `${key}-slot-${slotIndex}`} className="flex flex-col items-start gap-1">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${slot.status === "rejected" ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-700"}`}>
                       {slot.roleLabel || "Approver"}: {String(slot.status || "pending").toLowerCase()}
-                      {slot.decidedByName ? ` — ${slot.decidedByName}` : ""}
-                      {slot.decidedByPosition ? ` (${slot.decidedByPosition})` : ""}
+                      {actorDetail === "role"
+                        ? slot.decidedByName || slot.decidedByRole || ["approved", "rejected"].includes(String(slot.status).toLowerCase())
+                          ? ` — ${formatDefectProcessActor({ byName: slot.decidedByName, byRole: slot.decidedByRole })}` : ""
+                        : <>{slot.decidedByName ? ` — ${slot.decidedByName}` : ""}{slot.decidedByPosition ? ` (${slot.decidedByPosition})` : ""}</>}
                       {slot.decidedAt ? ` on ${formatMaritimeUtcDateTime(slot.decidedAt)}` : ""}
                     </span>
                     {remark ? (

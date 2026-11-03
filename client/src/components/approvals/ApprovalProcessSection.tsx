@@ -11,6 +11,8 @@ import { formatMaritimeUtcDateTime } from "@/pages/defects/defectApprovalPresent
 export interface ProcessEvent {
   type: string; label: string;
   byName: string | null; byPosition: string | null; at: string | null; remarks: string | null;
+  /** Defect-only current account role; byPosition remains the historical snapshot. */
+  byRole?: string | null;
 }
 export interface ApprovalProcess { subjectType: string; attempts: Array<{ number: number; events: ProcessEvent[] }> }
 export interface WorkOrderApprovalProcess { completion: ApprovalProcess; postponement: ApprovalProcess; rePostponement: ApprovalProcess }

@@ -1,5 +1,10 @@
 export type DefectApprovalAction = "extension" | "verification";
 
+/** Defect process actors use account roles only, never a rank/position fallback. */
+export function formatDefectProcessActor(actor: { byName?: string | null; byRole?: string | null }): string {
+  return `${actor.byName?.trim() || "Not Recorded"} (${actor.byRole?.trim() || "Role unavailable"})`;
+}
+
 export type ExtensionHistoryEntry = {
   id: string;
   status?: string | null;

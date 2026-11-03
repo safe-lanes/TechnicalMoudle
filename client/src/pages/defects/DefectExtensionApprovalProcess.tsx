@@ -3,10 +3,10 @@ import {
   type DefectApprovalChain,
 } from "@/components/approvals/ApprovalChainProgress";
 import {
-  formatProcessActor,
   formatProcessTime,
   type ApprovalProcess,
 } from "@/components/approvals/ApprovalProcessSection";
+import { formatDefectProcessActor } from "./defectApprovalPresentation";
 
 const EVENT_COLOR: Record<string, string> = {
   submitted: "#2e90fa",
@@ -85,7 +85,7 @@ export function DefectExtensionApprovalProcess({
                     </strong>
                   </div>
                   <div className="min-w-0 text-xs text-slate-600 [overflow-wrap:anywhere]">
-                    {formatProcessActor(event)} on {formatProcessTime(event.at)}
+                    {formatDefectProcessActor(event)} on {formatProcessTime(event.at)}
                   </div>
                   {event.remarks && (
                     <div className="min-w-0 whitespace-pre-wrap text-xs text-slate-600 [overflow-wrap:anywhere] sm:col-start-2">
@@ -105,7 +105,7 @@ export function DefectExtensionApprovalProcess({
           <p className="text-xs text-slate-600" data-testid={`${scopePrefix}-process-loading`}>
             Loading approval process...
           </p>
-          {processChain && <DefectChainProgress chain={processChain} title="" />}
+          {processChain && <DefectChainProgress chain={processChain} title="" actorDetail="role" />}
           {scope === "verification" && !processChain && chainStatus === "error" && !quietWhenUnavailable && (
             <p className="mt-2 text-xs text-slate-600" data-testid={`${scopePrefix}-current-chain-unresolved`}>
               Current approval-chain status could not be confirmed.
@@ -113,7 +113,7 @@ export function DefectExtensionApprovalProcess({
           )}
         </>
       ) : processChain ? (
-        <DefectChainProgress chain={processChain} title="" />
+        <DefectChainProgress chain={processChain} title="" actorDetail="role" />
       ) : (
         <p className="text-xs text-slate-600 [overflow-wrap:anywhere]" data-testid={`${scopePrefix}-process-unavailable`}>
           {chainStatus === "loading"
@@ -130,7 +130,7 @@ export function DefectExtensionApprovalProcess({
         </p>
       )}
       {attempts.length > 0 && !hasEvents && processChain && (
-        <DefectChainProgress chain={processChain} title="" />
+        <DefectChainProgress chain={processChain} title="" actorDetail="role" />
       )}
       {attempts.length > 0 && !hasEvents && !processChain && chainStatus !== "resolved" && !quietWhenUnavailable && (
         <p className="mt-2 text-xs text-slate-600">
@@ -154,8 +154,8 @@ export function DefectExtensionApprovalProcess({
           {pendingSlots.map((slot, index) => (
             <div key={slot.slotId || index} className="mt-1 min-w-0 text-xs text-slate-600 [overflow-wrap:anywhere]">
               {slot.roleLabel ? `${slot.roleLabel}: ` : ""}{String(slot.status || "pending").toLowerCase()}
-              {slot.decidedByName ? ` — ${slot.decidedByName}` : ""}
-              {slot.decidedByPosition ? ` (${slot.decidedByPosition})` : ""}
+              {slot.decidedByName || slot.decidedByRole || ["approved", "rejected"].includes(String(slot.status).toLowerCase())
+                ? ` — ${formatDefectProcessActor({ byName: slot.decidedByName, byRole: slot.decidedByRole })}` : ""}
               {slot.decidedAt ? ` on ${formatProcessTime(slot.decidedAt)}` : ""}
               {slot.remarks ? (
                 <div className="ml-3 whitespace-pre-wrap [overflow-wrap:anywhere]">{slot.remarks}</div>

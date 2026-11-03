@@ -26,6 +26,7 @@ import {
 import { getPostgresClient } from '../../../postgresClient';
 import { getCurrentTenantContext } from '../../../utils/asyncLocalStorage';
 import { resolveRoleApproverUserIds } from '../../approvals/approvalCard';
+import { loadDefectActorRoles } from './defectActorRoles';
 
 // ── Core Defects ──
 
@@ -419,6 +420,7 @@ type DefectApprovalChain = {
       status: 'pending' | 'active' | 'approved' | 'rejected' | 'skipped';
       decidedByName: string | null;
       decidedByPosition: string | null;
+      decidedByRole?: string | null;
       decidedAt: string | null;
       remarks: string | null;
     }>;
@@ -456,6 +458,7 @@ const projectApprovalChain = async (
   scope: any,
   actorUserId?: string | null,
   actorRole?: string | null,
+  actorRoles: ReadonlyMap<string, string | null> = new Map(),
 ): Promise<DefectApprovalChain> => {
   const activeRequest = request?.status === 'pending' ? request : null;
   const actorDecision = activeRequest
@@ -493,6 +496,7 @@ const projectApprovalChain = async (
         slotId: `${node.key}:${slotOrdinal}`, roleLabel: persisted?.roleLabel ?? slot.roleLabel,
         status: slotViewStatus(persisted?.status), decidedByName: identity?.name ?? null,
         decidedByPosition: identity?.roleLabel ?? null, decidedAt: persisted?.decidedAt ?? null,
+        decidedByRole: persisted?.decidedBy ? actorRoles.get(persisted.decidedBy) ?? null : null,
         remarks: persisted?.remarks ?? null,
       };
     });
@@ -605,7 +609,8 @@ export async function getDefectApprovalChain(
     workflow = await activeWorkflowScoped(scope, classification);
   }
 
-  const chain = await projectApprovalChain(request, workflow, classification, scope, actorUserId, actorRole);
+  const actorRoles = await loadDefectActorRoles(requests.flatMap(r => (r.slots ?? []).map(slot => slot.decidedBy)));
+  const chain = await projectApprovalChain(request, workflow, classification, scope, actorUserId, actorRole, actorRoles);
   if (action !== 'extension') return chain;
 
   // This is deliberately derived from the single requests-in-scopes read above.
@@ -617,7 +622,7 @@ export async function getDefectApprovalChain(
     const matched = entry?.id == null ? null : matches.get(String(entry.id));
     if (!matched) return;
     extensionChains[String(entry.id)] = await projectApprovalChain(
-      matched, matched.snapshot, matched.classification, matched.scope, actorUserId, actorRole,
+      matched, matched.snapshot, matched.classification, matched.scope, actorUserId, actorRole, actorRoles,
     );
   }));
   return entries.length ? { ...chain, extensionChains } : chain;
@@ -1162,7 +1167,10 @@ async function recordDefectSubmissions(previous: any, updated: any): Promise<voi
 export async function getDefectApprovalProcess(id: string) {
   const defect: any = await defectsRepo.getDefect(id);
   if (!defect) throw Object.assign(new Error(`Defect ${id} not found`), { statusCode: 404 });
-  const { approvalProcess, hasRecordedEvents } = await import('../../approvals/approvalHistoryService');
+  const { buildApprovalProcess } = await import('../../approvals/approvalHistoryService');
+  const { listEvents } = await import('../../approvals/approvalHistoryRepository');
+  const rows = await listEvents(defect.duuid, ['defect-extension', 'defect-verification']);
+  const actorRoles = await loadDefectActorRoles(rows.map(row => row.actorUuid));
   // Older records (before this history existed): rebuilt from the defect's own fields — who/when may be missing.
   // Only those: an entry stamped with its submitter (requestedByName) was recorded in the history already, and a
   // verification that has recorded events is never rebuilt (Date Completed is typed by the user — matching it to
@@ -1178,11 +1186,11 @@ export async function getDefectApprovalProcess(id: string) {
     }
   }
   const verLegacy: any[] = [];
-  const verRecorded = await hasRecordedEvents('defect-verification', defect.duuid);
+  const verRecorded = rows.some(row => row.subjectType === 'defect-verification');
   if (!verRecorded && defect.confirmCompleted) verLegacy.push({ type: 'submitted', at: defect.dateCompleted || null, byName: defect.closedByName ?? null, byPosition: defect.closedByRank ?? null, remarks: defect.closureComment ?? null });
   if (!verRecorded && defect.verified) verLegacy.push({ type: 'approved', at: defect.dateVerified || defect.verifiedDate || null, byName: defect.verifiedByName ?? null, byPosition: defect.verifiedByOfficePosition ?? null });
   return {
-    extension: await approvalProcess('defect-extension', defect.duuid, extLegacy),
-    verification: await approvalProcess('defect-verification', defect.duuid, verLegacy),
+    extension: buildApprovalProcess('defect-extension', rows.filter(row => row.subjectType === 'defect-extension'), extLegacy, actorRoles),
+    verification: buildApprovalProcess('defect-verification', rows.filter(row => row.subjectType === 'defect-verification'), verLegacy, actorRoles),
   };
 }

@@ -8,7 +8,12 @@ const mocks = vi.hoisted(() => ({
   isApprovalEngineAvailable: vi.fn(),
   classifyDefect: vi.fn(),
   deciderIdentity: vi.fn(),
+  loadDefectActorRoles: vi.fn(),
+  listEvents: vi.fn(),
 }));
+
+vi.mock('../services/defectActorRoles', () => ({ loadDefectActorRoles: mocks.loadDefectActorRoles }));
+vi.mock('../../approvals/approvalHistoryRepository', () => ({ listEvents: mocks.listEvents }));
 
 vi.mock('../repositories/defectsRepository', () => ({
   getDefect: mocks.getDefect,
@@ -32,7 +37,7 @@ vi.mock('../../approvals/engineGateway', () => ({
   isApprovalEngineAvailable: mocks.isApprovalEngineAvailable,
 }));
 
-import { getDefectApprovalChain } from '../services/defectsService';
+import { getDefectApprovalChain, getDefectApprovalProcess } from '../services/defectsService';
 
 const nodes = [
   {
@@ -76,6 +81,26 @@ describe('Defects approval chain projection', () => {
     mocks.activeWorkflowScoped.mockResolvedValue(null);
     mocks.isApprovalEngineAvailable.mockReturnValue(true);
     mocks.deciderIdentity.mockResolvedValue({ name: 'A. Approver', roleLabel: 'Chief Engineer' });
+    mocks.loadDefectActorRoles.mockResolvedValue(new Map([['actual-actor', 'Sail Admin']]));
+  });
+
+  it('enriches both process scopes by actor identity without changing historical positions or events', async () => {
+    const rows = [
+      { subjectType: 'defect-extension', eventType: 'submitted', actorUuid: 'actual-actor' },
+      { subjectType: 'defect-extension', eventType: 'approved', actorUuid: 'actual-actor', remarks: 'ADMIN OVERRIDE' },
+      { subjectType: 'defect-verification', eventType: 'rejected', actorUuid: 'missing-actor' },
+    ].map((r, i) => ({ actorName: 'Same Name', actorPosition: 'Master', occurredAt: new Date(`2026-11-03T0${i + 1}:00:00Z`), stepLabel: null, remarks: null, ...r }));
+    mocks.listEvents.mockResolvedValue(rows);
+    const before = structuredClone(rows);
+    const result = await getDefectApprovalProcess('DEF-1');
+    expect(result.extension.attempts[0].events[1]).toMatchObject({
+      byName: 'Same Name', byPosition: 'Master', byRole: 'Sail Admin', remarks: 'ADMIN OVERRIDE',
+    });
+    expect(result.verification.attempts[0].events[0]).toMatchObject({ byPosition: 'Master', byRole: null });
+    expect(mocks.loadDefectActorRoles).toHaveBeenCalledOnce();
+    expect(mocks.loadDefectActorRoles).toHaveBeenCalledWith(['actual-actor', 'actual-actor', 'missing-actor']);
+    expect(rows).toEqual(before);
+    expect(mocks.listEvents).toHaveBeenCalledWith('defect-uuid-1', ['defect-extension', 'defect-verification']);
   });
 
   it('returns the stable no-workflow shape without writing', async () => {
