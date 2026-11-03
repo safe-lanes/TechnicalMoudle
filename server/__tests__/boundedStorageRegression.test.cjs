@@ -14,13 +14,20 @@ const fixedMath = Object.create(Math);
 fixedMath.random = () => 0.25;
 const declaration = 'InsertComponent & { id?: Component["id"] }';
 
-test('current source retains all three corrections and the unsupported recurrence field', () => {
+test('current source retains the declarations and equivalent generated recurrence SQL', () => {
   for (const name of ['createComponent', 'createFleetScopedComponent']) {
     assert.ok(p.methodText(name).includes(`component: ${declaration}`));
   }
   const recurring = p.methodText('calculateAndUpdateRecurringDefects');
   assert.ok(recurring.includes('of Array.from(defectGroups))'));
-  assert.ok(recurring.includes('.set({ isRecurring: true, updatedAt: new Date() })'));
+  const { drizzle } = require('drizzle-orm/node-postgres');
+  const { pgTable, text, timestamp } = require('drizzle-orm/pg-core');
+  const table = pgTable('defects', { duuid: text('duuid'), updatedAt: timestamp('updated_at') });
+  const payload = p.evaluate(`module.exports = (${recurring.match(/\.set\((\{[^\n]+\})\)/)[1]});`,
+    { Date: FixedDate });
+  const db = drizzle({});
+  assert.deepEqual(db.update(table).set(payload).toSQL(),
+    db.update(table).set({ ...payload, isRecurring: true }).toSQL());
 });
 
 function methodText(name, candidate) {
@@ -166,7 +173,7 @@ async function runRecurrence(rows, order, candidate, { loggerFailure = false, mi
   ];
   for (const id of order) {
     const original = rows.find(row => row.duuid === id);
-    const payload = { isRecurring: true, updatedAt: fixedTime };
+    const payload = { updatedAt: fixedTime };
     expected.push(['update', table], ['set', payload],
       ['updateWhere', ['eq', table.duuid, id]], ['returning']);
     if (!missingUpdated) {

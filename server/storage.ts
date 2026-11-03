@@ -443,8 +443,8 @@ export interface IStorage {
   getFleetSpares(): Promise<Spare[]>;
   getFleetSpare(id: number): Promise<Spare | undefined>;
   createFleetSpare(spare: InsertSpare): Promise<Spare>;
-  updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare>;
-  deleteFleetSpare(id: number): Promise<void>;
+  updateFleetSpare(id: string, data: Partial<Spare>): Promise<Spare>;
+  deleteFleetSpare(id: string): Promise<void>;
   
   // Spares History methods
   getSpareHistory(vesselId: string, vesselIds?: string[]): Promise<SpareHistory[]>;
@@ -481,7 +481,7 @@ export interface IStorage {
   
   // Bulk Import methods
   bulkCreateComponents(components: InsertComponent[]): Promise<Component[]>;
-  bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]>;
+  bulkUpdateComponents(components: Array<{ id: string; cuuid: string; data: Partial<Component> }>): Promise<Component[]>;
   bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }>;
   bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]>;
   bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }>;

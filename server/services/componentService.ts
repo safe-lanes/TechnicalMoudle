@@ -178,7 +178,7 @@ export class ComponentService {
   /**
    * Bulk update components
    */
-  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
+  async bulkUpdateComponents(components: Array<{ id: string; cuuid: string; data: Partial<Component> }>): Promise<Component[]> {
     return storage.bulkUpdateComponents(components);
   }
 

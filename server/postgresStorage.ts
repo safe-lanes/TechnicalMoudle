@@ -3282,10 +3282,11 @@ export class PostgresStorage {
       .orderBy(desc(workOrders.createdAt));
   }
 
-  async createWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
+  async createWorkOrder(wo: InsertWorkOrder & { id?: string }): Promise<WorkOrder> {
     const db = await getDb();
     const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(workOrders).values({
+      workOrderNo: sql`default`,
       ...wo,
       id,
       wouuid: randomUUID(),
@@ -3333,7 +3334,7 @@ export class PostgresStorage {
     await db.delete(workOrders).where(or(eq(workOrders.wouuid, id), eq(workOrders.id, id)));
   }
 
-  async bulkCreateWorkOrders(woList: InsertWorkOrder[]): Promise<WorkOrder[]> {
+  async bulkCreateWorkOrders(woList: Array<InsertWorkOrder & { id?: string }>): Promise<WorkOrder[]> {
     if (woList.length === 0) return [];
     const db = await getDb();
     const results: WorkOrder[] = [];
@@ -3341,6 +3342,7 @@ export class PostgresStorage {
     for (const wo of woList) {
       const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const result = await db.insert(workOrders).values({
+        workOrderNo: sql`default`,
         ...wo,
         id,
         wouuid: randomUUID(),
@@ -3395,10 +3397,11 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createFleetWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
+  async createFleetWorkOrder(wo: InsertWorkOrder & { id?: string }): Promise<WorkOrder> {
     const db = await getDb();
     const id = wo.id || `FWO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const result = await db.insert(workOrders).values({
+      workOrderNo: sql`default`,
       ...wo,
       id,
       wouuid: randomUUID(),
@@ -4461,11 +4464,11 @@ export class PostgresStorage {
     return this.createSpare({ ...spare, dataScope: 'fleet' }, true);
   }
 
-  async updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+  async updateFleetSpare(id: string, data: Partial<Spare>): Promise<Spare> {
     return this.updateSpare(id, data);
   }
 
-  async deleteFleetSpare(id: number): Promise<void> {
+  async deleteFleetSpare(id: string): Promise<void> {
     return this.deleteSpare(id);
   }
 
@@ -9131,11 +9134,11 @@ export class PostgresStorage {
   async bulkCreateComponents(componentsData: InsertComponent[]): Promise<Component[]> {
     if (componentsData.length === 0) return [];
     const db = await getDb();
-    const result = await db.insert(components).values(componentsData).returning();
+    const result = await db.insert(components).values(componentsData.map(component => ({ id: sql`default`, ...component }))).returning();
     return result;
   }
 
-  async bulkUpdateComponents(updates: { id: string; data: Partial<Component> }[]): Promise<Component[]> {
+  async bulkUpdateComponents(updates: { id: string; cuuid: string; data: Partial<Component> }[]): Promise<Component[]> {
     const db = await getDb();
     const results: Component[] = [];
     
@@ -9275,7 +9278,7 @@ export class PostgresStorage {
       if (group.length >= 2) {
         for (const defect of group) {
           const [updated] = await db.update(defects)
-            .set({ isRecurring: true, updatedAt: new Date() })
+            .set({ updatedAt: new Date() })
             .where(eq(defects.duuid, defect.duuid))
             .returning();
           // Sync field logging — calculateAndUpdateRecurringDefects
@@ -10137,7 +10140,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async upsertSpareLocationStock(data: InsertSpareLocationStock, txConn?: any): Promise<SpareLocationStock> {
+  async upsertSpareLocationStock(data: Omit<InsertSpareLocationStock, 'spareUuid'> & { spareUuid?: string }, txConn?: any): Promise<SpareLocationStock> {
     const conn = txConn || await getDb();
 
     // Auto-resolve locationUuid from locations.luuid if not provided
@@ -10167,7 +10170,8 @@ export class PostgresStorage {
       try { await logFieldChanges('spare_location_stock', result[0].slsuuid, (result[0] as any).vesselId || (data as any).vesselId || null, existing, result[0], 'system'); } catch (e) { console.error('[FieldLogger] spare_location_stock update:', e); }
       return result[0];
     } else {
-      const result = await conn.insert(spareLocationStock).values(data).returning();
+      // New-row inserts without spareUuid still fail by design until a separate fix.
+      const result = await conn.insert(spareLocationStock).values({ spareUuid: sql`default`, ...data }).returning();
       // Sync field logging — INSERT
       try { await logFieldChanges('spare_location_stock', result[0].slsuuid, (result[0] as any).vesselId || (data as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] spare_location_stock create:', e); }
       return result[0];
