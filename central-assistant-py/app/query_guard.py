@@ -356,6 +356,7 @@ _ALL_REPORT_TYPES_RE = re.compile(r"\bunsafe\b|\breport\s+types?\b|\btypes?\b|\b
 COMPLETED_STATUSES = ["Done", "Closed"]
 COMPLETED_NOTE = "Completed means status Done or Closed. The History tab also lists inspections in other statuses, such as Processed or Uploaded."
 NEAR_MISS_NOTE = "This counts report type Near Miss only. Unsafe Acts and Unsafe Conditions are separate report types and are not included."
+NEAR_MISS_ACTIONS_NOTE = "Near-miss actions cover the whole Near Miss screen, including actions from Unsafe Act and Unsafe Condition reports."
 
 
 def apply_area_definitions(tool: str, args: dict[str, Any], text: str) -> dict[str, Any]:
@@ -376,6 +377,8 @@ def definition_note(tool: str, args: dict[str, Any]) -> str | None:
         return COMPLETED_NOTE
     if tool == "incident_query_near_misses" and (args.get("reportTypes") or []) == ["Near Miss"]:
         return NEAR_MISS_NOTE
+    if tool == "incident_query_actions" and (not args.get("sources") or "near_miss" in args["sources"]):
+        return NEAR_MISS_ACTIONS_NOTE
     return None
 
 

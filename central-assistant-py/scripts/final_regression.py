@@ -322,7 +322,7 @@ def areas():
     ask("near misses in a year = type Near Miss", "incident", "How many near misses were reported in 2024?", "incident_query_near_misses", {"mode": "count", "dateFrom": "2024-01-01", "dateTo": "2024-12-31", "reportTypes": ["Near Miss"]}, words=["Unsafe"])
     ask("unsafe acts are their own count", "incident", "How many unsafe acts were reported in 2024?", "incident_query_near_misses", {"mode": "count", "dateFrom": "2024-01-01", "dateTo": "2024-12-31", "reportTypes": ["Unsafe Act"]})
     ask("whole screen when asked", "incident", "How many reports of all types are on the Near Miss screen?", "incident_query_near_misses", {"mode": "count"})
-    ask("incident actions: pending", "incident", "How many incident and near miss actions are pending?", "incident_query_actions", {"mode": "count"})
+    ask("incident actions: pending, near-miss scope stated", "incident", "How many incident and near miss actions are pending?", "incident_query_actions", {"mode": "count"}, words=["Unsafe"])
     ask("lessons + fleet: total", "incident", "How many lessons learnt and fleet notifications are there?", "incident_query_lessons_fleet", {"mode": "count"})
     # missing records never a false zero
     for mod, q in (("audit", "How many preparations does vessel Zyzzyva Nonexistent have?"), ("safety", "How many safety meetings has vessel Zyzzyva Nonexistent held?"), ("incident", "How many near misses does vessel Zyzzyva Nonexistent have?")):

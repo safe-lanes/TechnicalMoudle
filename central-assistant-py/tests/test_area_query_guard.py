@@ -252,3 +252,5 @@ def test_agreed_definitions_completed_and_near_miss():
     assert a("incident_query_actions", {"mode": "count"}, "near misses") == {"mode": "count"}
     assert "Unsafe" in n(N, {"reportTypes": ["Near Miss"]}) and n(N, {"reportTypes": ["Unsafe Act"]}) is None
     assert "Done" in n(I, {"statuses": ["Closed", "Done"]}) and n(I, {"mode": "count"}) is None
+    A = "incident_query_actions"
+    assert "Unsafe" in n(A, {"mode": "count"}) and "Unsafe" in n(A, {"sources": ["near_miss"]}) and n(A, {"sources": ["incident"]}) is None
