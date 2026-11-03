@@ -41,12 +41,13 @@ export async function findById(id: string): Promise<Component | undefined> {
   return augmented;
 }
 
-export async function findByIdOrCode(id: string, vesselId: string): Promise<Component | undefined> {
+export async function findByIdOrCode(id: string, vesselId: string | null): Promise<Component | undefined> {
   const byId = await storage.getComponent(id);
   if (byId) {
     const [augmented] = await augmentWithSortOrder([byId]);
     return augmented;
   }
+  if (vesselId === null) return undefined;
   const byCode = await storage.getComponentByCode(id, vesselId);
   if (byCode) {
     const [augmented] = await augmentWithSortOrder([byCode]);
