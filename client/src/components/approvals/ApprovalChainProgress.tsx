@@ -194,31 +194,36 @@ export function ApprovalChainProgress({
   screenId,
   subjectRef,
   chain,
+  title = "Approval progress",
 }: {
   screenId: string;
   subjectRef: string | null | undefined;
   /** Supply this for the compact defects endpoint without changing legacy consumers. */
   chain?: DefectApprovalChain | null;
+  /** Opt-in heading for a contextual use; all existing consumers retain the default. */
+  title?: string;
 }) {
   // Keep the existing request/status behavior untouched for PMS and Work Orders. A supplied
   // chain intentionally disables that legacy query and only changes this component's data view.
   const { latestRequest: request } = useApprovalChain(screenId, chain !== undefined ? null : subjectRef);
   if (chain !== undefined) {
     if (!chain || (!chain.hasActiveWorkflow && !chain.steps?.length && !["rejected", "returned"].includes(String(chain.requestStatus).toLowerCase()))) return null;
-    return <DefectChainProgress chain={chain} />;
+    return <DefectChainProgress chain={chain} title={title} />;
   }
   if (!request) return null;
   const steps = request.snapshot.nodes.filter((n) => n.type === "approval-step").sort((a, b) => a.ordinal - b.ordinal);
   return (
     <div style={{ border: "1px solid #e4e7ec", borderRadius: 8, padding: 10, margin: "8px 0", fontSize: 13 }} data-testid="approval-chain-progress">
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>
-        Approval progress
-        {request.status !== "pending" && (
-          <span data-testid="approval-chain-final-status" style={{ marginLeft: 8, fontWeight: 500, color: request.status === "approved" ? "#067647" : "#b42318" }}>
-            — {request.status === "approved" ? "Approved" : request.status === "returned" ? "Returned" : request.status === "withdrawn" ? "Withdrawn" : request.status}
-          </span>
-        )}
-      </div>
+      {(title || request.status !== "pending") && (
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>
+          {title}
+          {request.status !== "pending" && (
+            <span data-testid="approval-chain-final-status" style={{ marginLeft: 8, fontWeight: 500, color: request.status === "approved" ? "#067647" : "#b42318" }}>
+              {title ? " — " : ""}{request.status === "approved" ? "Approved" : request.status === "returned" ? "Returned" : request.status === "withdrawn" ? "Withdrawn" : request.status}
+            </span>
+          )}
+        </div>
+      )}
       {steps.map((n) => {
         const slots = request.slots.filter((s) => s.nodeKey === n.key);
         return (
@@ -245,7 +250,7 @@ export function ApprovalChainProgress({
   );
 }
 
-export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
+export function DefectChainProgress({ chain, title = "Approval progress" }: { chain: DefectApprovalChain; title?: string }) {
   const steps = Array.isArray(chain.steps) ? chain.steps : [];
   const rejectedStepIndex = steps.findIndex((step) =>
     String(step.status).toLowerCase() === "rejected"
@@ -263,7 +268,7 @@ export function DefectChainProgress({ chain }: { chain: DefectApprovalChain }) {
 
   return (
     <div style={{ border: "1px solid #e4e7ec", borderRadius: 8, padding: 10, margin: "8px 0", fontSize: 13 }} data-testid="approval-chain-progress">
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>Approval progress</div>
+      {title && <div style={{ fontWeight: 600, marginBottom: 6 }}>{title}</div>}
       <div className="space-y-1">
         {steps.length === 0 ? (
           <div className="text-sm text-gray-600">No approval steps are configured.</div>

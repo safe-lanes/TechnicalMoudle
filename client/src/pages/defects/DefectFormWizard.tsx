@@ -43,7 +43,11 @@ import {
   type DefectApprovalChain,
 } from "@/components/approvals/ApprovalChainProgress";
 import { WithdrawRequestPanel } from "@/components/approvals/WithdrawRequestPanel";
-import { ApprovalProcessSection, type ApprovalProcess } from "@/components/approvals/ApprovalProcessSection";
+import {
+  ApprovalProcessSection,
+  type ApprovalProcess,
+} from "@/components/approvals/ApprovalProcessSection";
+import { DefectExtensionApprovalProcess } from "./DefectExtensionApprovalProcess";
 import {
   Form,
   FormControl,
@@ -218,6 +222,7 @@ function ExtensionCard({
   status,
   children,
   approval,
+  approvalProcess,
 }: {
   entry: ExtensionHistoryRecord;
   index: number;
@@ -227,6 +232,7 @@ function ExtensionCard({
   status?: string | null;
   children?: ReactNode;
   approval?: ReactNode;
+  approvalProcess?: ReactNode;
 }) {
   const presentation = projectExtensionCardPresentation({
     index,
@@ -236,7 +242,7 @@ function ExtensionCard({
     reasonForExtension: entry.reasonForExtension,
   });
   // Jeevan #7: without an engine chain (vessel, or entries from before the engine) show the decision itself.
-  const outcome = chain ? null : extensionOutcome(entry);
+  const outcome = chain && approval !== null ? null : extensionOutcome(entry);
   const body = (
     <div className="space-y-4 border-t border-slate-100 p-4 text-sm">
       {children ?? (
@@ -262,8 +268,9 @@ function ExtensionCard({
           {outcome.comments && <div className="mt-1 whitespace-pre-wrap"><span className="text-slate-600">Approver comments: </span>{outcome.comments}</div>}
         </div>
       )}
+      {approvalProcess}
       <div>
-        {outcome && approval === undefined ? null : approval !== undefined ? approval : (chain ? <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} /> : (
+        {outcome && approval === undefined ? null : approval !== undefined ? approval : (chain ? <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} title="Entry approval details" /> : (
           <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" data-testid={`extension-chain-unmatched-${entry.id}`}>
             No approval chain is associated with this entry. Historical approval data was not inferred.
           </div>
@@ -446,12 +453,15 @@ export function DefectApprovalStatus({
   approval,
   canEdit,
   previewWhenNoRequest = false,
+  showProgress = true,
 }: {
   action: "extension" | "verification";
   defectId: string | number | null;
   approval: ReturnType<typeof useDefectApprovalChain>;
   canEdit: boolean;
   previewWhenNoRequest?: boolean;
+  /** Suppress only the step projection when a separate, consolidated history is shown. */
+  showProgress?: boolean;
 }) {
   const actionLabel = action === "extension" ? "Defect Target Date Extension" : "Defect Verification";
   const presentation = resolveDefectApprovalPresentation(approval, canEdit);
@@ -502,7 +512,7 @@ export function DefectApprovalStatus({
   }
   return (
     <>
-      <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} />
+      {showProgress && <ApprovalChainProgress screenId="" subjectRef={null} chain={chain} />}
       {presentation.showDecisionControls && defectId !== null && <ApprovalDecisionPanel chain={chain} defectId={defectId} action={action} canEdit={canEdit} onDecided={() => void approval.refetch()} />}
     </>
   );
@@ -2434,7 +2444,6 @@ export default function DefectFormWizard({
                     {extensionUi.showContainer && (
                       <div className="border border-amber-300 rounded-lg p-6 bg-amber-50/30 space-y-6">
                         <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B5. Target Date Extension</h3>
-                        <ApprovalProcessSection blocks={[{ title: "Target date extension", process: defectApprovalProcess.data?.extension }]} />
                         {orphanedRequestedExtension && (
                           <div
                             className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
@@ -2452,6 +2461,15 @@ export default function DefectFormWizard({
                             total={visibleExtensionTotal}
                             chain={(row.chain as DefectApprovalChain | undefined) ?? null}
                             current={false}
+                            approvalProcess={row.entry.id === latestExtension?.id ? (
+                              <DefectExtensionApprovalProcess
+                                process={defectApprovalProcess.data?.extension}
+                                isLoading={defectApprovalProcess.isLoading}
+                                chain={(row.chain as DefectApprovalChain | undefined) ?? null}
+                                chainStatus={extensionApproval.isLoading ? "loading" : extensionApproval.error ? "error" : "resolved"}
+                              />
+                            ) : undefined}
+                            approval={row.entry.id === latestExtension?.id ? null : undefined}
                           />
                         ))}
 
@@ -2463,6 +2481,14 @@ export default function DefectFormWizard({
                             chain={currentExtensionChain}
                             current
                             status={displayedExtensionStatus}
+                            approvalProcess={(
+                              <DefectExtensionApprovalProcess
+                                process={defectApprovalProcess.data?.extension}
+                                isLoading={defectApprovalProcess.isLoading}
+                                chain={currentExtensionChain}
+                                chainStatus={extensionApproval.isLoading ? "loading" : extensionApproval.error ? "error" : "resolved"}
+                              />
+                            )}
                             approval={(
                               <>
                                 {hasExtensionChainsProjection && !currentExtensionChain ? (
@@ -2477,6 +2503,7 @@ export default function DefectFormWizard({
                                     defectId={approvalDefectId}
                                     approval={currentExtensionApproval}
                                     canEdit={canEditDefect && !isViewMode && String(displayedExtensionStatus ?? "").toLowerCase() === "requested"}
+                                    showProgress={false}
                                   />
                                 )}
                                 {approvalDefectId && displayedExtension.id && (
@@ -2570,6 +2597,7 @@ export default function DefectFormWizard({
                             defectId={approvalDefectId}
                             approval={currentExtensionApproval}
                             canEdit={canEditDefect && !isViewMode && String(displayedExtensionStatus ?? "").toLowerCase() === "requested"}
+                            showProgress={false}
                           />
                         ) : (
                           <div data-testid="extension-approval-preview-container">
