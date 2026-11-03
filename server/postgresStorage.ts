@@ -1359,7 +1359,7 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async getComponentByCode(componentCode: string, vesselId: string | null): Promise<Component | undefined> {
+  async getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined> {
     const db = await getDb();
     const result = await db.select().from(components)
       .where(and(

@@ -268,7 +268,7 @@ export interface IStorage {
   // Running Hours methods
   getComponents(vesselId: string, vesselIds?: string[]): Promise<Component[]>;
   getComponent(id: string): Promise<Component | undefined>;
-  getComponentByCode(componentCode: string, vesselId: string | null): Promise<Component | undefined>;
+  getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>;
   createComponent(component: Omit<InsertComponent, "cuuid"> & { cuuid?: string }): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
   deleteComponent(id: string, userId?: string): Promise<void>;

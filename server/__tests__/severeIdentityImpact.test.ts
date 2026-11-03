@@ -30,9 +30,10 @@ describe('severe review: isolated source probes (not full API/database tests)', 
   });
 
   it('candidate factory input declaration emits identical executable method', () => {
-    const before = probe.methodText('createComponent');
-    const after = before.replace('component: InsertComponent',
-      "component: Omit<InsertComponent, 'cuuid'> & { cuuid?: string }");
+    const after = probe.methodText('createComponent');
+    const before = after.replace(
+      'Omit<InsertComponent, "cuuid"> & { cuuid?: string; id?: Component["id"] }',
+      'InsertComponent & { id?: Component["id"] }');
     expect(after).not.toBe(before);
     expect(probe.compile(`class Factory { ${after} }`))
       .toBe(probe.compile(`class Factory { ${before} }`));
@@ -215,13 +216,26 @@ describe('severe review: isolated source probes (not full API/database tests)', 
     'legacy audit expression exposes vessel policy for %s/%s', async (woVessel, componentVessel, expected) => {
       const call = probe.extract('server/services/workOrderService.ts', (node: any) =>
         probe.ts.isCallExpression(node) && node.expression.getText() === 'storage.createRunningHoursAudit');
+      const auditSource = probe.source('server/services/workOrderService.ts');
+      const guardStart = auditSource.indexOf('              const auditVesselId = wo.vesselId || component.vesselId;');
+      const guardEnd = auditSource.indexOf('              await storage.createRunningHoursAudit(', guardStart);
+      expect(guardStart).toBeGreaterThan(-1);
+      expect(guardEnd).toBeGreaterThan(guardStart);
+      const guard = auditSource.slice(guardStart, guardEnd);
       const write = vi.fn();
       const run = probe.exported(`async function probe(wo, component) {
         const previousRH=100, runningHours=120, completionDate='2026-01-01', updatesAny={};
+        ${guard}
         await ${call};
-      }`, 'probe', { storage: { createRunningHoursAudit: write } });
-      await run({ id: 'wo-local', vesselId: woVessel }, { cuuid: 'component-canonical', vesselId: componentVessel });
-      expect(write).toHaveBeenCalledWith(expect.objectContaining({ vesselId: expected, newRH: '120' }));
+      }`, 'probe', { storage: { createRunningHoursAudit: write }, ValidationError });
+      const pending = run({ id: 'wo-local', vesselId: woVessel }, { cuuid: 'component-canonical', vesselId: componentVessel });
+      if (expected === null) {
+        await expect(pending).rejects.toThrow('Vessel ID is required for the running hours audit');
+        expect(write).not.toHaveBeenCalled();
+      } else {
+        await pending;
+        expect(write).toHaveBeenCalledWith(expect.objectContaining({ vesselId: expected, newRH: '120' }));
+      }
     },
   );
 

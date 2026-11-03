@@ -39,11 +39,18 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin" | "Super Admin" | "Vessel Admin" | "Vessel User" | "External 10";
 
-export type PublicUser = Omit<User, "password" | "role"> & {
+export type PublicUser = Omit<User, "password" | "role" | "isDeleted" | "createdByUuid" | "updatedByUuid" | "isSync" | "sortOrder" | "department"> & {
   role: UserRole;
   crewDesignation?: string;
   rankId?: string;
   rank_name?: string;
+  rankIsDefault?: boolean;
+  isDeleted?: User["isDeleted"];
+  createdByUuid?: User["createdByUuid"];
+  updatedByUuid?: User["updatedByUuid"];
+  isSync?: User["isSync"];
+  sortOrder?: User["sortOrder"];
+  department?: User["department"];
   userType?: "Office" | "Ship";
   userUuid?: string;
   firstname?: string;
