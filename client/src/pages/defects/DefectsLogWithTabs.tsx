@@ -672,27 +672,13 @@ export default function DefectsLogWithTabs() {
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
     setGridApi(params.api);
-    params.api.sizeColumnsToFit();
   }, []);
-
-  useEffect(() => {
-    if (!gridApi) return;
-    
-    const handleResize = () => {
-      setTimeout(() => {
-        gridApi.sizeColumnsToFit();
-      }, 100);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [gridApi]);
 
   const columnDefs: ColDef[] = [
     {
       headerName: 'ID',
       field: 'id',
-      flex: 1,
+      initialFlex: 1,
       cellStyle: { fontSize: '13px', color: '#2563eb' },
       filter: 'agTextColumnFilter',
       sortable: true,
@@ -701,7 +687,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Vessel',
       field: 'vesselName',
-      flex: 0.8,
+      initialFlex: 0.8,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agSetColumnFilter',
       sortable: true,
@@ -710,7 +696,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Issue Date',
       field: 'issueDate',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -719,7 +705,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Category',
       field: 'category',
-      flex: 0.7,
+      initialFlex: 0.7,
       cellRenderer: CategoryCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
@@ -729,7 +715,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Component',
       field: 'componentHardwareLevel3',
-      flex: 0.88,
+      initialFlex: 0.88,
       autoHeight: true,
       wrapText: true,
       cellStyle: { fontSize: '13px', color: '#4f5863', lineHeight: '1.4' },
@@ -742,7 +728,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Description',
       field: 'description',
-      flex: 1.5,
+      initialFlex: 1.5,
       cellRenderer: HtmlTextCellRenderer,
       autoHeight: true,
       wrapText: true,
@@ -754,7 +740,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Action Taken / Requested',
       field: 'actionTakenRequested',
-      flex: 1.5,
+      initialFlex: 1.5,
       cellRenderer: HtmlTextCellRenderer,
       autoHeight: true,
       wrapText: true,
@@ -767,7 +753,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Target Date',
       field: 'targetCloseDate',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -776,7 +762,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Date Compl.',
       field: 'dateCompleted',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -785,7 +771,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Status',
       field: 'status',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: StatusCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
@@ -795,7 +781,7 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Priority',
       field: 'priority',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: PriorityCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
@@ -805,10 +791,11 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Actions',
       field: 'actions',
-      flex: 0.8,
+      initialFlex: 0.8,
       cellRenderer: ActionsCellRenderer,
       sortable: false,
       filter: false,
+      resizable: true,
       cellClass: 'flex items-center justify-center'
     }
   ];
@@ -917,9 +904,6 @@ export default function DefectsLogWithTabs() {
       </div>
 
       <div className="px-4 flex-1 flex flex-col min-h-0">
-        {isLoading ? (
-          <div className="text-center py-8 text-gray-500">Loading defects...</div>
-        ) : (
           <>
             <div className="flex-1 min-h-0">
               <AgGridTable
@@ -929,9 +913,12 @@ export default function DefectsLogWithTabs() {
                 enableSideBar={true}
                 enableStatusBar={false}
                 enableRowGrouping={true}
+                preserveColumnWidths
                 height="100%"
+                className="defects-resizable-grid"
                 gridOptions={{
-                  domLayout: 'normal'
+                  domLayout: 'normal',
+                  loading: isLoading
                 }}
                 context={{
                   handleViewClick,
@@ -995,7 +982,6 @@ export default function DefectsLogWithTabs() {
               </div>
             </div>
           </>
-        )}
       </div>
       
       {linkModal.defectId && (

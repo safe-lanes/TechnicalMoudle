@@ -564,19 +564,7 @@ export default function DefectsCoC() {
 
   const onGridReady = useCallback((event: GridReadyEvent) => {
     setGridApi(event.api);
-    event.api.sizeColumnsToFit();
   }, []);
-
-  useEffect(() => {
-    if (!gridApi) return;
-    const handleResize = () => {
-      setTimeout(() => {
-        gridApi.sizeColumnsToFit();
-      }, 100);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [gridApi]);
 
   // Force refresh of custom cell renderers when defects data changes
   // This ensures the Verified icon's disabled state updates dynamically
@@ -590,7 +578,7 @@ export default function DefectsCoC() {
     {
       headerName: 'ID',
       field: 'id',
-      flex: 0.8,
+      initialFlex: 0.8,
       cellStyle: { fontSize: '13px', color: '#2563eb' },
       filter: 'agTextColumnFilter',
       sortable: true,
@@ -599,7 +587,7 @@ export default function DefectsCoC() {
     {
       headerName: 'Vessel',
       field: 'vesselName',
-      flex: 0.7,
+      initialFlex: 0.7,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agSetColumnFilter',
       sortable: true,
@@ -608,7 +596,7 @@ export default function DefectsCoC() {
     {
       headerName: 'Issue Date',
       field: 'issueDate',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -617,7 +605,7 @@ export default function DefectsCoC() {
     {
       headerName: 'Category',
       field: 'category',
-      flex: 0.8,
+      initialFlex: 0.8,
       cellRenderer: CategoryCellRenderer,
       filter: 'agSetColumnFilter',
       sortable: true,
@@ -626,7 +614,7 @@ export default function DefectsCoC() {
     {
       headerName: 'Description',
       field: 'description',
-      flex: 1.5,
+      initialFlex: 1.5,
       cellRenderer: HtmlTextCellRenderer,
       autoHeight: true,
       wrapText: true,
@@ -638,7 +626,7 @@ export default function DefectsCoC() {
     {
       headerName: 'Action Taken / Requested',
       field: 'actionTakenRequested',
-      flex: 1.5,
+      initialFlex: 1.5,
       cellRenderer: HtmlTextCellRenderer,
       autoHeight: true,
       wrapText: true,
@@ -651,7 +639,7 @@ export default function DefectsCoC() {
     {
       headerName: 'Target Date',
       field: 'targetCloseDate',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -660,7 +648,7 @@ export default function DefectsCoC() {
     ...(includesResolved ? [{
       headerName: 'Date Compl.',
       field: 'dateCompleted',
-      flex: 0.6,
+      initialFlex: 0.6,
       cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
@@ -669,7 +657,7 @@ export default function DefectsCoC() {
     {
       headerName: 'Status',
       field: 'status',
-      flex: 0.5,
+      initialFlex: 0.5,
       cellRenderer: StatusCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
@@ -679,10 +667,11 @@ export default function DefectsCoC() {
     {
       headerName: 'Actions',
       field: 'actions',
-      flex: 0.9,
+      initialFlex: 0.9,
       cellRenderer: ActionsCellRenderer,
       sortable: false,
       filter: false,
+      resizable: true,
       cellClass: 'flex items-center justify-center'
     }
   ];
@@ -804,9 +793,6 @@ export default function DefectsCoC() {
 
       {/* AG Grid Table */}
       <div className="px-4 flex-1 flex flex-col min-h-0">
-        {isLoading ? (
-          <div className="text-center py-8 text-gray-500">Loading CoC defects...</div>
-        ) : (
           <div className="flex-1 min-h-0">
             <AgGridTable
               rowData={defects}
@@ -815,10 +801,13 @@ export default function DefectsCoC() {
               enableSideBar={true}
               enableStatusBar={false}
               enableRowGrouping={true}
+              preserveColumnWidths
               height="100%"
+              className="defects-resizable-grid"
               getRowId={(params) => params.data?.id || ''}
               gridOptions={{
-                domLayout: 'normal'
+                domLayout: 'normal',
+                loading: isLoading
               }}
               context={{
                 handleViewClick: handleViewDefect,
@@ -830,7 +819,6 @@ export default function DefectsCoC() {
               }}
             />
           </div>
-        )}
 
         <div className="flex-shrink-0 py-2">
           <AgGridTableActions
