@@ -7,12 +7,21 @@ import { defectFileCommitContext } from './defectFileContext';
 import { assertDefectFileAccess, fileError, type DefectFileActor } from './defectFileAccess';
 import { readStagedDefectFile, stagingNamespace, type StagedDefectFile } from './defectFileStaging';
 import { defectFileStore, fileHash } from './defectFileStorage';
-import { getDefectFileReadiness, assertLocalC1UploadAvailable } from './defectFileReadiness';
+import { assertLocalC1UploadAvailable } from './defectFileReadiness';
 import { getEffectiveInstanceId, isShipInstance } from '../../sync/syncRole';
 
 export function hasExternalDefectFiles(body: any) {
   return Object.values(DEFECT_SECTION_FIELDS).some(field =>
     Array.isArray(body?.[field]) && body[field].some(isExternalDefectAttachment));
+}
+function assertRetainedInlineAttachments(body: any, saved: any) {
+  for (const field of Object.values(DEFECT_SECTION_FIELDS)) {
+    if (Array.isArray(body[field]) && body[field].some((file: any) =>
+      !isExternalDefectAttachment(file) &&
+      !(saved?.[field] ?? []).some((old: any) => isDeepStrictEqual(old, file)))) {
+      throw fileError('Please use private file uploads for new attachments.', 409, 'EXTERNAL_UPLOAD_REQUIRED');
+    }
+  }
 }
 /**
  * File bytes are copied before the business transaction commits; staging stays
@@ -22,19 +31,7 @@ export function hasExternalDefectFiles(body: any) {
 export async function withDefectFileSave<T>(body: any, current: any, actor: DefectFileActor | undefined,
   work: (body: any) => Promise<T>, revalidate: (locked: any, body: any) => Promise<void>) {
   const pairs = Object.entries(DEFECT_SECTION_FIELDS);
-  // New C1 bytes always use owned private staging, even with an unready peer.
-  if (Array.isArray(body.partCAttachments) && body.partCAttachments.some((file: any) =>
-    !isExternalDefectAttachment(file) &&
-    !(current?.partCAttachments ?? []).some((old: any) => isDeepStrictEqual(old, file)))) {
-    throw fileError('Please upload new closure documents in Part C1 using private file uploads.', 409, 'EXTERNAL_UPLOAD_REQUIRED');
-  }
-  // A ready pair never silently falls back to storing NEW file bytes inline.
-  const ready = await getDefectFileReadiness(current?.vesselId ?? body.vesselId);
-  if (ready.externalStorage && pairs.some(([, field]) => Array.isArray(body[field]) &&
-      body[field].some((file: any) => !isExternalDefectAttachment(file) &&
-        !(current?.[field] ?? []).some((old: any) => isDeepStrictEqual(old, file))))) {
-    throw fileError('This vessel requires private file uploads. Please attach the file again.', 409, 'EXTERNAL_UPLOAD_REQUIRED');
-  }
+  assertRetainedInlineAttachments(body, current);
   const fileChange = pairs.some(([, field]) => body[field] !== undefined &&
     !isDeepStrictEqual(body[field], current?.[field] ?? []) &&
     [...(body[field] ?? []), ...(current?.[field] ?? [])].some(isExternalDefectAttachment));
@@ -55,6 +52,8 @@ export async function withDefectFileSave<T>(body: any, current: any, actor: Defe
         throw fileError('This defect changed while you were editing. Refresh before saving; your staged files are retained.', 409, 'DEFECT_STALE');
       }
     }
+    // Recheck against the authoritative locked row, not only the pre-lock snapshot.
+    assertRetainedInlineAttachments(body, locked);
     const output = { ...body };
     delete output.attachmentCommit;
     const staged: StagedDefectFile[] = [];
@@ -87,14 +86,7 @@ export async function withDefectFileSave<T>(body: any, current: any, actor: Defe
           if (alreadySaved) throw fileError('This staged form was already saved. Refresh to load its saved record.', 409, 'DEFECT_ALREADY_SAVED');
         }
         await assertDefectFileAccess(actor, vessel, manifest.section, locked);
-        if (section === 'part-c1') {
-          await assertLocalC1UploadAvailable();
-        } else {
-          const ready = await getDefectFileReadiness(vessel);
-          if (!ready.externalStorage) {
-            throw fileError('File compatibility changed before saving. Please retry after the vessel update; your form values are retained.', 409, 'DEFECT_FILES_UNAVAILABLE');
-          }
-        }
+        await assertLocalC1UploadAvailable();
         const bytes = await defectFileStore.read(`${stagingNamespace(actor)}/${manifest.token}.bin`, manifest.attachment.backend, true);
         if (bytes.length !== manifest.attachment.size || fileHash(bytes) !== manifest.attachment.sha256) throw fileError('Staged file integrity check failed.', 409);
         try { await defectFileStore.write(manifest.attachment.fileKey, bytes, manifest.attachment.backend); }
@@ -112,13 +104,7 @@ export async function withDefectFileSave<T>(body: any, current: any, actor: Defe
     await revalidate(locked, output);
     const result = await defectFileCommitContext.run({ tx, duuid, actorUuid: actor.userUuid }, () => work(output));
     if (staged.length) {
-      if (staged.some(file => file.section === 'part-c1')) await assertLocalC1UploadAvailable();
-      if (staged.some(file => file.section !== 'part-c1')) {
-        const finalReady = await getDefectFileReadiness(vessel);
-        if (!finalReady.externalStorage) {
-          throw fileError('File compatibility changed before saving. Please retry; your staged uploads are retained.', 409, 'DEFECT_FILES_UNAVAILABLE');
-        }
-      }
+      await assertLocalC1UploadAvailable();
     }
     const instance = await getEffectiveInstanceId();
     const direction = await isShipInstance() ? 'ship_to_shore' : 'shore_to_ship';

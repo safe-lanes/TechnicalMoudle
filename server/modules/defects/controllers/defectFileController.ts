@@ -3,7 +3,7 @@ import type { RequestHandler, Request, Response } from 'express';
 import { DEFECT_FILE_BYTES, DEFECT_SECTIONS, type DefectFileSection } from '@shared/defectAttachments';
 import { tenantStorage, getCurrentTenantContext } from '../../../utils/asyncLocalStorage';
 import { defectFileActor, assertDefectFileAccess, fileError } from '../services/defectFileAccess';
-import { getDefectFileReadiness, getLocalC1Availability, assertLocalC1UploadAvailable } from '../services/defectFileReadiness';
+import { getDefectFileReadiness, assertLocalC1UploadAvailable } from '../services/defectFileReadiness';
 import { stageDefectFile, readStagedDefectFile, stagingNamespace } from '../services/defectFileStaging';
 import { defectFileStore, fileHash } from '../services/defectFileStorage';
 import { defectFileContent } from '../services/defectFileDownload';
@@ -58,7 +58,7 @@ export const readiness = fileHandler(async (req, res) => {
   const actor = await defectFileActor(req);
   const vessel = String(req.query.vesselUuid ?? '');
   await assertDefectFileAccess(actor, vessel);
-  res.json({ ...await getDefectFileReadiness(vessel), ...await getLocalC1Availability(), backend: defectFileStore.backend() });
+  res.json({ ...await getDefectFileReadiness(vessel), backend: defectFileStore.backend() });
 });
 export const peerReports = fileHandler(async (req, res) => {
   const actor = await defectFileActor(req);

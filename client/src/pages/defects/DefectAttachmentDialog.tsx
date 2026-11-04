@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FileAttachmentDialog } from '@/components/FileAttachmentDialog';
 import { Download, Eye, FileText, Image as ImageIcon, Trash2, Upload } from 'lucide-react';
 import { getAccessToken } from '@/lib/authToken';
 import { DEFECT_FILE_BYTES, isExternalDefectAttachment, type DefectAttachment, type DefectFileSection } from '@shared/defectAttachments';
@@ -39,34 +38,21 @@ export function DefectAttachmentDialog(props: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef(props.attachments);
   filesRef.current = props.attachments;
-  // Leave the established inline A/B behavior untouched for incompatible pairs.
-  if (!props.externalStorage && !props.attachments.some(isExternalDefectAttachment)) {
-    return <FileAttachmentDialog {...props} attachments={props.attachments as any} onAttachmentsChange={props.onAttachmentsChange} />;
-  }
   async function upload(files: FileList | null) {
     if (!files || props.readOnly) return;
     setError(''); setBusy(true);
     try {
       for (const file of Array.from(files)) {
         if (file.size > DEFECT_FILE_BYTES) throw new Error('The maximum file size is 5 MB.');
-        let attachment: DefectAttachment;
-        if (props.externalStorage) {
-          const body = new FormData();
-          body.append('file', file); body.append('vesselUuid', props.vesselUuid); body.append('sessionId', props.sessionId);
-          const base = props.defectId ? `/technical/api/defects/${encodeURIComponent(String(props.defectId))}` : '/technical/api/defects';
-          const response = await fetch(`${base}/file-staging/${props.section}`, {
-            method: 'POST', body, headers: defectFileHeaders(props.user), credentials: 'include',
-          });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || 'Upload failed. Please retry.');
-          attachment = result;
-        } else {
-          const data = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader(); reader.onload = () => resolve(String(reader.result));
-            reader.onerror = () => reject(new Error('The file could not be read.')); reader.readAsDataURL(file);
-          });
-          attachment = { id: crypto.randomUUID(), name: file.name, size: file.size, type: file.type, data, uploadedAt: new Date().toISOString() };
-        }
+        const body = new FormData();
+        body.append('file', file); body.append('vesselUuid', props.vesselUuid); body.append('sessionId', props.sessionId);
+        const base = props.defectId ? `/technical/api/defects/${encodeURIComponent(String(props.defectId))}` : '/technical/api/defects';
+        const response = await fetch(`${base}/file-staging/${props.section}`, {
+          method: 'POST', body, headers: defectFileHeaders(props.user), credentials: 'include',
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Upload failed. Please retry.');
+        const attachment: DefectAttachment = result;
         filesRef.current = [...filesRef.current, attachment];
         props.onAttachmentsChange(filesRef.current);
       }

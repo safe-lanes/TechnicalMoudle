@@ -5,7 +5,7 @@ import {
 } from '@shared/defectAttachments';
 import { defectFileStore, fileHash, type DefectFileStore } from './defectFileStorage';
 import { assertDefectFileAccess, fileError, type DefectFileActor } from './defectFileAccess';
-import { getDefectFileReadiness, assertLocalC1UploadAvailable } from './defectFileReadiness';
+import { assertLocalC1UploadAvailable } from './defectFileReadiness';
 
 export type StagedDefectFile = {
   token: string; tenant: string; actorUuid: string; sessionId: string; vesselUuid: string;
@@ -37,12 +37,7 @@ export async function stageDefectFile(actor: DefectFileActor, input: {
   if (!UUID.test(input.sessionId) || !UUID.test(input.vesselUuid)) throw fileError('A valid vessel and upload session are required.');
   if (current && current.vesselId !== input.vesselUuid) throw fileError('The defect does not belong to this vessel.', 403);
   await assertDefectFileAccess(actor, input.vesselUuid, input.section, current);
-  if (input.section === 'part-c1') {
-    await assertLocalC1UploadAvailable();
-  } else {
-    const ready = await getDefectFileReadiness(input.vesselUuid);
-    if (!ready.externalStorage) throw fileError(ready.reason, 409, 'DEFECT_FILES_UNAVAILABLE');
-  }
+  await assertLocalC1UploadAvailable();
   const checked = validateDefectUpload(file);
   const token = randomUUID();
   const defectUuid = current?.duuid ?? draftDefectUuid(actor, input.sessionId, input.vesselUuid);

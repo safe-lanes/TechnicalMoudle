@@ -830,7 +830,7 @@ export default function DefectFormWizard({
       const response = await fetch(`/technical/api/defects/file-readiness?vesselUuid=${encodeURIComponent(attachmentVesselUuid)}`, {
         headers: defectFileHeaders(currentUser ?? undefined), credentials: "include",
       });
-      if (!response.ok) throw new Error("File compatibility could not be verified.");
+      if (!response.ok) throw new Error("Local attachment availability could not be checked.");
       return response.json();
     },
   });
@@ -1081,7 +1081,7 @@ export default function DefectFormWizard({
         partAAttachments: partAAttachments,
         attachments: fileAttachments,
         partCAttachments,
-        ...(attachmentAvailability.externalStorage || [partAAttachments, fileAttachments, partCAttachments].some(files => files.some(isExternalDefectAttachment))
+        ...(attachmentAvailability.c1LocalUpload || [partAAttachments, fileAttachments, partCAttachments].some(files => files.some(isExternalDefectAttachment))
           ? { attachmentCommit: { sessionId: attachmentSessionId, expectedUpdatedAt: currentDefect?.updatedAt ? new Date(currentDefect.updatedAt).toISOString() : null } } : {}),
         // Preserve saved legacy/unavailable IDs; the API validates new selections.
         closureFiles,
@@ -2873,9 +2873,6 @@ export default function DefectFormWizard({
                         {fileReadiness.isError ? "Local C1 attachment availability could not be checked. Please retry." : attachmentAvailability.c1LocalReason}
                         <button type="button" className="ml-2 underline" onClick={() => void fileReadiness.refetch()}>Retry</button>
                       </p>}
-                      {attachmentAvailability.c1LocalUpload && !attachmentAvailability.externalStorage && (
-                        <p className="text-sm text-gray-600">C1 documents can be saved locally. Transfer to the counterpart will wait until synchronization compatibility is verified.</p>
-                      )}
                       {separateEvidence.isError && <p className="text-sm text-red-700">Legacy evidence could not be loaded. <button type="button" className="underline" onClick={() => void separateEvidence.refetch()}>Retry</button></p>}
                       {partCAttachments.length === 0 ? (
                         <p className="text-sm text-gray-500">No Part C1 documents uploaded.</p>
@@ -3015,10 +3012,10 @@ export default function DefectFormWizard({
         onOpenChange={setIsAttachmentDialogOpen}
         attachments={fileAttachments}
         onAttachmentsChange={setFileAttachments}
-        readOnly={isViewMode}
+        readOnly={isViewMode || !attachmentAvailability.c1LocalUpload}
         title="Part B - Rectification Documentation"
         itemName="Rectification"
-        externalStorage={attachmentAvailability.externalStorage} section="part-b" vesselUuid={attachmentVesselUuid}
+        externalStorage={true} section="part-b" vesselUuid={attachmentVesselUuid}
         defectId={currentDefect?.id ?? createdDefectId ?? undefined} sessionId={attachmentSessionId} user={currentUser ?? undefined}
       />
 
@@ -3039,10 +3036,10 @@ export default function DefectFormWizard({
         onOpenChange={setIsPartAAttachmentDialogOpen}
         attachments={partAAttachments}
         onAttachmentsChange={setPartAAttachments}
-        readOnly={partALocked}
+        readOnly={partALocked || !attachmentAvailability.c1LocalUpload}
         title="Part A Attachments - Defect Photos"
         itemName="Defect Photo"
-        externalStorage={attachmentAvailability.externalStorage} section="part-a" vesselUuid={attachmentVesselUuid}
+        externalStorage={true} section="part-a" vesselUuid={attachmentVesselUuid}
         defectId={currentDefect?.id ?? createdDefectId ?? undefined} sessionId={attachmentSessionId} user={currentUser ?? undefined}
       />
     </div>

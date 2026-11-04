@@ -109,9 +109,10 @@ describe('C1 presentation matches Part B without changing attachment operations'
     elements(tree).find(el => el.props?.children === 'Done').props.onClick();
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
   });
-  it.each(['part-a', 'part-b'])('leaves %s external and inline presentation unchanged', section => {
+  it.each(['part-a', 'part-b'])('uses private upload presentation for %s even without counterpart readiness', section => {
     expect(render({ section, attachments: [external] }).html).toContain('max-w-2xl');
-    expect(render({ section, externalStorage: false }).html).toContain('data-legacy-dialog');
+    expect(render({ section, externalStorage: false }).html).not.toContain('data-legacy-dialog');
+    expect(render({ section, externalStorage: false }).html).toContain('type="file"');
   });
   it('wires the hidden picker to the existing multipart staging handler, never FileReader', async () => {
     const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...external, stagedRef: 'owned-receipt' }) });
