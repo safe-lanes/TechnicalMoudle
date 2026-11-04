@@ -23,7 +23,6 @@ vi.mock('../controllers/componentController', () => ({
   remove: vi.fn(),
   inactivate: vi.fn(),
 }));
-vi.mock('../controllers/componentUploadController', () => ({ upload: vi.fn() }));
 vi.mock('../controllers/subEntityController', () => ({
   listDocuments: vi.fn(), createDocument: vi.fn(), updateDocument: vi.fn(), deleteDocument: vi.fn(), downloadDocument: vi.fn(),
   listClassRegulatory: vi.fn(), createClassRegulatory: vi.fn(), updateClassRegulatory: vi.fn(), deleteClassRegulatory: vi.fn(),

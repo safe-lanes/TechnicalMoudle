@@ -112,9 +112,6 @@ export async function inactivate(id: string, vesselId: string, userId: string, a
   return storage.inactivateComponent(id, vesselId, userId, apply);
 }
 
-export async function bulkUpsert(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
-  return storage.bulkUpsertComponents(components);
-}
 
 export async function setRunningHours(params: {
   componentId: string;

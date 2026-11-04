@@ -579,24 +579,6 @@ export async function getFleetVesselMappings() {
   return repo.getFleetVesselMappings();
 }
 
-export async function createFleetVesselMappings(body: any) {
-  const { fleetEntityType, fleetEntityIds, vesselId, vesselEntityId, vesselEntityCode } = body;
-
-  if (!fleetEntityType || !fleetEntityIds?.length || !vesselId) {
-    const err: any = new Error('Missing required fields: fleetEntityType, fleetEntityIds, vesselId');
-    err.statusCode = 400;
-    throw err;
-  }
-
-  return repo.createFleetVesselMappings({
-    fleetEntityType,
-    fleetEntityIds,
-    vesselId,
-    vesselEntityId,
-    vesselEntityCode,
-    mappedBy: 'admin'
-  });
-}
 
 export async function deleteFleetVesselMapping(id: string) {
   await repo.deleteFleetVesselMapping(id);

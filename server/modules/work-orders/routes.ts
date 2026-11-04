@@ -258,8 +258,6 @@ router.get('/work-order-executions/:componentId', asyncHandler(woCtrl.getExecuti
 // GET  /work-order-executions/details/:id — get single execution
 router.get('/work-order-executions/details/:id', asyncHandler(woCtrl.getExecution));
 
-// POST /work-order-executions — create execution
-router.post('/work-order-executions', asyncHandler(woCtrl.createExecution));
 
 // PATCH /work-order-executions/:id — update execution
 router.patch('/work-order-executions/:id', asyncHandler(woCtrl.updateExecution));

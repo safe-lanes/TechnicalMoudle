@@ -176,9 +176,6 @@ export async function getFleetVesselMappings() {
   return storage.getFleetVesselMappings();
 }
 
-export async function createFleetVesselMappings(data: any) {
-  return storage.createFleetVesselMappings(data);
-}
 
 export async function deleteFleetVesselMapping(id: string) {
   return storage.deleteFleetVesselMapping(id);

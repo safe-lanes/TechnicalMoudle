@@ -8287,11 +8287,6 @@ export class PostgresStorage {
     return result[0] || null;
   }
 
-  async createWorkOrderExecution(data: InsertWorkOrderExecution): Promise<WorkOrderExecution> {
-    const db = await getDb();
-    const result = await db.insert(workOrderExecutions).values(data).returning();
-    return result[0];
-  }
 
   async updateWorkOrderExecution(id: string, data: Partial<InsertWorkOrderExecution>): Promise<WorkOrderExecution> {
     const db = await getDb();
@@ -9156,29 +9151,6 @@ export class PostgresStorage {
     return results;
   }
 
-  async bulkUpsertComponents(componentsData: InsertComponent[]): Promise<{ created: number; updated: number }> {
-    const db = await getDb();
-    let created = 0;
-    let updated = 0;
-    
-    for (const comp of componentsData) {
-      const existing = await db.select().from(components)
-        .where(eq(components.cuuid, comp.cuuid))
-        .limit(1);
-      
-      if (existing.length > 0) {
-        await db.update(components)
-          .set(comp)
-          .where(eq(components.cuuid, comp.cuuid));
-        updated++;
-      } else {
-        await db.insert(components).values(comp);
-        created++;
-      }
-    }
-    
-    return { created, updated };
-  }
 
   async archiveComponentsByIds(ids: string[]): Promise<number> {
     if (ids.length === 0) return 0;
@@ -9380,29 +9352,6 @@ export class PostgresStorage {
 
   // ============= FLEET VESSEL MAPPING (Rule #16) =============
   
-  async createFleetVesselMappings(data: {
-    fleetEntityType: 'component' | 'job' | 'spare';
-    fleetEntityIds: string[];
-    vesselId: string;
-    vesselEntityId?: string;
-    vesselEntityCode?: string;
-    mappedBy: string;
-  }): Promise<any[]> {
-    const db = await getDb();
-    const results: any[] = [];
-    
-    for (const fleetEntityId of data.fleetEntityIds) {
-      const result = await db.insert(fleetVesselMapping).values({
-        fleetEquipmentCode: fleetEntityId,
-        vesselCode: data.vesselId,
-        vesselComponentCode: data.vesselEntityCode,
-        createdBy: data.mappedBy,
-      }).returning();
-      if (result.length > 0) results.push(result[0]);
-    }
-    
-    return results;
-  }
 
   async deleteFleetVesselMapping(id: string): Promise<void> {
     const db = await getDb();

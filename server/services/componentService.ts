@@ -185,9 +185,6 @@ export class ComponentService {
   /**
    * Bulk upsert components
    */
-  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
-    return storage.bulkUpsertComponents(components);
-  }
 
   /**
    * Validate component data

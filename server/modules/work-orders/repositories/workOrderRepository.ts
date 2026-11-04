@@ -45,9 +45,6 @@ export async function findExecutionById(id: string) {
   return storage.getWorkOrderExecutionById(id);
 }
 
-export async function createExecution(data: any) {
-  return storage.createWorkOrderExecution(data);
-}
 
 export async function updateExecution(id: string, data: any) {
   return storage.updateWorkOrderExecution(id, data);

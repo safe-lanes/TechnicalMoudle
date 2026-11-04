@@ -482,7 +482,6 @@ export interface IStorage {
   // Bulk Import methods
   bulkCreateComponents(components: InsertComponent[]): Promise<Component[]>;
   bulkUpdateComponents(components: Array<{ id: string; cuuid: string; data: Partial<Component> }>): Promise<Component[]>;
-  bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }>;
   bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]>;
   bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }>;
   archiveComponentsByIds(ids: string[]): Promise<number>;
@@ -654,7 +653,6 @@ export interface IStorage {
   // Work Order Execution methods
   getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]>;
   getWorkOrderExecutionById(id: string): Promise<WorkOrderExecution | null>;
-  createWorkOrderExecution(data: InsertWorkOrderExecution): Promise<WorkOrderExecution>;
   updateWorkOrderExecution(id: string, data: Partial<InsertWorkOrderExecution>): Promise<WorkOrderExecution>;
   
   // Defects methods
@@ -790,14 +788,6 @@ export interface IStorage {
   
   // Fleet Vessel Mapping methods (Rule #16)
   getFleetVesselMappings(): Promise<any[]>;
-  createFleetVesselMappings(data: {
-    fleetEntityType: 'component' | 'job' | 'spare';
-    fleetEntityIds: string[];
-    vesselId: string;
-    vesselEntityId?: string;
-    vesselEntityCode?: string;
-    mappedBy: string;
-  }): Promise<any[]>;
   deleteFleetVesselMapping(id: string): Promise<void>;
   getVessel(id: string, options?: { includeDeleted?: boolean }): Promise<Vessel | undefined>;
   getVessels(options?: { includeDeleted?: boolean }): Promise<Array<{id: string, vuuid: string, name: string, code: string, vCode: string | null, imoNumber: string | null, vesselType: string | null}>>;

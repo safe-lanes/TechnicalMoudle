@@ -426,9 +426,6 @@ export class WorkOrderService {
   /**
    * Create work order execution record
    */
-  async createWorkOrderExecution(executionData: InsertWorkOrderExecution): Promise<WorkOrderExecution> {
-    return storage.createWorkOrderExecution(executionData);
-  }
 
   /**
    * Update work order execution record

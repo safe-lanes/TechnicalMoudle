@@ -569,17 +569,6 @@ export async function getExecution(req: Request, res: Response) {
   res.json(result);
 }
 
-export async function createExecution(req: Request, res: Response) {
-  try {
-    const execution = await executionService.createExecution(req.body);
-    res.status(201).json(execution);
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
-      return res.status(400).json({ error: "Invalid execution data", details: error.errors });
-    }
-    throw error;
-  }
-}
 
 export async function updateExecution(req: Request, res: Response) {
   try {

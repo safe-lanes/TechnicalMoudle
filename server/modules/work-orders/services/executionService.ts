@@ -1,6 +1,5 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
-import { linkDocumentsToExecution } from './woDocumentService';
 import { isCompletedStatus } from '../../../utils/workOrderStatus';
 import { logFieldChanges } from '../../sync';
 
@@ -16,34 +15,6 @@ export async function getExecution(id: string) {
   return execution;
 }
 
-export async function createExecution(body: any) {
-  if (body.workOrderId) {
-    const wo = await repo.findById(body.workOrderId);
-    if (wo && isCompletedStatus(wo.status)) {
-      throw new ValidationError('Editing is not allowed because the Work Order is completed.');
-    }
-  }
-
-  const { insertWorkOrderExecutionSchema } = await import('@shared/schema');
-  const executionData = insertWorkOrderExecutionSchema.parse(body);
-  const execution = await repo.createExecution(executionData);
-
-  // Sync field logging — log execution INSERT
-  try {
-    const vesselId = (execution as any).vesselId || body.vesselId || null;
-    await logFieldChanges('work_order_executions', (execution as any).id, vesselId, null, execution, body.performedBy || 'system');
-  } catch (err) { console.error('[FieldLogger] WOExec create:', err); }
-
-  if (execution && execution.templateId && execution.id) {
-    try {
-      await linkDocumentsToExecution(execution.templateId, execution.id);
-    } catch (linkErr) {
-      console.error('Failed to link documents to execution:', linkErr);
-    }
-  }
-
-  return execution;
-}
 
 export async function updateExecution(id: string, body: any) {
   const existing = await repo.findExecutionById(id);

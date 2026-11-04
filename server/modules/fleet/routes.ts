@@ -77,7 +77,6 @@ router.delete('/fleet/master-list-types/:id', requireSailAdmin, asyncHandler(fle
 
 // ── Fleet Vessel Mappings ──
 router.get('/fleet/vessel-mappings', asyncHandler(fleetCtrl.getFleetVesselMappings));
-router.post('/fleet/vessel-mappings', requirePermission('admin-masters', 'create'), asyncHandler(fleetCtrl.createFleetVesselMappings));
 router.delete('/fleet/vessel-mappings/:id', requirePermission('admin-masters', 'delete'), asyncHandler(fleetCtrl.deleteFleetVesselMapping));
 
 // ══════════════════════════════════════════════════════════

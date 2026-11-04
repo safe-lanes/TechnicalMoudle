@@ -514,18 +514,6 @@ export async function getFleetVesselMappings(req: Request, res: Response) {
   }
 }
 
-export async function createFleetVesselMappings(req: Request, res: Response) {
-  try {
-    const mappings = await fleetService.createFleetVesselMappings(req.body);
-    res.status(201).json(mappings);
-  } catch (error: any) {
-    if (error.statusCode === 400) {
-      return res.status(400).json({ error: error.message });
-    }
-    console.error("Error creating vessel mappings:", error);
-    res.status(500).json({ error: error.message || "Failed to create vessel mappings" });
-  }
-}
 
 export async function deleteFleetVesselMapping(req: Request, res: Response) {
   try {

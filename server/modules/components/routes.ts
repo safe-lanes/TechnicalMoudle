@@ -4,7 +4,6 @@ import { asyncHandler } from '../shared/middleware';
 import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/permissions';
 import * as componentCtrl from './controllers/componentController';
-import * as uploadCtrl from './controllers/componentUploadController';
 import * as subCtrl from './controllers/subEntityController';
 import * as classCtrl from './controllers/classRegulatoryController';
 import * as attachmentCtrl from './controllers/sectionHAttachmentController';
@@ -31,8 +30,6 @@ router.get('/components/:vesselId', asyncHandler(componentCtrl.listByVessel));
 // GET /components/details/:id — single component detail page
 router.get('/components/details/:id', asyncHandler(componentCtrl.getDetails));
 
-// POST /components/upload — bulk CSV/XLSX upload
-router.post('/components/upload', upload.single('file'), asyncHandler(uploadCtrl.upload));
 
 // GET  /components — list all (optional ?vesselId= filter)
 // POST /components — create
