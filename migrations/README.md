@@ -1,3 +1,10 @@
+# Spare Category / Optimum Qty rollout
+
+See [184_spare_category_optimum_qty.md](184_spare_category_optimum_qty.md)
+for schema-first shore/vessel rollout, the atomic one-time backfill guard,
+explicit SQL replay behavior, mixed-version sync gating, and rollback/retry
+instructions. Keep both migration tracking records; code rollback retains data.
+
 # Migrations — Idempotency Contract
 
 Every migration file in this directory **must be idempotent**: running it a second time must be a clean no-op, never a crash.
