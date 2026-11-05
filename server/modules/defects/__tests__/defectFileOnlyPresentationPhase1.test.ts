@@ -102,15 +102,32 @@ describe('private upload presentation with legacy read compatibility', () => {
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
     expect(props.onAttachmentsChange).not.toHaveBeenCalled();
   });
-  it('uses draft staging before the first Defect save and retains existing entries after upload failure', async () => {
+  it.each(['part-a', 'part-b', 'part-c1'])('%s reads private saved and staged files through the existing section/session URLs', async section => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['fixture']) });
+    vi.stubGlobal('fetch', fetch);
+    vi.stubGlobal('window', { open: vi.fn() });
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fixture');
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((() => 0) as any);
+    for (const staged of [false, true]) {
+      const file = staged ? { ...external, stagedRef: 'receipt' } : external;
+      const { tree } = render(section, { attachments: [file], readOnly: true });
+      elements(tree).find(el => el.props?.['aria-label'] === `View ${external.name}`).props.onClick();
+      for (let i = 0; i < 8; i++) await Promise.resolve();
+      expect(fetch).toHaveBeenLastCalledWith(staged
+        ? '/technical/api/defects/file-staging/receipt?sessionId=fixture-session&backend=local'
+        : `/technical/api/defects/fixture-defect/files/${section}/file`,
+      expect.objectContaining({ credentials: 'include', headers: expect.any(Object) }));
+    }
+  });
+  it.each(['part-a', 'part-b', 'part-c1'])('%s uses draft staging before the first Defect save and retains existing entries after upload failure', async section => {
     const fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: 'fixture refusal' }) });
     vi.stubGlobal('fetch', fetch);
-    const { tree, props } = render('part-a', { defectId: undefined, attachments: [inline] });
+    const { tree, props } = render(section, { defectId: undefined, attachments: [inline] });
     elements(tree).find(el => el.type === 'input').props.onChange({
       target: { files: [new File(['%PDF-1.4'], 'proof.pdf', { type: 'application/pdf' })], value: '' },
     });
     for (let i = 0; i < 8; i++) await Promise.resolve();
-    expect(fetch).toHaveBeenCalledWith('/technical/api/defects/file-staging/part-a', expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith(`/technical/api/defects/file-staging/${section}`, expect.any(Object));
     expect(props.onAttachmentsChange).not.toHaveBeenCalled();
     expect(props.attachments).toEqual([inline]);
   });

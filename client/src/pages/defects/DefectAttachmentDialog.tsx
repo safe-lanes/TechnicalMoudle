@@ -73,7 +73,26 @@ export function DefectAttachmentDialog(props: Props) {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (cause: any) { setError(cause.message); }
   }
-  if (props.section === 'part-c1') {
+  const copy = {
+    'part-a': {
+      description: 'Defect photos and attachments.',
+      picker: 'defect photos and attachments',
+      empty: 'No defect photos or attachments yet',
+      hint: 'Upload photos or attachments to document the defect.',
+    },
+    'part-b': {
+      description: 'Rectification documentation.',
+      picker: 'rectification documents',
+      empty: 'No rectification documents yet',
+      hint: 'Upload documentation to support defect rectification.',
+    },
+    'part-c1': {
+      description: 'Closure documents and evidence.',
+      picker: 'closure documents',
+      empty: 'No closure documents yet',
+      hint: 'Upload evidence to support defect closure.',
+    },
+  }[props.section];
     const formatFileSize = (bytes: number) => {
       if (bytes < 1024) return `${bytes} B`;
       if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -84,7 +103,7 @@ export function DefectAttachmentDialog(props: Props) {
         <DialogHeader>
           <DialogTitle>{props.title}</DialogTitle>
           <DialogDescription>
-            Closure documents and evidence. Changes are committed when you save the defect form.
+            {copy.description} Changes are committed when you save the defect form.
           </DialogDescription>
         </DialogHeader>
 
@@ -98,7 +117,7 @@ export function DefectAttachmentDialog(props: Props) {
               disabled={busy}
               onChange={event => { void upload(event.target.files); event.target.value = ''; }}
               className="hidden"
-              aria-label="Choose closure documents"
+              aria-label={`Choose ${copy.picker}`}
             />
             <Button
               type="button"
@@ -106,7 +125,7 @@ export function DefectAttachmentDialog(props: Props) {
               disabled={busy}
               onClick={() => fileInputRef.current?.click()}
               className="h-20 w-full min-w-0 border-2 border-dashed hover:bg-gray-50"
-              aria-label={busy ? 'Uploading closure documents' : 'Click to upload closure documents'}
+              aria-label={`${busy ? 'Uploading' : 'Click to upload'} ${copy.picker}`}
             >
               <span className="flex flex-col items-center gap-1">
                 <Upload className="h-6 w-6 text-gray-400" aria-hidden="true" />
@@ -176,8 +195,8 @@ export function DefectAttachmentDialog(props: Props) {
           ) : (
             <div className="py-6 text-center text-gray-500">
               <FileText className="mx-auto mb-2 h-10 w-10 text-gray-300" aria-hidden="true" />
-              <p className="text-sm">No closure documents yet</p>
-              {!props.readOnly && <p className="mt-1 text-xs text-gray-400">Upload evidence to support defect closure.</p>}
+              <p className="text-sm">{copy.empty}</p>
+              {!props.readOnly && <p className="mt-1 text-xs text-gray-400">{copy.hint}</p>}
             </div>
           )}
         </div>
@@ -192,26 +211,4 @@ export function DefectAttachmentDialog(props: Props) {
         </div>
       </DialogContent>
     </Dialog>;
-  }
-  return <Dialog open={props.open} onOpenChange={open => { if (!busy) props.onOpenChange(open); }}>
-    <DialogContent className="max-w-2xl">
-      <DialogHeader><DialogTitle>{props.title}</DialogTitle>
-        <DialogDescription>PDF, JPG or PNG. Maximum 5 MB per file. Changes are committed when you save the form.</DialogDescription></DialogHeader>
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <ul className="max-h-80 overflow-y-auto divide-y">
-        {props.attachments.map(file => <li key={file.id} className="py-3 flex gap-2 items-center">
-          <div className="min-w-0 flex-1"><p className="break-all text-sm">{file.name}</p>
-            <p className="text-xs text-gray-500">{Math.ceil(file.size / 1024)} KB {isExternalDefectAttachment(file) && file.stagedRef ? '· Staged — not saved' : ''}</p></div>
-          <Button size="sm" variant="outline" onClick={() => void open(file, false)}>View</Button>
-          <Button size="sm" variant="outline" onClick={() => void open(file, true)}>Download</Button>
-          {!props.readOnly && <Button disabled={busy} size="sm" variant="outline" onClick={() => props.onAttachmentsChange(props.attachments.filter(item => item.id !== file.id))}>Remove</Button>}
-        </li>)}
-      </ul>
-      {!props.readOnly && <label className="text-sm">Attach files
-        <input disabled={busy} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="block mt-2"
-          onChange={event => { void upload(event.target.files); event.target.value = ''; }} />
-      </label>}
-      <Button disabled={busy} type="button" onClick={() => props.onOpenChange(false)}>{busy ? 'Uploading…' : 'Done'}</Button>
-    </DialogContent>
-  </Dialog>;
 }
