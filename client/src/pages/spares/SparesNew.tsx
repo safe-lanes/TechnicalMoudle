@@ -39,6 +39,7 @@ import { FEATURES } from '@/config/features';
 import { useVessels } from "@/hooks/useVessels";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 import { resolveSpareMakerDefault } from "./spareMakerDefault";
+import { SpareCategoryFields, useSpareCategories, validateSpareClassification, OPTIMUM_CATEGORY_KEY } from "@/components/spares/SpareCategoryFields";
 import { useSparePage, useSpareSearch, spareUrl, downloadSpareExport, SpareLocationPager } from "./sparesPaging";
 
 interface Spare {
@@ -77,6 +78,8 @@ interface Spare {
   fleetEquipmentCode?: string;
   evidenceType?: string;
   isRotationItem?: boolean;
+  spareCategory?: string | null;
+  optimumQty?: number | null;
   linkedComponents?: Array<{ componentId: string; componentCode: string; componentName: string }>;
 }
 
@@ -164,6 +167,8 @@ const Spares: React.FC = () => {
   const locationSearchEffective = useSpareSearch(locationSearchTerm);
   const locationOriginals = useRef(new Map<number, any>());
   const { data: vessels = [] } = useVessels();
+  const { data: spareCategoryOptions = [] } = useSpareCategories();
+  const spareCategoryLabel = (key?: string | null) => spareCategoryOptions.find(option => option.listKey === key)?.listValue || key || "—";
   
   useEffect(() => {
     setSelectedLocationId(null);
@@ -270,7 +275,9 @@ const Spares: React.FC = () => {
     ihm: "No",
     remarks: "",
     note: "",
-    isRotationItem: false
+    isRotationItem: false,
+    spareCategory: "",
+    optimumQty: ""
   });
   const [addMakerOverridden, setAddMakerOverridden] = useState(false);
   
@@ -306,7 +313,9 @@ const Spares: React.FC = () => {
     ihm: "No",
     remarks: "",
     note: "",
-    isRotationItem: false
+    isRotationItem: false,
+    spareCategory: "",
+    optimumQty: ""
   });
   
   const { toast } = useToast();
@@ -922,7 +931,9 @@ const Spares: React.FC = () => {
       ihm: spare.ihm || "",
       remarks: spare.remarks || "",
       note: spare.note || "",
-      isRotationItem: spare.isRotationItem ?? false
+      isRotationItem: spare.isRotationItem ?? false,
+      spareCategory: spare.spareCategory || "",
+      optimumQty: spare.optimumQty == null ? "" : String(spare.optimumQty)
     });
     
     // In modify mode, store original data for change tracking
@@ -1672,7 +1683,9 @@ const Spares: React.FC = () => {
         ihm: "No",
         remarks: "",
         note: "",
-        isRotationItem: false
+        isRotationItem: false,
+        spareCategory: "",
+        optimumQty: ""
       });
     },
     onError: (error: any) => {
@@ -1708,6 +1721,13 @@ const Spares: React.FC = () => {
   // Handle edit spare submit
   const handleEditSpareSubmit = () => {
     if (!selectedSpare) return;
+    const classificationError = validateSpareClassification(editSpareForm.spareCategory, editSpareForm.optimumQty);
+    if (classificationError) {
+      toast({ title: "Validation Error", description: classificationError, variant: "destructive" });
+      return;
+    }
+    if (selectedSpare.spareCategory === OPTIMUM_CATEGORY_KEY && editSpareForm.spareCategory !== OPTIMUM_CATEGORY_KEY &&
+      !window.confirm("Changing this spare away from Optimum will clear its saved Optimum Qty when the update succeeds. Continue?")) return;
 
     if (editSpareForm.maker && !makerListData.some(m => m.makerName.toLowerCase() === editSpareForm.maker.trim().toLowerCase())) {
       toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
@@ -1740,6 +1760,8 @@ const Spares: React.FC = () => {
       robLocationA: robA,
       robLocationB: robB,
       min: parseInt(editSpareForm.min) || 0,
+      spareCategory: editSpareForm.spareCategory,
+      optimumQty: editSpareForm.spareCategory === OPTIMUM_CATEGORY_KEY ? Number(editSpareForm.optimumQty) : null,
       location: editSpareForm.location || null,
       location2: editSpareForm.location2 || null,
       critical: editSpareForm.critical,
@@ -2501,6 +2523,11 @@ const Spares: React.FC = () => {
       toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
       return;
     }
+    const classificationError = validateSpareClassification(addSpareForm.spareCategory, addSpareForm.optimumQty);
+    if (classificationError) {
+      toast({ title: "Validation Error", description: classificationError, variant: "destructive" });
+      return;
+    }
 
     if (addSpareForm.maker && !makerListData.some(m => m.makerName.toLowerCase() === addSpareForm.maker.trim().toLowerCase())) {
       toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
@@ -2555,6 +2582,8 @@ const Spares: React.FC = () => {
       robLocationA: robA,
       robLocationB: robB,
       min,
+      spareCategory: addSpareForm.spareCategory,
+      optimumQty: addSpareForm.spareCategory === OPTIMUM_CATEGORY_KEY ? Number(addSpareForm.optimumQty) : null,
       location: addSpareForm.location || undefined,
       location2: addSpareForm.location2 || undefined,
       maker: addSpareForm.maker || undefined,
@@ -2822,6 +2851,13 @@ const Spares: React.FC = () => {
         },
       },
       {
+        field: 'spareCategory',
+        headerName: 'Spare Category',
+        width: 140,
+        minWidth: 120,
+        valueFormatter: params => spareCategoryLabel(params.value),
+      },
+      {
         field: 'rob',
         headerName: 'ROB',
         width: 80,
@@ -2848,6 +2884,15 @@ const Spares: React.FC = () => {
             {params.value}
           </span>
         ),
+      },
+      {
+        field: 'optimumQty',
+        headerName: 'Optimum Qty',
+        width: 115,
+        minWidth: 100,
+        filter: 'agNumberColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        valueFormatter: params => params.value == null ? "—" : String(params.value),
       },
       {
         headerName: 'Stock',
@@ -3081,6 +3126,13 @@ const Spares: React.FC = () => {
         },
       },
       {
+        field: 'spareCategory',
+        headerName: 'Spare Category',
+        width: 140,
+        minWidth: 120,
+        valueFormatter: params => spareCategoryLabel(params.value),
+      },
+      {
         field: 'rob',
         headerName: 'ROB',
         width: 80,
@@ -3095,6 +3147,15 @@ const Spares: React.FC = () => {
         minWidth: 70,
         filter: 'agNumberColumnFilter',
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      },
+      {
+        field: 'optimumQty',
+        headerName: 'Optimum Qty',
+        width: 115,
+        minWidth: 100,
+        filter: 'agNumberColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        valueFormatter: params => params.value == null ? "—" : String(params.value),
       },
       {
         headerName: 'Stock',
@@ -4275,6 +4336,15 @@ const Spares: React.FC = () => {
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <SpareCategoryFields
+                    idPrefix="add-spare"
+                    category={addSpareForm.spareCategory}
+                    quantity={addSpareForm.optimumQty}
+                    onCategoryChange={value => setAddSpareForm(prev => ({ ...prev, spareCategory: value }))}
+                    onQuantityChange={value => setAddSpareForm(prev => ({ ...prev, optimumQty: value }))}
+                  />
+                </div>
                 <div>
                   <Label htmlFor="add-part-code">Part Code *</Label>
                   <Input
@@ -4784,6 +4854,15 @@ const Spares: React.FC = () => {
             <div className="bg-blue-50 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <SpareCategoryFields
+                    idPrefix="edit-spare"
+                    category={editSpareForm.spareCategory}
+                    quantity={editSpareForm.optimumQty}
+                    onCategoryChange={value => setEditSpareForm(prev => ({ ...prev, spareCategory: value }))}
+                    onQuantityChange={value => setEditSpareForm(prev => ({ ...prev, optimumQty: value }))}
+                  />
+                </div>
                 <div>
                   <Label htmlFor="edit-min">Minimum Stock</Label>
                   <Input
@@ -5731,6 +5810,14 @@ const Spares: React.FC = () => {
               <div className="bg-blue-50 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Spare Category:</span>
+                    <span className="ml-2 font-medium text-gray-900">{spareCategoryLabel(selectedSpare.spareCategory)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Optimum Qty:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.optimumQty ?? '—'}</span>
+                  </div>
                   <div>
                     <span className="text-gray-500">ROB (Total):</span>
                     <span className="ml-2 font-medium text-gray-900">{selectedSpare.rob}</span>

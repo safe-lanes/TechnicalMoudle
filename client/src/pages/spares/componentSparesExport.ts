@@ -10,6 +10,20 @@ export interface ComponentSparesData {
   rows: { spare: ExportRecord; component: ExportRecord }[];
   components: ExportRecord[];
   excludedUnavailableSpareLinks?: number;
+  spareCategoryLabels?: Record<string, string>;
+}
+
+export async function fetchSpareCategoryLabels(readJson: ReadJson): Promise<Record<string, string>> {
+  try {
+    const list = await readJson("/technical/api/fleet/master-lists?listType=spareCategory");
+    if (!Array.isArray(list)) return {};
+    return Object.fromEntries(
+      list.filter((item: ExportRecord) => item?.listKey && item?.listValue && item.isActive !== false)
+        .map((item: ExportRecord) => [String(item.listKey), String(item.listValue)]),
+    );
+  } catch {
+    return {};
+  }
 }
 
 const deleted = (record: ExportRecord) => record.deleted === true || record.isDeleted === true;
@@ -50,8 +64,11 @@ export async function fetchComponentSparesData(
   readJson: ReadJson,
   assertCurrent: () => void = () => {},
 ): Promise<ComponentSparesData> {
+  assertCurrent();
   const rows: ComponentSparesData["rows"] = [];
   const components: ExportRecord[] = [];
+  const spareCategoryLabels = await fetchSpareCategoryLabels(readJson);
+  assertCurrent();
   let excludedUnavailableSpareLinks = 0;
   for (const vesselId of vesselIds) {
     assertCurrent();
@@ -205,14 +222,24 @@ export async function fetchComponentSparesData(
     }
   }
   assertCurrent();
-  return { rows, components, excludedUnavailableSpareLinks };
+  return { rows, components, excludedUnavailableSpareLinks, spareCategoryLabels };
 }
+
 
 export function buildComponentSparesWorkbook(data: ComponentSparesData) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Spares");
-  sheet.columns = SPARES_TEMPLATE_FIELDS.map(field => ({ header: field.header, width: field.width }));
-  sheet.getCell("AC1").value = "_TEMPLATE_VERSION_2.0.0";
+  const categoryInTemplate = SPARES_TEMPLATE_FIELDS.some(field => field.key === "spareCategory");
+  const optimumInTemplate = SPARES_TEMPLATE_FIELDS.some(field => field.key === "optimumQty");
+  const markerColumn = Math.max(29, SPARES_TEMPLATE_FIELDS.length + 1);
+  const spacerColumns = Math.max(0, markerColumn - SPARES_TEMPLATE_FIELDS.length);
+  sheet.columns = [
+    ...SPARES_TEMPLATE_FIELDS.map(field => ({ header: field.header, width: field.width })),
+    ...Array.from({ length: spacerColumns }, () => ({ header: "", width: 3 })),
+    ...(!categoryInTemplate ? [{ header: "Spare Category", width: 20 }] : []),
+    ...(!optimumInTemplate ? [{ header: "Optimum Qty", width: 14 }] : []),
+  ];
+  sheet.getCell(1, markerColumn).value = "_TEMPLATE_VERSION_2.0.0";
   sheet.getRow(1).font = { bold: true };
   const reference = workbook.addWorksheet("Components");
   reference.columns = [
@@ -238,11 +265,14 @@ export function buildComponentSparesWorkbook(data: ComponentSparesData) {
   lists.getCell("B2").value = "Yes";
   lists.getCell("B3").value = "No";
   data.rows.forEach(({ spare, component }) => {
-    const row = sheet.addRow(componentSpareValues(spare, component));
-    for (const column of [9, 18, 25, 26, 28]) {
+    const row = sheet.addRow(componentSpareValues(spare, component, data.spareCategoryLabels));
+    const columnFor = (key: string) => SPARES_TEMPLATE_FIELDS.findIndex(field => field.key === key) + 1;
+    for (const key of ["uom", "criticality", "isActive", "ihm", "isRotationItem"]) {
+      const column = columnFor(key);
+      if (column < 1) continue;
       row.getCell(column).dataValidation = {
         type: "list", allowBlank: true,
-        formulae: [column === 9 ? "=Lists!$A$2:$A$11" : "=Lists!$B$2:$B$3"],
+        formulae: [key === "uom" ? "=Lists!$A$2:$A$11" : "=Lists!$B$2:$B$3"],
       };
     }
   });
