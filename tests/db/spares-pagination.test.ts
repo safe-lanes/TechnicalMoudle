@@ -15,6 +15,8 @@ import { sparePageQuery } from "../../shared/sparesPagination";
 import { queryPage, queryValues, queryLocations } from "../../server/modules/spares/repositories/sparesPagingRepository";
 import { resolveSparesScope } from "../../server/modules/spares/repositories/sparesPagingScope";
 import { writeSpareExport } from "../../server/modules/spares/services/sparesExportService";
+import { buildComponentSparesWorkbook } from "../../client/src/pages/spares/componentSparesExport";
+import { SPARES_TEMPLATE_FIELDS } from "../../shared/sparesTemplateFields";
 import { parse, validatePagedBulk } from "../../server/modules/spares/controllers/sparesPagingController";
 
 test("Spares bounded SQL pages, full-scope controls and streaming exports", async t => {
@@ -25,7 +27,14 @@ test("Spares bounded SQL pages, full-scope controls and streaming exports", asyn
       id int PRIMARY KEY,suuid text,vessel_id text,data_scope text DEFAULT 'vessel',deleted boolean DEFAULT false,
       is_deleted boolean DEFAULT false,is_active boolean DEFAULT true,part_code text,part_name text,part_number text,
       component_code text,component_id text,component_name text,critical text,criticality text,is_rotation_item boolean DEFAULT false,
-      rob int,min int,max int,location text,location_2 text,rob_location_a int,rob_location_b int,ihm text, fleet_equipment_code text)`);
+      rob int,min int,max int,location text,location_2 text,rob_location_a int,rob_location_b int,ihm text, fleet_equipment_code text,
+      spare_category text DEFAULT 'essential',optimum_qty int)`);
+    await client.query(`CREATE TEMP TABLE master_lists (list_type text,list_key text,list_value text,is_active boolean,is_deleted boolean)`);
+    await client.query(`INSERT INTO master_lists VALUES
+      ('spareCategory','essential','Essential',true,false),
+      ('spareCategory','essential','Inactive label',false,false),
+      ('spareCategory','essential','Deleted label',true,true),
+      ('other','essential','Wrong list label',true,false)`);
     await client.query(`CREATE TEMP TABLE components (id text,cuuid text,vessel_id text,data_scope text DEFAULT 'vessel',
       is_deleted boolean DEFAULT false,is_active boolean DEFAULT true,component_code text,name text,component_category text,
       fleet_equipment_code text,fleet_equipment_name text)`);
@@ -134,7 +143,20 @@ test("Spares bounded SQL pages, full-scope controls and streaming exports", asyn
           const sheet = book.getWorksheet(type === "history" ? "Spares History" : "Spares")!;
           assert.equal(sheet.rowCount - 1, type === "unique" ? 41 : type === "component" ? 1 : 41);
           if (type !== "history") {
-            assert.equal(sheet.getCell("AC1").value, "_TEMPLATE_VERSION_2.0.0");
+            const clientBook = buildComponentSparesWorkbook({ rows: [], components: [] });
+            assert.deepEqual(sheet.getRow(1).values, clientBook.getWorksheet("Spares")!.getRow(1).values,
+              `${type} server and client headers must be identical`);
+            assert.equal(sheet.getCell(1, Math.max(29, SPARES_TEMPLATE_FIELDS.length + 1)).value, "_TEMPLATE_VERSION_2.0.0");
+            const categoryColumn = SPARES_TEMPLATE_FIELDS.findIndex(field => field.key === "spareCategory") + 1;
+            assert.equal(sheet.getCell(1, categoryColumn).value, "Spare Category");
+            assert.equal(sheet.getCell(2, categoryColumn).value, "Essential");
+            for (const key of ["uom", "criticality", "isActive", "ihm", "isRotationItem"]) {
+              const column = SPARES_TEMPLATE_FIELDS.findIndex(field => field.key === key) + 1;
+              assert.deepEqual(sheet.getCell(2, column).dataValidation, {
+                type: "list", allowBlank: true,
+                formulae: [key === "uom" ? "=Lists!$A$2:$A$11" : "=Lists!$B$2:$B$3"],
+              });
+            }
             assert.equal(sheet.getCell("E2").value, type === "unique" ? "6.1.1" : "8.2");
             assert.equal(book.getWorksheet("Components")!.rowCount, 3);
             assert.equal(sheet.getCell("I2").dataValidation.type, "list");

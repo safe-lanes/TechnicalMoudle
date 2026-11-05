@@ -35,9 +35,24 @@ export async function writeSpareExport(filename: string, vesselId: string, q: Sp
         sheet.commit();
         return;
       }
+      const categories = await tx.execute(sql`SELECT list_key, list_value FROM master_lists
+        WHERE list_type='spareCategory' AND is_active=true AND is_deleted IS NOT TRUE`);
+      const spareCategoryLabels = Object.fromEntries(
+        categories.rows.filter(item => item.list_key && item.list_value)
+          .map(item => [String(item.list_key), String(item.list_value)]),
+      );
       const sheet = workbook.addWorksheet("Spares");
-      sheet.columns = SPARES_TEMPLATE_FIELDS.map(f => ({ header: f.header, width: f.width }));
-      sheet.getCell("AC1").value = "_TEMPLATE_VERSION_2.0.0";
+      const categoryInTemplate = SPARES_TEMPLATE_FIELDS.some(field => field.key === "spareCategory");
+      const optimumInTemplate = SPARES_TEMPLATE_FIELDS.some(field => field.key === "optimumQty");
+      const markerColumn = Math.max(29, SPARES_TEMPLATE_FIELDS.length + 1);
+      const spacerColumns = Math.max(0, markerColumn - SPARES_TEMPLATE_FIELDS.length);
+      sheet.columns = [
+        ...SPARES_TEMPLATE_FIELDS.map(field => ({ header: field.header, width: field.width })),
+        ...Array.from({ length: spacerColumns }, () => ({ header: "", width: 3 })),
+        ...(!categoryInTemplate ? [{ header: "Spare Category", width: 20 }] : []),
+        ...(!optimumInTemplate ? [{ header: "Optimum Qty", width: 14 }] : []),
+      ];
+      sheet.getCell(1, markerColumn).value = "_TEMPLATE_VERSION_2.0.0";
       sheet.getRow(1).font = { bold: true };
       const reference = workbook.addWorksheet("Components");
       reference.columns = [
@@ -58,10 +73,14 @@ export async function writeSpareExport(filename: string, vesselId: string, q: Sp
         reference.addRow([row.component_code ?? "", row.name ?? "", row.category ?? "", row.fleet_equipment_code ?? "", row.fleet_equipment_name ?? ""]).commit();
       });
       const write = (s: any, c: any) => {
-        const row = sheet.addRow(componentSpareValues(s, c));
-        for (const column of [9, 18, 25, 26, 28]) row.getCell(column).dataValidation = {
-          type: "list", allowBlank: true, formulae: [column === 9 ? "=Lists!$A$2:$A$11" : "=Lists!$B$2:$B$3"],
-        };
+        const row = sheet.addRow(componentSpareValues(s, c, spareCategoryLabels));
+        for (const key of ["uom", "criticality", "isActive", "ihm", "isRotationItem"]) {
+          const column = SPARES_TEMPLATE_FIELDS.findIndex(field => field.key === key) + 1;
+          if (column < 1) continue;
+          row.getCell(column).dataValidation = {
+            type: "list", allowBlank: true, formulae: [key === "uom" ? "=Lists!$A$2:$A$11" : "=Lists!$B$2:$B$3"],
+          };
+        }
         row.commit();
         rowCount++;
       };
