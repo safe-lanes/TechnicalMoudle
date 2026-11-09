@@ -24,4 +24,4 @@
 - [SAILERP user-type contract](sailerp-user-type-contract.md) — owner confirms x-user-type is exactly Office or Ship; permissive string transport does not define more values.
 - [Type-diagnostic safety gates](type-diagnostic-safety-gates.md) — scoped type fixes require stopped-workflow verification and separate, task-specific restart/completion approval.
 - [Forms Master migrations](forms-master-migration-policy.md) — all Stage 1 database migrations must be file-based and idempotent.
-- [Forms Master domain policy](forms-master-domain-policy.md) — global replication, immutable scope, role approvers, strict Office permissions, no preview bypass, mandatory transactional auditing.
+- [Forms Master domain policy](forms-master-domain-policy.md) — global replication and a Replit-only AuthContext default; all other environments require real verified users.
