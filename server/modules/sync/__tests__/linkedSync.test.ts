@@ -107,8 +107,11 @@ describe('linked sync', () => {
     expect((await runLinkedSync([MY_FILES], harness({ trigger: () => json({}, 401) }).deps))[0].reason).toBe(
       'not allowed',
     );
+    expect((await runLinkedSync([MY_FILES], harness({ trigger: () => json({}, 500) }).deps))[0].reason).toBe(
+      'answered 500',
+    );
     expect((await runLinkedSync([MY_FILES], harness({ trigger: () => json({}, 502) }).deps))[0].reason).toBe(
-      'answered 502',
+      'could not be reached',
     );
     const notJson = harness({ trigger: () => new Response('<html>') });
     expect((await runLinkedSync([MY_FILES], notJson.deps))[0].state).toBe('failed');

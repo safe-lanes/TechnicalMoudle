@@ -103,6 +103,8 @@ async function runOne(service: LinkedService, deps: LinkedDeps): Promise<LinkedR
     return { name, state: 'failed', reason: 'could not be reached' };
   }
   if (!started) return timedOut;
+  // 502 to 504: the proxy in front could not reach the service.
+  if (started.status >= 502 && started.status <= 504) return { name, state: 'failed', reason: 'could not be reached' };
   if (!started.ok)
     return {
       name,
