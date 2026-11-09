@@ -18,7 +18,9 @@ subject to rollout verification.
 - Owner approved the proposed policies as written: role-based Approver source;
   global replication including vessel-specific forms; immutable saved scope;
   explicit admin-masters action grants for every Office role including admins;
-  restore requires edit; no missing/mock/preview identity exemption;
+  restore requires edit; one exact Replit AuthContext default identity path with
+  canonical-user mapping and unchanged explicit permissions; no general
+  missing/mock/preview identity exemption;
   mandatory transactional audit and outbound logging; system seed attribution;
   additive schema/file migrations allowed, unrelated extraction/refactors not.
 - Subsequent explicit approval: **“Approve matching reference types.”**
@@ -225,27 +227,33 @@ No files/attachments are synchronized by Stage 1.
 
 ## Authorization and audit evidence
 
-READ: route-local policy requires a signature-verified login for **every**
-request, including reads. On multi-tenant installations it uses the existing
-tenant-verified principal with no single-tenant key fallback. On single-tenant
-installations it verifies the bearer token with the existing JWT signing key.
-Forwarded/req.user actor UUID, role and Office/Ship type must all match verified
-claims; a valid-looking UUID or privileged role name alone never authenticates.
+READ: outside the exact Replit exception, route-local policy requires a
+signature-verified login for every request, including reads. On multi-tenant
+installations it uses the existing tenant-verified principal with no
+single-tenant key fallback. On single-tenant installations it verifies the
+bearer token with the existing JWT signing key. The Replit exception requires
+exact `VITE_APP_ENV=replit`, server development mode, single-tenant operation,
+and the fixed AuthContext default UUID/role/type; it maps that UUID to the
+canonical `master_users` record and uses the canonical role for RBAC. A
+valid-looking UUID or privileged role name alone never authenticates.
 
 Mutation capabilities additionally require a known shore installation,
 Office user type, active non-deleted role and explicit live admin-masters action.
-There is no admin bypass; restore maps to edit. Deleted permission rows do not
-authorize writes.
+The Replit default path receives no additional permissions and uses these same
+checks; there is no admin bypass. Restore maps to edit. Deleted permission rows
+do not authorize writes.
 
-The legacy preview default can forward a real-looking UUID. It has no exemption:
-like every other identity, it requires a verified matching login. No-token use
-is refused even if the claimed role has permission. No other module's
-authentication or mock-auth behavior was changed.
+Headers are not general authentication: outside the narrowly gated default
+identity, a verified matching login is required. No other module's authentication
+or mock-auth behavior was changed.
 
 Fixture evidence: all 14 mutation route shapes deny ship installation, ship user
 on shore, missing/mock/unconfigured identity, administrators without explicit
-permission and unverified development fallback. Valid Office writes succeed;
-restore fails without edit and succeeds after edit is granted.
+permission and unverified development fallback. The exact Replit default path is
+covered separately by the Forms Master identity/transport tests, including its
+environment gate, fixed-identity matching, canonical role and permission checks.
+Valid Office writes succeed; restore fails without edit and succeeds after edit
+is granted.
 
 Additional real-HTTP fixture evidence: 11 single-tenant and 12 multi-tenant
 identity-context attack combinations are rejected on all 14 mutation shapes
@@ -312,14 +320,15 @@ Routes:
 - Read-access shortcut:
   `/pms/forms-master?pms.master.view=forms-master`
 
-Screenshot verification reached the final shortcut. The capture browser has
-only the legacy unverified preview identity, so the final screen intentionally
-shows a 401 identity-required response and no mutation buttons. An anonymous
-proxied GET also returns 401. This verifies navigation and denial rendering,
-**not** a signed-in browser CRUD walkthrough. UI fields, dependent selectors,
-sort/pagination queries, per-action controls, error/draft retention, label
-dialogs and query invalidation were code-checked; server behavior is covered by
-the fixtures. “Create Form” is toast-only and does not open Form Builder.
+Screenshot verification reached the final shortcut. An anonymous capture
+browser without the fixed Replit client identity receives the expected 401; an
+anonymous proxied GET is also denied. This verifies navigation and denial
+rendering, not a signed-in browser CRUD walkthrough. The exact Replit identity
+path is covered by focused tests and the current preview capability response.
+UI fields, dependent selectors, sort/pagination queries, per-action controls,
+error/draft retention, label dialogs and query invalidation were code-checked;
+server behavior is covered by the fixtures. “Create Form” is toast-only and
+does not open Form Builder.
 
 ## Scope confirmation and rollout limitations
 
@@ -333,7 +342,9 @@ Before operational rollout:
 
 - Install migration/code on shore and every receiving ship.
 - Supply referenced vessels/roles through the existing master-data mechanisms.
-- Use a real signed-in Office/Ship identity; the preview default is not permitted.
+- Use a real signed-in Office/Ship identity on shore and ship installations.
+  The fixed default identity is permitted only in the exact development Replit
+  Forms Master path and must never be used as production authentication.
 - Verify the existing signing-key setup and `SAILERP_JWT_USER_CLAIMS` mapping
   provide the canonical actor UUID, role and Office/Ship type. Header-only
   forwarding is deliberately insufficient.

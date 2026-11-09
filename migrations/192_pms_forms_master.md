@@ -156,11 +156,17 @@ No files or attachments are part of this feature.
   instead of overwriting, adopting or deleting it automatically.
   For lazy tenant startup, that tenant's pool is not made ready; other tenants
   remain unaffected and the existing retry/cooldown path is retained.
-- **401 in preview:** expected without a signature-verified real login. There
-  is intentionally no preview/mock-admin exception. Header-only requests are
-  not authenticated even if the UUID and role look valid. In integrated use,
-  verify signing-key setup and the configured subject/role/user-type claims;
-  never fix a mismatch by trusting caller-supplied headers.
+- **Replit preview identity:** the fixed AuthContext default is accepted only
+  when the frontend flag is exactly `VITE_APP_ENV=replit`, the server is in
+  development and single-tenant mode, and the request matches that fixed
+  identity. Its UUID must map to a non-deleted canonical `master_users` record;
+  its effective role is read from that record and still needs an active
+  `admin-masters` action grant. This is not a permission bypass or general
+  header-based authentication.
+- **401 outside the Replit exception:** expected without a verified integrated
+  login. Header-only requests are not authenticated even if the UUID and role
+  look valid. Verify signing-key setup and configured subject/role/user-type
+  claims; never fix a mismatch by trusting caller-supplied headers.
 - **403 for an administrator:** verify Office identity, shore identity and the
   explicit admin-masters action. Missing/unconfigured/deleted grants deny.
 - **Audit or outbound-log failure:** no successful catalogue write is committed.
