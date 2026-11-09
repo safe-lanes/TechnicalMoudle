@@ -2,6 +2,8 @@
 // and its result is shown. Driven only by configuration, so another service can be added without code changes:
 //   { "name": "My Files", "url": "/m/api/v1", "enabled": true, "timeoutMs": 180000 }
 // A linked service answers POST <url>/sync/trigger and GET <url>/sync/trigger/status with the user's token.
+// On by default on every ship. Where a service is not installed (no such address: 404 or 405, or a web page instead of
+// its answer) it is skipped, and the screen says so; a service that is installed but fails is shown as failed.
 // Nothing here can stop the module's own sync: every failure, and any time-out, ends as a result. Plain TypeScript
 // with no framework, so the same step and the same tests apply in every module that has a Sync Now.
 
@@ -15,7 +17,7 @@ export interface LinkedService {
   pollMs?: number;
 }
 
-export type LinkedState = 'running' | 'synced' | 'failed' | 'skipped';
+export type LinkedState = 'running' | 'synced' | 'failed' | 'skipped' | 'absent';
 export interface LinkedResult {
   name: string;
   state: LinkedState;
@@ -56,6 +58,7 @@ export function linkedLine(r: LinkedResult): string | null {
   if (r.state === 'running') return `${r.name}: syncing…`;
   if (r.state === 'synced') return `${r.name}: synced`;
   if (r.state === 'failed') return `${r.name}: failed – ${r.reason ?? 'unknown reason'}`;
+  if (r.state === 'absent') return `${r.name}: not installed on this ship – skipped`;
   return null;
 }
 
@@ -103,6 +106,8 @@ async function runOne(service: LinkedService, deps: LinkedDeps): Promise<LinkedR
     return { name, state: 'failed', reason: 'could not be reached' };
   }
   if (!started) return timedOut;
+  // Nothing answers at that address: the service is not installed on this ship.
+  if (started.status === 404 || started.status === 405) return { name, state: 'absent' };
   // 502 to 504: the proxy in front could not reach the service.
   if (started.status >= 502 && started.status <= 504) return { name, state: 'failed', reason: 'could not be reached' };
   if (!started.ok)
@@ -111,7 +116,9 @@ async function runOne(service: LinkedService, deps: LinkedDeps): Promise<LinkedR
       state: 'failed',
       reason: started.status === 401 || started.status === 403 ? 'not allowed' : `answered ${started.status}`,
     };
-  const trigger = (await started.json().catch(() => ({}))) as { status?: string };
+  const trigger = (await started.json().catch((): null => null)) as { status?: string } | null;
+  // A web page instead of its answer: the address leads to some other app, so the service is not here.
+  if (!trigger) return { name, state: 'absent' };
   // A shore, or sync switched off there: nothing to do, and nothing to show.
   if (trigger.status === 'not_applicable' || trigger.status === 'disabled') return { name, state: 'skipped' };
   // 'already_running' follows the same path: wait for that run, and never start another.

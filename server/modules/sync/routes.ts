@@ -1,3 +1,4 @@
+import { linkedSyncServices } from './linkedServices';
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import * as syncController from './controller';
@@ -45,16 +46,8 @@ router.get('/sync/conflicts/review/:id', requirePermission('admin-sync-conflicts
 router.post('/sync/conflicts/review/:id/apply-incoming', requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(conflictReviewCtrl.applyIncomingHandler));
 router.post('/sync/conflicts/review/:id/dismiss', requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(conflictReviewCtrl.dismissHandler));
 
-// Linked services that sync before this module's Sync Now (My Files is the first). Set per server, in the environment;
-// unset means none, and Sync Now behaves as it always did. Addresses only: no secret.
 router.get('/sync/linked-services', asyncHandler(async (_req: any, res: any) => {
-  let services: unknown = [];
-  try {
-    services = JSON.parse(process.env.LINKED_SYNC_SERVICES || '[]');
-  } catch {
-    console.warn('[Sync] LINKED_SYNC_SERVICES is not valid JSON: ignored');
-  }
-  res.json({ services });
+  res.json({ services: linkedSyncServices() });
 }));
 
 // Sync engine trigger (manual or scheduled)

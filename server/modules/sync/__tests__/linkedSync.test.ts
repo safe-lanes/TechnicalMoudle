@@ -113,8 +113,20 @@ describe('linked sync', () => {
     expect((await runLinkedSync([MY_FILES], harness({ trigger: () => json({}, 502) }).deps))[0].reason).toBe(
       'could not be reached',
     );
-    const notJson = harness({ trigger: () => new Response('<html>') });
-    expect((await runLinkedSync([MY_FILES], notJson.deps))[0].state).toBe('failed');
+    expect((await runLinkedSync([MY_FILES], harness({ trigger: () => json({ status: 'odd' }) }).deps))[0].state).toBe(
+      'failed',
+    );
+  });
+
+  it('not installed on this ship: 404, 405 or a web page is skipped, and the screen says so', async () => {
+    for (const answer of [() => json({}, 404), () => json({}, 405), () => new Response('<html>app</html>')]) {
+      const { deps, calls, logs } = harness({ trigger: answer });
+      const [r] = await runLinkedSync([MY_FILES], deps);
+      expect(r).toEqual({ name: 'My Files', state: 'absent' });
+      expect(linkedLine(r)).toBe('My Files: not installed on this ship – skipped');
+      expect(calls.length).toBe(1);
+      expect(logs.length).toBe(0);
+    }
   });
 
   it('a passing network problem while following does not end it', async () => {
@@ -199,6 +211,10 @@ describe('linked sync', () => {
       const { deps } = harness({ trigger: () => Promise.reject(new Error('down')) });
       expect(await own(deps, config)).toEqual(['My Files:failed', 'own sync']);
     });
+    it('when My Files is not installed', async () => {
+      const { deps } = harness({ trigger: () => json({}, 404) });
+      expect(await own(deps, config)).toEqual(['My Files:absent', 'own sync']);
+    });
     it('when already running', async () => {
       const { deps } = harness({ trigger: () => json({ status: 'already_running' }) });
       expect(await own(deps, config)).toEqual(['My Files:running', 'My Files:synced', 'own sync']);
@@ -247,5 +263,16 @@ describe('linked sync', () => {
         withLinkedSync(config, harness({}).deps, () => Promise.reject(new Error('own failed'))),
       ).rejects.toThrow('own failed');
     });
+  });
+});
+
+describe('Technical: which services, per server', () => {
+  it('My Files by default; LINKED_SYNC_SERVICES replaces it; [] switches it off; bad JSON keeps the default', async () => {
+    const { linkedSyncServices, DEFAULT_LINKED_SYNC_SERVICES } = await import('../linkedServices');
+    expect(linkedSyncServices(undefined)).toEqual(DEFAULT_LINKED_SYNC_SERVICES);
+    expect(parseLinkedServices({ services: linkedSyncServices(undefined) })[0].name).toBe('My Files');
+    expect(linkedSyncServices('[]')).toEqual([]);
+    expect(linkedSyncServices('[{"name":"X","url":"/x","enabled":true}]')).toEqual([{ name: 'X', url: '/x', enabled: true }]);
+    expect(linkedSyncServices('{oops')).toEqual(DEFAULT_LINKED_SYNC_SERVICES);
   });
 });
