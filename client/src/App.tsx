@@ -109,6 +109,8 @@ function App() {
 
                 {/* Purchasing — Shipskart SSO embed (handled inside TechnicalModule) */}
                 <Route path="/purchasing" component={TechnicalModule} />
+                {/* My Files: the shared file module (handled inside TechnicalModule) */}
+                <Route path="/my-files" component={TechnicalModule} />
 
                 {/* ====== NOON REPORT MODULE ROUTES — START (remove to disable) ====== */}
                 <Route path="/noon-report" component={TechnicalModule} />
