@@ -7,7 +7,7 @@ import {
   type LinkedDeps,
   type LinkedResult,
   type LinkedService,
-} from '../linkedSync';
+} from '../../../../client/src/lib/linkedSync';
 
 const MY_FILES: LinkedService = { name: 'My Files', url: '/m/api/v1', enabled: true, timeoutMs: 10_000, pollMs: 1000 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
