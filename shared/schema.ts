@@ -497,6 +497,67 @@ export const insertRotationHistorySchema = createInsertSchema(rotationHistory).o
 export type InsertRotationHistory = z.infer<typeof insertRotationHistorySchema>;
 export type RotationHistory = typeof rotationHistory.$inferSelect;
 
+// Forms Master catalogue is intentionally separate from Form Builder.
+const formsMasterCommon = () => ({
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  seedKey: text("seed_key").unique(),
+  isDefault: boolean("is_default").notNull().default(false),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+});
+export const pmsFormGroups = pgTable("pms_form_groups", {
+  ...formsMasterCommon(),
+  fguuid: text("fguuid").notNull().unique(),
+  groupCode: text("group_code").notNull().unique(),
+  groupName: text("group_name").notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+}, t => ({
+  activeName: uniqueIndex("pms_form_groups_active_name").on(sql`lower(trim(${t.groupName}))`).where(sql`${t.isDeleted} = false`),
+  order: index("pms_form_groups_order").on(t.isDeleted, t.displayOrder),
+}));
+export const pmsFormCategories = pgTable("pms_form_categories", {
+  ...formsMasterCommon(),
+  fcuuid: text("fcuuid").notNull().unique(),
+  groupUuid: text("group_uuid").notNull().references(() => pmsFormGroups.fguuid),
+  categoryNo: integer("category_no").notNull(),
+  categoryName: text("category_name").notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+}, t => ({
+  allocatedNo: uniqueIndex("pms_form_categories_allocated_no").on(t.groupUuid, t.categoryNo),
+  activeName: uniqueIndex("pms_form_categories_active_name").on(t.groupUuid, sql`lower(trim(${t.categoryName}))`).where(sql`${t.isDeleted} = false`),
+  parentOrder: index("pms_form_categories_parent_order").on(t.groupUuid, t.isDeleted, t.displayOrder),
+}));
+export const pmsFormsMaster = pgTable("pms_forms_master", {
+  ...formsMasterCommon(),
+  fmuuid: text("fmuuid").notNull().unique(),
+  formId: text("form_id").notNull().unique(),
+  scope: text("scope").notNull(),
+  vesselId: text("vessel_id").references(() => vessels.vuuid),
+  groupUuid: text("group_uuid").notNull().references(() => pmsFormGroups.fguuid),
+  categoryUuid: text("category_uuid").notNull().references(() => pmsFormCategories.fcuuid),
+  formName: text("form_name").notNull(),
+  companyFormName: text("company_form_name").notNull(),
+  woPreApproval: boolean("wo_pre_approval").notNull().default(false),
+  woPostApproval: boolean("wo_post_approval").notNull().default(false),
+  // Logical UUID-string mapping follows the existing role schema declaration.
+  // Migration 192 matches the physical role-reference type (TEXT or native UUID)
+  // per installation. This feature must never use schema push to reconcile it.
+  approverRoleRuid: text("approver_role_ruid").references(() => admnRoleMaster.ruid),
+  approverRoleLabel: text("approver_role_label"),
+  whenToUse: text("when_to_use"),
+  responsible: text("responsible"),
+  typicalJobs: text("typical_jobs"),
+  suggestedApprover: text("suggested_approver"),
+}, t => ({
+  activeName: uniqueIndex("pms_forms_master_active_name").on(sql`lower(trim(regexp_replace(${t.formName}, '[ ' || chr(9) || chr(10) || chr(13) || chr(12) || chr(11) || ']+', ' ', 'g')))` ).where(sql`${t.isDeleted} = false`),
+  parents: index("pms_forms_master_parents").on(t.groupUuid, t.categoryUuid, t.isDeleted),
+  category: index("pms_forms_master_category").on(t.categoryUuid, t.isDeleted),
+  scope: index("pms_forms_master_scope").on(t.scope, t.vesselId, t.isDeleted),
+}));
+
 // Form Definitions Table
 export const formDefinitions = pgTable("form_definitions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

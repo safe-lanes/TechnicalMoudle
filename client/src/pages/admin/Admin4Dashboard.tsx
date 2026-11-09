@@ -1,6 +1,6 @@
 import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 import { useEffect } from "react";
-import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, MapPin, ChevronRight, Stamp } from "lucide-react";
+import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, MapPin, ChevronRight, Stamp, FileText } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -15,14 +15,15 @@ import FleetVesselManager from "./FleetVesselManager";
 import FleetDataView from "./FleetDataView";
 import LocationManagement from "./LocationManagement";
 import RotationItemMasterList from "./RotationItemMasterList";
+import FormsMasterManagement from "./FormsMasterManagement";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations' | 'rotation-items';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'master-data-table' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree' | 'fleet-vessel-manager' | 'fleet-data' | 'locations' | 'rotation-items' | 'forms-master';
 
-export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
-  const [currentView, setCurrentView] = useAdminUrlState<ViewType>("master.view", "dashboard", [
+export default function Admin4Dashboard({ onSubViewChange, formsMasterOnly = false }: { onSubViewChange?: (isSubView: boolean) => void; formsMasterOnly?: boolean }) {
+  const [currentView, setCurrentView] = useAdminUrlState<ViewType>("master.view", "dashboard", formsMasterOnly ? ["dashboard", "forms-master"] : [
     "dashboard", "makers", "master-lists", "master-data", "master-data-table",
     "components", "jobs", "spares", "vessel-mapping", "pms-settings", "equipment-tree",
-    "fleet-vessel-manager", "fleet-data", "locations", "rotation-items",
+    "fleet-vessel-manager", "fleet-data", "locations", "rotation-items", "forms-master",
   ], true);
 
   useEffect(() => {
@@ -31,6 +32,19 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
 
   const handleBackToDashboard = () => setCurrentView('dashboard');
 
+  if (formsMasterOnly) {
+    if (currentView === "forms-master") return <FormsMasterManagement onBack={handleBackToDashboard} />;
+    return <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900">Fleet Master Data</h1>
+      <p className="text-sm text-muted-foreground">Forms Master is available to all identified Office and ship users. Catalogue changes require Office permissions on shore.</p>
+      <button onClick={() => setCurrentView("forms-master")} data-testid="card-forms-master"
+        className="flex w-full max-w-md items-center gap-4 rounded-xl border bg-white p-5 text-left shadow-sm hover:border-blue-400">
+        <FileText className="h-7 w-7 text-blue-600" />
+        <span className="flex-1"><span className="block font-semibold">Forms Master</span><span className="mt-1 block text-sm text-muted-foreground">Fleet and vessel forms catalogue</span></span>
+        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      </button>
+    </div>;
+  }
   if (currentView === 'makers') return <MakerManagement onBack={handleBackToDashboard} />;
   if (currentView === 'master-lists') return <MasterListsManagement onBack={handleBackToDashboard} />;
   if (currentView === 'master-data') return <MasterDataManagement onBack={handleBackToDashboard} />;
@@ -45,6 +59,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
   if (currentView === 'fleet-data') return <FleetDataView onBack={handleBackToDashboard} />;
   if (currentView === 'locations') return <LocationManagement onBack={handleBackToDashboard} />;
   if (currentView === 'rotation-items') return <RotationItemMasterList onBack={handleBackToDashboard} />;
+  if (currentView === 'forms-master') return <FormsMasterManagement onBack={handleBackToDashboard} />;
 
   /* ── Section 1 card ── */
   const Card1 = ({
@@ -176,6 +191,13 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
           colorBg="bg-indigo-50" colorIcon="text-indigo-500" colorUnderline="bg-indigo-400"
           colorChevron="group-hover:text-indigo-400"
           testId="card-master-data"
+        />
+        <Card1
+          view="forms-master" icon={FileText} label="Forms Master"
+          description="Maintain the fleet and vessel forms catalogue."
+          colorBg="bg-cyan-50" colorIcon="text-cyan-700" colorUnderline="bg-cyan-500"
+          colorChevron="group-hover:text-cyan-600"
+          testId="card-forms-master"
         />
       </div>
 

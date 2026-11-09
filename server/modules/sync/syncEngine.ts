@@ -29,6 +29,7 @@ import { safeParseDate } from '../running-hours/utils/rhValidation';
 import { FileSyncProcessor, DEFAULT_FILE_DRAIN_MAX_BYTES } from './fileSyncProcessor';
 import { exchangeDefectCapabilities, processDefectTransfers } from './defectFileWorker';
 import { filterDefectLogs, filterDefectRows } from './defectMetadataCompatibility';
+import { formsMasterReferencedRoles } from "../forms-master/services/formsMasterSyncPolicy";
 import {
   getTablesByCategory,
   getTableSyncConfig,
@@ -1012,9 +1013,10 @@ export class SyncEngine {
       // Tables with no UUID identity (e.g. adm_role_menu_access) now use
       // composite-key matching in oneWayApplier.ts instead.
 
+      const catalogueRoleReferences = formsMasterReferencedRoles(pullData.oneWayRows);
       for (const tableData of pullData.oneWayRows) {
         try {
-          const result = await applyOneWayRows(tableData.tableName, tableData.rows, vesselId);
+          const result = await applyOneWayRows(tableData.tableName, tableData.rows, vesselId, catalogueRoleReferences);
           syncDiag(`PULL ONE-WAY: ${tableData.tableName} — inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
           totalPulled += result.inserted + result.updated + result.softDeleted;
           totalApplyErrors += result.errors.length;

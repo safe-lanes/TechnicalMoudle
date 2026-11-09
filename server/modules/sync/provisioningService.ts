@@ -14,12 +14,14 @@
  */
 
 import * as crypto from 'crypto';
+import { formsMasterProvisioningWhere, requireFormsMasterReceiverSchema } from "../forms-master/services/formsMasterSyncPolicy";
 import { getPool } from '../../db';
 import { tenantConnectionManager } from '../../utils/tenantConnectionManager';
 import * as syncRepo from './repository';
 import { coerceArrayValue, applyOneWayRows, getColumnMeta } from './oneWayApplier';
 import { CLASS_REGULATORY_CAPABILITY, CLASS_REGULATORY_REQUIRED_COLUMNS } from './classRegulatorySync';
 import {
+  isFormsMasterTable,
   getTablesByCategory,
   getTableSyncConfig,
   getSyncPhaseOrder,
@@ -139,7 +141,8 @@ export async function generateProvisioningBundle(
   // a FK to vessels.vuuid, so it must exist before anything else on import.
   try {
     const vesselRows = await pool.query(
-      'SELECT * FROM vessels WHERE vuuid = $1',
+      `SELECT * FROM vessels WHERE vuuid = $1 OR vuuid IN
+        (SELECT vessel_id FROM pms_forms_master WHERE vessel_id IS NOT NULL)`,
       [vesselId]
     );
     if (vesselRows.rows.length > 0) {
@@ -147,7 +150,7 @@ export async function generateProvisioningBundle(
       bundle.manifest.tables.push({
         tableName: 'vessels',
         rowCount: vesselRows.rows.length,
-        category: 'IDENTITY (vessel self)',
+        category: 'IDENTITY (vessel self and Forms Master applicability references)',
       });
       bundle.manifest.totalRows += vesselRows.rows.length;
     }
@@ -390,7 +393,7 @@ export async function verifyBundleExportIntegrity(
     try {
       let dbCount: number;
       if (tc.isGlobal || !tc.vesselScopeColumn) {
-        const res = await pool.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false`);
+        const res = await pool.query(`SELECT count(*)::int AS c FROM "${tc.tableName}" ${formsMasterProvisioningWhere(tc.tableName)}`);
         dbCount = res.rows[0]?.c ?? 0;
       } else {
         const scopeValues = vesselScopeValues(tc.vesselScopeColumn, vesselId, vesselCode);
@@ -471,6 +474,8 @@ export async function importProvisioningBundle(
   let tablesImported = 0;
   let rowsImported = 0;
   const errors: string[] = [];
+  if (bundle.data.some(item => isFormsMasterTable(item.tableName)))
+    await requireFormsMasterReceiverSchema(pool);
   const regulatoryRows = bundle.data.find(item => item.tableName === 'component_class_regulatory')?.rows || [];
   const attachmentRows = bundle.data.find(item => item.tableName === 'component_class_regulatory_attachments')?.rows || [];
   if (attachmentRows.length) {
@@ -539,7 +544,14 @@ export async function importProvisioningBundle(
         'DELETE FROM adm_menumaster_ac WHERE parent_menu IS NOT NULL'
       );
       const deleted3 = await pool.query('DELETE FROM adm_menumaster_ac');
-      const deleted4 = await pool.query('DELETE FROM admn_role_master');
+      // A previously provisioned catalogue may reference these canonical roles.
+      // Preserve only those roles; all previous cleanup semantics remain intact
+      // when Forms Master is absent or has no selected Approvers.
+      const catalogueReady = await pool.query("SELECT to_regclass('pms_forms_master') AS forms");
+      const deleted4 = await pool.query(catalogueReady.rows[0]?.forms
+        ? `DELETE FROM admn_role_master r WHERE NOT EXISTS
+            (SELECT 1 FROM pms_forms_master f WHERE f.approver_role_ruid = r.ruid)`
+        : 'DELETE FROM admn_role_master');
       console.log(
         `[Provisioning] RBAC cleanup: deleted ${deleted1.rowCount} permissions, ` +
           `${(deleted2.rowCount || 0) + (deleted3.rowCount || 0)} menus, ${deleted4.rowCount} roles`
@@ -646,7 +658,8 @@ export async function importProvisioningBundle(
 
     try {
       if (tableData.tableName === 'component_class_regulatory' ||
-          tableData.tableName === 'component_class_regulatory_attachments') {
+          tableData.tableName === 'component_class_regulatory_attachments' ||
+          isFormsMasterTable(tableData.tableName)) {
         const applied = await applyOneWayRows(tableData.tableName, tableData.rows, bundle.manifest.vesselId);
         if (applied.errors.length) throw new Error(applied.errors[0].error);
         rowsImported += tableData.rows.length;
@@ -1125,7 +1138,7 @@ async function exportAndAdd(
     } else {
       rows = await pool
         .query(
-          `SELECT * FROM "${tc.tableName}" WHERE COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`
+          `SELECT * FROM "${tc.tableName}" ${formsMasterProvisioningWhere(tc.tableName)} ORDER BY COALESCE(created_at, NOW()) ASC`
         )
         .then((r: any) => r.rows);
     }

@@ -65,6 +65,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "spares", label: "Spares", icon: Archive },
     { id: "stores", label: "Stores", icon: Store },
     { id: "reports", label: "Reports", icon: FileText },
+    { id: "forms-master", label: "Forms Master", icon: ClipboardCheck },
     { id: "modify-pms", label: "Modify PMS", icon: Settings2 },
     { id: "admin", label: "Admin", icon: Settings },
   ],
@@ -149,6 +150,9 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   // 25-Sep-2026: the separate "Approval Engine" entry is retired — its builder lives inside
   // Admin → Approval Workflow (Sahil's combined screen), gated by Access Control like other menus.
   const menuItems = allMenuItems.filter((item) => {
+    // Catalogue reads have no admin-masters grant requirement. Its own API
+    // authenticates every read and independently authorizes every mutation.
+    if (subModule === "pms" && item.id === "forms-master") return true;
     if (item.id === "access-control") return isSailAdmin;
     if (item.id === "audit-trail") return isSailAdmin;
     if (item.id === "retention-settings") return isSailAdmin;

@@ -1,3 +1,5 @@
+# Local verification/build outputs are not deployment input.
+/generated-artifacts/
 /generated-artifacts/
 /.private/defect-docs/
 /.private/defect-docs-staging/

@@ -13,6 +13,7 @@ import { getPool } from '../../db';
 import { getTableSyncConfig, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { safeParseDate } from '../running-hours/utils/rhValidation';
+import { isFormsMasterTable } from "@shared/syncConfig";
 import {
   isCompletedWorkOrderStatus,
   isValidCompletedWorkOrderDate,
@@ -307,6 +308,7 @@ export async function applyOneWayRows(
   tableName: string,
   rows: any[],
   vesselId?: string,
+  formsMasterRoleReferences?: ReadonlySet<string>,
 ): Promise<ApplyResult> {
   if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, silentNoOps: 0, errors: [] };
 
@@ -381,6 +383,10 @@ export async function applyOneWayRows(
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
+    // Absent catalogue tombstones reserve identifiers. Retired role rows must
+    // also land when this catalogue explicitly references them (not all roles).
+    const retainTombstone = isFormsMasterTable(tableName) ||
+      (tableName === 'admn_role_master' && formsMasterRoleReferences?.has(String(row.ruid)) === true);
     try {
       // Check if this is a soft-delete marker
       const isDeleted = row.is_deleted === true || row.isDeleted === true;
@@ -442,7 +448,7 @@ export async function applyOneWayRows(
         continue;
       }
       if (existCheck.rows.length > 0) {
-        if (isDeleted) {
+        if (isDeleted && !retainTombstone) {
           // Soft-delete: Jobs must also be inactive so the receiving instance
           // preserves the same lifecycle invariant as the shore-side delete.
           await pool.query(
@@ -566,7 +572,7 @@ export async function applyOneWayRows(
           result.updated++;
         }
       } else {
-        if (isDeleted) {
+        if (isDeleted && !retainTombstone) {
           // Row doesn't exist and is deleted — skip
           result.softDeleted++;
           continue;

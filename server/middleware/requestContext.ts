@@ -74,3 +74,11 @@ export function getAuditActor(): AuditActor {
 export function getRequestContext(): RequestContext | undefined {
   return asyncLocalStorage.getStore();
 }
+
+/** Background initialization must not inherit the user who first opened a tenant. */
+export function runWithSystemAuditContext<T>(callback: () => T): T {
+  return asyncLocalStorage.run({
+    userId: SYSTEM_ACTOR.actorId, fullName: SYSTEM_ACTOR.actorLabel,
+    actor: SYSTEM_ACTOR, rbacRole: null,
+  }, callback);
+}

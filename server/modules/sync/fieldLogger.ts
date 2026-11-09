@@ -20,7 +20,7 @@
 
 import { getDb, getPool } from '../../db';
 import { syncFieldLog, syncFieldLogFailures } from '../../../shared/schema';
-import { requiresFieldLogging } from '../../../shared/syncConfig';
+import { requiresFieldLogging, isFormsMasterTable } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { getRequestContext } from '../../middleware/requestContext';
 import { getColumnMeta } from './oneWayApplier';
@@ -219,7 +219,13 @@ async function logFieldChangesCore(
   }
 
   const db = txConn || await getDb();
-  const instanceId = await getInstanceId();
+  // Forms Master can initialize several tenants in one process. Its outbound
+  // rows must use that tenant's effective identity, never the default DB cache.
+  const instanceId = isFormsMasterTable(tableName)
+    ? await (await import("./syncRole")).getEffectiveInstanceId()
+    : await getInstanceId();
+  if (isFormsMasterTable(tableName) && (!instanceId || ["UNKNOWN", "SHIP-VESSELNAME"].includes(instanceId.trim().toUpperCase())))
+    throw new Error("Forms Master requires a configured sync instance identity before logging.");
   const changedAt = new Date();
   let logCount = 0;
   let failedFields = 0;

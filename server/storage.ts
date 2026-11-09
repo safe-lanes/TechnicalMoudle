@@ -1,5 +1,8 @@
 
 import crypto from "crypto";
+import type { getDb } from "./db";
+export type FormsMasterDatabase = Awaited<ReturnType<typeof getDb>>;
+export type FormsMasterTransaction = Parameters<Parameters<FormsMasterDatabase["transaction"]>[0]>[0];
 import { generateFleetEquipmentCode, generateFleetJobCode, generateFleetPartCode } from "./utils/codeGeneration";
 import type { ApprovalFieldOverride } from '../shared/officeReviewer';
 import {
@@ -260,6 +263,8 @@ export function calculateRecordChecksum(record: any): string {
 // you might need
 
 export interface IStorage {
+  getFormsMasterDatabase(): Promise<FormsMasterDatabase>;
+  withFormsMasterTransaction<T>(callback: (tx: FormsMasterTransaction) => Promise<T>): Promise<T>;
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
@@ -802,7 +807,7 @@ export interface IStorage {
   }>;
   
   // Audit Log
-  createAuditLog(data: any): Promise<any>;
+  createAuditLog(data: any, tx?: FormsMasterTransaction): Promise<any>;
   getAuditLogs(filters?: any): Promise<any[]>;
   countAuditLogs(filters?: any): Promise<number>;
   getAuditLogsByEntity(entityType: string, entityId: string): Promise<any[]>;

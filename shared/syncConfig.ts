@@ -439,6 +439,25 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
 
   // ── Forms ──
 
+  pms_form_groups: {
+    tableName: 'pms_form_groups', identityColumn: 'fguuid',
+    category: 'ONE_WAY_SHORE_TO_SHIP', direction: 'shore_to_ship',
+    isGlobal: true, isConfigurable: false, vesselScopeColumn: null, vesselScopeJoinPath: null, businessRules: null,
+    notes: 'Forms Master – Office-managed; ships read-only; defaults seeded both sides with UUID v5 identities.',
+  },
+  pms_form_categories: {
+    tableName: 'pms_form_categories', identityColumn: 'fcuuid',
+    category: 'ONE_WAY_SHORE_TO_SHIP', direction: 'shore_to_ship',
+    isGlobal: true, isConfigurable: false, vesselScopeColumn: null, vesselScopeJoinPath: null, businessRules: null,
+    notes: 'Forms Master – Office-managed; ships read-only; defaults seeded both sides with UUID v5 identities.',
+  },
+  pms_forms_master: {
+    tableName: 'pms_forms_master', identityColumn: 'fmuuid',
+    category: 'ONE_WAY_SHORE_TO_SHIP', direction: 'shore_to_ship',
+    isGlobal: true, isConfigurable: false, vesselScopeColumn: null, vesselScopeJoinPath: null, businessRules: null,
+    notes: 'Forms Master – Office-managed; ships read-only; defaults seeded both sides with UUID v5 identities.',
+  },
+
   form_definitions: {
     tableName: 'form_definitions',
     category: 'ONE_WAY_SHORE_TO_SHIP',
@@ -1825,7 +1844,14 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
 
 /** Get all tables in a specific sync category */
 export function getTablesByCategory(category: SyncCategory): TableSyncConfig[] {
-  return Object.values(SYNC_CONFIG).filter(t => t.category === category);
+  const tables = Object.values(SYNC_CONFIG).filter(t => t.category === category);
+  // Explicit catalogue dependency order shared by full provisioning and incremental
+  // one-way pull. All pre-existing tables retain their relative order.
+  const catalogue = ['pms_form_groups', 'pms_form_categories', 'pms_forms_master'];
+  return [
+    ...tables.filter(t => !catalogue.includes(t.tableName)),
+    ...catalogue.flatMap(name => tables.filter(t => t.tableName === name)),
+  ];
 }
 
 /** Get sync config for a specific table */
@@ -1833,10 +1859,16 @@ export function getTableSyncConfig(tableName: string): TableSyncConfig | undefin
   return SYNC_CONFIG[tableName];
 }
 
+/** Catalogue tombstones reserve deterministic identities and historical allocations. */
+export function isFormsMasterTable(tableName: string): boolean {
+  return ['pms_form_groups', 'pms_form_categories', 'pms_forms_master'].includes(tableName);
+}
+
 /** Check if a table requires field-level change logging */
 export function requiresFieldLogging(tableName: string): boolean {
   const config = SYNC_CONFIG[tableName];
-  return config?.category === 'BOTH_EDITABLE';
+  return config?.category === 'BOTH_EDITABLE' ||
+    ['pms_form_groups', 'pms_form_categories', 'pms_forms_master'].includes(tableName);
 }
 
 /** Get the identity column for a table (used for sync_field_log.row_uuid) */

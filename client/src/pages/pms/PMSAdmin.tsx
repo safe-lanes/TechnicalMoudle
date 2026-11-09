@@ -12,7 +12,8 @@ import { useAdminUrlState } from "@/hooks/useAdminUrlState";
 export default function PMSAdmin() {
   const { uiRole, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const showBulkDataImp = isSailAdmin || isClientAdmin || isExternal;
-  const showMasterData = isSailAdmin;
+  // Non-admin users get only the Forms Master catalogue, not the existing masters.
+  const showMasterData = !isExternal;
   const [requestedTab, setActiveTab] = useAdminUrlState<string>(
     "tab", "", ["", "bulk-data-imp", "alerts", "forms", "admin-4"], true,
   );
@@ -131,7 +132,7 @@ export default function PMSAdmin() {
 
         {showMasterData && (
           <TabsContent value="admin-4" className={hideHeader ? "mt-0" : "mt-6"}>
-            <Admin4Dashboard onSubViewChange={handleSubViewChange} />
+            <Admin4Dashboard onSubViewChange={handleSubViewChange} formsMasterOnly={!isSailAdmin} />
           </TabsContent>
         )}
       </Tabs>

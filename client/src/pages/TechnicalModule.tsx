@@ -30,6 +30,7 @@ import SurveysPage from "./cert-surveys/SurveysPage";
 import PurchasingPage from "./purchasing/PurchasingPage";
 import { useLocation, useParams } from "wouter";
 import DataMasters from "./admin/DataMasters";
+import Admin4Dashboard from "./admin/Admin4Dashboard";
 import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
 import ShipsSurveysAdmin from "./admin/ShipsSurveysAdmin";
 import AccessControl from "./admin/AccessControl";
@@ -201,7 +202,7 @@ export const TechnicalModule = () => {
           ref={mainContentRef}
           className={`flex-1 min-h-0 ${isComponentsPage ? "overflow-hidden" : "overflow-auto"} ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}
         >
-          {((permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem === "approval-engine" ? "approval-workflow" : selectedMenuItem)) ? (
+          {((permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && selectedSubModule !== "purchasing" && !(selectedSubModule === "pms" && selectedMenuItem === "forms-master") && !canViewSidebarItem(selectedSubModule, selectedMenuItem === "approval-engine" ? "approval-workflow" : selectedMenuItem)) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
                 <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
@@ -250,6 +251,8 @@ export const TechnicalModule = () => {
             <JobsSelector />
           ) : selectedSubModule === "pms" && selectedMenuItem === "superintendent" ? (
             <SuperintendentPage />
+          ) : selectedSubModule === "pms" && selectedMenuItem === "forms-master" ? (
+            <Admin4Dashboard formsMasterOnly />
           ) : selectedSubModule === "pms" && selectedMenuItem === "admin" ? (
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem.startsWith("maintenance-records") ? (

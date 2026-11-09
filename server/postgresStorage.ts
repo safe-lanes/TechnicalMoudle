@@ -14,6 +14,7 @@ import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, 
 import { masterUsers } from '@shared/schema'; // 28-Oct-2026: Work Instructions "who" names (getMasterUserNamesByIds)
 import { levelsMatch } from '@shared/approvals/level';
 import { getDb } from './db';
+import type { FormsMasterDatabase, FormsMasterTransaction } from "./storage";
 import { extractJobNoFromWorkOrderNo } from './utils/workOrderStatus';
 import { defectSeriesPrefix, formatDefectNumber, highestInSeries, vcodeDefectSeriesPrefix, type DefectSide } from './utils/defectNumberSeries';
 import {
@@ -456,6 +457,10 @@ export async function reopenDefectAfterVerificationReturnTx(
 }
 
 export class PostgresStorage {
+  async getFormsMasterDatabase(): Promise<FormsMasterDatabase> { return getDb(); }
+  async withFormsMasterTransaction<T>(callback: (tx: FormsMasterTransaction) => Promise<T>): Promise<T> {
+    return (await getDb()).transaction(callback);
+  }
 
   private async insertWithSequenceRepair<T>(
     tableName: string,
@@ -7940,8 +7945,8 @@ export class PostgresStorage {
 
   // ============= MODULE 17: AUDIT LOG =============
 
-  async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
-    const db = await getDb();
+  async createAuditLog(data: InsertAuditLog, tx?: FormsMasterTransaction): Promise<AuditLog> {
+    const db = tx ?? await getDb();
 
     // Audit identity (Phase 0). The request-context actor is AUTHORITATIVE for audit_log.user_id
     // (= "who acted"), regardless of any name/rank a controller injected into data.userId for its

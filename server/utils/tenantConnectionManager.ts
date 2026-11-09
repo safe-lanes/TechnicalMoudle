@@ -351,13 +351,17 @@ class TenantConnectionManager {
       client.release();
       this.clearCircuitBreaker(tuid);
 
+      const db = drizzle(pool, { schema });
       // Lazy per-tenant migration (Part-E pool-arg runners), once per tuid.
       if (!this.migratedTenants.has(tuid)) {
         try {
-          await runMigrations(pool);
-          await runDrizzleMigrations(pool);
-          await initializeDatabase(pool);
-          await ensureMaintenanceHistoryImmutability(pool);
+          const { initializePmsFormsMasterTenant } = await import("../modules/forms-master/defaults/pmsFormsMasterSeeder");
+          await initializePmsFormsMasterTenant({ tuid, db, pool }, async () => {
+            await runMigrations(pool);
+            await runDrizzleMigrations(pool);
+            await initializeDatabase(pool);
+            await ensureMaintenanceHistoryImmutability(pool);
+          });
           this.migratedTenants.add(tuid);
           this.migrationFailures.delete(tuid);
         } catch (migErr: any) {
@@ -368,7 +372,6 @@ class TenantConnectionManager {
         }
       }
 
-      const db = drizzle(pool, { schema });
       const entry: PoolCacheEntry = { pool, db, lastUsed: Date.now() };
       this.poolCache.set(tuid, entry);
       console.log(`🔗 Tenant pool created for '${maskTuid(tuid)}' (active pools: ${this.poolCache.size})`);

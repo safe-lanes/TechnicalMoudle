@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
+import formsMasterRouter from "./modules/forms-master/formsMasterRoutes";
 import { mockAuthMiddleware, initMockAuthRankId, requireRole, type AuthenticatedRequest } from "./middleware/auth";
 import { z } from "zod";
 import { tenantMiddleware } from "./middleware/tenantMiddleware";
@@ -47,6 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/technical/api', tenantMiddleware);
   app.use('/technical/api', mockAuthMiddleware);
   app.use('/technical/api', requestContextMiddleware);
+  app.use('/technical/api/admin/forms-master', formsMasterRouter);
   console.log('🔒 Mock authentication enabled for /technical/api/* routes');
 
   // Mount modular architecture router (modules extracted from routes.ts go here)

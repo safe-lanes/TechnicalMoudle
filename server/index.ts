@@ -106,6 +106,11 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 
+  // Separate catalogue seed, never Form Builder's seedForms. Fail closed before
+  // routes accept writes if defaults conflict or mandatory audit/logging fails.
+  const { seedPmsFormsMasterDefaults } = await import("./modules/forms-master/defaults/pmsFormsMasterSeeder");
+  await seedPmsFormsMasterDefaults();
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
