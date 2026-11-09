@@ -129,7 +129,7 @@ async function runOne(service: LinkedService, deps: LinkedDeps): Promise<LinkedR
     }
     if (!res) return timedOut;
     if (!res.ok) continue;
-    const status = (await res.json().catch(() => null)) as {
+    const status = (await res.json().catch((): null => null)) as {
       running?: boolean;
       lastStatus?: string | null;
       lastError?: string | null;
