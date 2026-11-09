@@ -7,7 +7,14 @@ import { getRbacIdentity } from "../../../middleware/auth";
 import { storage } from "../../../storage";
 import { isShipInstance, getEffectiveInstanceId } from "../../sync/syncRole";
 import { formMasterInput, formsMasterUuid, formsMasterListInput } from "@shared/pmsFormsMasterContracts";
+import { createDefaultDevelopmentUser } from "@shared/developmentUser";
+import { findMasterUserById } from "../../assistant-api/masterUserRepository";
 import * as repo from "../repositories/formsMasterRepository";
+
+type CatalogueRequest = AuthenticatedRequest & {
+  verifiedUser?: VerifiedUser;
+  formsMasterActor?: { userId: string; role: string; userType: "Office" | "Ship" };
+};
 
 function verifiedCatalogueUser(req: AuthenticatedRequest): VerifiedUser | undefined {
   let verified = (req as AuthenticatedRequest & { verifiedUser?: VerifiedUser }).verifiedUser;
@@ -24,23 +31,117 @@ function verifiedCatalogueUser(req: AuthenticatedRequest): VerifiedUser | undefi
   }
   return verified;
 }
-export function requireCatalogueIdentity(req: AuthenticatedRequest): string {
-  const identity = getRbacIdentity(req);
-  const actor = req.user?.userUuid;
+
+/** Server-owned gate for the Forms Master default-user path; never sourced from request claims. */
+export function formsMasterReplitDefaultEnabled(): boolean {
+  return process.env.NODE_ENV === "development" &&
+    process.env.VITE_APP_ENV === "replit" &&
+    !tenantConnectionManager.isMultiTenantEnabled;
+}
+
+function forwardedHeader(req: AuthenticatedRequest, name: string): string | null {
+  const value = req.get(name);
+  if (!value?.trim()) return null;
+  try { return decodeURIComponent(value).trim(); } catch { return value.trim(); }
+}
+
+function formsMasterDefaultRequested(req: AuthenticatedRequest): boolean {
+  return req.get("x-forms-master-development") === "default-user";
+}
+
+async function resolveReplitDefaultActor(req: CatalogueRequest): Promise<string> {
+  if (!formsMasterReplitDefaultEnabled() || !formsMasterDefaultRequested(req) ||
+      req.get("authorization") || req.verifiedUser) {
+    repo.catalogueError("A verified signed-in user is required for Forms Master.", 401);
+  }
+
+  const user = createDefaultDevelopmentUser();
+  if (!req.user || !user.isActive || user.isDeleted || !user.userUuid ||
+      (user.userType !== "Office" && user.userType !== "Ship")) {
+    repo.catalogueError("The Replit default Forms Master user is not available.", 403);
+  }
+
+  const userId = forwardedHeader(req, "x-user-id");
+  const role = forwardedHeader(req, "x-user-role");
+  const userType = forwardedHeader(req, "x-user-type");
+  if (userId !== user.userUuid || role !== user.role || userType !== user.userType ||
+      req.user.userUuid !== user.userUuid || req.user.userType !== user.userType) {
+    repo.catalogueError("The Replit Forms Master identity does not match the AuthContext default user. Refresh the preview and retry.", 403);
+  }
+
+  const upstream = getRbacIdentity(req);
+  if (upstream.source === "forwarded" &&
+      ((upstream.role && upstream.role !== user.role) ||
+       (upstream.userType && upstream.userType !== user.userType))) {
+    repo.catalogueError("The forwarded Replit Forms Master identity does not match the configured default user.", 403);
+  }
+
+  // The fixed development identity must correspond to this installation's
+  // canonical user record. Its stored role is authoritative for RBAC; do not
+  // grant the role label embedded in the public AuthContext development profile.
+  const mapped = await findMasterUserById(user.userUuid);
+  if (!mapped || !mapped.role || mapped.userType !== user.userType) {
+    repo.catalogueError(
+      "The Replit default user is not registered as an active user with a valid Office/Ship type in this installation's user directory.",
+      403,
+    );
+  }
+
+  // Route-local RBAC is now derived from the fixed server-owned identity and
+  // canonical role mapping, not from mockAuthMiddleware or caller-controlled values.
+  req.rbac = { source: "forwarded", role: mapped.role, userType: mapped.userType };
+  req.formsMasterActor = { userId: user.userUuid, role: mapped.role, userType: mapped.userType };
+  return user.userUuid;
+}
+
+export async function requireCatalogueIdentity(request: AuthenticatedRequest): Promise<string> {
+  const req = request as CatalogueRequest;
+  if (req.formsMasterActor) return req.formsMasterActor.userId;
+
+  if (!req.user) repo.catalogueError("Please sign in to access Forms Master.", 401);
+  if (formsMasterDefaultRequested(req) && formsMasterReplitDefaultEnabled() &&
+      !req.verifiedUser && !req.get("authorization")) {
+    return resolveReplitDefaultActor(req);
+  }
+
   const verified = verifiedCatalogueUser(req);
-  // req.user is historically populated with a mock. It is NOT authentication.
-  // Forwarded fields are used only after binding them to a verified session.
-  // A syntactically valid UUID or a privileged role name is not authentication.
-  if (!req.user || identity.source !== "forwarded" || !identity.userType ||
-      !actor || !formsMasterUuid.safeParse(actor).success ||
-      req.get("x-user-id") !== actor ||
-      !verified || verified.userId !== actor || !verified.role ||
-      verified.role !== identity.role || verified.userType !== identity.userType)
-    repo.catalogueError("An identified user is required for Forms Master", 401);
+  if (!verified?.userId || !formsMasterUuid.safeParse(verified.userId).success) {
+    repo.catalogueError("Please sign in through the integrated application to access Forms Master.", 401);
+  }
+
+  // Some integrated tokens omit role/type; resolve only from the canonical
+  // server-side directory, never from browser headers.
+  let role = verified.role;
+  let userType = verified.userType;
+  if (!role || !userType) {
+    const mapped = await findMasterUserById(verified.userId);
+    role ||= mapped?.role ?? null;
+    userType ||= mapped?.userType ?? null;
+  }
+  const actor = verified.userId;
+  const forwardedId = forwardedHeader(req, "x-user-id");
+  const forwardedRole = forwardedHeader(req, "x-user-role");
+  const forwardedType = forwardedHeader(req, "x-user-type");
+  if (!req.user || !role || !userType || req.user.userUuid !== actor ||
+      forwardedId !== actor || forwardedRole !== role || forwardedType !== userType) {
+    repo.catalogueError("The signed-in identity could not be matched to the Forms Master request. Please sign in again.", 401);
+  }
+
+  const upstream = getRbacIdentity(req);
+  if (upstream.source === "forwarded" &&
+      ((upstream.role && upstream.role !== role) ||
+       (upstream.userType && upstream.userType !== userType))) {
+    repo.catalogueError("The forwarded identity does not match the verified Forms Master session. Please sign in again.", 401);
+  }
+
+  // Use the verified claims (or server-side canonical role/type resolution) for
+  // Forms Master RBAC, including when unrelated mock-RBAC mode is enabled.
+  req.rbac = { source: "forwarded", role, userType };
+  req.formsMasterActor = { userId: actor, role, userType };
   return actor;
 }
 export async function catalogueCapabilities(req: AuthenticatedRequest) {
-  requireCatalogueIdentity(req);
+  await requireCatalogueIdentity(req);
   const identity = getRbacIdentity(req);
   const none = { create: false, edit: false, delete: false };
   const instance = (await getEffectiveInstanceId()).trim().toUpperCase();
@@ -54,7 +155,7 @@ export async function catalogueCapabilities(req: AuthenticatedRequest) {
   return { create: permission?.canCreate === true, edit: permission?.canEdit === true, delete: permission?.canDelete === true };
 }
 export async function requireCatalogueWrite(req: AuthenticatedRequest, action: "create" | "edit" | "delete") {
-  const actor = requireCatalogueIdentity(req);
+  const actor = await requireCatalogueIdentity(req);
   if (!(await catalogueCapabilities(req))[action])
     repo.catalogueError("Forms Master can only be edited from the office with explicit admin-masters permission.", 403);
   return actor;

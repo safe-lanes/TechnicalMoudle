@@ -26,6 +26,33 @@ function ErrorPanel({ message, retry }: { message: string; retry: () => void }) 
   return <div className="m-6 rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-sm"><p className="font-semibold">Couldn’t load Forms Master</p><p className="mt-1 text-muted-foreground">{message}</p><Button className="mt-3" variant="outline" onClick={retry}>Try again</Button></div>;
 }
 
+function formsMasterLoadErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  const response = raw.match(/^(\d{3}):\s*([\s\S]*)$/);
+  const status = response ? Number(response[1]) : null;
+  let detail = response?.[2] ?? raw;
+  try {
+    const parsed = JSON.parse(detail);
+    if (typeof parsed?.error === "string") detail = parsed.error;
+  } catch {
+    // The response may already be a plain-text message.
+  }
+
+  if (status === 401) {
+    return "Your signed-in identity could not be verified. In Replit, refresh the preview to use its AuthContext default user; elsewhere, sign in through the integrated application and retry.";
+  }
+  if (/replit default user.*(not registered|matching role)/i.test(detail)) {
+    return "The Replit default user is not mapped to an active user with a valid Office/Ship type in this installation. Ask an administrator to verify its user-directory record, then retry.";
+  }
+  if (/replit forms master identity|configured default user/i.test(detail)) {
+    return "The Replit default identity did not match AuthContext. Refresh the preview and try again.";
+  }
+  if (status === 403 && /admin-masters|only be edited from the office/i.test(detail)) {
+    return "Your account is signed in but does not have the required Forms Master permission. Ask an administrator to grant the appropriate admin-masters access.";
+  }
+  return detail || "Check your access and connection, then try again.";
+}
+
 export default function FormsMasterManagement({ onBack }: { onBack: () => void }) {
   const [search, setSearch] = useState("");
   const [groupUuid, setGroupUuid] = useState("");
@@ -81,6 +108,11 @@ export default function FormsMasterManagement({ onBack }: { onBack: () => void }
     onError: (error: Error) => toast({ title: "Action failed", description: error.message, variant: "destructive" }),
   });
   const records = listQuery.data?.records ?? [];
+  const loadError = optionsQuery.error ?? listQuery.error;
+  const retryLoad = () => {
+    void optionsQuery.refetch();
+    void listQuery.refetch();
+  };
   const total = listQuery.data?.total ?? 0;
   const pageSize = listQuery.data?.pageSize ?? 20;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -106,7 +138,6 @@ export default function FormsMasterManagement({ onBack }: { onBack: () => void }
         {opts?.capabilities.create && <Button onClick={() => setEditing(null)}><Plus className="mr-2 h-4 w-4" />Add form</Button>}
       </div>
     </div>
-    {optionsQuery.error && <ErrorPanel message={(optionsQuery.error as Error).message} retry={() => { void optionsQuery.refetch(); }} />}
     {opts && !opts.capabilities.edit && <div className="rounded-md border border-amber-300/70 bg-amber-50 px-4 py-2 text-sm text-amber-900">Editable from the office only.</div>}
     <section className="rounded-lg border bg-card shadow-sm">
       <div className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -119,8 +150,8 @@ export default function FormsMasterManagement({ onBack }: { onBack: () => void }
         <select aria-label="Post approval filter" value={post} onChange={e => { setPost(e.target.value); setPage(1); }} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="">Post approval: any</option><option value="true">Post approval: Yes</option><option value="false">Post approval: No</option></select>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showDeleted} onChange={e => { setShowDeleted(e.target.checked); setPage(1); }} />Show deleted</label>
       </div>
-      {listQuery.isLoading || optionsQuery.isLoading ? <div className="space-y-3 p-5" aria-label="Loading forms">{Array.from({ length: 5 }, (_, i) => <div key={i} className="h-10 animate-pulse rounded bg-muted" />)}</div>
-      : listQuery.error ? <ErrorPanel message={(listQuery.error as Error).message} retry={() => { void listQuery.refetch(); void optionsQuery.refetch(); }} />
+      {loadError ? <ErrorPanel message={formsMasterLoadErrorMessage(loadError)} retry={retryLoad} />
+      : listQuery.isLoading || optionsQuery.isLoading ? <div className="space-y-3 p-5" aria-label="Loading forms">{Array.from({ length: 5 }, (_, i) => <div key={i} className="h-10 animate-pulse rounded bg-muted" />)}</div>
       : <><div className="overflow-x-auto">
         <table className="w-full min-w-[1250px] text-left text-sm">
           <thead className="bg-muted/70 text-xs uppercase tracking-wide text-muted-foreground"><tr>{columns.map(col => <th key={col.key} className="px-3 py-3"><button onClick={() => changeSort(col.key)} className="inline-flex items-center gap-1 hover:text-foreground">{col.label}{sort === col.key && (direction === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}</button></th>)}</tr></thead>

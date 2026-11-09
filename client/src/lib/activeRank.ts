@@ -1,5 +1,6 @@
 import { getAccessToken } from "./authToken";
 import { isReplit } from "./env";
+import { createDefaultDevelopmentUser } from "@shared/developmentUser";
 
 let activeRank: string | null = null;
 const listeners = new Set<(rank: string | null) => void>();
@@ -20,6 +21,16 @@ export interface ActiveIdentity {
 let activeIdentity: ActiveIdentity = {};
 
 const API_PREFIX = "/technical/api";
+const FORMS_MASTER_PATH = `${API_PREFIX}/admin/forms-master`;
+const FORMS_MASTER_DEFAULT_USER = createDefaultDevelopmentUser();
+
+function isFormsMasterDefaultUserRequest(path: string, identity: ActiveIdentity): boolean {
+  return isReplit() &&
+    (path === FORMS_MASTER_PATH || path.startsWith(`${FORMS_MASTER_PATH}/`)) &&
+    identity.userId === FORMS_MASTER_DEFAULT_USER.userUuid &&
+    identity.role === FORMS_MASTER_DEFAULT_USER.role &&
+    identity.userType === FORMS_MASTER_DEFAULT_USER.userType;
+}
 
 export function isApiUrl(url: string): boolean {
   if (!url) return false;
@@ -119,11 +130,11 @@ export function installRankFetchInterceptor(): void {
 
     // Inject auth/audit headers without overwriting any the caller already set.
     const applyAuthHeaders = (h: Headers) => {
-      // Section H explicitly selects its approved default workspace actor.
-      // Do not mix in a stale real session (including a still-valid Ship token).
-      // This is transport selection only; the server independently checks its
-      // development environment and canonical default user before granting it.
       const path = new URL(url, window.location.origin).pathname;
+      // These resource-specific markers only select a development transport;
+      // each module independently validates its server-side environment and
+      // canonical default identity. Never carry a stale real token alongside
+      // an explicitly selected default-user request.
       const sectionHDefault = isReplit() && h.get("x-section-h-development") === "default-user" &&
         (path === `${API_PREFIX}/component-class-regulatory` ||
           path.startsWith(`${API_PREFIX}/component-class-regulatory/`) ||
@@ -132,9 +143,15 @@ export function installRankFetchInterceptor(): void {
           /^\/technical\/api\/section-h-entries\/[0-9a-f-]+\/attachments(?:\/[0-9a-f-]+(?:\/(?:download|restore))?)?$/i.test(path) ||
           (path === `${API_PREFIX}/fleet/master-lists` &&
             ["classificationSociety", "surveyType"].includes(new URL(url, window.location.origin).searchParams.get("listType") || "")));
+      const formsMasterDefault = isFormsMasterDefaultUserRequest(path, identity);
+      if (path === FORMS_MASTER_PATH || path.startsWith(`${FORMS_MASTER_PATH}/`)) {
+        if (formsMasterDefault) h.set("x-forms-master-development", "default-user");
+        else h.delete("x-forms-master-development");
+      }
       if (sectionHDefault) h.delete("authorization");
+      if (formsMasterDefault) h.delete("authorization");
       if (rank && !h.has("x-rank")) h.set("x-rank", rank);                                   // (a) x-rank
-      if (token && !sectionHDefault && !h.has("authorization")) h.set("Authorization", `Bearer ${token}`); // (b) Bearer token
+      if (token && !sectionHDefault && !formsMasterDefault && !h.has("authorization")) h.set("Authorization", `Bearer ${token}`); // (b) Bearer token
       if (identity.userId && !h.has("x-user-id")) h.set("x-user-id", encodeURIComponent(identity.userId)); // (c) x-user-*
       if (identity.name && !h.has("x-user-name")) h.set("x-user-name", encodeURIComponent(identity.name));
       if (identity.email && !h.has("x-user-email")) h.set("x-user-email", encodeURIComponent(identity.email));

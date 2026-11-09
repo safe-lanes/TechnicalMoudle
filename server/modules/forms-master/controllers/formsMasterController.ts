@@ -12,7 +12,7 @@ export function formsMasterEndpoint(
   return async (request, res) => {
     const req = request as AuthenticatedRequest;
     try {
-      const actor = action ? await service.requireCatalogueWrite(req, action) : service.requireCatalogueIdentity(req);
+      const actor = action ? await service.requireCatalogueWrite(req, action) : await service.requireCatalogueIdentity(req);
       const result = await handler(req, actor);
       res.status(req.method === "POST" && action === "create" ? 201 : 200).json(result);
     } catch (error) {
