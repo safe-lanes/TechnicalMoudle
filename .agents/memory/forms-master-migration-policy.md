@@ -18,8 +18,11 @@ one-time file-based installation of the default data. Existing customer edits
 and identities must not be replaced when changing this mechanism.
 
 **How to apply:** Keep schema creation and baseline insertion in separate SQL
-files. Confirm the shore/ship seeding and initial-delivery design before
-implementing; the owner requested sync analysis before approving that change.
+files. The owner's final scope is seeding on EVERY installation (shore and ships)
+with exactly the existing UUID-v5 identities and insert-missing-only behavior.
+Do not substitute shore-only seeding, migration-time role checks or catalogue
+resend/replay. Seed SQL intentionally writes no application audit or sync logs;
+normal Office-edit auditing and one-way synchronization remain unchanged.
 
 New role foreign keys must match the installation's actual reference type rather
 than trusting the ORM's text declaration.
