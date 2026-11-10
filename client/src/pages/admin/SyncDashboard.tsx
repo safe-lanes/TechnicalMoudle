@@ -7,6 +7,8 @@
  * Route: /admin/sync-dashboard
  */
 
+import { getAccessToken } from "@/lib/authToken";
+import { linkedLine, withLinkedSync } from "@/lib/linkedSync";
 import { useState, useContext, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -300,10 +302,30 @@ export default function SyncDashboard() {
 
   // ── Sync Trigger ──
   const syncMutation = useMutation({
-    mutationFn: async (vesselId: string): Promise<SyncTriggerResult> => {
-      const res = await apiRequest("POST", "/technical/api/sync/trigger", { vesselId });
-      return res.json();
-    },
+    mutationFn: (vesselId: string): Promise<SyncTriggerResult> =>
+      // Linked services (LINKED_SYNC_SERVICES; My Files first) sync before Technical's own sync, which starts whatever
+      // they did. With none configured it starts at once, as it always did.
+      withLinkedSync(
+        () => fetch("/technical/api/sync/linked-services").then((r) => (r.ok ? r.json() : null)),
+        {
+          getToken: () => getAccessToken(),
+          log: (message) => console.warn(message),
+          onUpdate: (result) => {
+            const line = linkedLine(result);
+            if (!line) return;
+            if (result.state === "running") setSyncStage(line);
+            setSyncLog((prev) => [
+              ...prev,
+              `[${new Date().toLocaleTimeString()}] ${result.state === "failed" ? line.replace(": failed", ": FAILED") : line}`,
+            ]);
+          },
+        },
+        async () => {
+          setSyncStage("Initiating sync session...");
+          const res = await apiRequest("POST", "/technical/api/sync/trigger", { vesselId });
+          return res.json();
+        },
+      ),
     onMutate: () => {
       setSyncProgress(5);
       setSyncStage("Initiating sync session...");

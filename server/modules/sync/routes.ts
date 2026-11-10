@@ -1,3 +1,4 @@
+import { linkedSyncServices } from './linkedServices';
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import * as syncController from './controller';
@@ -44,6 +45,10 @@ router.get('/sync/conflicts/review', requirePermission('admin-sync-conflicts', '
 router.get('/sync/conflicts/review/:id', requirePermission('admin-sync-conflicts', 'view', { enforce: true }), asyncHandler(conflictReviewCtrl.getConflictHandler));
 router.post('/sync/conflicts/review/:id/apply-incoming', requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(conflictReviewCtrl.applyIncomingHandler));
 router.post('/sync/conflicts/review/:id/dismiss', requirePermission('admin-sync-conflicts', 'edit', { enforce: true }), asyncHandler(conflictReviewCtrl.dismissHandler));
+
+router.get('/sync/linked-services', asyncHandler(async (_req: any, res: any) => {
+  res.json({ services: linkedSyncServices() });
+}));
 
 // Sync engine trigger (manual or scheduled)
 router.post('/sync/trigger', requirePermission('admin-sync-dashboard', 'edit'), asyncHandler(syncController.triggerSyncHandler));

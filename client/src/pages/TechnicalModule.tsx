@@ -28,6 +28,7 @@ import RecurringDefects from "./RecurringDefects";
 import CertificatesPage from "./cert-surveys/CertificatesPage";
 import SurveysPage from "./cert-surveys/SurveysPage";
 import PurchasingPage from "./purchasing/PurchasingPage";
+import MyFilesPage from "./my-files/MyFilesPage";
 import { useLocation, useParams } from "wouter";
 import DataMasters from "./admin/DataMasters";
 import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
@@ -102,6 +103,8 @@ export const TechnicalModule = () => {
       return { subModule: "cert-surveys", menuItem: subpage };
     } else if (location.startsWith("/purchasing")) {
       return { subModule: "purchasing", menuItem: "purchasing" };
+    } else if (location.startsWith("/my-files")) {
+      return { subModule: "my-files", menuItem: "my-files" };
     // ====== NOON REPORT MODULE — START ======
     } else if (location === "/noon-report") {
       return { subModule: "noon-report", menuItem: "entry" };
@@ -164,6 +167,9 @@ export const TechnicalModule = () => {
     } else if (subModule === "purchasing") {
       setSelectedMenuItem("purchasing");
       setLocation("/purchasing");
+    } else if (subModule === "my-files") {
+      setSelectedMenuItem("my-files");
+      setLocation("/my-files");
     // ====== NOON REPORT MODULE — START ======
     } else if (subModule === "noon-report") {
       setSelectedMenuItem("entry");
@@ -201,7 +207,7 @@ export const TechnicalModule = () => {
           ref={mainContentRef}
           className={`flex-1 min-h-0 ${isComponentsPage ? "overflow-hidden" : "overflow-auto"} ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}
         >
-          {((permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem === "approval-engine" ? "approval-workflow" : selectedMenuItem)) ? (
+          {((permissionStatus === "configured" || permissionStatus === "error") && !(["access-control", "audit-trail", "retention-settings"].includes(selectedMenuItem) && isSailAdmin) && selectedSubModule !== "purchasing" && selectedSubModule !== "my-files" && !canViewSidebarItem(selectedSubModule, selectedMenuItem === "approval-engine" ? "approval-workflow" : selectedMenuItem)) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
                 <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
@@ -338,6 +344,8 @@ export const TechnicalModule = () => {
             <SurveysPage />
           ) : selectedSubModule === "purchasing" ? (
             <PurchasingPage />
+          ) : selectedSubModule === "my-files" ? (
+            <MyFilesPage />
           // ====== NOON REPORT MODULE — START ======
           ) : selectedSubModule === "noon-report" && selectedMenuItem === "entry" ? (
             <NoonEntryForm />

@@ -9,6 +9,7 @@ import {
   Shield,
   Anchor,
   ShoppingCart,
+  FolderOpen,
 } from "lucide-react";
 // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
 import { NOON_MODULE_ENABLED } from "@/modules/noon-report/config";
@@ -76,6 +77,13 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       alwaysVisible: true,
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — END ======
+    // My Files: its own server decides what each role may see (modules_access), so no Technical RBAC row here.
+    {
+      id: "my-files",
+      label: "My Files",
+      icon: FolderOpen,
+      alwaysVisible: true,
+    },
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
     ...(NOON_MODULE_ENABLED && isSailAdmin ? [{
       id: "noon-report",
