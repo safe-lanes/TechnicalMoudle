@@ -7,7 +7,19 @@ All database migrations required for Forms Master Stage 1 must be file-based and
 
 **Why:** The owners explicitly repeated this requirement when requesting the implementation task; database setup must remain reviewable and repeatable across installations.
 
-**How to apply:** Use checked-in SQL migration files through the existing tracked runner. Do not substitute schema push, manual deployment SQL, inline migration bodies or runtime schema repair. Static default-data seeding is separate from schema migration.
+**How to apply:** Use checked-in SQL migration files through the existing tracked runner. Do not substitute schema push, manual deployment SQL, inline migration bodies or runtime schema repair.
+
+Forms Master baseline catalogue data must be installed by a separate, tracked,
+idempotent SQL data migration after the schema migration, not a recurring
+application startup seeder.
+
+**Why:** The owner explicitly rejected startup seeding and requires reviewable,
+one-time file-based installation of the default data. Existing customer edits
+and identities must not be replaced when changing this mechanism.
+
+**How to apply:** Keep schema creation and baseline insertion in separate SQL
+files. Confirm the shore/ship seeding and initial-delivery design before
+implementing; the owner requested sync analysis before approving that change.
 
 New role foreign keys must match the installation's actual reference type rather
 than trusting the ORM's text declaration.
