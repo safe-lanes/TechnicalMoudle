@@ -355,12 +355,15 @@ class TenantConnectionManager {
       // Lazy per-tenant migration (Part-E pool-arg runners), once per tuid.
       if (!this.migratedTenants.has(tuid)) {
         try {
-          const { initializePmsFormsMasterTenant } = await import("../modules/forms-master/defaults/pmsFormsMasterSeeder");
-          await initializePmsFormsMasterTenant({ tuid, db, pool }, async () => {
+          await tenantStorage.run({ tuid, db, pool }, async () => {
             await runMigrations(pool);
             await runDrizzleMigrations(pool);
             await initializeDatabase(pool);
             await ensureMaintenanceHistoryImmutability(pool);
+            const { getEffectiveInstanceId } = await import("../modules/sync/syncRole");
+            const instanceId = (await getEffectiveInstanceId()).trim().toUpperCase();
+            if (!instanceId || ["UNKNOWN", "SHIP-VESSELNAME"].includes(instanceId))
+              throw new Error("Forms Master tenant startup requires a configured sync instance identity.");
           });
           this.migratedTenants.add(tuid);
           this.migrationFailures.delete(tuid);
