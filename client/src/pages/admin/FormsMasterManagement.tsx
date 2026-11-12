@@ -57,10 +57,6 @@ export default function FormsMasterManagement({ onBack }: { onBack: () => void }
   const [search, setSearch] = useState("");
   const [groupUuid, setGroupUuid] = useState("");
   const [categoryUuid, setCategoryUuid] = useState("");
-  const [scope, setScope] = useState("");
-  const [vesselId, setVesselId] = useState("");
-  const [pre, setPre] = useState("");
-  const [post, setPost] = useState("");
   const [showDeleted, setShowDeleted] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<Sort>("formId");
@@ -87,8 +83,8 @@ export default function FormsMasterManagement({ onBack }: { onBack: () => void }
     queryFn: async () => (await apiRequest("GET", queryUrl("categories", { groupUuid, showDeleted: "true" }))).json(),
   });
   const listUrl = queryUrl("records", {
-    page, pageSize: 20, search, groupUuid, categoryUuid, scope, vesselId,
-    pre: pre || undefined, post: post || undefined, showDeleted: String(showDeleted), sort, direction,
+    page, pageSize: 20, search, groupUuid, categoryUuid,
+    showDeleted: String(showDeleted), sort, direction,
   });
   const listQuery = useQuery<FormsMasterList>({ queryKey: [listUrl] });
   const refresh = async () => {
@@ -140,15 +136,11 @@ export default function FormsMasterManagement({ onBack }: { onBack: () => void }
     </div>
     {opts && !opts.capabilities.edit && <div className="rounded-md border border-amber-300/70 bg-amber-50 px-4 py-2 text-sm text-amber-900">Editable from the office only.</div>}
     <section className="rounded-lg border bg-card shadow-sm">
-      <div className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="relative sm:col-span-2"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="pl-9" placeholder="Search form ID, names, group or category" /></div>
+      <div className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <div className="relative min-w-0 sm:col-span-2 lg:col-span-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="pl-9" placeholder="Search form ID, names, group or category" /></div>
         <select aria-label="Group filter" value={groupUuid} onChange={e => { setGroupUuid(e.target.value); setCategoryUuid(""); setPage(1); }} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="">All groups</option>{groups.map(g => <option key={g.fguuid} value={g.fguuid}>{g.groupCode}. {g.groupName}</option>)}</select>
         <select aria-label="Category filter" disabled={!groupUuid} value={categoryUuid} onChange={e => { setCategoryUuid(e.target.value); setPage(1); }} className="h-10 rounded-md border bg-background px-3 text-sm disabled:opacity-50"><option value="">All categories</option>{categories.filter(c => c.groupUuid === groupUuid && (showDeleted || !c.isDeleted)).map(c => <option key={c.fcuuid} value={c.fcuuid}>{String(c.categoryNo).padStart(2, "0")}. {c.categoryName}</option>)}</select>
-        <select aria-label="Scope filter" value={scope} onChange={e => { setScope(e.target.value); if (e.target.value !== "vessel") setVesselId(""); setPage(1); }} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="">All scopes</option><option value="fleet">Fleet</option><option value="vessel">Vessel</option></select>
-        {scope === "vessel" && <select aria-label="Vessel filter" value={vesselId} onChange={e => { setVesselId(e.target.value); setPage(1); }} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="">All vessels</option>{opts?.vessels.map(v => <option key={v.vuuid} value={v.vuuid}>{v.name}</option>)}</select>}
-        <select aria-label="Pre approval filter" value={pre} onChange={e => { setPre(e.target.value); setPage(1); }} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="">Pre approval: any</option><option value="true">Pre approval: Yes</option><option value="false">Pre approval: No</option></select>
-        <select aria-label="Post approval filter" value={post} onChange={e => { setPost(e.target.value); setPage(1); }} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="">Post approval: any</option><option value="true">Post approval: Yes</option><option value="false">Post approval: No</option></select>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showDeleted} onChange={e => { setShowDeleted(e.target.checked); setPage(1); }} />Show deleted</label>
+        <label className="flex items-center gap-2 whitespace-nowrap text-sm"><input type="checkbox" checked={showDeleted} onChange={e => { setShowDeleted(e.target.checked); setPage(1); }} />Show deleted</label>
       </div>
       {loadError ? <ErrorPanel message={formsMasterLoadErrorMessage(loadError)} retry={retryLoad} />
       : listQuery.isLoading || optionsQuery.isLoading ? <div className="space-y-3 p-5" aria-label="Loading forms">{Array.from({ length: 5 }, (_, i) => <div key={i} className="h-10 animate-pulse rounded bg-muted" />)}</div>
