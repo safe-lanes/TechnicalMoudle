@@ -17,6 +17,10 @@ interface Props {
   scope?: { moduleId: string; screenId: string; actionId?: string } | null;
   /** View only: no add/save, and the enable switch is disabled (host permission = view). */
   readOnly?: boolean;
+  /** Host endpoint for the read-only "configured approvers" panel (GET ?roleId=…, returns
+   *  { names, vesselScoped, users }). The engine has no such route of its own: each host serves
+   *  it. Default = Technical's route, so Technical needs no change. */
+  roleApproversPath?: string;
 }
 type Tree = { modules: Array<{ moduleId: string; label: string; scopes: Array<{ screenId: string; actionId: string; label: string; classifications: { id: string; label: string }[] }> }> };
 type Role = { roleId: string; roleLabel: string };
@@ -38,7 +42,7 @@ const S: Record<string, React.CSSProperties> = {
   ok: { color: '#067647', marginTop: 8 },
 };
 
-export default function ApprovalEngineAdmin({ basePath = '/approval-engine', scope: hostScope = null, readOnly = false }: Props) {
+export default function ApprovalEngineAdmin({ basePath = '/approval-engine', scope: hostScope = null, readOnly = false, roleApproversPath = '/technical/api/approvals/role-approvers' }: Props) {
   const api = useCallback(async (method: string, path: string, body?: unknown) => {
     const res = await fetch(`${basePath}${path}`, {
       method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
@@ -146,7 +150,7 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
       const uniqueRoleIds = Array.from(new Set(steps.flatMap((s: any) => s.slots.map((x: any) => x.roleId))));
       const entries = await Promise.all(uniqueRoleIds.map(async (rid) => {
         try {
-          const res = await fetch(`/technical/api/approvals/role-approvers?roleId=${encodeURIComponent(rid as string)}`);
+          const res = await fetch(`${roleApproversPath}?roleId=${encodeURIComponent(rid as string)}`);
           // Jeevan #13: a refused/failed lookup is NOT "no approver" — say it could not be loaded.
           if (!res.ok) return [rid, { names: [], vesselScoped: false, error: `could not load the approvers (HTTP ${res.status})` }] as const;
           const j = await res.json();
@@ -158,7 +162,7 @@ export default function ApprovalEngineAdmin({ basePath = '/approval-engine', sco
       if (current()) { setLoadError(`Could not load saved workflow: ${e.message}`); setLoading(false); }
     });
     return () => { cancelled = true; };
-  }, [api, classification, versions, selectionKey]);
+  }, [api, classification, versions, selectionKey, roleApproversPath]);
 
   const canMutate = editing && !readOnly && !saving;
   const addRow = () => {
