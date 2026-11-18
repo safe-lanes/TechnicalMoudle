@@ -169,6 +169,13 @@ async function cleanup() {
   check('submit → 400 EMPTY_SLOT_EXPANSION', s5.status === 400 && s5.json?.code === 'EMPTY_SLOT_EXPANSION');
   check('no engine request created', (await sql(`SELECT count(*) c FROM apprv_requests WHERE subject_ref=$1`, [wo5]))[0].c === '0');
 
+  hr('6b. a payload naming a different WO is refused (no approver substitution)');
+  await setJob([R1.ruid, R2.ruid], 'any');
+  const wo6 = await newWo();
+  const s6 = await call('POST', `${AE}/requests`, { scope, subjectRef: wo6, subject: { kind: 'wo', workOrderId: wo1 }, vesselId: V }, ADMIN);
+  check('subject/subjectRef mismatch → 400 SUBJECT_MISMATCH', s6.status === 400 && s6.json?.code === 'SUBJECT_MISMATCH');
+  check('no engine request created for it', (await sql(`SELECT count(*) c FROM apprv_requests WHERE subject_ref=$1`, [wo6]))[0].c === '0');
+
   hr('7. admin panel lookup for the special approver');
   const look = await call('GET', `/approvals/role-approvers?roleId=${encodeURIComponent(SPECIAL)}`, undefined, ADMIN);
   check('panel says it is set on each Job', look.status === 200 && /Set on each Job/.test(JSON.stringify(look.json)));

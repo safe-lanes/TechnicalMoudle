@@ -18,6 +18,7 @@
  */
 import { and, eq, inArray, or } from 'drizzle-orm';
 import type { ApprovalCard, DecisionNotice, Scope } from '../approval-engine';
+import { EngineError } from '../approval-engine';
 import { getPostgresClient } from '../../postgresClient';
 import { getCurrentTenantContext } from '../../utils/asyncLocalStorage';
 import { admnRoleMaster, masterUsers, masterUserVessels, mocApprovers, changeRequest, workOrders, vessels } from '@shared/schema';
@@ -122,11 +123,15 @@ export const technicalApprovalCard: ApprovalCard = {
   },
 
   // 18-Nov-2026: replaces "Job's Office Reviewers" with the roles + rule set on the WO's Job.
-  async expandSlot(_ctx, _scope: Scope, slot, subject: unknown, subjectRef: string) {
-    if (slot.roleId !== JOB_OFFICE_REVIEWERS_ROLE) return null;
+  // The WO is taken ONLY from subjectRef (the request's subject, which onDecision acts on); a
+  // payload naming a different WO is refused, so one WO's Job roles can never approve another WO.
+  async expandSlot(_ctx, scope: Scope, slot, subject: unknown, subjectRef: string) {
     const s = subject as TechnicalSubject;
-    const woUuid = s?.kind === 'wo' ? s.workOrderId : subjectRef;
-    return jobOfficeReviewersExpansion(woUuid);
+    if (scope.screenId === OFFICE_REVIEW_SCREEN && s?.kind === 'wo' && s.workOrderId !== subjectRef) {
+      throw new EngineError(400, '[approvals] subject.workOrderId does not match subjectRef', 'SUBJECT_MISMATCH');
+    }
+    if (slot.roleId !== JOB_OFFICE_REVIEWERS_ROLE) return null;
+    return jobOfficeReviewersExpansion(subjectRef);
   },
 
   async classify(_ctx, scope: Scope, subject: unknown) {
