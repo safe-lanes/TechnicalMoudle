@@ -164,10 +164,29 @@ export interface DecisionNotice {
   decidedBy: string;
   remarks: string | null;
 }
+/**
+ * 18-Nov-2026 — a "subject-defined" slot. A card may let a workflow step name a special role
+ * (e.g. "the Job's Office Reviewers") that is replaced, when a request is submitted, by the real
+ * roles held on the subject (one slot per role), optionally with the step's AND/OR rule taken
+ * from the subject too. The replacement is written into the request's snapshot, so the request
+ * keeps it for its whole life; later edits to the subject or the workflow never change it.
+ */
+export interface SlotExpansion {
+  /** The roles that replace the special slot (one slot each). Must not be empty. */
+  slots: RoleSlotDef[];
+  /** Step rule from the subject. Applied only when the special slot is the step's ONLY slot. */
+  quorum?: { rule: 'all' | 'any' };
+}
 export interface ApprovalCard {
   moduleId: string;
   label: string;
   scopes: CardScope[];
+  /**
+   * OPTIONAL. Called at submit for every slot of every approval step. Return null to keep the
+   * slot as configured, or a SlotExpansion to replace it. Cards without this hook behave exactly
+   * as before.
+   */
+  expandSlot?(ctx: CardCtx, scope: Scope, slot: RoleSlotDef, subject: unknown, subjectRef: string): Promise<SlotExpansion | null>;
   /** Roles offered to the builder + resolved for slots. Stable ids, display labels. */
   listRoles(ctx: CardCtx, scope: Scope): Promise<RoleOption[]>;
   /** Maps a subject to one of the scope's classification ids. */

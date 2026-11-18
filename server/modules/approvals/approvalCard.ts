@@ -25,6 +25,10 @@ import { isVesselScopeStrict } from './vesselScopeFlag';
 import { classifyChangeRequestScope } from '../change-requests/services/changeRequestsService';
 import { classifyWoForPostponement, classifyWoForRePostponement } from '../work-orders/services/workOrderService';
 import { AppError } from '../shared/errors';
+import {
+  JOB_OFFICE_REVIEWERS_LABEL, JOB_OFFICE_REVIEWERS_ROLE, OFFICE_REVIEW_CLASSIFICATION, OFFICE_REVIEW_SCREEN,
+  jobOfficeReviewersExpansion,
+} from './jobOfficeReviewers';
 
 export const TECHNICAL_MODULE_ID = 'technical';
 export const MOC_POOL_ROLE_L1 = 'moc:Level 1';
@@ -98,17 +102,31 @@ export const technicalApprovalCard: ApprovalCard = {
       classifications: [{ id: 'Normal WO', label: 'Normal WO' }, { id: 'Critical WO', label: 'Critical WO' }, { id: 'Critical Equipment WO', label: 'Critical Equipment WO' }] },
     { screenId: 'pms-wo-re-postponement', actionId: '', label: 'Work Order Re-Postponement',
       classifications: [{ id: 'Normal WO', label: 'Normal WO' }, { id: 'Critical WO', label: 'Critical WO' }, { id: 'Critical Equipment WO', label: 'Critical Equipment WO' }] },
+    // 18-Nov-2026: office review of a completed WO. One classification; who approves comes from
+    // the Job via the special approver "Job's Office Reviewers" (roles + Any one / All).
+    { screenId: OFFICE_REVIEW_SCREEN, actionId: '', label: 'Work Order Office Review',
+      classifications: [{ id: OFFICE_REVIEW_CLASSIFICATION, label: OFFICE_REVIEW_CLASSIFICATION }] },
   ],
 
-  async listRoles() {
+  async listRoles(_ctx, scope: Scope) {
     const roles = await db().select({ ruid: admnRoleMaster.ruid, name: admnRoleMaster.assignedRole })
       .from(admnRoleMaster)
       .where(and(eq(admnRoleMaster.isActive, true), eq(admnRoleMaster.isDeleted, false)));
     return [
+      // The special approver is offered only where the subject has a Job (WO Office Review).
+      ...(scope?.screenId === OFFICE_REVIEW_SCREEN ? [{ roleId: JOB_OFFICE_REVIEWERS_ROLE, roleLabel: JOB_OFFICE_REVIEWERS_LABEL }] : []),
       ...roles.map((r) => ({ roleId: r.ruid, roleLabel: r.name })),
       { roleId: MOC_POOL_ROLE_L1, roleLabel: 'Approver Pool — Level 1 (moc list)' },
       { roleId: MOC_POOL_ROLE_L2, roleLabel: 'Approver Pool — Level 2 (moc list)' },
     ];
+  },
+
+  // 18-Nov-2026: replaces "Job's Office Reviewers" with the roles + rule set on the WO's Job.
+  async expandSlot(_ctx, _scope: Scope, slot, subject: unknown, subjectRef: string) {
+    if (slot.roleId !== JOB_OFFICE_REVIEWERS_ROLE) return null;
+    const s = subject as TechnicalSubject;
+    const woUuid = s?.kind === 'wo' ? s.workOrderId : subjectRef;
+    return jobOfficeReviewersExpansion(woUuid);
   },
 
   async classify(_ctx, scope: Scope, subject: unknown) {
@@ -124,6 +142,9 @@ export const technicalApprovalCard: ApprovalCard = {
     if (s?.kind !== 'wo') throw new AppError(400, `[approvals] WO scope needs a {kind:'wo'} subject`);
     const rows = await db().select().from(workOrders).where(eq(workOrders.wouuid, s.workOrderId)).limit(1);
     if (!rows[0]) throw new AppError(404, `[approvals] work order ${s.workOrderId} not found`);
+    // A Job with no Office Reviewer roles is refused by the engine itself (400 EMPTY_SLOT_EXPANSION)
+    // when the chain uses "Job's Office Reviewers"; a chain naming fixed roles still works.
+    if (scope.screenId === OFFICE_REVIEW_SCREEN) return OFFICE_REVIEW_CLASSIFICATION;
     const cls = scope.screenId === 'pms-wo-re-postponement'
       ? await classifyWoForRePostponement(rows[0])
       : await classifyWoForPostponement(rows[0]);
@@ -131,6 +152,8 @@ export const technicalApprovalCard: ApprovalCard = {
   },
 
   async resolveApprovers(_ctx, scope: Scope, roleId: string, subjectRef: string) {
+    // Never reached for a submitted request: expandSlot replaced it with real roles at submit.
+    if (roleId === JOB_OFFICE_REVIEWERS_ROLE) return [];
     // pool pseudo-roles (matrix migration, D-2) — the exact verifyApproverForLevel set
     if (roleId === MOC_POOL_ROLE_L1 || roleId === MOC_POOL_ROLE_L2) {
       const level = roleId.slice('moc:'.length);
@@ -158,6 +181,14 @@ export const technicalApprovalCard: ApprovalCard = {
         const crService = await import('../change-requests/services/changeRequestsService');
         if (approve) await crService.approveChangeRequest(cr.id, { comment: remarks, reviewerId: notice.decidedBy, role: 'Office' }, { viaEngine: true });
         else await crService.rejectChangeRequest(cr.id, { comment: remarks, reviewerId: notice.decidedBy, role: 'Office' }, { viaEngine: true });
+      } else if (notice.scope.screenId === OFFICE_REVIEW_SCREEN) {
+        // Office review: the engine's final decision applies today's reviewer approve / reopen.
+        const wo = (await db().select({ id: workOrders.id }).from(workOrders)
+          .where(eq(workOrders.wouuid, notice.subjectRef)).limit(1))[0];
+        if (!wo) throw new AppError(404, `[approvals] WO ${notice.subjectRef} not found for onDecision`);
+        const bulk = await import('../work-orders/services/workOrderBulkService');
+        if (approve) await bulk.reviewerApprove(wo.id, notice.remarks ?? undefined, notice.decidedBy);
+        else await bulk.reviewerReopen(wo.id, notice.remarks ?? undefined, notice.decidedBy);
       } else {
         const wo = (await db().select({ id: workOrders.id }).from(workOrders)
           .where(eq(workOrders.wouuid, notice.subjectRef)).limit(1))[0];
@@ -175,7 +206,7 @@ export const technicalApprovalCard: ApprovalCard = {
     } catch (e: any) {
       // Idempotency: a replayed onDecision hits the module's own decide-once/status guards.
       const msg = String(e?.message ?? e);
-      if (e?.statusCode === 409 || /already|Only work orders with status/i.test(msg)) {
+      if (e?.statusCode === 409 || /already|Only work orders with status|not pending office review/i.test(msg)) {
         console.log(`[approvals] onDecision no-op (already applied): ${notice.scope.screenId} ${notice.subjectRef}`);
         return;
       }
@@ -207,6 +238,11 @@ async function withAssignedVessels(users: Array<{ id: string; name: string | nul
 }
 
 export async function resolveApproverNames(roleId: string): Promise<{ roleLabel: string | null; names: string[]; vesselScoped: boolean; users: ApproverUser[] }> {
+  if (roleId === JOB_OFFICE_REVIEWERS_ROLE) {
+    // Not a fixed group of people: the roles (and Any one / All) come from each Job.
+    const note = 'Set on each Job (Office Reviewer roles, Any one / All)';
+    return { roleLabel: JOB_OFFICE_REVIEWERS_LABEL, names: [note], vesselScoped: true, users: [{ id: JOB_OFFICE_REVIEWERS_ROLE, name: note, vessels: ['Per Job and vessel'] }] };
+  }
   if (roleId === MOC_POOL_ROLE_L1 || roleId === MOC_POOL_ROLE_L2) {
     const level = roleId.slice('moc:'.length);
     const rows = await db().select({ id: masterUsers.id, name: masterUsers.fullName })

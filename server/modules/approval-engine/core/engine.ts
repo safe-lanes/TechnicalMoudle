@@ -5,8 +5,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import type {
-  ApprovalCard, DecideInput, DecideResult, EngineCtx, EngineEvent, PendingItem,
-  RequestRow, RequestSlotRow, Scope, SlotUpdate, StoredWorkflow, StoredWorkflowSummary,
+  ApprovalCard, DecideInput, DecideResult, EngineCtx, EngineEvent, NodeDef, PendingItem,
+  RequestRow, RequestSlotRow, RoleSlotDef, Scope, SlotUpdate, StoredWorkflow, StoredWorkflowSummary,
   SubmitInput, SubmitOutcome, WorkflowDefInput,
 } from './types';
 import { CardRegistry } from './registry';
@@ -139,6 +139,12 @@ export class ApprovalEngine {
     const already = await repo.findPendingBySubject(input.scope, input.subjectRef);
     if (already) return { outcome: 'ALREADY_PENDING', requuid: already.requuid };
 
+    // 18-Nov-2026: subject-defined slots (card.expandSlot, optional). Cards without the hook get
+    // the workflow's nodes unchanged — the same object as before this change.
+    const nodes = card.expandSlot
+      ? await this.expandNodes(ctx, card, input.scope, wf.nodes, input.subject, input.subjectRef)
+      : wf.nodes;
+
     const requuid = randomUUID();
     const now = this.nowIso();
     const request: RequestRow = {
@@ -147,7 +153,7 @@ export class ApprovalEngine {
       classification,
       subjectRef: input.subjectRef,
       vesselId: input.vesselId ?? null,
-      snapshot: { scope: wf.scope, classification: wf.classification, mode: wf.mode, label: wf.label, nodes: wf.nodes, edges: wf.edges, wfuuid: wf.wfuuid, version: wf.version },
+      snapshot: { scope: wf.scope, classification: wf.classification, mode: wf.mode, label: wf.label, nodes, edges: wf.edges, wfuuid: wf.wfuuid, version: wf.version },
       status: 'pending',
       currentNodeKey: null,
       submittedBy: ctx.actor.userId,
@@ -155,7 +161,7 @@ export class ApprovalEngine {
       finalizedAt: null,
     };
     const slots: RequestSlotRow[] = [];
-    for (const n of wf.nodes) {
+    for (const n of nodes) {
       if (n.type !== 'approval-step') continue;
       (n.slots ?? []).forEach((s, i) => slots.push({
         requuid, nodeKey: n.key, slotOrdinal: i, roleId: s.roleId, roleLabel: s.roleLabel,
@@ -166,6 +172,46 @@ export class ApprovalEngine {
     const entry = entryNodeKey(wf);
     await this.activateNode(ctx, card, request, entry);
     return { outcome: 'STARTED', requuid, activeNodeKey: entry };
+  }
+
+  /**
+   * Replace subject-defined slots (card.expandSlot) with the subject's own roles. Returns NEW node
+   * objects; the stored workflow is never modified.
+   *   - a slot the card expands → its roles, one slot each (duplicates dropped, first kept)
+   *   - an expansion with no roles → 400 EMPTY_SLOT_EXPANSION (the subject has nobody to ask)
+   *   - the subject's AND/OR (expansion.quorum) becomes the step rule only when the special slot
+   *     was the step's ONLY slot; otherwise the step keeps its configured rule. An 'nOfM' rule
+   *     larger than the expanded slot count is lowered to the slot count.
+   */
+  private async expandNodes(ctx: EngineCtx, card: ApprovalCard, scope: Scope, nodes: NodeDef[], subject: unknown, subjectRef: string): Promise<NodeDef[]> {
+    const out: NodeDef[] = [];
+    for (const n of nodes) {
+      if (n.type !== 'approval-step' || !n.slots?.length) { out.push(n); continue; }
+      const slots: RoleSlotDef[] = [];
+      const seen = new Set<string>();
+      let quorum = n.quorum;
+      let expanded = false;
+      for (const s of n.slots) {
+        const exp = await card.expandSlot!({ tenantId: ctx.tenantId }, scope, s, subject, subjectRef);
+        if (!exp) {
+          if (!seen.has(s.roleId)) { seen.add(s.roleId); slots.push(s); }
+          continue;
+        }
+        expanded = true;
+        if (!exp.slots.length) {
+          err(400, 'EMPTY_SLOT_EXPANSION', `step '${n.label || n.key}': "${s.roleLabel}" has no roles on this record`);
+        }
+        for (const e of exp.slots) {
+          if (!e.roleId?.trim()) err(500, 'BAD_EXPANSION', `card expanded "${s.roleLabel}" to a slot without a roleId`);
+          if (!seen.has(e.roleId)) { seen.add(e.roleId); slots.push({ roleId: e.roleId, roleLabel: e.roleLabel }); }
+        }
+        if (exp.quorum && n.slots.length === 1) quorum = { rule: exp.quorum.rule };
+      }
+      if (!expanded) { out.push(n); continue; }
+      if (quorum?.rule === 'nOfM' && (quorum.n ?? 0) > slots.length) quorum = { rule: 'nOfM', n: slots.length };
+      out.push({ ...n, slots, quorum });
+    }
+    return out;
   }
 
   /** Resolve approvers per slot of the node, mark them active, move the pointer, emit. */

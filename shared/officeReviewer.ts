@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+/**
+ * 18-Nov-2026 (Jeevan): how the Job's Office Reviewer roles approve, like the approval workflow:
+ *   'any' = Any one (OR) — one of the roles approving is enough (DEFAULT, = behaviour before)
+ *   'all' = All (AND)    — each role must approve (different people)
+ * Only meaningful with 2+ roles. Stored in jobs.office_reviewer_rule (migration 185).
+ */
+export const OFFICE_REVIEWER_RULES = ["any", "all"] as const;
+export type OfficeReviewerRule = (typeof OFFICE_REVIEWER_RULES)[number];
+export const officeReviewerRuleSchema = z.enum(OFFICE_REVIEWER_RULES);
+
+/** Anything that is not exactly 'all' reads as 'any' (the default), so old rows keep today's behaviour. */
+export function normalizeOfficeReviewerRule(value: unknown): OfficeReviewerRule {
+  return value === "all" ? "all" : "any";
+}
+
 /** Job configuration only: this selection does not grant reviewer permissions. */
 export const officeReviewerRoleRuidsSchema = z.array(
   z.string().min(1).refine(id => id.trim() === id, "Role IDs must not contain surrounding whitespace"),

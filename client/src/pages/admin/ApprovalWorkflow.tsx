@@ -93,6 +93,7 @@ const APPROVAL_MODULES: ModuleNode[] = [
         functions: [
           { id: "pms-wo-postponement", name: "WO Postponement" },
           { id: "pms-wo-re-postponement", name: "WO Re-Postponement" },
+          { id: "pms-wo-office-review", name: "WO Office Review" },
         ],
       },
     ],

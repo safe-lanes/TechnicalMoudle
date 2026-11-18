@@ -188,6 +188,29 @@ Classification ids should be your module's existing STABLE config keys (Technica
 awc variableNames like 'Critical Spares'), not display strings invented for the card — the
 old-config generator and support reports then map 1:1 without a translation table.
 
+### Optional: approvers defined on the record (`expandSlot`, added 18-Nov-2026)
+
+Use this when the approvers are set on each record rather than in the chain, e.g. Technical's
+"Job's Office Reviewers" (the roles and Any one / All ticked on each Job).
+
+1. `listRoles` returns a special role id for the scopes that need it (e.g. `job:office-reviewers`).
+   The admin puts it in a step like any role.
+2. `expandSlot(ctx, scope, slot, subject, subjectRef)` is called once per slot at submit.
+   Return `null` for ordinary slots (unchanged). For the special slot, return
+   `{ slots: [{roleId, roleLabel}, …], quorum?: { rule: 'any' | 'all' } }`.
+3. The engine replaces the special slot with those roles, one approval box per role, and writes
+   the result into the request's snapshot. The saved chain never changes, and later edits to the
+   record do not change running requests.
+4. `quorum` only applies when the special slot is the step's only slot. A step that mixes it
+   with fixed roles keeps the rule set in the chain. Duplicate roles are merged, and nOfM is capped
+   at the slot count.
+5. No roles → submit refused `400 EMPTY_SLOT_EXPANSION`, nothing created. The host keeps its old
+   behaviour, the same as for `NO_WORKFLOW`.
+6. `resolveApprovers` for the special role id should return `[]`; it never reaches a live request.
+
+A card without `expandSlot` takes exactly the old code path. Tests:
+`server/approval-demo/__tests__/slotExpansion.test.ts`; live: `scripts/test-office-review-job-reviewers.ts`.
+
 ## Verification checklist (run before calling an integration done)
 
 1. Boot with your card registered — process starts; break a function name — process refuses.

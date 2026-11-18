@@ -1,4 +1,4 @@
-import { officeReviewerRoleRuidsSchema } from "./officeReviewer";
+import { officeReviewerRoleRuidsSchema, officeReviewerRuleSchema } from "./officeReviewer";
 
 import { pgTable, text, integer, boolean, timestamp, decimal, index, uniqueIndex, json, jsonb, numeric, primaryKey, unique, pgEnum, serial, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -1214,6 +1214,8 @@ export const jobs = pgTable("jobs", {
   approver: text("approver"), // Rank who approves the job
   level2ReviewerRankId: text("level2_reviewer_rank_id"), // Retired legacy column; never use as reviewer configuration or fallback
   officeReviewerRoleRuids: jsonb("office_reviewer_role_ruids").$type<string[]>().default([]),
+  // Migration 185: 'any' = Any one (OR, default), 'all' = All (AND). See shared/officeReviewer.ts.
+  officeReviewerRule: text("office_reviewer_rule").notNull().default("any"),
   department: text("department"),
   
   // Template data (Part A)
@@ -1249,6 +1251,7 @@ export const jobs = pgTable("jobs", {
 
 export const insertJobSchema = createInsertSchema(jobs, {
   officeReviewerRoleRuids: officeReviewerRoleRuidsSchema.optional().default([]),
+  officeReviewerRule: officeReviewerRuleSchema.optional().default("any"),
 }).omit({
   id: true,
   createdAt: true,
