@@ -22,6 +22,7 @@ import { UserMenu } from "./UserMenu";
 import { NotificationBell } from "./NotificationBell";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useMyFilesAccess } from "@/hooks/useMyFilesAccess";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -40,6 +41,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
 }) => {
   const { hasAnyChildAccess, isLoading: permissionsLoading } = usePermissions();
   const { isSailAdmin } = useUIRole();
+  const canViewMyFiles = useMyFilesAccess("Technical"); // exact sails auditmodules.shortname
 
   const menuItems = [
     {
@@ -77,13 +79,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       alwaysVisible: true,
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — END ======
-    // My Files: its own server decides what each role may see (modules_access), so no Technical RBAC row here.
-    {
-      id: "my-files",
-      label: "My Files",
-      icon: FolderOpen,
-      alwaysVisible: true,
-    },
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
     ...(NOON_MODULE_ENABLED && isSailAdmin ? [{
       id: "noon-report",
@@ -91,6 +86,14 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Anchor,
     }] : []),
     // ====== NOON REPORT MODULE NAV LINK — END ======
+    // My Files: always the LAST entry, and shown only when the My Files server says this role may view it for
+    // Technical (modules_access, set in Access Control). No Technical RBAC row.
+    ...(canViewMyFiles ? [{
+      id: "my-files",
+      label: "My Files",
+      icon: FolderOpen,
+      alwaysVisible: true,
+    }] : []),
   ];
 
   return (
