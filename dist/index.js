@@ -12237,6 +12237,24 @@ var init_fileSyncProcessor = __esm({
   }
 });
 
+// server/modules/sync/linkedServices.ts
+function linkedSyncServices(raw = process.env.LINKED_SYNC_SERVICES) {
+  if (!raw?.trim()) return DEFAULT_LINKED_SYNC_SERVICES;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    console.warn("[Sync] LINKED_SYNC_SERVICES is not valid JSON: using the default");
+    return DEFAULT_LINKED_SYNC_SERVICES;
+  }
+}
+var DEFAULT_LINKED_SYNC_SERVICES;
+var init_linkedServices = __esm({
+  "server/modules/sync/linkedServices.ts"() {
+    "use strict";
+    DEFAULT_LINKED_SYNC_SERVICES = [{ name: "My Files", url: "/m/api/v1", enabled: true, timeoutMs: 18e4 }];
+  }
+});
+
 // server/modules/shared/middleware.ts
 import { ZodError } from "zod";
 function asyncHandler(fn) {
@@ -38006,6 +38024,7 @@ var router, routes_default;
 var init_routes = __esm({
   "server/modules/sync/routes.ts"() {
     "use strict";
+    init_linkedServices();
     init_middleware();
     init_controller();
     init_conflictReviewController();
@@ -38028,6 +38047,9 @@ var init_routes = __esm({
     router.get("/sync/conflicts/review/:id", requirePermission("admin-sync-conflicts", "view", { enforce: true }), asyncHandler(getConflictHandler));
     router.post("/sync/conflicts/review/:id/apply-incoming", requirePermission("admin-sync-conflicts", "edit", { enforce: true }), asyncHandler(applyIncomingHandler));
     router.post("/sync/conflicts/review/:id/dismiss", requirePermission("admin-sync-conflicts", "edit", { enforce: true }), asyncHandler(dismissHandler));
+    router.get("/sync/linked-services", asyncHandler(async (_req, res) => {
+      res.json({ services: linkedSyncServices() });
+    }));
     router.post("/sync/trigger", requirePermission("admin-sync-dashboard", "edit"), asyncHandler(triggerSyncHandler));
     router.post("/sync/file/upload-chunk", syncTenantGuard, asyncHandler(uploadChunkHandler));
     router.post("/sync/file/pending", syncTenantGuard, asyncHandler(pendingFilesHandler));
